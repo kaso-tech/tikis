@@ -112,3 +112,12 @@
 - [x] Calculer une distance géographique provisoire et une estimation adaptée aux caractéristiques de course.
 - [x] Afficher clairement le statut provisoire et préparer le recalcul Routes ultérieur.
 - [x] Tester la publication avec itinéraire provisoire avant la livraison.
+- [x] Évaluer la migration vers Mapbox GL, Mapbox Search et Directions, avec Supabase Realtime.
+- [x] Comparer Mapbox GL et MapLibre afin de choisir le moteur de carte de Tikis.
+- [x] Documenter Mapbox GL, Mapbox Search/Directions et Supabase Realtime comme architecture cible.
+- [x] Préparer les dépendances et les jetons Mapbox et Supabase.
+- [x] Migrer la recherche d’adresses et les itinéraires vers les services Mapbox côté backend.
+- [x] Intégrer Supabase Realtime avec canaux privés et un repli local pour le suivi GPS.
+- [ ] Appliquer les politiques RLS Supabase et relier les autorisations de livraison au JWT de production.
+- [ ] Préparer Mapbox GL dans un build de développement Expo, tout en conservant la carte actuelle dans Expo Go.
+- [x] Tester la migration cartographique et enregistrer la version.

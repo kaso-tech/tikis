@@ -98,11 +98,22 @@ export async function getTikisPlaceByGoogleId(googlePlaceId: string) {
   return result[0];
 }
 
+export async function getTikisPlaceByMapboxId(mapboxPlaceId: string) {
+  const db = await getDb();
+  if (!db || !mapboxPlaceId) return undefined;
+  const result = await db.select().from(tikisPlaces).where(eq(tikisPlaces.mapboxPlaceId, mapboxPlaceId)).limit(1);
+  return result[0];
+}
+
 export async function saveTikisPlace(input: InsertTikisPlace) {
   const db = await getDb();
   if (!db) throw new Error("La base de lieux est temporairement indisponible.");
   if (input.googlePlaceId) {
     const cached = await getTikisPlaceByGoogleId(input.googlePlaceId);
+    if (cached) return cached;
+  }
+  if (input.mapboxPlaceId) {
+    const cached = await getTikisPlaceByMapboxId(input.mapboxPlaceId);
     if (cached) return cached;
   }
   const inserted = await db.insert(tikisPlaces).values(input);

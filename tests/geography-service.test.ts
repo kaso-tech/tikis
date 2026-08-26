@@ -5,29 +5,30 @@ const originalFetch = global.fetch;
 
 afterEach(() => {
   global.fetch = originalFetch;
-  delete process.env.GOOGLE_MAPS_BACKEND_API_KEY;
+  delete process.env.MAPBOX_SECRET_ACCESS_TOKEN;
 });
 
 describe("services géographiques backend Tikis", () => {
-  it("utilise la clé backend uniquement dans les en-têtes des requêtes Places", async () => {
-    process.env.GOOGLE_MAPS_BACKEND_API_KEY = "backend-test-key";
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ places: [{ id: "places/test", displayName: { text: "Maison du Peuple" }, formattedAddress: "Ouagadougou, Burkina Faso", location: { latitude: 12.3714, longitude: -1.5197 }, addressComponents: [{ longText: "Ouagadougou", types: ["locality"] }] }] })));
+  it("utilise Mapbox Search via le backend sans exposer le jeton au client", async () => {
+    process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ suggestions: [{ mapbox_id: "dXJuOm1ieHBsYzpwbGFjZQ", name: "Maison du Peuple", full_address: "Ouagadougou", place_formatted: "Ouagadougou, Burkina Faso" }] })));
     global.fetch = fetchMock as typeof fetch;
     const result = await searchPlaces("Maison du Peuple");
-    expect(result[0]?.latitude).toBe(12.3714);
-    expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({ "X-Goog-Api-Key": "backend-test-key" });
+    expect(result[0]?.mapboxId).toBe("dXJuOm1ieHBsYzpwbGFjZQ");
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("searchbox/v1/suggest");
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("access_token=backend-test-token");
   });
 
-  it("retourne une distance et une durée depuis Routes API", async () => {
-    process.env.GOOGLE_MAPS_BACKEND_API_KEY = "backend-test-key";
-    global.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ routes: [{ distanceMeters: 5400, duration: "721s" }] }))) as typeof fetch;
+  it("retourne une distance et une durée depuis Mapbox Directions", async () => {
+    process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
+    global.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ routes: [{ distance: 5400, duration: 721 }] }))) as typeof fetch;
     const result = await computeRoute({ name: "Coris", district: "Koulouba", city: "Ouagadougou", latitude: 12.37, longitude: -1.52 }, { name: "Maison", district: "Ouaga 2000", city: "Ouagadougou", latitude: 12.35, longitude: -1.54 });
     expect(result).toEqual({ distanceKm: 5.4, durationMinutes: 12 });
   });
 
   it("assainit une adresse avant le géocodage backend", async () => {
-    process.env.GOOGLE_MAPS_BACKEND_API_KEY = "backend-test-key";
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ results: [] })));
+    process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ features: [] })));
     global.fetch = fetchMock as typeof fetch;
     await geocodeAddress(" <Karpala> ");
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("Karpala");

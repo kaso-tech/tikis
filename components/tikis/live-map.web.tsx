@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { remainingMinutes, routeProgress, SIMULATED_ROUTE, trackingEventAtStep, type TrackingEvent } from "@/lib/gps-simulator";
 
-export function LiveMap({ driverName, onTrackingEvent }: { driverName: string; onTrackingEvent?: (event: TrackingEvent) => void }) {
+export function LiveMap({ deliveryId: _deliveryId, driverName, onTrackingEvent }: { deliveryId: string; driverName: string; onTrackingEvent?: (event: TrackingEvent) => void }) {
   const [step, setStep] = useState(3);
   const sentEvents = useRef<Set<TrackingEvent["type"]>>(new Set());
   const trackingEventHandler = useRef(onTrackingEvent);

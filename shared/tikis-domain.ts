@@ -59,6 +59,8 @@ export interface LocationLabel {
   latitude: number;
   longitude: number;
   googlePlaceId?: string;
+  mapboxId?: string;
+  mapboxSessionToken?: string;
   formattedAddress?: string;
   street?: string;
   province?: string;

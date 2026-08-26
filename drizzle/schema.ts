@@ -33,6 +33,7 @@ export const tikisProfiles = mysqlTable("tikis_profiles", {
 export const tikisPlaces = mysqlTable("tikis_places", {
   id: int("id").autoincrement().primaryKey(),
   googlePlaceId: varchar("googlePlaceId", { length: 255 }).unique(),
+  mapboxPlaceId: varchar("mapboxPlaceId", { length: 255 }).unique(),
   latitude: decimal("latitude", { precision: 10, scale: 7 }).notNull(),
   longitude: decimal("longitude", { precision: 10, scale: 7 }).notNull(),
   formattedAddress: varchar("formattedAddress", { length: 255 }).notNull(),

@@ -21,7 +21,7 @@ const DELIVERY_TYPES: { value: DeliveryType; icon: React.ComponentProps<typeof M
 ];
 
 function toPlacePayload(place: LocationLabel) {
-  return { name: place.name, district: place.district, city: place.city, latitude: place.latitude, longitude: place.longitude, ...(place.googlePlaceId ? { googlePlaceId: place.googlePlaceId } : {}), ...(place.formattedAddress ? { formattedAddress: place.formattedAddress } : {}), ...(place.street ? { street: place.street } : {}), ...(place.province ? { province: place.province } : {}), ...(place.country ? { country: place.country } : {}) };
+  return { name: place.name, district: place.district, city: place.city, latitude: place.latitude, longitude: place.longitude, ...(place.googlePlaceId ? { googlePlaceId: place.googlePlaceId } : {}), ...(place.mapboxId ? { mapboxId: place.mapboxId } : {}), ...(place.mapboxSessionToken ? { mapboxSessionToken: place.mapboxSessionToken } : {}), ...(place.formattedAddress ? { formattedAddress: place.formattedAddress } : {}), ...(place.street ? { street: place.street } : {}), ...(place.province ? { province: place.province } : {}), ...(place.country ? { country: place.country } : {}) };
 }
 
 function favoriteToLocation(item: { place: { placeName: string; district: string | null; city: string | null; latitude: string; longitude: string; googlePlaceId: string | null; formattedAddress: string; street: string | null; province: string | null; country: string | null } }): LocationLabel {

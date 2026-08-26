@@ -53,7 +53,7 @@ async function generateUniqueReferralCode(fullName: string) {
 const photoMimeSchema = z.enum(["image/jpeg", "image/png", "image/webp"]);
 const base64ImageSchema = z.string().min(32).max(1_600_000).regex(/^[A-Za-z0-9+/=]+$/, "Données d’image invalides.");
 const coordinateSchema = z.number().finite();
-const placeSchema = z.object({ name: z.string().max(140), district: z.string().max(120), city: z.string().max(120), latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180), googlePlaceId: z.string().max(255).optional(), formattedAddress: z.string().max(255).optional(), street: z.string().max(160).optional(), province: z.string().max(120).optional(), country: z.string().max(120).optional() });
+const placeSchema = z.object({ name: z.string().max(140), district: z.string().max(120), city: z.string().max(120), latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180), googlePlaceId: z.string().max(255).optional(), mapboxId: z.string().max(255).optional(), mapboxSessionToken: z.string().uuid().optional(), formattedAddress: z.string().max(255).optional(), street: z.string().max(160).optional(), province: z.string().max(120).optional(), country: z.string().max(120).optional() });
 const favoriteLabelSchema = z.string().trim().min(1).max(80).regex(/^[\p{L}\p{N}]+(?:[ .,'’()\-][\p{L}\p{N}]+)*$/u, "Libellé de favori invalide.");
 
 export const appRouter = router({
@@ -104,10 +104,11 @@ export const appRouter = router({
   }),
   geography: router({
     search: publicProcedure.input(z.object({ query: z.string().min(2).max(120), biasLatitude: coordinateSchema.min(-90).max(90).optional(), biasLongitude: coordinateSchema.min(-180).max(180).optional() })).mutation(async ({ input }) => geography.searchPlaces(input.query, input.biasLatitude !== undefined && input.biasLongitude !== undefined ? { latitude: input.biasLatitude, longitude: input.biasLongitude } : undefined)),
+    resolve: publicProcedure.input(z.object({ mapboxId: z.string().min(1).max(255), mapboxSessionToken: z.string().uuid().optional() })).mutation(async ({ input }) => geography.resolveMapboxPlace(input.mapboxId, input.mapboxSessionToken)),
     geocode: publicProcedure.input(z.object({ address: z.string().min(3).max(180) })).mutation(async ({ input }) => geography.geocodeAddress(input.address)),
     reverse: publicProcedure.input(z.object({ latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180) })).mutation(async ({ input }) => geography.reverseGeocodeLocation(input.latitude, input.longitude)),
     route: publicProcedure.input(z.object({ origin: placeSchema, destination: placeSchema })).mutation(async ({ input }) => geography.computeRoute(input.origin, input.destination)),
-    savePlace: publicProcedure.input(placeSchema).mutation(async ({ input }) => db.saveTikisPlace({ googlePlaceId: input.googlePlaceId, latitude: String(input.latitude), longitude: String(input.longitude), formattedAddress: input.formattedAddress ?? input.name, placeName: input.name, street: input.street, district: input.district, city: input.city, province: input.province, country: input.country })),
+    savePlace: publicProcedure.input(placeSchema).mutation(async ({ input }) => db.saveTikisPlace({ googlePlaceId: input.googlePlaceId, mapboxPlaceId: input.mapboxId, latitude: String(input.latitude), longitude: String(input.longitude), formattedAddress: input.formattedAddress ?? input.name, placeName: input.name, street: input.street, district: input.district, city: input.city, province: input.province, country: input.country })),
     favorites: router({
       list: publicProcedure.input(z.object({ phone: phoneSchema })).query(async ({ input }) => db.listFavoritePlaces(input.phone)),
       add: publicProcedure.input(z.object({ phone: phoneSchema, placeId: z.number().int().positive(), label: favoriteLabelSchema })).mutation(async ({ input }) => db.saveFavoritePlace(input.phone, input.placeId, input.label)),

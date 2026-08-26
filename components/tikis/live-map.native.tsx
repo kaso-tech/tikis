@@ -3,18 +3,31 @@ import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { coordinateAtStep, remainingMinutes, routeProgress, SIMULATED_ROUTE, trackingEventAtStep, type TrackingEvent } from "@/lib/gps-simulator";
+import { broadcastDeliveryPosition, closeDeliveryTrackingChannel, createDeliveryTrackingChannel, type DeliveryPosition } from "@/lib/supabase-tracking";
 
-export function LiveMap({ driverName, onTrackingEvent }: { driverName: string; onTrackingEvent?: (event: TrackingEvent) => void }) {
+export function LiveMap({ deliveryId, driverName, onTrackingEvent }: { deliveryId: string; driverName: string; onTrackingEvent?: (event: TrackingEvent) => void }) {
   const [step, setStep] = useState(3);
+  const [remotePosition, setRemotePosition] = useState<DeliveryPosition | null>(null);
   const mapRef = useRef<MapView | null>(null);
+  const trackingChannel = useRef<ReturnType<typeof createDeliveryTrackingChannel>>(null);
   const dispatchedEvents = useRef(new Set<TrackingEvent["type"]>());
-  const position = coordinateAtStep(step);
+  const simulatedPosition = coordinateAtStep(step);
+  const position = remotePosition ?? simulatedPosition;
   const progress = routeProgress(step);
 
   useEffect(() => {
     const interval = setInterval(() => setStep((current) => current >= SIMULATED_ROUTE.length - 1 ? 0 : current + 1), 2800);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    trackingChannel.current = createDeliveryTrackingChannel(deliveryId, setRemotePosition);
+    return () => { void closeDeliveryTrackingChannel(trackingChannel.current); trackingChannel.current = null; };
+  }, [deliveryId]);
+
+  useEffect(() => {
+    void broadcastDeliveryPosition(trackingChannel.current, { latitude: simulatedPosition.latitude, longitude: simulatedPosition.longitude, heading: 40, recordedAt: new Date().toISOString() });
+  }, [simulatedPosition.latitude, simulatedPosition.longitude]);
 
   useEffect(() => {
     mapRef.current?.animateCamera({ center: position, pitch: 35, heading: 40, zoom: 15.3 }, { duration: 720 });

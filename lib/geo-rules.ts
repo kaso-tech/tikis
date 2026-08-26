@@ -20,6 +20,8 @@ export function normalizeLocation(input: Partial<LocationLabel>): LocationLabel 
   const formattedAddress = sanitizePlaceText(input.formattedAddress ?? "", 255);
   if (![name, district, city, formattedAddress].some(Boolean)) return null;
   const googlePlaceId = sanitizePlaceText(input.googlePlaceId ?? "", 255);
+  const mapboxId = sanitizePlaceText(input.mapboxId ?? "", 255);
+  const mapboxSessionToken = (input.mapboxSessionToken ?? "").trim();
   const street = sanitizePlaceText(input.street ?? "");
   const province = sanitizePlaceText(input.province ?? "");
   const country = sanitizePlaceText(input.country ?? "");
@@ -30,6 +32,8 @@ export function normalizeLocation(input: Partial<LocationLabel>): LocationLabel 
     latitude: Number(input.latitude),
     longitude: Number(input.longitude),
     ...(googlePlaceId ? { googlePlaceId } : {}),
+    ...(mapboxId ? { mapboxId } : {}),
+    ...(mapboxSessionToken ? { mapboxSessionToken } : {}),
     ...(formattedAddress ? { formattedAddress } : {}),
     ...(street ? { street } : {}),
     ...(province ? { province } : {}),
