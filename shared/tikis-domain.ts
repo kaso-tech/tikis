@@ -1,0 +1,121 @@
+export type UserRole = "sender" | "driver";
+
+export type DeliveryStatus =
+  | "draft"
+  | "open"
+  | "pending_confirmation"
+  | "active"
+  | "completed"
+  | "disabled"
+  | "cancelled";
+
+export type CandidateStatus = "applied" | "selected" | "confirmed" | "withdrawn" | "replaced";
+
+export type WalletOperation = "block" | "unblock" | "debit" | "compensation" | "credit";
+
+export type VehicleType = "Moto" | "Tricycle" | "Voiture" | "Fourgonnette";
+
+export interface CommissionPolicy {
+  rate: number;
+  currency: "FCFA";
+}
+
+export interface LocationLabel {
+  name: string;
+  district: string;
+  city: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface Delivery {
+  id: string;
+  title: string;
+  status: DeliveryStatus;
+  type: "Colis" | "Plis" | "Personne";
+  pickup: LocationLabel;
+  dropoff: LocationLabel;
+  distanceKm: number;
+  estimatedPrice: number;
+  offeredPrice?: number;
+  vehicleTypes: VehicleType[];
+  createdAt: string;
+  scheduledAt: string;
+  senderName: string;
+  senderPhone?: string;
+  driverId?: string;
+  driverName?: string;
+  driverPhone?: string;
+  previousDriverId?: string;
+  previousDriverName?: string;
+  details: string;
+  weightKg?: number;
+  dimensions?: string;
+  passengers?: number;
+}
+
+export interface DriverCandidate {
+  id: string;
+  deliveryId: string;
+  driverId: string;
+  name: string;
+  initials: string;
+  rating: number;
+  completedDeliveries: number;
+  vehicles: VehicleType[];
+  offerPrice?: number;
+  status: CandidateStatus;
+  commissionBlocked: number;
+  isVerified: boolean;
+}
+
+export interface WalletSnapshot {
+  total: number;
+  blocked: number;
+}
+
+export interface FinancialRecord {
+  id: string;
+  deliveryId: string;
+  createdAt: string;
+  operation: WalletOperation;
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  reason: string;
+}
+
+export interface InAppNotification {
+  id: string;
+  title: string;
+  body: string;
+  createdAt: string;
+  read: boolean;
+  tone: "info" | "success" | "warning";
+}
+
+export const SIMULATION_OTP = "730512";
+
+export const commissionFor = (price: number, policy: CommissionPolicy) =>
+  Math.round(price * policy.rate);
+
+export const availableWalletBalance = (wallet: WalletSnapshot) => wallet.total - wallet.blocked;
+
+export const displayLocation = (location: LocationLabel) =>
+  [location.name, location.district, location.city].filter(Boolean).join(" · ");
+
+export const formatMoney = (amount: number) =>
+  `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(amount)} FCFA`;
+
+export const deliveryStatusMeta: Record<
+  DeliveryStatus,
+  { label: string; color: string; background: string }
+> = {
+  draft: { label: "Brouillon", color: "#697386", background: "#EEF1F5" },
+  open: { label: "Active", color: "#B45309", background: "#FEF3C7" },
+  pending_confirmation: { label: "À confirmer", color: "#3B6BCD", background: "#EAF1FF" },
+  active: { label: "Attribuée", color: "#11875D", background: "#DCFCE7" },
+  completed: { label: "Terminée", color: "#677489", background: "#EEF1F5" },
+  disabled: { label: "Désactivée", color: "#C23B45", background: "#FEE2E2" },
+  cancelled: { label: "Annulée", color: "#C23B45", background: "#FEE2E2" },
+};

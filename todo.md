@@ -1,0 +1,21 @@
+# Project TODO
+
+- [x] Analyser les exigences restantes du document de logique métier et la spécification partagée.
+- [x] Formaliser les modèles de domaine Tikis et les invariants de commission, wallet et remplacement.
+- [x] Définir l’architecture UX mobile et les parcours expéditeur/livreur dans design.md.
+- [x] Créer l’identité de marque Tikis et configurer les icônes de l’application.
+- [x] Concevoir le parcours d’authentification par numéro de téléphone et code OTP à six chiffres.
+- [x] Implémenter la demande, le renvoi et la vérification simulée d’un OTP à six chiffres pour la démonstration.
+- [x] Implémenter les écrans mobile de saisie de numéro et de vérification OTP avec gestion du chargement, des erreurs et des tentatives.
+- [x] Mettre en place le thème, la navigation principale et les composants d’interface réutilisables.
+- [x] Implémenter le tableau de bord expéditeur et la liste de ses livraisons.
+- [x] Implémenter la création et le détail de livraison côté expéditeur.
+- [x] Implémenter la liste de candidatures, la sélection et le remplacement d’un livreur.
+- [x] Implémenter le tableau de bord livreur, les opportunités et le détail de course.
+- [x] Implémenter la candidature, le retrait avant attribution et les validations de solde insuffisant.
+- [x] Implémenter les modales de confirmation à incidence financière et les retours d’état.
+- [x] Implémenter les écrans wallet, journal financier, notifications et profil.
+- [x] Ajouter les notifications internes, le signalement et l’historique de livraison.
+- [x] Écrire des tests unitaires déterministes sur les règles de commission et les transitions de livraison.
+- [x] Vérifier la compilation TypeScript et valider les interactions principales.
+- [x] Créer un point de contrôle final et préparer la livraison.
