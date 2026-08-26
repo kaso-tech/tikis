@@ -59,6 +59,7 @@ export default function ProfileScreen() {
   }
 
   const items = [
+    ...(driver && profile?.referralCode ? [{ icon: "group-add" as const, label: "Parrainage", detail: "Invitez des livreurs et gagnez des crédits", action: () => router.push("/referrals" as any) }] : []),
     { icon: "history" as const, label: "Historique des courses", detail: `${completed.length} course${completed.length > 1 ? "s" : ""} terminée${completed.length > 1 ? "s" : ""}`, action: () => router.push("/history" as any) },
     { icon: "star-outline" as const, label: "Mes avis", detail: driver ? (receivedReviews.length ? `${receivedReviews.length} avis reçu${receivedReviews.length > 1 ? "s" : ""}` : "Aucun avis reçu") : "Évaluations envoyées", action: () => router.push("/reviews" as any) },
     { icon: "notifications-none" as const, label: "Notifications", detail: unread ? `${unread} nouvelle${unread > 1 ? "s" : ""}` : "À jour", action: markNotificationsRead },

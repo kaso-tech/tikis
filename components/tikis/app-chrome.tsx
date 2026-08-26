@@ -24,6 +24,7 @@ const drawerItems = (role: UserRole, unread: number): DrawerItem[] => {
   ];
   if (role === "driver") {
     shared.push({ key: "wallet", label: "Mon Wallet", caption: "Solde et mouvements", icon: "account-balance-wallet", route: "/(tabs)/wallet" });
+    shared.push({ key: "referrals", label: "Parrainage", caption: "Code et récompenses", icon: "group-add", route: "/referrals" });
   }
   return [
     ...shared,

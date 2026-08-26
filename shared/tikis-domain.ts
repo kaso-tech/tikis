@@ -34,6 +34,17 @@ export interface DeliveryReview {
   createdAt: string;
 }
 
+export type ReferralStatus = "invited" | "qualified" | "rewarded";
+
+export interface ReferralRecord {
+  id: string;
+  fullName: string;
+  joinedAt: string;
+  completedDeliveries: number;
+  status: ReferralStatus;
+  rewardAmount: number;
+}
+
 export interface CommissionPolicy {
   rate: number;
   currency: "FCFA";

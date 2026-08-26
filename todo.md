@@ -54,3 +54,8 @@
 - [x] Générer et enregistrer un code de parrainage unique pour chaque compte livreur inscrit.
 - [x] Afficher le code de parrainage du livreur dans son profil.
 - [x] Tester les règles de nom et la génération de code de parrainage avant la livraison.
+- [x] Définir les règles des filleuls et les seuils de récompense du parrainage Tikis.
+- [x] Ajouter les actions de copie et de partage sécurisé du code de parrainage.
+- [x] Créer un écran de suivi des filleuls et de leurs statuts d’éligibilité.
+- [x] Enregistrer et présenter les récompenses de parrainage dans le Wallet et son journal.
+- [x] Tester le suivi des filleuls et les crédits Wallet de parrainage avant la livraison.
