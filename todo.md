@@ -38,3 +38,9 @@
 - [x] Implémenter le choix définitif de rôle, la sélection d’engins et la saisie de nom complet.
 - [x] Adapter le store au profil inscrit et interdire le changement de rôle après inscription.
 - [x] Tester le parcours d’inscription complet et enregistrer la version.
+- [x] Ajuster le header afin qu’il respecte la zone sûre et ne soit plus masqué.
+- [x] Fixer le drawer à gauche avec une largeur maximale de 380 px et un comportement mobile adapté.
+- [x] Configurer le schéma sécurisé de persistance des profils utilisateur.
+- [x] Connecter l’inscription et la connexion OTP à la base de données des profils.
+- [x] Créer les pages réelles de conditions d’utilisation et de politique de confidentialité.
+- [x] Valider la navigation, la persistance des profils et les documents légaux avant la livraison.

@@ -1,13 +1,14 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
 import { OTP_MAX_ATTEMPTS, verifySimulationOtp } from "@/lib/otp-simulator";
 import { COUNTRIES, createRegisteredProfile, detectCountry, findSimulatedAccount, formatLocalPhone, isValidInternationalPhone, normalizedInternationalPhone, sanitizeFullName, sanitizePhoneInput, validateFullName, type CountrySpec } from "@/lib/registration-rules";
 import { useTikisStore } from "@/lib/tikis-store";
+import { trpc } from "@/lib/trpc";
 import type { UserRole, VehicleType } from "@/shared/tikis-domain";
 import { SIMULATION_OTP } from "@/shared/tikis-domain";
 
@@ -29,6 +30,8 @@ const welcomeCopy = {
 
 export function AuthFlow() {
   const { signInProfile, registerProfile } = useTikisStore();
+  const lookupProfileMutation = trpc.profiles.lookup.useMutation();
+  const registerProfileMutation = trpc.profiles.register.useMutation();
   const [stage, setStage] = useState<Stage>("welcome");
   const [language, setLanguage] = useState<Language>("fr");
   const [country, setCountry] = useState<CountrySpec>(() => detectCountry());
@@ -112,10 +115,26 @@ export function AuthFlow() {
     setVerifying(true);
     await new Promise((resolve) => setTimeout(resolve, 650));
     if (verifySimulationOtp(otp)) {
-      const existingProfile = findSimulatedAccount(phone);
+      let existingProfile = null;
+      try {
+        existingProfile = await lookupProfileMutation.mutateAsync({ phone, otp: otp as "730512" });
+      } catch {
+        // The simulation remains usable offline; the profile is persisted on the next successful registration call.
+      }
+      const demoProfile = findSimulatedAccount(phone);
       haptic.success();
       if (existingProfile) {
         signInProfile(existingProfile);
+        router.replace("/(tabs)");
+        return;
+      }
+      if (demoProfile) {
+        try {
+          const persistedDemoProfile = await registerProfileMutation.mutateAsync({ phone: demoProfile.phone, fullName: demoProfile.fullName, role: demoProfile.role, vehicles: demoProfile.vehicles, otp: otp as "730512" });
+          signInProfile(persistedDemoProfile);
+        } catch {
+          signInProfile(demoProfile);
+        }
         router.replace("/(tabs)");
         return;
       }
@@ -175,7 +194,16 @@ export function AuthFlow() {
     }
     setFinishing(true);
     await new Promise((resolve) => setTimeout(resolve, 550));
-    registerProfile(createRegisteredProfile({ fullName: validatedName, phone, role: selectedRole, vehicles: selectedVehicles }));
+    const localProfile = createRegisteredProfile({ fullName: validatedName, phone, role: selectedRole, vehicles: selectedVehicles });
+    try {
+      const persistedProfile = await registerProfileMutation.mutateAsync({ phone: localProfile.phone, fullName: localProfile.fullName, role: localProfile.role, vehicles: localProfile.vehicles, otp: otp as "730512" });
+      registerProfile(persistedProfile);
+    } catch {
+      setFinishing(false);
+      setNameError("Impossible d’enregistrer votre profil de façon sécurisée. Vérifiez votre connexion puis réessayez.");
+      haptic.error();
+      return;
+    }
     haptic.success();
     router.replace("/(tabs)");
   }
@@ -187,7 +215,7 @@ export function AuthFlow() {
 
 function OnboardingTop({ step, onBack }: { step: number; onBack: () => void }) { return <View style={styles.top}><Pressable accessibilityRole="button" accessibilityLabel="Étape précédente" onPress={onBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}><MaterialIcons name="arrow-back" size={21} color="#0B1F3A" /></Pressable><View style={styles.stepInfo}><Text style={styles.stepLabel}>INSCRIPTION</Text><Text style={styles.stepCount}>Étape {step} sur 5</Text></View><View style={styles.stepDots}>{[1, 2, 3, 4, 5].map((item) => <View key={item} style={[styles.stepDot, item <= step && styles.stepDotActive]} />)}</View></View>; }
 
-function WelcomeScreen({ language, onLanguageChange, onContinue, copy }: { language: Language; onLanguageChange: (language: Language) => void; onContinue: () => void; copy: (typeof welcomeCopy)[Language] }) { const isFrench = language === "fr"; return <View style={styles.welcome}><View style={styles.brandArea}><Image source={require("@/assets/images/icon.png")} style={styles.logo} accessibilityLabel="Logo Tikis" /><View style={styles.brandChip}><View style={styles.brandStatus} /><Text style={styles.brandChipText}>PLATEFORME DE LIVRAISON</Text></View></View><View style={styles.welcomeBody}><Text style={styles.welcomeEyebrow}>{copy.eyebrow}</Text><Text style={styles.welcomeTitle}>{copy.title}</Text><Text style={styles.welcomeSubtitle}>{copy.subtitle}</Text><Text style={styles.languageLabel}>LANGUE</Text><View style={styles.languageSwitch}><Pressable onPress={() => onLanguageChange("fr")} style={({ pressed }) => [styles.languageOption, language === "fr" && styles.languageActive, pressed && styles.pressed]}><Text style={[styles.languageText, language === "fr" && styles.languageTextActive]}>Français</Text></Pressable><Pressable onPress={() => onLanguageChange("en")} style={({ pressed }) => [styles.languageOption, language === "en" && styles.languageActive, pressed && styles.pressed]}><Text style={[styles.languageText, language === "en" && styles.languageTextActive]}>English</Text></Pressable></View><View style={styles.trustList}><TrustRow icon="verified-user" title="Compte sécurisé" text="Votre numéro est protégé par une vérification OTP." /><TrustRow icon="handshake" title="Mise en relation transparente" text="Les informations sensibles sont partagées après confirmation." /></View><TikisButton label={copy.continue} icon="arrow-forward" onPress={onContinue} style={styles.welcomeButton} /><Text style={styles.legal}>{isFrench ? "En continuant, vous acceptez nos " : "By continuing, you accept our "}<Text onPress={() => Alert.alert("Conditions d’utilisation", "Les conditions d’utilisation Tikis seront disponibles ici.")} style={styles.legalLink}>{isFrench ? "conditions d’utilisation" : "terms of use"}</Text>{isFrench ? " et notre " : " and "}<Text onPress={() => Alert.alert("Politique de confidentialité", "La politique de confidentialité Tikis sera disponible ici.")} style={styles.legalLink}>{isFrench ? "politique de confidentialité" : "privacy policy"}</Text>.</Text></View></View>; }
+function WelcomeScreen({ language, onLanguageChange, onContinue, copy }: { language: Language; onLanguageChange: (language: Language) => void; onContinue: () => void; copy: (typeof welcomeCopy)[Language] }) { const isFrench = language === "fr"; return <View style={styles.welcome}><View style={styles.brandArea}><Image source={require("@/assets/images/icon.png")} style={styles.logo} accessibilityLabel="Logo Tikis" /><View style={styles.brandChip}><View style={styles.brandStatus} /><Text style={styles.brandChipText}>PLATEFORME DE LIVRAISON</Text></View></View><View style={styles.welcomeBody}><Text style={styles.welcomeEyebrow}>{copy.eyebrow}</Text><Text style={styles.welcomeTitle}>{copy.title}</Text><Text style={styles.welcomeSubtitle}>{copy.subtitle}</Text><Text style={styles.languageLabel}>LANGUE</Text><View style={styles.languageSwitch}><Pressable onPress={() => onLanguageChange("fr")} style={({ pressed }) => [styles.languageOption, language === "fr" && styles.languageActive, pressed && styles.pressed]}><Text style={[styles.languageText, language === "fr" && styles.languageTextActive]}>Français</Text></Pressable><Pressable onPress={() => onLanguageChange("en")} style={({ pressed }) => [styles.languageOption, language === "en" && styles.languageActive, pressed && styles.pressed]}><Text style={[styles.languageText, language === "en" && styles.languageTextActive]}>English</Text></Pressable></View><View style={styles.trustList}><TrustRow icon="verified-user" title="Compte sécurisé" text="Votre numéro est protégé par une vérification OTP." /><TrustRow icon="handshake" title="Mise en relation transparente" text="Les informations sensibles sont partagées après confirmation." /></View><TikisButton label={copy.continue} icon="arrow-forward" onPress={onContinue} style={styles.welcomeButton} /><Text style={styles.legal}>{isFrench ? "En continuant, vous acceptez nos " : "By continuing, you accept our "}<Text onPress={() => router.push("/legal/terms" as any)} style={styles.legalLink}>{isFrench ? "conditions d’utilisation" : "terms of use"}</Text>{isFrench ? " et notre " : " and "}<Text onPress={() => router.push("/legal/privacy" as any)} style={styles.legalLink}>{isFrench ? "politique de confidentialité" : "privacy policy"}</Text>.</Text></View></View>; }
 
 function TrustRow({ icon, title, text }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; title: string; text: string }) { return <View style={styles.trustRow}><View style={styles.trustIcon}><MaterialIcons name={icon} size={19} color="#007B8B" /></View><View style={styles.trustInfo}><Text style={styles.trustTitle}>{title}</Text><Text style={styles.trustText}>{text}</Text></View></View>; }
 
