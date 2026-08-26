@@ -54,6 +54,7 @@ const photoMimeSchema = z.enum(["image/jpeg", "image/png", "image/webp"]);
 const base64ImageSchema = z.string().min(32).max(1_600_000).regex(/^[A-Za-z0-9+/=]+$/, "Données d’image invalides.");
 const coordinateSchema = z.number().finite();
 const placeSchema = z.object({ name: z.string().max(140), district: z.string().max(120), city: z.string().max(120), latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180), googlePlaceId: z.string().max(255).optional(), formattedAddress: z.string().max(255).optional(), street: z.string().max(160).optional(), province: z.string().max(120).optional(), country: z.string().max(120).optional() });
+const favoriteLabelSchema = z.string().trim().min(1).max(80).regex(/^[\p{L}\p{N}]+(?:[ .,'’()\-][\p{L}\p{N}]+)*$/u, "Libellé de favori invalide.");
 
 export const appRouter = router({
   system: systemRouter,
@@ -109,7 +110,9 @@ export const appRouter = router({
     savePlace: publicProcedure.input(placeSchema).mutation(async ({ input }) => db.saveTikisPlace({ googlePlaceId: input.googlePlaceId, latitude: String(input.latitude), longitude: String(input.longitude), formattedAddress: input.formattedAddress ?? input.name, placeName: input.name, street: input.street, district: input.district, city: input.city, province: input.province, country: input.country })),
     favorites: router({
       list: publicProcedure.input(z.object({ phone: phoneSchema })).query(async ({ input }) => db.listFavoritePlaces(input.phone)),
-      add: publicProcedure.input(z.object({ phone: phoneSchema, placeId: z.number().int().positive(), label: z.string().min(1).max(80) })).mutation(async ({ input }) => db.saveFavoritePlace(input.phone, input.placeId, input.label)),
+      add: publicProcedure.input(z.object({ phone: phoneSchema, placeId: z.number().int().positive(), label: favoriteLabelSchema })).mutation(async ({ input }) => db.saveFavoritePlace(input.phone, input.placeId, input.label)),
+      rename: publicProcedure.input(z.object({ phone: phoneSchema, favoriteId: z.number().int().positive(), label: favoriteLabelSchema })).mutation(async ({ input }) => db.renameFavoritePlace(input.phone, input.favoriteId, input.label)),
+      remove: publicProcedure.input(z.object({ phone: phoneSchema, favoriteId: z.number().int().positive() })).mutation(async ({ input }) => db.deleteFavoritePlace(input.phone, input.favoriteId)),
     }),
   }),
 });

@@ -124,3 +124,19 @@ export async function saveFavoritePlace(profilePhone: string, placeId: number, l
   const result = await db.select().from(tikisFavoritePlaces).where(and(eq(tikisFavoritePlaces.profilePhone, profilePhone), eq(tikisFavoritePlaces.placeId, placeId))).limit(1);
   return result[0];
 }
+
+export async function renameFavoritePlace(profilePhone: string, favoriteId: number, label: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Les favoris sont temporairement indisponibles.");
+  await db.update(tikisFavoritePlaces).set({ label }).where(and(eq(tikisFavoritePlaces.id, favoriteId), eq(tikisFavoritePlaces.profilePhone, profilePhone)));
+  const result = await db.select().from(tikisFavoritePlaces).where(and(eq(tikisFavoritePlaces.id, favoriteId), eq(tikisFavoritePlaces.profilePhone, profilePhone))).limit(1);
+  if (!result[0]) throw new Error("Ce favori est introuvable ou ne vous appartient pas.");
+  return result[0];
+}
+
+export async function deleteFavoritePlace(profilePhone: string, favoriteId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Les favoris sont temporairement indisponibles.");
+  await db.delete(tikisFavoritePlaces).where(and(eq(tikisFavoritePlaces.id, favoriteId), eq(tikisFavoritePlaces.profilePhone, profilePhone)));
+  return { success: true } as const;
+}

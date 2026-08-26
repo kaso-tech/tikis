@@ -51,6 +51,8 @@ export default function CreateDeliveryScreen() {
   const { mutateAsync: requestRoute } = trpc.geography.route.useMutation();
   const savePlaceMutation = trpc.geography.savePlace.useMutation();
   const favoriteMutation = trpc.geography.favorites.add.useMutation();
+  const renameFavoriteMutation = trpc.geography.favorites.rename.useMutation();
+  const removeFavoriteMutation = trpc.geography.favorites.remove.useMutation();
   const favoritesQuery = trpc.geography.favorites.list.useQuery({ phone }, { enabled: Boolean(profile?.phone) });
 
   const dimensions = useMemo(() => ({ ...(lengthCm ? { lengthCm: Number(lengthCm) } : {}), ...(widthCm ? { widthCm: Number(widthCm) } : {}), ...(heightCm ? { heightCm: Number(heightCm) } : {}) }), [lengthCm, widthCm, heightCm]);
@@ -85,6 +87,18 @@ export default function CreateDeliveryScreen() {
       await favoritesQuery.refetch();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Impossible d’ajouter ce favori."); }
     finally { setFavoriteTarget(null); }
+  }
+
+  async function renameFavorite(favorite: SavedFavorite, label: string) {
+    if (!profile?.phone) return;
+    await renameFavoriteMutation.mutateAsync({ phone: profile.phone, favoriteId: Number(favorite.id), label });
+    await favoritesQuery.refetch();
+  }
+
+  async function removeFavorite(favorite: SavedFavorite) {
+    if (!profile?.phone) return;
+    await removeFavoriteMutation.mutateAsync({ phone: profile.phone, favoriteId: Number(favorite.id) });
+    await favoritesQuery.refetch();
   }
 
   async function publish() {
@@ -147,7 +161,7 @@ export default function CreateDeliveryScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
       <FloatingPlacePicker visible={Boolean(pickerTarget)} target={pickerTarget} value={pickerTarget === "pickup" ? pickup : dropoff} onClose={() => setPickerTarget(null)} onSelect={(place) => { if (pickerTarget) selectPlace(pickerTarget, place); }} />
-      <FavoritePlacesSheet visible={favoritesVisible} favorites={favoriteLocations} onClose={() => setFavoritesVisible(false)} onPickup={(place) => selectPlace("pickup", place)} onDropoff={(place) => selectPlace("dropoff", place)} />
+      <FavoritePlacesSheet visible={favoritesVisible} favorites={favoriteLocations} onClose={() => setFavoritesVisible(false)} onPickup={(place) => selectPlace("pickup", place)} onDropoff={(place) => selectPlace("dropoff", place)} onRename={renameFavorite} onRemove={removeFavorite} />
     </SafeAreaView>
   );
 }

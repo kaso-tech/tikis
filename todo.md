@@ -90,3 +90,7 @@
 - [x] Créer un écran distinct de consultation des lieux favoris.
 - [x] Alléger les champs de lieu dans la création de livraison et relier les sélections.
 - [x] Tester les parcours de sélection, fermeture et favoris avant la livraison.
+- [x] Définir la recherche et les opérations sécurisées de renommage ou suppression des favoris.
+- [x] Ajouter les routes backend de mise à jour et suppression des lieux favoris.
+- [x] Ajouter la recherche instantanée, le renommage et la suppression confirmée à l’écran favoris.
+- [x] Tester les actions de gestion des favoris avant la livraison.
