@@ -2,6 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Tabs } from "expo-router";
 import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { TikisHeader } from "@/components/tikis/app-chrome";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -10,7 +11,8 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
+        headerShown: true,
+        header: () => <TikisHeader />,
         tabBarActiveTintColor: "#007B8B",
         tabBarInactiveTintColor: "#8A96A8",
         tabBarLabelStyle: { fontSize: 11, fontWeight: "800", marginTop: 2 },
@@ -24,4 +26,3 @@ export default function TabLayout() {
     </Tabs>
   );
 }
-

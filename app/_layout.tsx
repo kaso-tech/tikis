@@ -8,6 +8,8 @@ import "react-native-reanimated";
 import { Platform } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
+import { TikisDrawer } from "@/components/tikis/app-chrome";
+import { TikisNavigationProvider } from "@/lib/tikis-navigation";
 import { TikisStoreProvider } from "@/lib/tikis-store";
 import {
   SafeAreaFrameContext,
@@ -91,6 +93,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="oauth/callback" />
           </Stack>
+          <TikisDrawer />
           <StatusBar style="auto" />
         </QueryClientProvider>
       </trpc.Provider>
@@ -105,7 +108,7 @@ export default function RootLayout() {
       <SafeAreaProvider initialMetrics={providerInitialMetrics}>
           <SafeAreaFrameContext.Provider value={frame}>
             <SafeAreaInsetsContext.Provider value={insets}>
-              <TikisStoreProvider>{content}</TikisStoreProvider>
+              <TikisStoreProvider><TikisNavigationProvider>{content}</TikisNavigationProvider></TikisStoreProvider>
             </SafeAreaInsetsContext.Provider>
           </SafeAreaFrameContext.Provider>
         </SafeAreaProvider>
@@ -115,7 +118,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <SafeAreaProvider initialMetrics={providerInitialMetrics}><TikisStoreProvider>{content}</TikisStoreProvider></SafeAreaProvider>
+      <SafeAreaProvider initialMetrics={providerInitialMetrics}><TikisStoreProvider><TikisNavigationProvider>{content}</TikisNavigationProvider></TikisStoreProvider></SafeAreaProvider>
     </ThemeProvider>
   );
 }

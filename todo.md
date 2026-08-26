@@ -26,3 +26,7 @@
 - [x] Définir les seuils de proximité et d’arrivée qui déclenchent les notifications push simulées.
 - [x] Intégrer les alertes locales de suivi GPS et leur enregistrement dans le centre de notifications.
 - [x] Tester les évènements de proximité et d’arrivée, puis valider l’expérience expéditeur.
+- [x] Définir les sections, les états actifs et les raccourcis du header et du drawer Tikis.
+- [x] Implémenter un header persistant professionnel avec menu, titre contextuel et accès aux notifications.
+- [x] Implémenter un drawer professionnel et responsive, adapté aux onglets expéditeur et livreur.
+- [x] Tester la navigation par header et drawer, puis enregistrer la version.

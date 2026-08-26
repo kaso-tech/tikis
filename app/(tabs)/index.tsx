@@ -1,17 +1,16 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router } from "expo-router";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { DeliveryCard } from "@/components/tikis/delivery-card";
 import { SectionHeading, SurfaceCard, TikisButton, tikisStyles } from "@/components/tikis/ui";
 import { useTikisStore } from "@/lib/tikis-store";
 import { availableWalletBalance, formatMoney } from "@/shared/tikis-domain";
 
 export default function HomeScreen() {
-  const { role, deliveries, notifications, wallet } = useTikisStore();
+  const { role, deliveries, wallet } = useTikisStore();
   const visibleDeliveries = role === "sender"
     ? deliveries.filter((delivery) => delivery.senderName === "A. Traoré")
     : deliveries.filter((delivery) => delivery.status === "open" || delivery.status === "pending_confirmation" || (delivery.driverId === "driver-antoine" && delivery.status !== "completed"));
-  const unread = notifications.filter((notification) => !notification.read).length;
 
   return (
     <View style={tikisStyles.screen}>
@@ -23,14 +22,8 @@ export default function HomeScreen() {
         ListHeaderComponent={
           <>
             <View style={styles.header}>
-              <View>
-                <Text style={tikisStyles.eyebrow}>{role === "sender" ? "Espace expéditeur" : "Espace livreur"}</Text>
-                <Text style={[tikisStyles.title, styles.greeting]}>Bonjour, {role === "sender" ? "Aïcha" : "Antoine"}</Text>
-              </View>
-              <Pressable onPress={() => router.push("/notifications" as any)} style={({ pressed }) => [styles.notificationButton, pressed && styles.pressed]}>
-                <MaterialIcons name="notifications-none" size={24} color="#0B1F3A" />
-                {unread ? <View style={styles.unreadDot}><Text style={styles.unreadText}>{unread}</Text></View> : null}
-              </Pressable>
+              <Text style={tikisStyles.eyebrow}>{role === "sender" ? "Espace expéditeur" : "Espace livreur"}</Text>
+              <Text style={[tikisStyles.title, styles.greeting]}>Bonjour, {role === "sender" ? "Aïcha" : "Antoine"}</Text>
             </View>
 
             {role === "sender" ? (
@@ -66,11 +59,8 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   list: { padding: 20, paddingBottom: 115 },
-  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 22 },
+  header: { marginBottom: 22 },
   greeting: { marginTop: 3, fontSize: 28 },
-  notificationButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7ECF2", alignItems: "center", justifyContent: "center" },
-  unreadDot: { position: "absolute", right: 6, top: 5, minWidth: 16, height: 16, paddingHorizontal: 3, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#C23B45" },
-  unreadText: { color: "#FFFFFF", fontWeight: "900", fontSize: 10 },
   heroCard: { backgroundColor: "#0B1F3A", borderColor: "#0B1F3A", marginBottom: 27 },
   heroTop: { flexDirection: "row", gap: 12 },
   heroIcon: { width: 45, height: 45, borderRadius: 15, alignItems: "center", justifyContent: "center", backgroundColor: "#007B8B" },
