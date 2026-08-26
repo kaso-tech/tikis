@@ -98,3 +98,7 @@
 - [x] Ajouter un champ de prix proposé sécurisé à la création de livraison.
 - [x] Enregistrer et afficher le prix publié distinct de l’estimation intelligente.
 - [x] Tester les validations et les indicateurs d’écart tarifaire avant la livraison.
+- [x] Définir les règles de montant et de confirmation d’une contre-proposition livreur.
+- [x] Ajouter la saisie sécurisée de contre-proposition dans le détail de course livreur.
+- [x] Afficher la contre-proposition parmi les candidatures côté expéditeur.
+- [x] Tester la contre-proposition, la commission associée et la sélection de candidature.

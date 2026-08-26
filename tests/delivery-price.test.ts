@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { offeredPriceError, parseOfferedPrice, priceDifferencePercent, sanitizeOfferedPriceInput } from "../lib/delivery-price";
+import { counterOfferCommission, offeredPriceError, parseOfferedPrice, priceDifferencePercent, sanitizeOfferedPriceInput } from "../lib/delivery-price";
 
 describe("prix proposé de livraison", () => {
   it("supprime les caractères non numériques avant publication", () => {
@@ -15,5 +15,9 @@ describe("prix proposé de livraison", () => {
   it("calcule l’écart entre prix proposé et estimation", () => {
     expect(priceDifferencePercent(6000, 5000)).toBe(20);
     expect(priceDifferencePercent(4250, 5000)).toBe(-15);
+  });
+
+  it("calcule la commission d’une contre-proposition", () => {
+    expect(counterOfferCommission(6500, 0.1)).toBe(650);
   });
 });

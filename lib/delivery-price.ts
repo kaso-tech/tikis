@@ -24,3 +24,7 @@ export function priceDifferencePercent(offeredPrice: number, estimatedPrice: num
   if (estimatedPrice <= 0) return 0;
   return Math.round(((offeredPrice - estimatedPrice) / estimatedPrice) * 100);
 }
+
+export function counterOfferCommission(amount: number, commissionRate: number) {
+  return Math.round(amount * commissionRate);
+}

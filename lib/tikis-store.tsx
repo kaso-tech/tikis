@@ -15,6 +15,7 @@ import { commissionFor, formatMoney } from "../shared/tikis-domain";
 import { canApplyToDelivery } from "./tikis-engine";
 import { REFERRAL_REWARD_AMOUNT, canClaimReferralReward } from "./referral-rules";
 import { canSubmitDeliveryReview, isValidReviewText, sanitizeReviewText } from "./review-rules";
+import { counterOfferCommission, parseOfferedPrice } from "./delivery-price";
 
 const POLICY: CommissionPolicy = { rate: 0.1, currency: "FCFA" };
 
@@ -197,6 +198,7 @@ type Store = {
   candidatesForDelivery: (id: string) => DriverCandidate[];
   driverCandidateForDelivery: (id: string) => DriverCandidate | undefined;
   applyToDelivery: (deliveryId: string) => { ok: boolean; message?: string };
+  counterOffer: (deliveryId: string, offerPrice: number) => { ok: boolean; message?: string };
   withdrawFromDelivery: (deliveryId: string) => void;
   selectCandidate: (deliveryId: string, candidateId: string) => void;
   confirmAssignedDelivery: (deliveryId: string) => void;
@@ -296,6 +298,33 @@ export function TikisStoreProvider({ children }: { children: React.ReactNode }) 
     return { ok: true };
   };
 
+  const counterOffer = (deliveryId: string, offerPrice: number) => {
+    const delivery = deliveryById(deliveryId);
+    const validatedPrice = parseOfferedPrice(String(offerPrice));
+    if (!delivery || delivery.status !== "open") return { ok: false, message: "Cette course n’accepte plus de contre-proposition." };
+    if (!validatedPrice) return { ok: false, message: "Le prix proposé est invalide." };
+    const nextCommission = counterOfferCommission(validatedPrice, POLICY.rate);
+    const existing = driverCandidateForDelivery(deliveryId);
+    if (existing && existing.status !== "applied") return { ok: false, message: "Votre candidature ne peut plus être modifiée." };
+    const previousCommission = existing?.commissionBlocked ?? 0;
+    const delta = nextCommission - previousCommission;
+    if (delta > 0 && wallet.total - wallet.blocked < delta) return { ok: false, message: "Votre Wallet ne couvre pas la commission de cette contre-proposition." };
+
+    if (existing) {
+      setCandidates((items) => items.map((item) => item.id === existing.id ? { ...item, offerPrice: validatedPrice, commissionBlocked: nextCommission } : item));
+      setWallet((current) => ({ ...current, blocked: Math.max(0, current.blocked + delta) }));
+      if (delta !== 0) addJournal({ deliveryId, operation: delta > 0 ? "block" : "unblock", amount: Math.abs(delta), balanceBefore: wallet.total, balanceAfter: wallet.total, reason: delta > 0 ? "Commission complémentaire bloquée après contre-proposition" : "Commission partiellement débloquée après contre-proposition" });
+      setNotifications((items) => [makeNotification("Contre-proposition actualisée", `Votre proposition de ${formatMoney(validatedPrice)} est visible par l’expéditeur.`, "info"), ...items]);
+      return { ok: true };
+    }
+
+    setCandidates((items) => [...items, { id: `cand-antoine-${Date.now()}`, deliveryId, driverId: CURRENT_DRIVER_ID, name: "Antoine Kaboré", initials: "AK", rating: 4.9, completedDeliveries: 342, vehicles: ["Moto", "Tricycle"], offerPrice: validatedPrice, status: "applied", commissionBlocked: nextCommission, isVerified: true }]);
+    setWallet((current) => ({ ...current, blocked: current.blocked + nextCommission }));
+    addJournal({ deliveryId, operation: "block", amount: nextCommission, balanceBefore: wallet.total, balanceAfter: wallet.total, reason: "Commission bloquée pour candidature avec contre-proposition" });
+    setNotifications((items) => [makeNotification("Contre-proposition envoyée", `Votre proposition de ${formatMoney(validatedPrice)} attend la décision de l’expéditeur.`, "warning"), ...items]);
+    return { ok: true };
+  };
+
   const withdrawFromDelivery = (deliveryId: string) => {
     const candidate = driverCandidateForDelivery(deliveryId);
     if (!candidate || candidate.status !== "applied") return;
@@ -318,6 +347,7 @@ export function TikisStoreProvider({ children }: { children: React.ReactNode }) 
     setDeliveries((items) => items.map((item) => item.id === deliveryId ? {
       ...item,
       status: "pending_confirmation",
+      offeredPrice: candidate.offerPrice ?? item.offeredPrice,
       previousDriverId: isReplacement ? item.driverId : undefined,
       previousDriverName: isReplacement ? item.driverName : undefined,
       driverId: candidate.driverId,
@@ -392,7 +422,7 @@ export function TikisStoreProvider({ children }: { children: React.ReactNode }) 
   const value = useMemo<Store>(() => ({
     role, setRole: setRoleSafely, profile, signInProfile, registerProfile, updateProfile, logout, policy: POLICY, wallet, deliveries, candidates, journal, notifications, reviews, referrals,
     deliveryById, completedDeliveriesForRole, reviewForDelivery, candidatesForDelivery, driverCandidateForDelivery,
-    applyToDelivery, withdrawFromDelivery, selectCandidate, confirmAssignedDelivery, completeDelivery, createDemoDelivery, submitReview, claimReferralReward,
+    applyToDelivery, counterOffer, withdrawFromDelivery, selectCandidate, confirmAssignedDelivery, completeDelivery, createDemoDelivery, submitReview, claimReferralReward,
     addNotification: (notification) => setNotifications((items) => [makeNotification(notification.title, notification.body, notification.tone), ...items]),
     markNotificationsRead: () => setNotifications((items) => items.map((item) => ({ ...item, read: true }))),
   }), [role, profile, wallet, deliveries, candidates, journal, notifications, reviews, referrals]);
