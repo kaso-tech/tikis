@@ -61,16 +61,17 @@ export async function searchPlaces(query: string, bias?: { latitude: number; lon
 }
 
 export async function reverseGeocodeLocation(latitude: number, longitude: number) {
-  const response = await fetch("https://geocode.googleapis.com/v1/geocode:reverse", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Goog-Api-Key": backendKey(), "X-Goog-FieldMask": "results.placeId,results.formattedAddress,results.location,results.addressComponents,results.addressComponents.longText,results.addressComponents.types" },
-    body: JSON.stringify({ location: { latitude, longitude }, languageCode: "fr" }),
-  });
-  if (!response.ok) throw new Error("Le géocodage inverse est momentanément indisponible.");
-  const payload = await response.json() as { results?: Array<{ placeId?: string; formattedAddress?: string; location?: { latitude?: number; longitude?: number }; addressComponents?: GoogleAddressComponent[] }> };
+  const url = new URL("https://maps.googleapis.com/maps/api/geocode/json");
+  url.searchParams.set("latlng", `${latitude},${longitude}`);
+  url.searchParams.set("language", "fr");
+  url.searchParams.set("key", backendKey());
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(await googleError(response, "Geocoding"));
+  const payload = await response.json() as { status?: string; error_message?: string; results?: Array<{ place_id?: string; formatted_address?: string; geometry?: { location?: { lat?: number; lng?: number } }; address_components?: Array<{ long_name?: string; types?: string[] }> }> };
+  if (payload.status !== "OK") throw new Error(`Geocoding API n’a pas renvoyé de lieu.${payload.error_message ? ` Détail Google : ${payload.error_message}` : ""}`);
   const result = payload.results?.[0];
-  if (!result) return null;
-  return toLocation({ id: result.placeId, displayName: { text: result.formattedAddress }, formattedAddress: result.formattedAddress, location: result.location, addressComponents: result.addressComponents });
+  if (!result?.geometry?.location) return null;
+  return toLocation({ id: result.place_id, displayName: { text: result.formatted_address }, formattedAddress: result.formatted_address, location: { latitude: result.geometry.location.lat, longitude: result.geometry.location.lng }, addressComponents: result.address_components?.map((item) => ({ longText: item.long_name, types: item.types })) });
 }
 
 export async function geocodeAddress(address: string) {
@@ -94,7 +95,7 @@ export async function computeRoute(origin: LocationLabel, destination: LocationL
     headers: { "Content-Type": "application/json", "X-Goog-Api-Key": backendKey(), "X-Goog-FieldMask": "routes.distanceMeters,routes.duration" },
     body: JSON.stringify({ origin: { location: { latLng: { latitude: origin.latitude, longitude: origin.longitude } } }, destination: { location: { latLng: { latitude: destination.latitude, longitude: destination.longitude } } }, travelMode: "DRIVE", languageCode: "fr" }),
   });
-  if (!response.ok) throw new Error("Le calcul d’itinéraire est momentanément indisponible.");
+  if (!response.ok) throw new Error(await googleError(response, "Routes"));
   const payload = await response.json() as { routes?: Array<{ distanceMeters?: number; duration?: string }> };
   const route = payload.routes?.[0];
   if (!route?.distanceMeters) throw new Error("Aucun itinéraire routier n’a été trouvé.");

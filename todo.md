@@ -82,3 +82,11 @@
 - [x] Diagnostiquer et corriger l’indisponibilité de la recherche Places.
 - [x] Préserver les espaces simples durant la saisie des recherches de lieux.
 - [x] Tester la recherche Places et les suggestions d’adresses après correction.
+- [ ] Diagnostiquer et corriger l’indisponibilité de Routes API côté backend.
+- [ ] Diagnostiquer et corriger l’indisponibilité de Geocoding inverse côté backend.
+- [ ] Tester le calcul d’itinéraire et la sélection sur carte après correction.
+- [x] Définir le parcours du sélecteur flottant de lieu et de l’écran des favoris.
+- [x] Créer un écran flottant de recherche et sélection d’adresse.
+- [x] Créer un écran distinct de consultation des lieux favoris.
+- [x] Alléger les champs de lieu dans la création de livraison et relier les sélections.
+- [x] Tester les parcours de sélection, fermeture et favoris avant la livraison.
