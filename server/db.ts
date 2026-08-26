@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, tikisProfiles, users } from "../drizzle/schema";
+import { InsertTikisPlace, InsertUser, tikisFavoritePlaces, tikisPlaces, tikisProfiles, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,38 @@ export async function updateTikisProfile(phone: string, changes: Pick<PersistedT
   const profile = await getTikisProfileByPhone(phone);
   if (!profile) throw new Error("Le profil est introuvable.");
   return profile;
+}
+
+export async function getTikisPlaceByGoogleId(googlePlaceId: string) {
+  const db = await getDb();
+  if (!db || !googlePlaceId) return undefined;
+  const result = await db.select().from(tikisPlaces).where(eq(tikisPlaces.googlePlaceId, googlePlaceId)).limit(1);
+  return result[0];
+}
+
+export async function saveTikisPlace(input: InsertTikisPlace) {
+  const db = await getDb();
+  if (!db) throw new Error("La base de lieux est temporairement indisponible.");
+  if (input.googlePlaceId) {
+    const cached = await getTikisPlaceByGoogleId(input.googlePlaceId);
+    if (cached) return cached;
+  }
+  const inserted = await db.insert(tikisPlaces).values(input);
+  const result = await db.select().from(tikisPlaces).where(eq(tikisPlaces.id, Number(inserted[0].insertId))).limit(1);
+  if (!result[0]) throw new Error("Le lieu n’a pas pu être enregistré.");
+  return result[0];
+}
+
+export async function listFavoritePlaces(profilePhone: string) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({ id: tikisFavoritePlaces.id, label: tikisFavoritePlaces.label, createdAt: tikisFavoritePlaces.createdAt, place: tikisPlaces }).from(tikisFavoritePlaces).innerJoin(tikisPlaces, eq(tikisFavoritePlaces.placeId, tikisPlaces.id)).where(eq(tikisFavoritePlaces.profilePhone, profilePhone));
+}
+
+export async function saveFavoritePlace(profilePhone: string, placeId: number, label: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Les favoris sont temporairement indisponibles.");
+  await db.insert(tikisFavoritePlaces).values({ profilePhone, placeId, label }).onDuplicateKeyUpdate({ set: { label } });
+  const result = await db.select().from(tikisFavoritePlaces).where(and(eq(tikisFavoritePlaces.profilePhone, profilePhone), eq(tikisFavoritePlaces.placeId, placeId))).limit(1);
+  return result[0];
 }

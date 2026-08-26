@@ -62,3 +62,13 @@
 - [x] Définir une confirmation de déconnexion uniforme pour le profil et le drawer.
 - [x] Implémenter une modal de déconnexion professionnelle avec annulation et état de chargement.
 - [x] Vérifier la fermeture de session et la redirection vers l’authentification avant la livraison.
+- [x] Formaliser les trois types de course et les données de tarification requises ou optionnelles.
+- [x] Créer le modèle sécurisé de lieu GPS, la table de lieux favoris et leurs règles de normalisation.
+- [x] Intégrer une sélection de collecte et destination sur carte avec données GPS et libellés intelligents.
+- [x] Permettre d’enregistrer et de réutiliser des lieux favoris lors de la création de course.
+- [x] Refondre la création de livraison avec champs conditionnels et un seul engin inscrit sélectionnable.
+- [x] Implémenter une estimation basée sur distance géographique, type de course, mesures et engin.
+- [x] Tester les lieux, les validations anti-injection et l’estimation avant la livraison.
+- [x] Définir la séparation des clés Google Maps mobile et backend, avec restrictions adaptées.
+- [x] Mettre en place les services backend sécurisés pour Routes, Geocoding et Geocoding inverse.
+- [x] Intégrer la recherche Places et la sélection de position avec react-native-maps côté mobile.

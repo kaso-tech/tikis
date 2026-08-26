@@ -90,8 +90,8 @@ export default function DeliveryDetailScreen() {
           <SectionHeading title="Détails" />
           <SurfaceCard style={styles.detailCard}>
             <DetailRow icon="category" label="Type" value={delivery.type} />
-            {delivery.type === "Colis" && delivery.weightKg ? <DetailRow icon="scale" label="Poids" value={`${delivery.weightKg} kg`} /> : null}
-            {delivery.type === "Colis" && delivery.dimensions ? <DetailRow icon="straighten" label="Dimensions" value={delivery.dimensions} /> : null}
+            {delivery.type === "Autre" && delivery.weightKg ? <DetailRow icon="scale" label="Poids" value={`${delivery.weightKg} kg`} /> : null}
+            {delivery.type === "Autre" && delivery.dimensions ? <DetailRow icon="straighten" label="Dimensions" value={[delivery.dimensions.lengthCm, delivery.dimensions.widthCm, delivery.dimensions.heightCm].filter(Boolean).join(" × ") + " cm"} /> : null}
             {delivery.type === "Personne" && delivery.passengers ? <DetailRow icon="group" label="Nombre" value={`${delivery.passengers} personne`} /> : null}
             <DetailRow icon="two-wheeler" label="Engins" value={delivery.vehicleTypes.join(", ")} />
             <View style={styles.detailLast}><Text style={styles.detailDescription}>{delivery.details}</Text></View>

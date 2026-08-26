@@ -36,6 +36,8 @@ const env = {
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
+  googleMapsAndroidKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY,
+  googleMapsIosKey: process.env.GOOGLE_MAPS_IOS_API_KEY,
 };
 
 const config: ExpoConfig = {
@@ -93,6 +95,13 @@ const config: ExpoConfig = {
       },
     ],
     "expo-router",
+    [
+      "react-native-maps",
+      {
+        androidGoogleMapsApiKey: env.googleMapsAndroidKey,
+        iosGoogleMapsApiKey: env.googleMapsIosKey,
+      },
+    ],
     [
       "expo-image-picker",
       {

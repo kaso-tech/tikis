@@ -14,6 +14,8 @@ export type CandidateStatus = "applied" | "selected" | "confirmed" | "withdrawn"
 export type WalletOperation = "block" | "unblock" | "debit" | "compensation" | "credit";
 
 export type VehicleType = "Vélo" | "Moto" | "Tricycle" | "Voiture" | "Fourgonnette";
+export type SelectableVehicleType = Exclude<VehicleType, "Fourgonnette">;
+export type DeliveryType = "Plis" | "Personne" | "Autre";
 
 export interface RegisteredProfile {
   fullName: string;
@@ -54,21 +56,26 @@ export interface LocationLabel {
   name: string;
   district: string;
   city: string;
-  latitude?: number;
-  longitude?: number;
+  latitude: number;
+  longitude: number;
+  googlePlaceId?: string;
+  formattedAddress?: string;
+  street?: string;
+  province?: string;
+  country?: string;
 }
 
 export interface Delivery {
   id: string;
   title: string;
   status: DeliveryStatus;
-  type: "Colis" | "Plis" | "Personne";
+  type: DeliveryType;
   pickup: LocationLabel;
   dropoff: LocationLabel;
   distanceKm: number;
   estimatedPrice: number;
   offeredPrice?: number;
-  vehicleTypes: VehicleType[];
+  vehicleTypes: SelectableVehicleType[];
   createdAt: string;
   scheduledAt: string;
   senderName: string;
@@ -80,7 +87,7 @@ export interface Delivery {
   previousDriverName?: string;
   details: string;
   weightKg?: number;
-  dimensions?: string;
+  dimensions?: { lengthCm?: number; widthCm?: number; heightCm?: number };
   passengers?: number;
 }
 
@@ -132,7 +139,7 @@ export const commissionFor = (price: number, policy: CommissionPolicy) =>
 export const availableWalletBalance = (wallet: WalletSnapshot) => wallet.total - wallet.blocked;
 
 export const displayLocation = (location: LocationLabel) =>
-  [location.name, location.district, location.city].filter(Boolean).join(" · ");
+  [location.name, location.district, location.city].filter(Boolean).filter((item, index, values) => values.findIndex((value) => value.toLocaleLowerCase("fr") === item.toLocaleLowerCase("fr")) === index).join(" · ");
 
 export const formatMoney = (amount: number) =>
   `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(amount)} FCFA`;

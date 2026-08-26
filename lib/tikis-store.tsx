@@ -26,11 +26,11 @@ const INITIAL_DELIVERIES: Delivery[] = [
     title: "Colis de bureau · Documents",
     status: "open",
     type: "Plis",
-    pickup: { name: "Siège Coris Bank", district: "Koulouba", city: "Ouagadougou" },
-    dropoff: { name: "Maison de l’Entreprise", district: "Ouaga 2000", city: "Ouagadougou" },
+    pickup: { name: "Siège Coris Bank", district: "Koulouba", city: "Ouagadougou", latitude: 12.3698, longitude: -1.5231, formattedAddress: "Koulouba, Ouagadougou, Burkina Faso", country: "Burkina Faso" },
+    dropoff: { name: "Maison de l’Entreprise", district: "Ouaga 2000", city: "Ouagadougou", latitude: 12.3594, longitude: -1.5431, formattedAddress: "Ouaga 2000, Ouagadougou, Burkina Faso", country: "Burkina Faso" },
     distanceKm: 5.4,
     estimatedPrice: 4500,
-    vehicleTypes: ["Moto", "Tricycle"],
+    vehicleTypes: ["Moto"],
     createdAt: "Aujourd’hui · 08:42",
     scheduledAt: "Aujourd’hui · avant 14:00",
     senderName: "A. Traoré",
@@ -40,13 +40,13 @@ const INITIAL_DELIVERIES: Delivery[] = [
     id: "liv-002",
     title: "Matériel informatique",
     status: "active",
-    type: "Colis",
-    pickup: { name: "Canal Olympia", district: "Pissy", city: "Ouagadougou" },
-    dropoff: { name: "Immeuble Avenir", district: "Zone du Bois", city: "Ouagadougou" },
+    type: "Autre",
+    pickup: { name: "Canal Olympia", district: "Pissy", city: "Ouagadougou", latitude: 12.3242, longitude: -1.5413, formattedAddress: "Pissy, Ouagadougou, Burkina Faso", country: "Burkina Faso" },
+    dropoff: { name: "Immeuble Avenir", district: "Zone du Bois", city: "Ouagadougou", latitude: 12.3571, longitude: -1.5263, formattedAddress: "Zone du Bois, Ouagadougou, Burkina Faso", country: "Burkina Faso" },
     distanceKm: 8.2,
     estimatedPrice: 8500,
     offeredPrice: 8500,
-    vehicleTypes: ["Voiture", "Fourgonnette"],
+    vehicleTypes: ["Voiture"],
     createdAt: "Hier · 17:25",
     scheduledAt: "Aujourd’hui · 16:30",
     senderName: "A. Traoré",
@@ -56,15 +56,15 @@ const INITIAL_DELIVERIES: Delivery[] = [
     driverPhone: "+226 76 44 88 21",
     details: "Unité centrale et écran protégés dans leurs emballages.",
     weightKg: 18,
-    dimensions: "70 × 45 × 32 cm",
+    dimensions: { lengthCm: 70, widthCm: 45, heightCm: 32 },
   },
   {
     id: "liv-003",
     title: "Déplacement vers l’aéroport",
     status: "completed",
     type: "Personne",
-    pickup: { name: "Hôtel Sopatel Silmandé", district: "Koulouba", city: "Ouagadougou" },
-    dropoff: { name: "Aéroport international", district: "Donsin", city: "Ouagadougou" },
+    pickup: { name: "Hôtel Sopatel Silmandé", district: "Koulouba", city: "Ouagadougou", latitude: 12.3831, longitude: -1.5241, formattedAddress: "Koulouba, Ouagadougou, Burkina Faso", country: "Burkina Faso" },
+    dropoff: { name: "Aéroport international", district: "Donsin", city: "Ouagadougou", latitude: 12.3581, longitude: -1.5335, formattedAddress: "Donsin, Ouagadougou, Burkina Faso", country: "Burkina Faso" },
     distanceKm: 9.8,
     estimatedPrice: 6500,
     vehicleTypes: ["Voiture"],
@@ -201,7 +201,7 @@ type Store = {
   selectCandidate: (deliveryId: string, candidateId: string) => void;
   confirmAssignedDelivery: (deliveryId: string) => void;
   completeDelivery: (deliveryId: string) => void;
-  createDemoDelivery: (input: Pick<Delivery, "title" | "pickup" | "dropoff" | "estimatedPrice" | "vehicleTypes" | "type" | "details">) => Delivery;
+  createDemoDelivery: (input: Pick<Delivery, "title" | "pickup" | "dropoff" | "estimatedPrice" | "vehicleTypes" | "type" | "details" | "weightKg" | "dimensions" | "passengers"> & { distanceKm: number }) => Delivery;
   submitReview: (input: { deliveryId: string; rating: 1 | 2 | 3 | 4 | 5; comment?: string }) => { ok: boolean; message?: string };
   claimReferralReward: (referralId: string) => { ok: boolean; message?: string };
   addNotification: (notification: Pick<InAppNotification, "title" | "body" | "tone">) => void;
@@ -352,12 +352,12 @@ export function TikisStoreProvider({ children }: { children: React.ReactNode }) 
     setNotifications((items) => [makeNotification("Livraison terminée", "La course a été ajoutée à votre historique et à vos statistiques.", "success"), ...items]);
   };
 
-  const createDemoDelivery = (input: Pick<Delivery, "title" | "pickup" | "dropoff" | "estimatedPrice" | "vehicleTypes" | "type" | "details">) => {
+  const createDemoDelivery = (input: Pick<Delivery, "title" | "pickup" | "dropoff" | "estimatedPrice" | "vehicleTypes" | "type" | "details" | "weightKg" | "dimensions" | "passengers"> & { distanceKm: number }) => {
     const delivery: Delivery = {
       ...input,
       id: `liv-${Date.now()}`,
       status: "open",
-      distanceKm: 4.8,
+      distanceKm: input.distanceKm,
       createdAt: "À l’instant",
       scheduledAt: "Aujourd’hui · dès que possible",
       senderName: profile?.fullName ?? "A. Traoré",
