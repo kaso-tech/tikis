@@ -60,20 +60,35 @@ export function isValidInternationalPhone(value: string, country: CountrySpec) {
   return localNumber.length === country.digits && /^[1-9]\d*$/.test(localNumber);
 }
 
-const FULL_NAME_PATTERN = /^[\p{L}]+(?:[ '-][\p{L}]+)+(?:[ '-][\p{L}]+)*$/u;
+const NAME_PATTERN = /^[\p{L}]+(?:[ '-][\p{L}]+)*$/u;
+const ALLOWED_NAME_CHARACTERS = /[^\p{L} '-]/gu;
 
 export function sanitizeFullName(value: string) {
-  return value
-    .replace(/[<>`{}\[\]\\/;=]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  let sanitized = "";
+  for (const character of value.normalize("NFC").replace(/[’‘]/g, "'").replace(ALLOWED_NAME_CHARACTERS, "")) {
+    const isLetter = /^\p{L}$/u.test(character);
+    if (isLetter) {
+      sanitized += character;
+      continue;
+    }
+    const isSeparator = character === " " || character === "-" || character === "'";
+    if (isSeparator && sanitized && /^\p{L}$/u.test(sanitized.at(-1) ?? "")) sanitized += character;
+  }
+  return sanitized.replace(/[ '-]+$/g, "").slice(0, 70);
 }
 
 export function validateFullName(value: string) {
+  if (/[^\p{L} '’‘-]/u.test(value)) return { valid: false, message: "Le nom contient des caractères non autorisés." };
   const sanitized = sanitizeFullName(value);
-  if (sanitized.length < 3 || sanitized.length > 70) return { valid: false, message: "Saisissez un nom complet entre 3 et 70 caractères." };
-  if (!FULL_NAME_PATTERN.test(sanitized)) return { valid: false, message: "Utilisez au moins un prénom et un nom, avec des lettres uniquement." };
+  if (sanitized.length < 3 || sanitized.length > 70) return { valid: false, message: "Saisissez un nom entre 3 et 70 caractères." };
+  if (!NAME_PATTERN.test(sanitized)) return { valid: false, message: "Utilisez des lettres et un seul séparateur entre les mots." };
   return { valid: true, value: sanitized } as const;
+}
+
+export function generateDriverReferralCode(fullName: string, randomNumber = Math.floor(Math.random() * 100000)) {
+  const letters = sanitizeFullName(fullName).replace(/[^\p{L}]/gu, "").toLocaleUpperCase("fr-FR").slice(0, 3);
+  const digits = String(Math.max(0, Math.min(99999, randomNumber))).padStart(8 - letters.length, "0");
+  return `${letters}${digits}`.slice(0, 8);
 }
 
 export const SIMULATED_ACCOUNTS: Record<string, RegisteredProfile> = {
@@ -86,5 +101,6 @@ export function findSimulatedAccount(phone: string) {
 }
 
 export function createRegisteredProfile(input: { fullName: string; phone: string; role: UserRole; vehicles?: VehicleType[] }): RegisteredProfile {
-  return { fullName: sanitizeFullName(input.fullName), phone: input.phone, role: input.role, vehicles: input.role === "driver" ? input.vehicles ?? [] : [], roleLocked: true };
+  const normalizedName = sanitizeFullName(input.fullName);
+  return { fullName: normalizedName, phone: input.phone, role: input.role, vehicles: input.role === "driver" ? input.vehicles ?? [] : [], roleLocked: true, referralCode: input.role === "driver" ? generateDriverReferralCode(normalizedName) : undefined };
 }

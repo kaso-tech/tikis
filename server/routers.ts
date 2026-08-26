@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { COOKIE_NAME } from "../shared/const";
+import { randomInt } from "node:crypto";
 import * as db from "./db";
 import { storagePut } from "./storage";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -8,7 +9,7 @@ import { publicProcedure, router } from "./_core/trpc";
 
 const phoneSchema = z.string().regex(/^\+[1-9]\d{7,14}$/, "Numéro de téléphone international invalide.");
 const simulationOtpSchema = z.literal("730512", { error: "Code OTP de simulation invalide." });
-const fullNameSchema = z.string().trim().min(3).max(70).regex(/^[\p{L}]+(?:[ '-][\p{L}]+)+(?:[ '-][\p{L}]+)*$/u, "Nom complet invalide.");
+const fullNameSchema = z.string().trim().min(3).max(70).regex(/^[\p{L}]+(?:[ '-][\p{L}]+)*$/u, "Nom invalide.");
 const vehicleSchema = z.enum(["Vélo", "Moto", "Tricycle", "Voiture", "Fourgonnette"]);
 type ValidVehicle = z.infer<typeof vehicleSchema>;
 const profileFieldsSchema = z.object({
@@ -26,13 +27,26 @@ function validateProfileRole(value: z.infer<typeof profileFieldsSchema>, ctx: z.
 const profileInputSchema = profileFieldsSchema.superRefine(validateProfileRole);
 const registrationInputSchema = profileFieldsSchema.extend({ otp: simulationOtpSchema }).superRefine(validateProfileRole);
 
-function toPublicProfile(profile: { phone: string; fullName: string; accountType: "sender" | "driver"; vehicles: string; photoKey?: string | null }) {
+function toPublicProfile(profile: { phone: string; fullName: string; accountType: "sender" | "driver"; vehicles: string; photoKey?: string | null; referralCode?: string | null }) {
   let vehicles: ValidVehicle[] = [];
   try {
     const parsed = JSON.parse(profile.vehicles) as unknown;
     if (Array.isArray(parsed)) vehicles = parsed.filter((item): item is ValidVehicle => vehicleSchema.safeParse(item).success);
   } catch { vehicles = []; }
-  return { phone: profile.phone, fullName: profile.fullName, role: profile.accountType, vehicles, roleLocked: true as const, photoUrl: profile.photoKey ? `/manus-storage/${profile.photoKey}` : undefined };
+  return { phone: profile.phone, fullName: profile.fullName, role: profile.accountType, vehicles, roleLocked: true as const, photoUrl: profile.photoKey ? `/manus-storage/${profile.photoKey}` : undefined, referralCode: profile.accountType === "driver" ? profile.referralCode ?? undefined : undefined };
+}
+
+function newReferralCode(fullName: string) {
+  const prefix = fullName.normalize("NFC").replace(/[^\p{L}]/gu, "").toLocaleUpperCase("fr-FR").slice(0, 3);
+  return `${prefix}${String(randomInt(0, 100000000)).padStart(8 - prefix.length, "0")}`.slice(0, 8);
+}
+
+async function generateUniqueReferralCode(fullName: string) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const code = newReferralCode(fullName);
+    if (!await db.getTikisProfileByReferralCode(code)) return code;
+  }
+  throw new Error("Impossible de générer un code de parrainage unique.");
 }
 
 const photoMimeSchema = z.enum(["image/jpeg", "image/png", "image/webp"]);
@@ -55,11 +69,13 @@ export const appRouter = router({
       return profile ? toPublicProfile(profile) : null;
     }),
     register: publicProcedure.input(registrationInputSchema).mutation(async ({ input }) => {
+      const referralCode = input.role === "driver" ? await generateUniqueReferralCode(input.fullName) : undefined;
       const profile = await db.createTikisProfile({
         phone: input.phone,
         fullName: input.fullName,
         accountType: input.role,
         vehicles: JSON.stringify(input.role === "driver" ? input.vehicles : []),
+        referralCode,
       });
       return toPublicProfile(profile);
     }),

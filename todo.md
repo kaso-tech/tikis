@@ -49,3 +49,8 @@
 - [x] Créer un historique détaillé des courses passées pour expéditeurs et livreurs.
 - [x] Implémenter la notation et l’avis du livreur à la fin d’une livraison.
 - [x] Tester les parcours de profil, d’historique et d’avis avant la livraison.
+- [x] Définir l’assainissement automatique de nom avec lettres, espaces, apostrophes et traits d’union contrôlés.
+- [x] Autoriser un nom unique tout en empêchant les séparateurs successifs ou combinés.
+- [x] Générer et enregistrer un code de parrainage unique pour chaque compte livreur inscrit.
+- [x] Afficher le code de parrainage du livreur dans son profil.
+- [x] Tester les règles de nom et la génération de code de parrainage avant la livraison.

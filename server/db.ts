@@ -53,12 +53,20 @@ export type PersistedTikisProfile = {
   accountType: "sender" | "driver";
   vehicles: string;
   photoKey?: string | null;
+  referralCode?: string | null;
 };
 
 export async function getTikisProfileByPhone(phone: string) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(tikisProfiles).where(eq(tikisProfiles.phone, phone)).limit(1);
+  return result[0];
+}
+
+export async function getTikisProfileByReferralCode(referralCode: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(tikisProfiles).where(eq(tikisProfiles.referralCode, referralCode)).limit(1);
   return result[0];
 }
 

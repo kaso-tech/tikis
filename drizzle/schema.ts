@@ -24,6 +24,7 @@ export const tikisProfiles = mysqlTable("tikis_profiles", {
   accountType: mysqlEnum("accountType", ["sender", "driver"]).notNull(),
   vehicles: text("vehicles").notNull(),
   photoKey: varchar("photoKey", { length: 512 }),
+  referralCode: varchar("referralCode", { length: 8 }).unique(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

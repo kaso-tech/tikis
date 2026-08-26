@@ -22,6 +22,7 @@ export interface RegisteredProfile {
   vehicles: VehicleType[];
   roleLocked: true;
   photoUrl?: string;
+  referralCode?: string;
 }
 
 export interface DeliveryReview {

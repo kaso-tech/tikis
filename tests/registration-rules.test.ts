@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COUNTRIES, createRegisteredProfile, detectCountry, findSimulatedAccount, formatLocalPhone, isValidInternationalPhone, normalizedInternationalPhone, sanitizeFullName, validateFullName } from "../lib/registration-rules";
+import { COUNTRIES, createRegisteredProfile, detectCountry, findSimulatedAccount, formatLocalPhone, generateDriverReferralCode, isValidInternationalPhone, normalizedInternationalPhone, sanitizeFullName, validateFullName } from "../lib/registration-rules";
 
 describe("règles d’inscription internationale Tikis", () => {
   const burkina = COUNTRIES.find((country) => country.id === "BF")!;
@@ -19,16 +19,25 @@ describe("règles d’inscription internationale Tikis", () => {
     expect(findSimulatedAccount("+22671111111")).toBeNull();
   });
 
-  it("accepte un nom complet raisonnable et bloque les entrées dangereuses", () => {
+  it("accepte un nom unique et normalise automatiquement les séparateurs", () => {
     expect(validateFullName("Mariam Ouédraogo").valid).toBe(true);
-    expect(validateFullName("Mariam").valid).toBe(false);
+    expect(validateFullName("Mariam").valid).toBe(true);
     expect(validateFullName("<script>alert</script>").valid).toBe(false);
     expect(sanitizeFullName("  Mariam   Ouédraogo  ")).toBe("Mariam Ouédraogo");
+    expect(sanitizeFullName("Mariam--Ouédraogo")).toBe("Mariam-Ouédraogo");
+    expect(sanitizeFullName("Mariam - Ouédraogo")).toBe("Mariam Ouédraogo");
+    expect(sanitizeFullName("Mariam' Ouédraogo")).toBe("Mariam'Ouédraogo");
   });
 
   it("verrouille le type de compte créé avec les engins du livreur", () => {
     const profile = createRegisteredProfile({ fullName: "Issa Sanou", phone: "+22671111111", role: "driver", vehicles: ["Vélo", "Moto"] });
     expect(profile.roleLocked).toBe(true);
     expect(profile.vehicles).toEqual(["Vélo", "Moto"]);
+    expect(profile.referralCode).toMatch(/^ISS\d{5}$/);
+  });
+
+  it("génère un code de parrainage de huit caractères basé sur le nom du livreur", () => {
+    expect(generateDriverReferralCode("Ali", 42)).toBe("ALI00042");
+    expect(generateDriverReferralCode("É", 42)).toBe("É0000042");
   });
 });
