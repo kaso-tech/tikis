@@ -102,3 +102,6 @@
 - [x] Ajouter la saisie sécurisée de contre-proposition dans le détail de course livreur.
 - [x] Afficher la contre-proposition parmi les candidatures côté expéditeur.
 - [x] Tester la contre-proposition, la commission associée et la sélection de candidature.
+- [x] Identifier la condition qui empêche la publication de livraison.
+- [x] Rendre visibles les erreurs de validation et l’état d’action du bouton de publication.
+- [x] Tester une publication complète de livraison avec les champs requis.
