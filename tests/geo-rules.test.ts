@@ -7,6 +7,8 @@ describe("règles géographiques et estimation Tikis", () => {
 
   it("protège et normalise les lieux avec leurs coordonnées", () => {
     expect(sanitizePlaceText("  <Maison>  du  Peuple<script> ")).toBe("Maison du Peuplescript");
+    expect(sanitizePlaceText("Maison du ", 120, { preserveTrailingSpace: true })).toBe("Maison du ");
+    expect(sanitizePlaceText("Maison du ")).toBe("Maison du");
     expect(normalizeLocation(pickup)?.city).toBe("Ouagadougou");
     expect(normalizeLocation({ ...pickup, latitude: 98 })).toBeNull();
     expect(compactRouteLabel(pickup, dropoff)).toBe("Maison du Peuple → Stade du 4 Août");
@@ -28,4 +30,3 @@ describe("règles géographiques et estimation Tikis", () => {
     expect(validateDeliveryMeasurement("Plis", {})).toBeNull();
   });
 });
-

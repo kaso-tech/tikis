@@ -3,8 +3,9 @@ import type { DeliveryType, LocationLabel, SelectableVehicleType } from "@/share
 const safeWhitespace = /\s+/g;
 const forbiddenPlaceChars = /[^\p{L}\p{N}\s,.'’\-()/]/gu;
 
-export function sanitizePlaceText(value: string, maxLength = 120) {
-  return value.normalize("NFC").replace(forbiddenPlaceChars, "").replace(safeWhitespace, " ").trim().slice(0, maxLength);
+export function sanitizePlaceText(value: string, maxLength = 120, options: { preserveTrailingSpace?: boolean } = {}) {
+  const normalized = value.normalize("NFC").replace(forbiddenPlaceChars, "").replace(safeWhitespace, " ").trimStart().slice(0, maxLength);
+  return options.preserveTrailingSpace ? normalized : normalized.trimEnd();
 }
 
 export function isValidCoordinate(latitude: number, longitude: number) {

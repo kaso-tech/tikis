@@ -32,6 +32,19 @@ function toLocation(place: GooglePlace): LocationLabel | null {
 
 const placeFields = "places.id,places.displayName,places.formattedAddress,places.location,places.addressComponents";
 
+async function googleError(response: Response, service: "Places" | "Geocoding" | "Routes") {
+  let detail = "";
+  try {
+    const payload = await response.json() as { error?: { message?: string } };
+    detail = payload.error?.message ?? "";
+  } catch {
+    // No structured message was returned by Google.
+  }
+  if (response.status === 401 || response.status === 403) return `${service} API a refusé la clé backend. Vérifiez l’activation de l’API, la facturation et la restriction IP.${detail ? ` Détail Google : ${detail}` : ""}`;
+  if (response.status === 429) return `${service} API est temporairement limitée. Réessayez dans quelques instants.`;
+  return detail ? `${service} API est indisponible : ${detail}` : `${service} API est momentanément indisponible.`;
+}
+
 export async function searchPlaces(query: string, bias?: { latitude: number; longitude: number }) {
   const textQuery = sanitizePlaceText(query, 120);
   if (textQuery.length < 2) return [];
@@ -42,7 +55,7 @@ export async function searchPlaces(query: string, bias?: { latitude: number; lon
     headers: { "Content-Type": "application/json", "X-Goog-Api-Key": backendKey(), "X-Goog-FieldMask": placeFields },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error("La recherche de lieux est momentanément indisponible.");
+  if (!response.ok) throw new Error(await googleError(response, "Places"));
   const payload = await response.json() as { places?: GooglePlace[] };
   return (payload.places ?? []).map(toLocation).filter((item): item is LocationLabel => Boolean(item)).slice(0, 8);
 }

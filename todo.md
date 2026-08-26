@@ -79,3 +79,6 @@
 - [x] Tester les noms composés avec espaces tout en conservant les protections de séparateurs.
 - [x] Identifier et corriger l’effet React responsable de la boucle de mises à jour.
 - [x] Vérifier l’absence de « Maximum update depth exceeded » après correction.
+- [x] Diagnostiquer et corriger l’indisponibilité de la recherche Places.
+- [x] Préserver les espaces simples durant la saisie des recherches de lieux.
+- [x] Tester la recherche Places et les suggestions d’adresses après correction.
