@@ -193,7 +193,7 @@ export default function CreateDeliveryScreen() {
           <Text style={styles.footerNote}>Aucun débit immédiat. Les coordonnées complètes servent uniquement à la course et au calcul de distance.</Text>
         </ScrollView>
       </KeyboardAvoidingView>
-      <FloatingPlacePicker visible={Boolean(pickerTarget)} target={pickerTarget} value={pickerTarget === "pickup" ? pickup : dropoff} onClose={() => setPickerTarget(null)} onSelect={(place) => { if (pickerTarget) selectPlace(pickerTarget, place); }} />
+      <FloatingPlacePicker visible={Boolean(pickerTarget)} target={pickerTarget} value={pickerTarget === "pickup" ? pickup : dropoff} countryCode={profile?.countryCode} onClose={() => setPickerTarget(null)} onSelect={(place) => { if (pickerTarget) selectPlace(pickerTarget, place); }} />
       <FavoritePlacesSheet visible={favoritesVisible} favorites={favoriteLocations} onClose={() => setFavoritesVisible(false)} onPickup={(place) => selectPlace("pickup", place)} onDropoff={(place) => selectPlace("dropoff", place)} onRename={renameFavorite} onRemove={removeFavorite} />
     </SafeAreaView>
   );

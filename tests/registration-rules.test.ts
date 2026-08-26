@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { COUNTRIES, createRegisteredProfile, detectCountry, findSimulatedAccount, formatLocalPhone, generateDriverReferralCode, isValidInternationalPhone, normalizedInternationalPhone, sanitizeFullName, validateFullName } from "../lib/registration-rules";
+import { COUNTRIES, createRegisteredProfile, detectCountry, findCountryForPhone, findSimulatedAccount, formatLocalPhone, generateDriverReferralCode, isValidInternationalPhone, normalizedInternationalPhone, sanitizeFullName, validateFullName } from "../lib/registration-rules";
 
 describe("règles d’inscription internationale Tikis", () => {
   const burkina = COUNTRIES.find((country) => country.id === "BF")!;
@@ -12,6 +12,7 @@ describe("règles d’inscription internationale Tikis", () => {
     expect(normalizedInternationalPhone("70 12 34 56", burkina)).toBe("+22670123456");
     expect(isValidInternationalPhone("70 12 34 56", burkina)).toBe(true);
     expect(isValidInternationalPhone("70 12", burkina)).toBe(false);
+    expect(findCountryForPhone("+2250701234567").id).toBe("CI");
   });
 
   it("identifie le compte de démonstration seulement après une vérification OTP réussie", () => {
@@ -33,8 +34,9 @@ describe("règles d’inscription internationale Tikis", () => {
   });
 
   it("verrouille le type de compte créé avec les engins du livreur", () => {
-    const profile = createRegisteredProfile({ fullName: "Issa Sanou", phone: "+22671111111", role: "driver", vehicles: ["Vélo", "Moto"] });
+    const profile = createRegisteredProfile({ fullName: "Issa Sanou", phone: "+22671111111", countryCode: "BF", role: "driver", vehicles: ["Vélo", "Moto"] });
     expect(profile.roleLocked).toBe(true);
+    expect(profile.countryCode).toBe("BF");
     expect(profile.vehicles).toEqual(["Vélo", "Moto"]);
     expect(profile.referralCode).toMatch(/^ISS\d{5}$/);
   });

@@ -7,15 +7,18 @@ import * as geography from "./geography";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
+import { findCountryForPhone } from "../lib/registration-rules";
 
 const phoneSchema = z.string().regex(/^\+[1-9]\d{7,14}$/, "Numéro de téléphone international invalide.");
 const simulationOtpSchema = z.literal("730512", { error: "Code OTP de simulation invalide." });
 const fullNameSchema = z.string().trim().min(3).max(70).regex(/^[\p{L}]+(?:[ '-][\p{L}]+)*$/u, "Nom invalide.");
 const vehicleSchema = z.enum(["Vélo", "Moto", "Tricycle", "Voiture", "Fourgonnette"]);
 type ValidVehicle = z.infer<typeof vehicleSchema>;
+const countryCodeSchema = z.string().regex(/^[A-Z]{2}$/, "Code pays ISO invalide.");
 const profileFieldsSchema = z.object({
   phone: phoneSchema,
   fullName: fullNameSchema,
+  countryCode: countryCodeSchema,
   role: z.enum(["sender", "driver"]),
   vehicles: z.array(vehicleSchema).max(5),
 });
@@ -34,7 +37,7 @@ function toPublicProfile(profile: { phone: string; fullName: string; accountType
     const parsed = JSON.parse(profile.vehicles) as unknown;
     if (Array.isArray(parsed)) vehicles = parsed.filter((item): item is ValidVehicle => vehicleSchema.safeParse(item).success);
   } catch { vehicles = []; }
-  return { phone: profile.phone, fullName: profile.fullName, role: profile.accountType, vehicles, roleLocked: true as const, photoUrl: profile.photoKey ? `/manus-storage/${profile.photoKey}` : undefined, referralCode: profile.accountType === "driver" ? profile.referralCode ?? undefined : undefined };
+  return { phone: profile.phone, fullName: profile.fullName, countryCode: findCountryForPhone(profile.phone).id, role: profile.accountType, vehicles, roleLocked: true as const, photoUrl: profile.photoKey ? `/manus-storage/${profile.photoKey}` : undefined, referralCode: profile.accountType === "driver" ? profile.referralCode ?? undefined : undefined };
 }
 
 function newReferralCode(fullName: string) {
@@ -103,7 +106,7 @@ export const appRouter = router({
     }),
   }),
   geography: router({
-    search: publicProcedure.input(z.object({ query: z.string().min(2).max(120), biasLatitude: coordinateSchema.min(-90).max(90).optional(), biasLongitude: coordinateSchema.min(-180).max(180).optional() })).mutation(async ({ input }) => geography.searchPlaces(input.query, input.biasLatitude !== undefined && input.biasLongitude !== undefined ? { latitude: input.biasLatitude, longitude: input.biasLongitude } : undefined)),
+    search: publicProcedure.input(z.object({ query: z.string().min(2).max(120), countryCode: countryCodeSchema.optional(), biasLatitude: coordinateSchema.min(-90).max(90).optional(), biasLongitude: coordinateSchema.min(-180).max(180).optional() })).mutation(async ({ input }) => geography.searchPlaces(input.query, input.biasLatitude !== undefined && input.biasLongitude !== undefined ? { latitude: input.biasLatitude, longitude: input.biasLongitude } : undefined, input.countryCode)),
     resolve: publicProcedure.input(z.object({ mapboxId: z.string().min(1).max(255), mapboxSessionToken: z.string().uuid().optional() })).mutation(async ({ input }) => geography.resolveMapboxPlace(input.mapboxId, input.mapboxSessionToken)),
     geocode: publicProcedure.input(z.object({ address: z.string().min(3).max(180) })).mutation(async ({ input }) => geography.geocodeAddress(input.address)),
     reverse: publicProcedure.input(z.object({ latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180) })).mutation(async ({ input }) => geography.reverseGeocodeLocation(input.latitude, input.longitude)),

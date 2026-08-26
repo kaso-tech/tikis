@@ -19,12 +19,14 @@ export function FloatingPlacePicker({
   visible,
   target,
   value,
+  countryCode,
   onClose,
   onSelect,
 }: {
   visible: boolean;
   target: LocationTarget | null;
   value: LocationLabel | null;
+  countryCode?: string;
   onClose: () => void;
   onSelect: (place: LocationLabel) => void;
 }) {
@@ -50,6 +52,7 @@ export function FloatingPlacePicker({
               label={target === "pickup" ? "Adresse de récupération" : "Adresse de destination"}
               tone={target}
               value={value}
+              countryCode={countryCode}
               onChange={(place) => {
                 onSelect(place);
                 onClose();

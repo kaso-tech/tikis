@@ -45,6 +45,22 @@ describe("services géographiques backend Tikis", () => {
     expect(result[0]).toMatchObject({ name: "12 Avenue Kwame Nkrumah", district: "Koulouba", city: "Ouagadougou", formattedAddress: "12 Avenue Kwame Nkrumah, Koulouba, Ouagadougou, Burkina Faso" });
   });
 
+  it("restreint les suggestions Mapbox au pays du profil lorsque le code est valide", async () => {
+    process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ suggestions: [] })));
+    global.fetch = fetchMock as typeof fetch;
+    await searchPlaces("Abidjan", undefined, "CI");
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("country=CI");
+  });
+
+  it("ignore les codes pays non conformes et conserve le repli sans filtre", async () => {
+    process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ suggestions: [] })));
+    global.fetch = fetchMock as typeof fetch;
+    await searchPlaces("Ouagadougou", undefined, "BF<script>");
+    expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain("country=");
+  });
+
   it("conserve les contextes Mapbox structurés lors de la résolution d’une suggestion", async () => {
     process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
     global.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ features: [{ id: "address-1", geometry: { coordinates: [-1.5203, 12.3699] }, properties: { feature_type: "address", mapbox_id: "address-1", name: "12 Avenue Kwame Nkrumah", full_address: "12 Avenue Kwame Nkrumah", context: { neighborhood: { name: "Koulouba" }, place: { name: "Ouagadougou" }, region: { name: "Centre" }, country: { name: "Burkina Faso" } } } }] }))) as typeof fetch;

@@ -20,6 +20,7 @@ export type DeliveryType = "Plis" | "Personne" | "Autre";
 export interface RegisteredProfile {
   fullName: string;
   phone: string;
+  countryCode: string;
   role: UserRole;
   vehicles: VehicleType[];
   roleLocked: true;

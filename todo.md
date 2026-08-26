@@ -130,3 +130,7 @@
 - [x] Améliorer la récupération Mapbox des détails de suggestion et de point sélectionné.
 - [x] Afficher un libellé hiérarchisé précis plutôt qu’un simple nom de ville.
 - [x] Tester la recherche, la sélection de carte et la réutilisation des lieux favoris.
+- [x] Identifier et normaliser le code pays défini dans le profil utilisateur.
+- [x] Valider et transmettre le filtre de pays vers Mapbox Search côté backend.
+- [x] Appliquer automatiquement le pays du profil aux sélecteurs d’adresse mobile et web.
+- [x] Tester le filtrage géographique, le repli sans pays et la sécurité des entrées.

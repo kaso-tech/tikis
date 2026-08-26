@@ -9,10 +9,10 @@ import { autocompleteQuery, PLACE_AUTOCOMPLETE_DEBOUNCE_MS } from "@/lib/place-a
 import { trpc } from "@/lib/trpc";
 import { locationSubtitle, locationTitle, type LocationLabel } from "@/shared/tikis-domain";
 
-type Props = { label: string; tone: "pickup" | "dropoff"; value: LocationLabel | null; onChange: (place: LocationLabel) => void };
+type Props = { label: string; tone: "pickup" | "dropoff"; value: LocationLabel | null; countryCode?: string; onChange: (place: LocationLabel) => void };
 const INITIAL_REGION = { latitude: 12.3714, longitude: -1.5197, latitudeDelta: 0.12, longitudeDelta: 0.12 };
 
-export function PlacePicker({ label, tone, value, onChange }: Props) {
+export function PlacePicker({ label, tone, value, countryCode, onChange }: Props) {
   const mapRef = useRef<MapView>(null);
   const [query, setQuery] = useState(value?.name ?? "");
   const [results, setResults] = useState<LocationLabel[]>([]);
@@ -35,7 +35,7 @@ export function PlacePicker({ label, tone, value, onChange }: Props) {
     const requestId = ++latestSearch.current;
     try {
       setMessage("");
-      const places = await search.mutateAsync({ query: clean, ...(value ? { biasLatitude: value.latitude, biasLongitude: value.longitude } : {}) });
+      const places = await search.mutateAsync({ query: clean, ...(countryCode ? { countryCode } : {}), ...(value ? { biasLatitude: value.latitude, biasLongitude: value.longitude } : {}) });
       if (requestId === latestSearch.current) {
         setResults(places);
         if (!places.length) setMessage("Aucun lieu trouvé. Touchez la carte pour choisir une position.");
@@ -43,7 +43,7 @@ export function PlacePicker({ label, tone, value, onChange }: Props) {
     } catch (cause) {
       if (requestId === latestSearch.current) setMessage(cause instanceof Error ? cause.message : "La recherche est indisponible.");
     }
-  }, [search, value]);
+  }, [countryCode, search, value]);
 
   useEffect(() => {
     if (!autocompleteQuery(query)) { latestSearch.current += 1; setResults([]); return; }

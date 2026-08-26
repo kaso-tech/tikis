@@ -31,6 +31,12 @@ export function findCountry(dialCode: string) {
   return COUNTRIES.find((country) => country.dialCode === dialCode) ?? DEFAULT_COUNTRY;
 }
 
+export function findCountryForPhone(phone: string) {
+  return [...COUNTRIES]
+    .sort((left, right) => right.dialCode.length - left.dialCode.length)
+    .find((country) => phone.startsWith(country.dialCode)) ?? DEFAULT_COUNTRY;
+}
+
 export function digitsOnly(value: string) {
   return value.replace(/\D/g, "");
 }
@@ -93,15 +99,16 @@ export function generateDriverReferralCode(fullName: string, randomNumber = Math
 }
 
 export const SIMULATED_ACCOUNTS: Record<string, RegisteredProfile> = {
-  "+22670000000": { fullName: "Aïcha Traoré", phone: "+22670000000", role: "sender", vehicles: [], roleLocked: true },
-  "+22676000000": { fullName: "Antoine Kaboré", phone: "+22676000000", role: "driver", vehicles: ["Moto", "Tricycle"], roleLocked: true },
+  "+22670000000": { fullName: "Aïcha Traoré", phone: "+22670000000", countryCode: "BF", role: "sender", vehicles: [], roleLocked: true },
+  "+22676000000": { fullName: "Antoine Kaboré", phone: "+22676000000", countryCode: "BF", role: "driver", vehicles: ["Moto", "Tricycle"], roleLocked: true },
 };
 
 export function findSimulatedAccount(phone: string) {
   return SIMULATED_ACCOUNTS[phone] ?? null;
 }
 
-export function createRegisteredProfile(input: { fullName: string; phone: string; role: UserRole; vehicles?: VehicleType[] }): RegisteredProfile {
+export function createRegisteredProfile(input: { fullName: string; phone: string; countryCode?: string; role: UserRole; vehicles?: VehicleType[] }): RegisteredProfile {
   const normalizedName = sanitizeFullName(input.fullName);
-  return { fullName: normalizedName, phone: input.phone, role: input.role, vehicles: input.role === "driver" ? input.vehicles ?? [] : [], roleLocked: true, referralCode: input.role === "driver" ? generateDriverReferralCode(normalizedName) : undefined };
+  const countryCode = COUNTRIES.some((country) => country.id === input.countryCode) ? input.countryCode! : findCountryForPhone(input.phone).id;
+  return { fullName: normalizedName, phone: input.phone, countryCode, role: input.role, vehicles: input.role === "driver" ? input.vehicles ?? [] : [], roleLocked: true, referralCode: input.role === "driver" ? generateDriverReferralCode(normalizedName) : undefined };
 }

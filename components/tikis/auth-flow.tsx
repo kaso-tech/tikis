@@ -130,7 +130,7 @@ export function AuthFlow() {
       }
       if (demoProfile) {
         try {
-          const persistedDemoProfile = await registerProfileMutation.mutateAsync({ phone: demoProfile.phone, fullName: demoProfile.fullName, role: demoProfile.role, vehicles: demoProfile.vehicles, otp: otp as "730512" });
+          const persistedDemoProfile = await registerProfileMutation.mutateAsync({ phone: demoProfile.phone, fullName: demoProfile.fullName, countryCode: demoProfile.countryCode, role: demoProfile.role, vehicles: demoProfile.vehicles, otp: otp as "730512" });
           signInProfile(persistedDemoProfile);
         } catch {
           signInProfile(demoProfile);
@@ -194,9 +194,9 @@ export function AuthFlow() {
     }
     setFinishing(true);
     await new Promise((resolve) => setTimeout(resolve, 550));
-    const localProfile = createRegisteredProfile({ fullName: validatedName, phone, role: selectedRole, vehicles: selectedVehicles });
+    const localProfile = createRegisteredProfile({ fullName: validatedName, phone, countryCode: country.id, role: selectedRole, vehicles: selectedVehicles });
     try {
-      const persistedProfile = await registerProfileMutation.mutateAsync({ phone: localProfile.phone, fullName: localProfile.fullName, role: localProfile.role, vehicles: localProfile.vehicles, otp: otp as "730512" });
+      const persistedProfile = await registerProfileMutation.mutateAsync({ phone: localProfile.phone, fullName: localProfile.fullName, countryCode: localProfile.countryCode, role: localProfile.role, vehicles: localProfile.vehicles, otp: otp as "730512" });
       registerProfile(persistedProfile);
     } catch {
       setFinishing(false);

@@ -121,7 +121,7 @@ async function mapboxJson(url: URL, service: "Search" | "Directions") {
   return response.json() as Promise<unknown>;
 }
 
-export async function searchPlaces(query: string, bias?: { latitude: number; longitude: number }) {
+export async function searchPlaces(query: string, bias?: { latitude: number; longitude: number }, countryCode?: string) {
   const textQuery = sanitizePlaceText(query, 120);
   if (textQuery.length < 2) return [];
   const sessionToken = randomUUID();
@@ -131,6 +131,7 @@ export async function searchPlaces(query: string, bias?: { latitude: number; lon
   url.searchParams.set("limit", "10");
   url.searchParams.set("types", "address,poi,street,neighborhood,locality,place");
   url.searchParams.set("session_token", sessionToken);
+  if (countryCode && /^[A-Z]{2}$/.test(countryCode)) url.searchParams.set("country", countryCode);
   if (bias) url.searchParams.set("proximity", `${bias.longitude},${bias.latitude}`);
   const payload = await mapboxJson(url, "Search") as { suggestions?: MapboxSuggestion[] };
   return (payload.suggestions ?? []).map((item) => suggestionToLocation(item, sessionToken)).filter((item): item is LocationLabel => Boolean(item));
