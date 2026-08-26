@@ -89,13 +89,15 @@ export default function RootLayout() {
           {/* Default to hiding native headers so raw route segments don't appear (e.g. "(tabs)", "products/[id]"). */}
           {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
           {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="oauth/callback" />
-          </Stack>
-          <TikisDrawer />
-          <StatusBar style="auto" />
+          <TikisLogoutProvider>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="oauth/callback" />
+            </Stack>
+            <TikisDrawer />
+            <StatusBar style="auto" />
+          </TikisLogoutProvider>
         </QueryClientProvider>
       </trpc.Provider>
     </GestureHandlerRootView>
@@ -109,7 +111,7 @@ export default function RootLayout() {
       <SafeAreaProvider initialMetrics={providerInitialMetrics}>
           <SafeAreaFrameContext.Provider value={frame}>
             <SafeAreaInsetsContext.Provider value={insets}>
-              <TikisStoreProvider><TikisNavigationProvider><TikisLogoutProvider>{content}</TikisLogoutProvider></TikisNavigationProvider></TikisStoreProvider>
+              <TikisStoreProvider><TikisNavigationProvider>{content}</TikisNavigationProvider></TikisStoreProvider>
             </SafeAreaInsetsContext.Provider>
           </SafeAreaFrameContext.Provider>
         </SafeAreaProvider>
@@ -119,7 +121,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <SafeAreaProvider initialMetrics={providerInitialMetrics}><TikisStoreProvider><TikisNavigationProvider><TikisLogoutProvider>{content}</TikisLogoutProvider></TikisNavigationProvider></TikisStoreProvider></SafeAreaProvider>
+      <SafeAreaProvider initialMetrics={providerInitialMetrics}><TikisStoreProvider><TikisNavigationProvider>{content}</TikisNavigationProvider></TikisStoreProvider></SafeAreaProvider>
     </ThemeProvider>
   );
 }
