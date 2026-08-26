@@ -73,6 +73,7 @@ export interface Delivery {
   pickup: LocationLabel;
   dropoff: LocationLabel;
   distanceKm: number;
+  routeSource?: "routes" | "provisional";
   estimatedPrice: number;
   offeredPrice?: number;
   vehicleTypes: SelectableVehicleType[];

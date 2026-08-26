@@ -203,7 +203,7 @@ type Store = {
   selectCandidate: (deliveryId: string, candidateId: string) => void;
   confirmAssignedDelivery: (deliveryId: string) => void;
   completeDelivery: (deliveryId: string) => void;
-  createDemoDelivery: (input: Pick<Delivery, "title" | "pickup" | "dropoff" | "estimatedPrice" | "offeredPrice" | "vehicleTypes" | "type" | "details" | "weightKg" | "dimensions" | "passengers"> & { distanceKm: number }) => Delivery;
+  createDemoDelivery: (input: Pick<Delivery, "title" | "pickup" | "dropoff" | "estimatedPrice" | "offeredPrice" | "vehicleTypes" | "type" | "details" | "weightKg" | "dimensions" | "passengers" | "routeSource"> & { distanceKm: number }) => Delivery;
   submitReview: (input: { deliveryId: string; rating: 1 | 2 | 3 | 4 | 5; comment?: string }) => { ok: boolean; message?: string };
   claimReferralReward: (referralId: string) => { ok: boolean; message?: string };
   addNotification: (notification: Pick<InAppNotification, "title" | "body" | "tone">) => void;
@@ -383,7 +383,7 @@ export function TikisStoreProvider({ children }: { children: React.ReactNode }) 
     setNotifications((items) => [makeNotification("Livraison terminée", "La course a été ajoutée à votre historique et à vos statistiques.", "success"), ...items]);
   };
 
-  const createDemoDelivery = (input: Pick<Delivery, "title" | "pickup" | "dropoff" | "estimatedPrice" | "offeredPrice" | "vehicleTypes" | "type" | "details" | "weightKg" | "dimensions" | "passengers"> & { distanceKm: number }) => {
+  const createDemoDelivery = (input: Pick<Delivery, "title" | "pickup" | "dropoff" | "estimatedPrice" | "offeredPrice" | "vehicleTypes" | "type" | "details" | "weightKg" | "dimensions" | "passengers" | "routeSource"> & { distanceKm: number }) => {
     const delivery: Delivery = {
       ...input,
       id: `liv-${Date.now()}`,

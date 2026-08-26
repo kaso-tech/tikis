@@ -60,6 +60,13 @@ export function geodesicDistanceKm(origin: Pick<LocationLabel, "latitude" | "lon
   return 2 * earthRadiusKm * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+export function provisionalRoute(origin: Pick<LocationLabel, "latitude" | "longitude">, destination: Pick<LocationLabel, "latitude" | "longitude">) {
+  const directDistance = geodesicDistanceKm(origin, destination);
+  const distanceKm = Math.max(0.5, Math.ceil(directDistance * 1.28 * 10) / 10);
+  const durationMinutes = Math.max(4, Math.ceil((distanceKm / 22) * 60));
+  return { distanceKm, durationMinutes, precise: false as const, source: "provisional" as const };
+}
+
 export type EstimationInput = {
   distanceKm: number;
   durationMinutes?: number;

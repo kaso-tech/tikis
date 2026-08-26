@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compactRouteLabel, estimateDeliveryPrice, geodesicDistanceKm, normalizeLocation, sanitizePlaceText, validateDeliveryMeasurement } from "../lib/geo-rules";
+import { compactRouteLabel, estimateDeliveryPrice, geodesicDistanceKm, normalizeLocation, provisionalRoute, sanitizePlaceText, validateDeliveryMeasurement } from "../lib/geo-rules";
 
 describe("règles géographiques et estimation Tikis", () => {
   const pickup = { name: "Maison du Peuple", district: "Koulouba", city: "Ouagadougou", latitude: 12.3714, longitude: -1.5197 };
@@ -22,6 +22,14 @@ describe("règles géographiques et estimation Tikis", () => {
     const passenger = estimateDeliveryPrice({ distanceKm: distance, type: "Personne", vehicle: "Voiture", passengers: 3 });
     expect(cargo).toBeGreaterThan(pli);
     expect(passenger).toBeGreaterThan(pli);
+  });
+
+  it("crée un itinéraire provisoire lorsqu’aucun calcul Routes n’est disponible", () => {
+    const fallback = provisionalRoute(pickup, dropoff);
+    expect(fallback.precise).toBe(false);
+    expect(fallback.source).toBe("provisional");
+    expect(fallback.distanceKm).toBeGreaterThan(geodesicDistanceKm(pickup, dropoff));
+    expect(fallback.durationMinutes).toBeGreaterThan(0);
   });
 
   it("impose les seules mesures pertinentes à chaque type", () => {

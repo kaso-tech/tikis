@@ -108,3 +108,7 @@
 - [x] Définir l’état visuel et le libellé de traitement de la publication.
 - [x] Ajouter une animation de chargement claire au bouton de publication.
 - [x] Tester la prévention des doubles envois et les retours de publication.
+- [x] Définir les règles de repli pour publier une livraison sans Routes API.
+- [x] Calculer une distance géographique provisoire et une estimation adaptée aux caractéristiques de course.
+- [x] Afficher clairement le statut provisoire et préparer le recalcul Routes ultérieur.
+- [x] Tester la publication avec itinéraire provisoire avant la livraison.

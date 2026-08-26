@@ -7,7 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { FavoritePlacesSheet, FloatingPlacePicker, type SavedFavorite } from "@/components/tikis/place-sheets";
 import { SurfaceCard, TikisButton } from "@/components/tikis/ui";
 import { offeredPriceError, parseOfferedPrice, priceDifferencePercent, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
-import { compactRouteLabel, estimateDeliveryPrice, sanitizePlaceText, validateDeliveryMeasurement } from "@/lib/geo-rules";
+import { compactRouteLabel, estimateDeliveryPrice, provisionalRoute, sanitizePlaceText, validateDeliveryMeasurement } from "@/lib/geo-rules";
 import { isAllowedDeliveryText, sanitizeDeliveryText } from "@/lib/tikis-engine";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
@@ -43,7 +43,7 @@ export default function CreateDeliveryScreen() {
   const [heightCm, setHeightCm] = useState("");
   const [passengers, setPassengers] = useState("1");
   const [offeredPriceInput, setOfferedPriceInput] = useState("");
-  const [route, setRoute] = useState<{ distanceKm: number; durationMinutes: number; precise: boolean } | null>(null);
+  const [route, setRoute] = useState<{ distanceKm: number; durationMinutes: number; precise: boolean; source: "routes" | "provisional" } | null>(null);
   const [routeMessage, setRouteMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -68,9 +68,13 @@ export default function CreateDeliveryScreen() {
       setRouteMessage("Calcul de l’itinéraire sécurisé…");
       try {
         const result = await requestRoute({ origin: toPlacePayload(pickup), destination: toPlacePayload(dropoff) });
-        if (active) { setRoute({ ...result, precise: true }); setRouteMessage("Distance routière calculée avec Routes API."); }
-      } catch (cause) {
-        if (active) { setRoute(null); setRouteMessage(cause instanceof Error ? cause.message : "L’itinéraire sécurisé est indisponible. Vérifiez votre connexion puis réessayez."); }
+        if (active) { setRoute({ ...result, precise: true, source: "routes" }); setRouteMessage("Distance routière calculée avec Routes API."); }
+      } catch {
+        if (active) {
+          const fallback = provisionalRoute(pickup, dropoff);
+          setRoute(fallback);
+          setRouteMessage("Itinéraire provisoire basé sur la distance GPS. Routes API recalculera la distance routière dès son activation.");
+        }
       }
     }
     void calculateRoute();
@@ -125,7 +129,7 @@ export default function CreateDeliveryScreen() {
       await Promise.all([savePlaceMutation.mutateAsync(toPlacePayload(pickup)), savePlaceMutation.mutateAsync(toPlacePayload(dropoff))]);
       setPublicationStage("Publication auprès des livreurs…");
       await new Promise((resolve) => setTimeout(resolve, 180));
-      const delivery = createDemoDelivery({ title: cleanTitle, type: deliveryType, pickup, dropoff, distanceKm: route.distanceKm, estimatedPrice: estimate, ...(parsedOfferedPrice ? { offeredPrice: parsedOfferedPrice } : {}), vehicleTypes: [vehicle], details: cleanDetails, ...(deliveryType === "Autre" && weightKg ? { weightKg: Number(weightKg) } : {}), ...(deliveryType === "Autre" && Object.keys(dimensions).length ? { dimensions } : {}), ...(deliveryType === "Personne" ? { passengers: Number(passengers) } : {}) });
+      const delivery = createDemoDelivery({ title: cleanTitle, type: deliveryType, pickup, dropoff, distanceKm: route.distanceKm, routeSource: route.source, estimatedPrice: estimate, ...(parsedOfferedPrice ? { offeredPrice: parsedOfferedPrice } : {}), vehicleTypes: [vehicle], details: cleanDetails, ...(deliveryType === "Autre" && weightKg ? { weightKg: Number(weightKg) } : {}), ...(deliveryType === "Autre" && Object.keys(dimensions).length ? { dimensions } : {}), ...(deliveryType === "Personne" ? { passengers: Number(passengers) } : {}) });
       router.replace(`/delivery/${delivery.id}` as any);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "La livraison n’a pas pu être publiée."); }
     finally { setLoading(false); setPublicationStage(""); }
@@ -173,19 +177,19 @@ export default function CreateDeliveryScreen() {
           <Text style={styles.sectionLabel}>ENGIN ET ESTIMATION</Text>
           <Text style={styles.helper}>Sélectionnez un seul engin compatible. La fourgonnette n’est pas disponible.</Text>
           <View style={styles.vehicleGrid}>{VEHICLES.map((item) => <Pressable key={item} onPress={() => setVehicle(item)} style={({ pressed }) => [styles.vehicle, vehicle === item && styles.vehicleActive, pressed && styles.pressed]}><MaterialIcons name={item === "Vélo" || item === "Tricycle" ? "pedal-bike" : item === "Moto" ? "two-wheeler" : "directions-car"} size={20} color={vehicle === item ? "#FFFFFF" : "#007B8B"} /><Text style={[styles.vehicleText, vehicle === item && styles.vehicleTextActive]}>{item}</Text></Pressable>)}</View>
-          <View style={styles.estimate}><MaterialIcons name="auto-awesome" size={18} color="#007B8B" /><View style={styles.estimateInfo}><Text style={styles.estimateLabel}>{route ? `Estimation ${vehicle.toLocaleLowerCase("fr-FR")} · ${route.distanceKm.toFixed(1)} km` : "Sélectionnez les deux lieux"}</Text><Text style={styles.estimateValue}>{estimate ? `${estimate.toLocaleString("fr-FR")} FCFA` : "—"}</Text></View></View>
+          <View style={styles.estimate}><MaterialIcons name="auto-awesome" size={18} color="#007B8B" /><View style={styles.estimateInfo}><Text style={styles.estimateLabel}>{route ? `${route.precise ? "Estimation" : "Estimation provisoire"} ${vehicle.toLocaleLowerCase("fr-FR")} · ${route.distanceKm.toFixed(1)} km` : "Sélectionnez les deux lieux"}</Text><Text style={styles.estimateValue}>{estimate ? `${estimate.toLocaleString("fr-FR")} FCFA` : "—"}</Text></View></View>
           <View style={styles.priceFieldWrap}>
             <View style={styles.priceLabelRow}><Text style={styles.fieldLabel}>Prix proposé au livreur</Text><Text style={styles.optional}>Facultatif</Text></View>
             <View style={styles.priceField}><MaterialIcons name="payments" size={18} color="#007B8B" style={styles.fieldIcon} /><TextInput value={offeredPriceInput} onChangeText={(value) => setOfferedPriceInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} placeholder={estimate ? `${estimate.toLocaleString("fr-FR")} FCFA` : "Ex. 4 500"} placeholderTextColor="#9AA5B6" style={styles.input} /><Text style={styles.currency}>FCFA</Text></View>
             {priceInputError ? <Text style={styles.priceError}>{priceInputError}</Text> : parsedOfferedPrice && estimate ? <Text style={styles.priceHint}>{priceDifference === 0 ? "Aligné sur l’estimation intelligente." : `${priceDifference > 0 ? "+" : ""}${priceDifference}% par rapport à l’estimation.`}</Text> : <Text style={styles.priceHint}>Sans saisie, l’estimation intelligente sera publiée comme prix proposé.</Text>}
           </View>
           {routeMessage ? <Text style={[styles.routeMessage, !route?.precise && styles.routeWarning]}>{routeMessage}</Text> : null}
-          {pickup && dropoff && !route ? <Pressable accessibilityRole="button" onPress={retryRoute} style={({ pressed }) => [styles.retryRoute, pressed && styles.pressed]}><MaterialIcons name="refresh" size={16} color="#007B8B" /><Text style={styles.retryRouteText}>Réessayer le calcul d’itinéraire</Text></Pressable> : null}
+          {pickup && dropoff && (!route || !route.precise) ? <Pressable accessibilityRole="button" onPress={retryRoute} style={({ pressed }) => [styles.retryRoute, pressed && styles.pressed]}><MaterialIcons name="refresh" size={16} color="#007B8B" /><Text style={styles.retryRouteText}>{route ? "Recalculer avec Routes API" : "Réessayer le calcul d’itinéraire"}</Text></Pressable> : null}
           {pickup && dropoff ? <Text style={styles.routeTitle}>{compactRouteLabel(pickup, dropoff)}</Text> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <TikisButton label={`Publier · ${publishedPrice ? `${publishedPrice.toLocaleString("fr-FR")} FCFA` : "prix à définir"}`} icon="publish" onPress={() => void publish()} loading={loading} loadingLabel={publicationStage || "Publication en cours…"} style={styles.publish} />
           {loading ? <Text style={styles.publicationLoadingHint}>Veuillez patienter, votre course est en cours de publication.</Text> : null}
-          {!loading && (!pickup || !dropoff || !route) ? <Text style={styles.publicationHint}>Le bouton affichera précisément l’information manquante. L’itinéraire Routes est obligatoire avant publication.</Text> : null}
+          {!loading && (!pickup || !dropoff || !route) ? <Text style={styles.publicationHint}>Le bouton affichera précisément l’information manquante. Deux lieux GPS sont nécessaires avant publication.</Text> : null}
           <Text style={styles.footerNote}>Aucun débit immédiat. Les coordonnées complètes servent uniquement à la course et au calcul de distance.</Text>
         </ScrollView>
       </KeyboardAvoidingView>
