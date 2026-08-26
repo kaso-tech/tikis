@@ -2,11 +2,12 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
-import { coordinateAtStep, remainingMinutes, routeProgress, SIMULATED_ROUTE } from "@/lib/gps-simulator";
+import { coordinateAtStep, remainingMinutes, routeProgress, SIMULATED_ROUTE, trackingEventAtStep, type TrackingEvent } from "@/lib/gps-simulator";
 
-export function LiveMap({ driverName }: { driverName: string }) {
+export function LiveMap({ driverName, onTrackingEvent }: { driverName: string; onTrackingEvent?: (event: TrackingEvent) => void }) {
   const [step, setStep] = useState(3);
   const mapRef = useRef<MapView | null>(null);
+  const dispatchedEvents = useRef(new Set<TrackingEvent["type"]>());
   const position = coordinateAtStep(step);
   const progress = routeProgress(step);
 
@@ -18,6 +19,18 @@ export function LiveMap({ driverName }: { driverName: string }) {
   useEffect(() => {
     mapRef.current?.animateCamera({ center: position, pitch: 35, heading: 40, zoom: 15.3 }, { duration: 720 });
   }, [position]);
+
+  useEffect(() => {
+    if (step === 0) {
+      dispatchedEvents.current.clear();
+      return;
+    }
+    const event = trackingEventAtStep(step);
+    if (event && !dispatchedEvents.current.has(event.type)) {
+      dispatchedEvents.current.add(event.type);
+      onTrackingEvent?.(event);
+    }
+  }, [onTrackingEvent, step]);
 
   return (
     <View style={styles.container}>
@@ -58,4 +71,3 @@ const styles = StyleSheet.create({
   progressBubble: { position: "absolute", left: 14, right: 14, bottom: 14, padding: 12, borderRadius: 17, backgroundColor: "rgba(11,31,58,0.94)" },
   progressMain: { color: "#FFFFFF", fontSize: 18, fontWeight: "900" }, progressSub: { color: "#BED0E7", fontSize: 12, marginTop: 2 },
 });
-

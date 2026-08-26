@@ -183,6 +183,7 @@ type Store = {
   confirmAssignedDelivery: (deliveryId: string) => void;
   completeDelivery: (deliveryId: string) => void;
   createDemoDelivery: (input: Pick<Delivery, "title" | "pickup" | "dropoff" | "estimatedPrice" | "vehicleTypes" | "type" | "details">) => Delivery;
+  addNotification: (notification: Pick<InAppNotification, "title" | "body" | "tone">) => void;
   markNotificationsRead: () => void;
 };
 
@@ -315,6 +316,7 @@ export function TikisStoreProvider({ children }: { children: React.ReactNode }) 
     role, setRole, policy: POLICY, wallet, deliveries, candidates, journal, notifications,
     deliveryById, candidatesForDelivery, driverCandidateForDelivery,
     applyToDelivery, withdrawFromDelivery, selectCandidate, confirmAssignedDelivery, completeDelivery, createDemoDelivery,
+    addNotification: (notification) => setNotifications((items) => [makeNotification(notification.title, notification.body, notification.tone), ...items]),
     markNotificationsRead: () => setNotifications((items) => items.map((item) => ({ ...item, read: true }))),
   }), [role, wallet, deliveries, candidates, journal, notifications]);
 

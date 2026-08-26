@@ -23,3 +23,6 @@
 - [x] Implémenter une carte de suivi animée avec position du livreur, progression, ETA et contrôles de simulation.
 - [x] Rendre le suivi en direct accessible depuis les détails d’une livraison attribuée ou en cours.
 - [x] Tester le calcul de progression GPS simulée et valider l’intégration du suivi sur mobile.
+- [x] Définir les seuils de proximité et d’arrivée qui déclenchent les notifications push simulées.
+- [x] Intégrer les alertes locales de suivi GPS et leur enregistrement dans le centre de notifications.
+- [x] Tester les évènements de proximité et d’arrivée, puis valider l’expérience expéditeur.

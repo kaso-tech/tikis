@@ -85,6 +85,13 @@ const config: ExpoConfig = {
     favicon: "./assets/images/favicon.png",
   },
   plugins: [
+    [
+      "expo-notifications",
+      {
+        color: "#007B8B",
+        defaultChannel: "tikis-delivery-tracking",
+      },
+    ],
     "expo-router",
     [
       "expo-audio",
