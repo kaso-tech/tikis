@@ -52,6 +52,9 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
+    config: {
+      googleMapsApiKey: env.googleMapsIosKey,
+    },
     "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -66,6 +69,11 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
+    config: {
+      googleMaps: {
+        apiKey: env.googleMapsAndroidKey,
+      },
+    },
     permissions: ["POST_NOTIFICATIONS"],
     intentFilters: [
       {
@@ -95,13 +103,6 @@ const config: ExpoConfig = {
       },
     ],
     "expo-router",
-    [
-      "react-native-maps",
-      {
-        androidGoogleMapsApiKey: env.googleMapsAndroidKey,
-        iosGoogleMapsApiKey: env.googleMapsIosKey,
-      },
-    ],
     [
       "expo-image-picker",
       {

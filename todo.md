@@ -72,3 +72,6 @@
 - [x] Définir la séparation des clés Google Maps mobile et backend, avec restrictions adaptées.
 - [x] Mettre en place les services backend sécurisés pour Routes, Geocoding et Geocoding inverse.
 - [x] Intégrer la recherche Places et la sélection de position avec react-native-maps côté mobile.
+- [x] Définir la temporisation, le seuil de saisie et l’annulation des recherches d’adresse obsolètes.
+- [x] Intégrer les suggestions Places en autocomplétion dans les sélecteurs de collecte et destination.
+- [x] Tester l’autocomplétion, le nettoyage des requêtes et la sélection de suggestion avant la livraison.
