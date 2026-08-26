@@ -105,3 +105,6 @@
 - [x] Identifier la condition qui empêche la publication de livraison.
 - [x] Rendre visibles les erreurs de validation et l’état d’action du bouton de publication.
 - [x] Tester une publication complète de livraison avec les champs requis.
+- [x] Définir l’état visuel et le libellé de traitement de la publication.
+- [x] Ajouter une animation de chargement claire au bouton de publication.
+- [x] Tester la prévention des doubles envois et les retours de publication.

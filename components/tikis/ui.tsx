@@ -16,6 +16,7 @@ export function TikisButton({
   onPress,
   variant = "primary",
   loading = false,
+  loadingLabel,
   disabled = false,
   icon,
   style,
@@ -24,6 +25,7 @@ export function TikisButton({
   onPress: () => void;
   variant?: ButtonVariant;
   loading?: boolean;
+  loadingLabel?: string;
   disabled?: boolean;
   icon?: React.ComponentProps<typeof MaterialIcons>["name"];
   style?: ViewStyle;
@@ -48,7 +50,10 @@ export function TikisButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={palette.foreground} />
+        <>
+          <ActivityIndicator color={palette.foreground} />
+          <Text style={[styles.buttonText, { color: palette.foreground }]}>{loadingLabel ?? "Traitement en cours…"}</Text>
+        </>
       ) : (
         <>
           {icon ? <MaterialIcons name={icon} size={19} color={palette.foreground} /> : null}
@@ -170,4 +175,3 @@ const styles = StyleSheet.create({
   avatar: { alignItems: "center", justifyContent: "center" },
   avatarText: { color: "#FFFFFF", fontWeight: "800" },
 });
-
