@@ -19,3 +19,7 @@
 - [x] Écrire des tests unitaires déterministes sur les règles de commission et les transitions de livraison.
 - [x] Vérifier la compilation TypeScript et valider les interactions principales.
 - [x] Créer un point de contrôle final et préparer la livraison.
+- [x] Concevoir les états, l’itinéraire et les informations du suivi GPS simulé d’une livraison active.
+- [x] Implémenter une carte de suivi animée avec position du livreur, progression, ETA et contrôles de simulation.
+- [x] Rendre le suivi en direct accessible depuis les détails d’une livraison attribuée ou en cours.
+- [x] Tester le calcul de progression GPS simulée et valider l’intégration du suivi sur mobile.
