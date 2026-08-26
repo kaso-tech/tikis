@@ -23,6 +23,7 @@ export const tikisProfiles = mysqlTable("tikis_profiles", {
   fullName: varchar("fullName", { length: 70 }).notNull(),
   accountType: mysqlEnum("accountType", ["sender", "driver"]).notNull(),
   vehicles: text("vehicles").notNull(),
+  photoKey: varchar("photoKey", { length: 512 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

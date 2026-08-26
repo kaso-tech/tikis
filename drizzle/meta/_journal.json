@@ -15,6 +15,13 @@
       "when": 1787719184249,
       "tag": "0001_dashing_obadiah_stane",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1787719876243,
+      "tag": "0002_dapper_starfox",
+      "breakpoints": true
     }
   ]
 }

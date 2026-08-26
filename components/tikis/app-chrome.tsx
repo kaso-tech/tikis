@@ -28,6 +28,8 @@ const drawerItems = (role: UserRole, unread: number): DrawerItem[] => {
   return [
     ...shared,
     { key: "notifications", label: "Notifications", caption: "Activité de vos courses", icon: "notifications", route: "/notifications", badge: unread },
+    { key: "history", label: "Historique", caption: "Courses terminées", icon: "history", route: "/history" },
+    { key: "reviews", label: "Mes avis", caption: role === "driver" ? "Évaluations reçues" : "Évaluations envoyées", icon: "star-outline", route: "/reviews" },
     { key: "profile", label: "Profil et préférences", caption: "Compte, rôle et assistance", icon: "person", route: "/(tabs)/profile" },
   ];
 };

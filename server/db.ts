@@ -52,6 +52,7 @@ export type PersistedTikisProfile = {
   fullName: string;
   accountType: "sender" | "driver";
   vehicles: string;
+  photoKey?: string | null;
 };
 
 export async function getTikisProfileByPhone(phone: string) {
@@ -71,4 +72,13 @@ export async function createTikisProfile(input: PersistedTikisProfile) {
   const created = await getTikisProfileByPhone(input.phone);
   if (!created) throw new Error("Le profil n’a pas pu être enregistré.");
   return created;
+}
+
+export async function updateTikisProfile(phone: string, changes: Pick<PersistedTikisProfile, "fullName" | "photoKey">) {
+  const db = await getDb();
+  if (!db) throw new Error("La base de données sécurisée est temporairement indisponible.");
+  await db.update(tikisProfiles).set({ ...changes, updatedAt: new Date() }).where(eq(tikisProfiles.phone, phone));
+  const profile = await getTikisProfileByPhone(phone);
+  if (!profile) throw new Error("Le profil est introuvable.");
+  return profile;
 }

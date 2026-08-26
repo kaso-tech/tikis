@@ -94,6 +94,12 @@ const config: ExpoConfig = {
     ],
     "expo-router",
     [
+      "expo-image-picker",
+      {
+        photosPermission: "Autoriser $(PRODUCT_NAME) à accéder à vos photos pour modifier votre photo de profil.",
+      },
+    ],
+    [
       "expo-audio",
       {
         microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",

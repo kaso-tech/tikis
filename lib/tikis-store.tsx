@@ -2,6 +2,7 @@ import { createContext, useContext, useMemo, useState } from "react";
 import type {
   CommissionPolicy,
   Delivery,
+  DeliveryReview,
   DriverCandidate,
   FinancialRecord,
   InAppNotification,
@@ -11,6 +12,7 @@ import type {
 } from "../shared/tikis-domain";
 import { commissionFor, formatMoney } from "../shared/tikis-domain";
 import { canApplyToDelivery } from "./tikis-engine";
+import { canSubmitDeliveryReview, isValidReviewText, sanitizeReviewText } from "./review-rules";
 
 const POLICY: CommissionPolicy = { rate: 0.1, currency: "FCFA" };
 
@@ -172,6 +174,7 @@ type Store = {
   profile: RegisteredProfile | null;
   signInProfile: (profile: RegisteredProfile) => void;
   registerProfile: (profile: RegisteredProfile) => void;
+  updateProfile: (changes: Partial<Pick<RegisteredProfile, "fullName" | "photoUrl">>) => void;
   logout: () => void;
   policy: CommissionPolicy;
   wallet: WalletSnapshot;
@@ -179,7 +182,10 @@ type Store = {
   candidates: DriverCandidate[];
   journal: FinancialRecord[];
   notifications: InAppNotification[];
+  reviews: DeliveryReview[];
   deliveryById: (id: string) => Delivery | undefined;
+  completedDeliveriesForRole: (role: UserRole) => Delivery[];
+  reviewForDelivery: (deliveryId: string) => DeliveryReview | undefined;
   candidatesForDelivery: (id: string) => DriverCandidate[];
   driverCandidateForDelivery: (id: string) => DriverCandidate | undefined;
   applyToDelivery: (deliveryId: string) => { ok: boolean; message?: string };
@@ -188,6 +194,7 @@ type Store = {
   confirmAssignedDelivery: (deliveryId: string) => void;
   completeDelivery: (deliveryId: string) => void;
   createDemoDelivery: (input: Pick<Delivery, "title" | "pickup" | "dropoff" | "estimatedPrice" | "vehicleTypes" | "type" | "details">) => Delivery;
+  submitReview: (input: { deliveryId: string; rating: 1 | 2 | 3 | 4 | 5; comment?: string }) => { ok: boolean; message?: string };
   addNotification: (notification: Pick<InAppNotification, "title" | "body" | "tone">) => void;
   markNotificationsRead: () => void;
 };
@@ -206,6 +213,7 @@ export function TikisStoreProvider({ children }: { children: React.ReactNode }) 
   const [candidates, setCandidates] = useState<DriverCandidate[]>(INITIAL_CANDIDATES);
   const [journal, setJournal] = useState<FinancialRecord[]>(INITIAL_JOURNAL);
   const [notifications, setNotifications] = useState<InAppNotification[]>(INITIAL_NOTIFICATIONS);
+  const [reviews, setReviews] = useState<DeliveryReview[]>([]);
 
   const addJournal = (record: Omit<FinancialRecord, "id" | "createdAt">) => {
     setJournal((items) => [{ ...record, id: `fin-${Date.now()}`, createdAt: "À l’instant" }, ...items]);
@@ -227,12 +235,22 @@ export function TikisStoreProvider({ children }: { children: React.ReactNode }) 
     setNotifications((items) => [makeNotification("Bienvenue sur Tikis", `Votre compte ${nextProfile.role === "sender" ? "expéditeur" : "livreur"} a été créé avec succès.`, "success"), ...items]);
   };
 
+  const updateProfile = (changes: Partial<Pick<RegisteredProfile, "fullName" | "photoUrl">>) => {
+    setProfile((current) => current ? { ...current, ...changes } : current);
+  };
+
   const logout = () => {
     setProfile(null);
     setRole("sender");
   };
 
   const deliveryById = (id: string) => deliveries.find((delivery) => delivery.id === id);
+  const completedDeliveriesForRole = (targetRole: UserRole) => deliveries.filter((delivery) => {
+    if (delivery.status !== "completed") return false;
+    if (targetRole === "sender") return delivery.senderName === "A. Traoré" || delivery.senderName === profile?.fullName;
+    return delivery.driverId === CURRENT_DRIVER_ID || delivery.driverName === "Antoine Kaboré" || delivery.driverName === profile?.fullName;
+  });
+  const reviewForDelivery = (deliveryId: string) => reviews.find((review) => review.deliveryId === deliveryId);
   const candidatesForDelivery = (id: string) => candidates.filter((candidate) => candidate.deliveryId === id && candidate.status !== "withdrawn");
   const driverCandidateForDelivery = (id: string) => candidates.find((candidate) => candidate.deliveryId === id && candidate.driverId === CURRENT_DRIVER_ID && candidate.status !== "withdrawn");
 
@@ -339,13 +357,23 @@ export function TikisStoreProvider({ children }: { children: React.ReactNode }) 
     return delivery;
   };
 
+  const submitReview = ({ deliveryId, rating, comment }: { deliveryId: string; rating: 1 | 2 | 3 | 4 | 5; comment?: string }) => {
+    const delivery = deliveryById(deliveryId);
+    if (!delivery || !canSubmitDeliveryReview(delivery.status, Boolean(reviewForDelivery(deliveryId)), rating)) return { ok: false, message: "Cette livraison ne peut pas être évaluée dans cet état." };
+    if (comment && !isValidReviewText(comment)) return { ok: false, message: "Caractères non autorisés dans l’avis." };
+    const cleanComment = comment ? sanitizeReviewText(comment) : undefined;
+    setReviews((items) => [{ id: `review-${Date.now()}`, deliveryId, driverName: delivery.driverName ?? "Livreur Tikis", rating, comment: cleanComment, createdAt: "À l’instant" }, ...items]);
+    setNotifications((items) => [makeNotification("Avis enregistré", "Votre évaluation du livreur a été ajoutée à l’historique de cette course.", "success"), ...items]);
+    return { ok: true };
+  };
+
   const value = useMemo<Store>(() => ({
-    role, setRole: setRoleSafely, profile, signInProfile, registerProfile, logout, policy: POLICY, wallet, deliveries, candidates, journal, notifications,
-    deliveryById, candidatesForDelivery, driverCandidateForDelivery,
-    applyToDelivery, withdrawFromDelivery, selectCandidate, confirmAssignedDelivery, completeDelivery, createDemoDelivery,
+    role, setRole: setRoleSafely, profile, signInProfile, registerProfile, updateProfile, logout, policy: POLICY, wallet, deliveries, candidates, journal, notifications, reviews,
+    deliveryById, completedDeliveriesForRole, reviewForDelivery, candidatesForDelivery, driverCandidateForDelivery,
+    applyToDelivery, withdrawFromDelivery, selectCandidate, confirmAssignedDelivery, completeDelivery, createDemoDelivery, submitReview,
     addNotification: (notification) => setNotifications((items) => [makeNotification(notification.title, notification.body, notification.tone), ...items]),
     markNotificationsRead: () => setNotifications((items) => items.map((item) => ({ ...item, read: true }))),
-  }), [role, profile, wallet, deliveries, candidates, journal, notifications]);
+  }), [role, profile, wallet, deliveries, candidates, journal, notifications, reviews]);
 
   return <TikisStoreContext.Provider value={value}>{children}</TikisStoreContext.Provider>;
 }

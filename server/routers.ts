@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { COOKIE_NAME } from "../shared/const";
 import * as db from "./db";
+import { storagePut } from "./storage";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
@@ -25,14 +26,17 @@ function validateProfileRole(value: z.infer<typeof profileFieldsSchema>, ctx: z.
 const profileInputSchema = profileFieldsSchema.superRefine(validateProfileRole);
 const registrationInputSchema = profileFieldsSchema.extend({ otp: simulationOtpSchema }).superRefine(validateProfileRole);
 
-function toPublicProfile(profile: { phone: string; fullName: string; accountType: "sender" | "driver"; vehicles: string }) {
+function toPublicProfile(profile: { phone: string; fullName: string; accountType: "sender" | "driver"; vehicles: string; photoKey?: string | null }) {
   let vehicles: ValidVehicle[] = [];
   try {
     const parsed = JSON.parse(profile.vehicles) as unknown;
     if (Array.isArray(parsed)) vehicles = parsed.filter((item): item is ValidVehicle => vehicleSchema.safeParse(item).success);
   } catch { vehicles = []; }
-  return { phone: profile.phone, fullName: profile.fullName, role: profile.accountType, vehicles, roleLocked: true as const };
+  return { phone: profile.phone, fullName: profile.fullName, role: profile.accountType, vehicles, roleLocked: true as const, photoUrl: profile.photoKey ? `/manus-storage/${profile.photoKey}` : undefined };
 }
+
+const photoMimeSchema = z.enum(["image/jpeg", "image/png", "image/webp"]);
+const base64ImageSchema = z.string().min(32).max(1_600_000).regex(/^[A-Za-z0-9+/=]+$/, "Données d’image invalides.");
 
 export const appRouter = router({
   system: systemRouter,
@@ -57,6 +61,24 @@ export const appRouter = router({
         accountType: input.role,
         vehicles: JSON.stringify(input.role === "driver" ? input.vehicles : []),
       });
+      return toPublicProfile(profile);
+    }),
+    update: publicProcedure.input(z.object({ phone: phoneSchema, otp: simulationOtpSchema, fullName: fullNameSchema.optional(), photoBase64: base64ImageSchema.optional(), photoMime: photoMimeSchema.optional() }).superRefine((value, ctx) => {
+      if (!value.fullName && !value.photoBase64) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Aucune modification à enregistrer." });
+      if (value.photoBase64 && !value.photoMime) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["photoMime"], message: "Type d’image requis." });
+    })).mutation(async ({ input }) => {
+      let photoKey: string | null | undefined;
+      if (input.photoBase64 && input.photoMime) {
+        const bytes = Buffer.from(input.photoBase64, "base64");
+        if (bytes.length > 1_000_000) throw new Error("La photo est trop volumineuse.");
+        const extension = input.photoMime === "image/png" ? "png" : input.photoMime === "image/webp" ? "webp" : "jpg";
+        const safePhone = input.phone.replace(/[^0-9]/g, "");
+        const stored = await storagePut(`tikis-profiles/${safePhone}/avatar.${extension}`, bytes, input.photoMime);
+        photoKey = stored.key;
+      }
+      const current = await db.getTikisProfileByPhone(input.phone);
+      if (!current) throw new Error("Profil introuvable. Connectez-vous de nouveau pour le créer.");
+      const profile = await db.updateTikisProfile(input.phone, { fullName: input.fullName ?? current.fullName, photoKey: photoKey ?? current.photoKey });
       return toPublicProfile(profile);
     }),
   }),

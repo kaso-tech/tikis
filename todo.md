@@ -44,3 +44,8 @@
 - [x] Connecter l’inscription et la connexion OTP à la base de données des profils.
 - [x] Créer les pages réelles de conditions d’utilisation et de politique de confidentialité.
 - [x] Valider la navigation, la persistance des profils et les documents légaux avant la livraison.
+- [x] Formaliser les données de profil, de photo, d’historique et de notation Tikis.
+- [x] Ajouter la modification de photo et d’informations personnelles au profil utilisateur.
+- [x] Créer un historique détaillé des courses passées pour expéditeurs et livreurs.
+- [x] Implémenter la notation et l’avis du livreur à la fin d’une livraison.
+- [x] Tester les parcours de profil, d’historique et d’avis avant la livraison.

@@ -21,6 +21,16 @@ export interface RegisteredProfile {
   role: UserRole;
   vehicles: VehicleType[];
   roleLocked: true;
+  photoUrl?: string;
+}
+
+export interface DeliveryReview {
+  id: string;
+  deliveryId: string;
+  driverName: string;
+  rating: 1 | 2 | 3 | 4 | 5;
+  comment?: string;
+  createdAt: string;
 }
 
 export interface CommissionPolicy {
