@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
 import { useTikisNavigation } from "@/lib/tikis-navigation";
+import { useTikisLogout } from "@/lib/tikis-logout";
 import { useTikisStore } from "@/lib/tikis-store";
 import type { UserRole } from "@/shared/tikis-domain";
 
@@ -53,7 +54,8 @@ export function TikisDrawer() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { isDrawerOpen, closeDrawer } = useTikisNavigation();
-  const { role, profile, logout, notifications } = useTikisStore();
+  const { role, profile, notifications } = useTikisStore();
+  const { openLogoutConfirmation } = useTikisLogout();
   const unread = notifications.filter((item) => !item.read).length;
   const items = drawerItems(role, unread);
   const name = profile?.fullName ?? (role === "sender" ? "Aïcha Traoré" : "Antoine Kaboré");
@@ -64,7 +66,7 @@ export function TikisDrawer() {
     router.push(route as any);
   }
 
-  return <Modal visible={isDrawerOpen} transparent animationType="fade" onRequestClose={closeDrawer} statusBarTranslucent><View style={styles.drawerModal}><View style={[styles.drawerPanel, { paddingTop: Math.max(insets.top, 16) }]}><View style={styles.drawerTop}><Text style={styles.drawerEyebrow}>NAVIGATION</Text><Pressable accessibilityRole="button" accessibilityLabel="Fermer le menu" onPress={closeDrawer} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}><MaterialIcons name="close" size={21} color="#0B1F3A" /></Pressable></View><View style={styles.profileBlock}><Avatar initials={initials} color={role === "sender" ? "#7657A7" : "#007B8B"} /><View style={styles.profileText}><Text style={styles.profileName}>{name}</Text><View style={styles.rolePill}><View style={styles.roleDot} /><Text style={styles.roleLabel}>{role === "sender" ? "Expéditeur vérifié" : "Livreur vérifié"}</Text></View></View></View><View style={styles.lockedAccount}><MaterialIcons name="lock" size={16} color="#8A5A0E" /><Text style={styles.lockedAccountText}>Type de compte définitif : {role === "sender" ? "Expéditeur" : "Livreur"}</Text></View><Text style={styles.menuLabel}>ESPACE TIKIS</Text><View style={styles.menu}>{items.map((item) => <DrawerRow key={item.key} item={item} active={pathname === item.route || (item.key === "home" && pathname === "/")} onPress={() => navigate(item.route)} />)}</View><View style={styles.drawerFooter}><View style={styles.securityRow}><MaterialIcons name="verified-user" size={17} color="#18A572" /><Text style={styles.securityText}>Votre compte est sécurisé par Tikis</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Se déconnecter" onPress={() => { logout(); closeDrawer(); router.replace("/" as any); }} style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}><MaterialIcons name="logout" size={19} color="#C23B45" /><Text style={styles.signOutText}>Se déconnecter</Text></Pressable></View></View><Pressable accessibilityRole="button" accessibilityLabel="Fermer le menu" onPress={closeDrawer} style={styles.scrim} /></View></Modal>;
+  return <Modal visible={isDrawerOpen} transparent animationType="fade" onRequestClose={closeDrawer} statusBarTranslucent><View style={styles.drawerModal}><View style={[styles.drawerPanel, { paddingTop: Math.max(insets.top, 16) }]}><View style={styles.drawerTop}><Text style={styles.drawerEyebrow}>NAVIGATION</Text><Pressable accessibilityRole="button" accessibilityLabel="Fermer le menu" onPress={closeDrawer} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}><MaterialIcons name="close" size={21} color="#0B1F3A" /></Pressable></View><View style={styles.profileBlock}><Avatar initials={initials} color={role === "sender" ? "#7657A7" : "#007B8B"} /><View style={styles.profileText}><Text style={styles.profileName}>{name}</Text><View style={styles.rolePill}><View style={styles.roleDot} /><Text style={styles.roleLabel}>{role === "sender" ? "Expéditeur vérifié" : "Livreur vérifié"}</Text></View></View></View><View style={styles.lockedAccount}><MaterialIcons name="lock" size={16} color="#8A5A0E" /><Text style={styles.lockedAccountText}>Type de compte définitif : {role === "sender" ? "Expéditeur" : "Livreur"}</Text></View><Text style={styles.menuLabel}>ESPACE TIKIS</Text><View style={styles.menu}>{items.map((item) => <DrawerRow key={item.key} item={item} active={pathname === item.route || (item.key === "home" && pathname === "/")} onPress={() => navigate(item.route)} />)}</View><View style={styles.drawerFooter}><View style={styles.securityRow}><MaterialIcons name="verified-user" size={17} color="#18A572" /><Text style={styles.securityText}>Votre compte est sécurisé par Tikis</Text></View><Pressable accessibilityRole="button" accessibilityLabel="Se déconnecter" onPress={openLogoutConfirmation} style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}><MaterialIcons name="logout" size={19} color="#C23B45" /><Text style={styles.signOutText}>Se déconnecter</Text></Pressable></View></View><Pressable accessibilityRole="button" accessibilityLabel="Fermer le menu" onPress={closeDrawer} style={styles.scrim} /></View></Modal>;
 }
 
 function DrawerRow({ item, active, onPress }: { item: DrawerItem; active: boolean; onPress: () => void }) {

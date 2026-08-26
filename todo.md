@@ -59,3 +59,6 @@
 - [x] Créer un écran de suivi des filleuls et de leurs statuts d’éligibilité.
 - [x] Enregistrer et présenter les récompenses de parrainage dans le Wallet et son journal.
 - [x] Tester le suivi des filleuls et les crédits Wallet de parrainage avant la livraison.
+- [x] Définir une confirmation de déconnexion uniforme pour le profil et le drawer.
+- [x] Implémenter une modal de déconnexion professionnelle avec annulation et état de chargement.
+- [x] Vérifier la fermeture de session et la redirection vers l’authentification avant la livraison.

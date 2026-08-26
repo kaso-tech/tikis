@@ -10,6 +10,7 @@ import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { TikisDrawer } from "@/components/tikis/app-chrome";
 import { TikisNavigationProvider } from "@/lib/tikis-navigation";
+import { TikisLogoutProvider } from "@/lib/tikis-logout";
 import { TikisStoreProvider } from "@/lib/tikis-store";
 import {
   SafeAreaFrameContext,
@@ -108,7 +109,7 @@ export default function RootLayout() {
       <SafeAreaProvider initialMetrics={providerInitialMetrics}>
           <SafeAreaFrameContext.Provider value={frame}>
             <SafeAreaInsetsContext.Provider value={insets}>
-              <TikisStoreProvider><TikisNavigationProvider>{content}</TikisNavigationProvider></TikisStoreProvider>
+              <TikisStoreProvider><TikisNavigationProvider><TikisLogoutProvider>{content}</TikisLogoutProvider></TikisNavigationProvider></TikisStoreProvider>
             </SafeAreaInsetsContext.Provider>
           </SafeAreaFrameContext.Provider>
         </SafeAreaProvider>
@@ -118,7 +119,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <SafeAreaProvider initialMetrics={providerInitialMetrics}><TikisStoreProvider><TikisNavigationProvider>{content}</TikisNavigationProvider></TikisStoreProvider></SafeAreaProvider>
+      <SafeAreaProvider initialMetrics={providerInitialMetrics}><TikisStoreProvider><TikisNavigationProvider><TikisLogoutProvider>{content}</TikisLogoutProvider></TikisNavigationProvider></TikisStoreProvider></SafeAreaProvider>
     </ThemeProvider>
   );
 }
