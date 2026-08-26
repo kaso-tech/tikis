@@ -7,7 +7,8 @@ import { useTikisStore } from "@/lib/tikis-store";
 import { availableWalletBalance, formatMoney } from "@/shared/tikis-domain";
 
 export default function HomeScreen() {
-  const { role, deliveries, wallet } = useTikisStore();
+  const { role, profile, deliveries, wallet } = useTikisStore();
+  const firstName = (profile?.fullName ?? (role === "sender" ? "Aïcha Traoré" : "Antoine Kaboré")).split(" ")[0];
   const visibleDeliveries = role === "sender"
     ? deliveries.filter((delivery) => delivery.senderName === "A. Traoré")
     : deliveries.filter((delivery) => delivery.status === "open" || delivery.status === "pending_confirmation" || (delivery.driverId === "driver-antoine" && delivery.status !== "completed"));
@@ -23,7 +24,7 @@ export default function HomeScreen() {
           <>
             <View style={styles.header}>
               <Text style={tikisStyles.eyebrow}>{role === "sender" ? "Espace expéditeur" : "Espace livreur"}</Text>
-              <Text style={[tikisStyles.title, styles.greeting]}>Bonjour, {role === "sender" ? "Aïcha" : "Antoine"}</Text>
+              <Text style={[tikisStyles.title, styles.greeting]}>Bonjour, {firstName}</Text>
             </View>
 
             {role === "sender" ? (

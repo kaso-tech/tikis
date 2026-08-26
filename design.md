@@ -25,8 +25,12 @@ Les statuts visibles par l’expéditeur utilisent les conventions métier défi
 
 | Écran | Contenu principal | Actions importantes |
 |---|---|---|
-| Connexion téléphone | Indicatif pays, numéro, consentement aux conditions et politique de confidentialité | Envoyer le code à six chiffres |
+| Présentation et consentement | Proposition de valeur, sélecteur Français/English, conditions d’utilisation et politique de confidentialité | Accepter et continuer |
+| Téléphone international | Pays pré-détecté, sélecteur de pays, indicatif fixe, longueur et espaces de saisie adaptés | Envoyer le code à six chiffres |
 | Vérification OTP | Numéro masqué, six champs ou saisie groupée, délai de renvoi et aide | Vérifier le code, modifier le numéro, renvoyer le code |
+| Choix de compte | Comparatif expéditeur/livreur et explication de l’irréversibilité du rôle | Choisir le rôle et continuer |
+| Engins du livreur | Sélection multi-engins : vélo, moto, tricycle et voiture | Continuer vers l’identité |
+| Identité | Nom complet assaini et contrôle de format standard | Créer le compte |
 | Accueil expéditeur | Résumé d’activité, courses actives, statut, raccourci de création | Créer une livraison, ouvrir le détail, filtrer |
 | Créer une livraison | Adresses, type, détails, engins, estimation intelligente et frais suggérés | Enregistrer, publier, modifier les choix |
 | Détail expéditeur | Chronologie, détails, tarification, candidatures et validation par codes | Choisir/remplacer un livreur, suivre, signaler, noter |
@@ -35,12 +39,14 @@ Les statuts visibles par l’expéditeur utilisent les conventions métier défi
 | Détail livreur | Informations utiles anonymisées avant sélection, tarification, détails et conditions | Se proposer, renoncer avant sélection, signaler |
 | Wallet | Solde disponible, commission bloquée, derniers mouvements | Consulter le journal détaillé |
 | Notifications | Évènements de courses, candidatures, attribution et signalements | Marquer comme lu, accéder à la course |
-| Profil | Identité, rôle de démonstration, engins, performance et préférences | Changer de rôle de démonstration, gérer les engins |
+| Profil | Identité, rôle définitivement inscrit, engins, performance et préférences | Consulter les préférences et se déconnecter |
 | Confirmation financière | Résumé, montant, conséquences fonctionnelles et caractère irréversible | Confirmer ou annuler |
 
 ## Parcours prioritaires
 
-Le parcours d’accès commence avec un numéro de téléphone international. Après une validation locale de format, Tikis génère un code OTP de simulation composé de **six chiffres exactement**. L’écran de vérification affiche le numéro sous forme masquée, active la validation dès la saisie complète, limite les tentatives et propose un renvoi temporisé. À validation réussie, l’utilisateur est redirigé vers son espace Tikis ; aucun mot de passe n’est demandé ni conservé. Dans cette version de démonstration, le code de simulation est affiché explicitement à l’utilisateur et aucune donnée sensible n’est transmise à un fournisseur SMS.
+Le parcours d’accès commence par une présentation de Tikis avec choix de langue et consentement explicite. L’écran de téléphone détecte le pays d’après le fuseau de l’appareil et présélectionne le format correspondant. L’utilisateur peut modifier le pays ; l’indicatif, la longueur requise et les espaces de saisie sont alors mis à jour. Après une validation locale de format, Tikis génère un code OTP de simulation composé de **six chiffres exactement**. L’écran de vérification masque le numéro, active la validation dès la saisie complète, limite les tentatives et propose un renvoi temporisé.
+
+Après validation de l’OTP, le numéro est recherché dans le répertoire de démonstration. Un numéro associé à un compte est connecté immédiatement selon son rôle inscrit. Sinon, le nouvel utilisateur choisit un rôle irréversible. L’expéditeur saisit son nom complet puis accède à son espace. Le livreur choisit d’abord un ou plusieurs engins — vélo, moto, tricycle ou voiture — puis saisit son nom complet. Tous les champs sont assainis ; le nom est limité à soixante-dix caractères et exige au minimum un prénom et un nom valides.
 
 L’expéditeur crée d’abord une livraison, obtient une estimation contextualisée par l’engin choisi et la publie sans débit immédiat. Il consulte ensuite les candidatures, voit le prix et la commission de mise en relation concernée, puis sélectionne un livreur via une confirmation détaillée. Cette sélection rend les coordonnées visibles et acte définitivement une seule commission Tikis pour la livraison.
 

@@ -13,7 +13,15 @@ export type CandidateStatus = "applied" | "selected" | "confirmed" | "withdrawn"
 
 export type WalletOperation = "block" | "unblock" | "debit" | "compensation" | "credit";
 
-export type VehicleType = "Moto" | "Tricycle" | "Voiture" | "Fourgonnette";
+export type VehicleType = "Vélo" | "Moto" | "Tricycle" | "Voiture" | "Fourgonnette";
+
+export interface RegisteredProfile {
+  fullName: string;
+  phone: string;
+  role: UserRole;
+  vehicles: VehicleType[];
+  roleLocked: true;
+}
 
 export interface CommissionPolicy {
   rate: number;

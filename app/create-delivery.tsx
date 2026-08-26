@@ -8,7 +8,7 @@ import { useTikisStore } from "@/lib/tikis-store";
 import { isAllowedDeliveryText, sanitizeDeliveryText } from "@/lib/tikis-engine";
 import type { VehicleType } from "@/shared/tikis-domain";
 
-const VEHICLES: VehicleType[] = ["Moto", "Tricycle", "Voiture", "Fourgonnette"];
+const VEHICLES: VehicleType[] = ["Vélo", "Moto", "Tricycle", "Voiture", "Fourgonnette"];
 const DELIVERY_TYPES = ["Colis", "Plis", "Personne"] as const;
 
 export default function CreateDeliveryScreen() {
@@ -74,7 +74,7 @@ export default function CreateDeliveryScreen() {
 
           <Text style={styles.sectionLabel}>ENGIN ET FRAIS</Text>
           <Text style={styles.helper}>Sélectionnez les engins compatibles avec votre livraison.</Text>
-          <View style={styles.vehicleGrid}>{VEHICLES.map((vehicle) => <Pressable key={vehicle} onPress={() => toggleVehicle(vehicle)} style={({ pressed }) => [styles.vehicle, vehicles.includes(vehicle) && styles.vehicleActive, pressed && styles.pressed]}><MaterialIcons name={vehicle === "Moto" ? "two-wheeler" : vehicle === "Tricycle" ? "pedal-bike" : "local-shipping"} size={20} color={vehicles.includes(vehicle) ? "#FFFFFF" : "#007B8B"} /><Text style={[styles.vehicleText, vehicles.includes(vehicle) && styles.vehicleTextActive]}>{vehicle}</Text></Pressable>)}</View>
+          <View style={styles.vehicleGrid}>{VEHICLES.map((vehicle) => <Pressable key={vehicle} onPress={() => toggleVehicle(vehicle)} style={({ pressed }) => [styles.vehicle, vehicles.includes(vehicle) && styles.vehicleActive, pressed && styles.pressed]}><MaterialIcons name={vehicle === "Vélo" || vehicle === "Tricycle" ? "pedal-bike" : vehicle === "Moto" ? "two-wheeler" : "local-shipping"} size={20} color={vehicles.includes(vehicle) ? "#FFFFFF" : "#007B8B"} /><Text style={[styles.vehicleText, vehicles.includes(vehicle) && styles.vehicleTextActive]}>{vehicle}</Text></Pressable>)}</View>
           <Text style={styles.fieldLabel}>Frais suggérés</Text>
           <View style={styles.priceField}><TextInput value={price} onChangeText={(value) => setPrice(value.replace(/\D/g, ""))} keyboardType="number-pad" style={styles.priceInput} placeholder="4500" placeholderTextColor="#9AA5B6" /><Text style={styles.currency}>FCFA</Text></View>
           <View style={styles.estimate}><MaterialIcons name="auto-awesome" size={17} color="#007B8B" /><Text style={styles.estimateText}>Estimation intelligente pour {vehicles[0]} : <Text style={styles.estimateValue}>{estimate.toLocaleString("fr-FR")} FCFA</Text></Text></View>

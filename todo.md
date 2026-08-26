@@ -30,3 +30,11 @@
 - [x] Implémenter un header persistant professionnel avec menu, titre contextuel et accès aux notifications.
 - [x] Implémenter un drawer professionnel et responsive, adapté aux onglets expéditeur et livreur.
 - [x] Tester la navigation par header et drawer, puis enregistrer la version.
+- [x] Définir le parcours d’inscription à six écrans, les consentements et le comportement des comptes existants.
+- [x] Créer le catalogue des pays, la détection de pays et le formatage sécurisé de numéro par pays.
+- [x] Renforcer les validateurs de téléphone, d’OTP et de nom complet contre les entrées malveillantes.
+- [x] Créer la présentation initiale avec sélecteur de langue et liens légaux.
+- [x] Implémenter la saisie de téléphone internationale, l’OTP et la détection de compte simulée.
+- [x] Implémenter le choix définitif de rôle, la sélection d’engins et la saisie de nom complet.
+- [x] Adapter le store au profil inscrit et interdire le changement de rôle après inscription.
+- [x] Tester le parcours d’inscription complet et enregistrer la version.
