@@ -77,3 +77,5 @@
 - [x] Tester l’autocomplétion, le nettoyage des requêtes et la sélection de suggestion avant la livraison.
 - [x] Corriger la conservation des espaces simples dans le champ de nom complet.
 - [x] Tester les noms composés avec espaces tout en conservant les protections de séparateurs.
+- [x] Identifier et corriger l’effet React responsable de la boucle de mises à jour.
+- [x] Vérifier l’absence de « Maximum update depth exceeded » après correction.

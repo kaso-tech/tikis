@@ -1,11 +1,12 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { remainingMinutes, routeProgress, SIMULATED_ROUTE, trackingEventAtStep, type TrackingEvent } from "@/lib/gps-simulator";
 
 export function LiveMap({ driverName, onTrackingEvent }: { driverName: string; onTrackingEvent?: (event: TrackingEvent) => void }) {
   const [step, setStep] = useState(3);
-  const [sentEvents, setSentEvents] = useState<TrackingEvent["type"][]>([]);
+  const sentEvents = useRef<Set<TrackingEvent["type"]>>(new Set());
+  const trackingEventHandler = useRef(onTrackingEvent);
   const progress = routeProgress(step);
   const x = 20 + (step / (SIMULATED_ROUTE.length - 1)) * 63;
   const y = 70 - (step / (SIMULATED_ROUTE.length - 1)) * 43;
@@ -16,16 +17,20 @@ export function LiveMap({ driverName, onTrackingEvent }: { driverName: string; o
   }, []);
 
   useEffect(() => {
+    trackingEventHandler.current = onTrackingEvent;
+  }, [onTrackingEvent]);
+
+  useEffect(() => {
     if (step === 0) {
-      setSentEvents([]);
+      sentEvents.current.clear();
       return;
     }
     const event = trackingEventAtStep(step);
-    if (event && !sentEvents.includes(event.type)) {
-      setSentEvents((items) => [...items, event.type]);
-      onTrackingEvent?.(event);
+    if (event && !sentEvents.current.has(event.type)) {
+      sentEvents.current.add(event.type);
+      trackingEventHandler.current?.(event);
     }
-  }, [onTrackingEvent, sentEvents, step]);
+  }, [step]);
 
   return <View style={styles.container}><View style={styles.water} /><View style={[styles.road, styles.roadOne]} /><View style={[styles.road, styles.roadTwo]} /><View style={[styles.road, styles.roadThree]} /><View style={styles.routeStart}><MaterialIcons name="inventory-2" size={13} color="#FFFFFF" /></View><View style={styles.destination}><MaterialIcons name="location-on" size={27} color="#E45858" /></View><View style={[styles.driver, { left: `${x}%`, top: `${y}%` }]}><MaterialIcons name="two-wheeler" size={21} color="#FFFFFF" /></View><View style={styles.liveBadge}><View style={styles.liveDot} /><Text style={styles.liveText}>POSITION MISE À JOUR</Text></View><View style={styles.progressBubble}><Text style={styles.progressMain}>{progress} %</Text><Text style={styles.progressSub}>{driverName} · arrivée estimée dans {remainingMinutes(step)} min</Text></View></View>;
 }

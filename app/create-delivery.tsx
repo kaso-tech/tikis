@@ -41,7 +41,7 @@ export default function CreateDeliveryScreen() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [favoriteTarget, setFavoriteTarget] = useState<"pickup" | "dropoff" | null>(null);
-  const routeMutation = trpc.geography.route.useMutation();
+  const { mutateAsync: requestRoute } = trpc.geography.route.useMutation();
   const savePlaceMutation = trpc.geography.savePlace.useMutation();
   const favoriteMutation = trpc.geography.favorites.add.useMutation();
   const favoritesQuery = trpc.geography.favorites.list.useQuery({ phone }, { enabled: Boolean(profile?.phone) });
@@ -55,7 +55,7 @@ export default function CreateDeliveryScreen() {
       if (!pickup || !dropoff) { setRoute(null); setRouteMessage(""); return; }
       setRouteMessage("Calcul de l’itinéraire sécurisé…");
       try {
-        const result = await routeMutation.mutateAsync({ origin: toPlacePayload(pickup), destination: toPlacePayload(dropoff) });
+        const result = await requestRoute({ origin: toPlacePayload(pickup), destination: toPlacePayload(dropoff) });
         if (active) { setRoute({ ...result, precise: true }); setRouteMessage("Distance routière calculée avec Routes API."); }
       } catch (cause) {
         if (active) { setRoute(null); setRouteMessage(cause instanceof Error ? cause.message : "L’itinéraire sécurisé est indisponible. Vérifiez votre connexion puis réessayez."); }
@@ -63,7 +63,7 @@ export default function CreateDeliveryScreen() {
     }
     void calculateRoute();
     return () => { active = false; };
-  }, [pickup, dropoff, routeMutation]);
+  }, [pickup, dropoff, requestRoute]);
 
   const estimate = useMemo(() => route ? estimateDeliveryPrice({ distanceKm: route.distanceKm, durationMinutes: route.durationMinutes, type: deliveryType, vehicle, ...measurement }) : 0, [route, deliveryType, vehicle, measurement]);
 

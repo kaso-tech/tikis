@@ -18,10 +18,15 @@ export function PlacePicker({ label, tone, value, onChange }: Props) {
   const [message, setMessage] = useState("");
   const search = trpc.geography.search.useMutation();
   const reverse = trpc.geography.reverse.useMutation();
+  const searchPlaces = search.mutateAsync;
+  const reverseGeocode = reverse.mutateAsync;
+  const selectedName = value?.name;
+  const biasLatitude = value?.latitude;
+  const biasLongitude = value?.longitude;
   const latestSearch = useRef(0);
   const accent = tone === "pickup" ? "#007B8B" : "#C23B45";
 
-  useEffect(() => { if (value) { setQuery(value.name); mapRef.current?.animateToRegion({ latitude: value.latitude, longitude: value.longitude, latitudeDelta: 0.025, longitudeDelta: 0.025 }, 350); } }, [value]);
+  useEffect(() => { if (selectedName && biasLatitude !== undefined && biasLongitude !== undefined) { if (query !== selectedName) setQuery(selectedName); mapRef.current?.animateToRegion({ latitude: biasLatitude, longitude: biasLongitude, latitudeDelta: 0.025, longitudeDelta: 0.025 }, 350); } }, [selectedName, biasLatitude, biasLongitude, query]);
 
   const runSearch = useCallback(async (rawQuery: string) => {
     const clean = autocompleteQuery(rawQuery);
@@ -29,12 +34,12 @@ export function PlacePicker({ label, tone, value, onChange }: Props) {
     const requestId = ++latestSearch.current;
     try {
       setMessage("");
-      const places = await search.mutateAsync({ query: clean, ...(value ? { biasLatitude: value.latitude, biasLongitude: value.longitude } : {}) });
+      const places = await searchPlaces({ query: clean, ...(biasLatitude !== undefined && biasLongitude !== undefined ? { biasLatitude, biasLongitude } : {}) });
       if (requestId !== latestSearch.current) return;
       setResults(places);
       if (!places.length) setMessage("Aucun lieu trouvé. Touchez la carte pour choisir une position.");
     } catch (cause) { if (requestId === latestSearch.current) setMessage(cause instanceof Error ? cause.message : "La recherche est indisponible."); }
-  }, [search, value]);
+  }, [searchPlaces, biasLatitude, biasLongitude]);
 
   useEffect(() => {
     if (!autocompleteQuery(query)) { latestSearch.current += 1; setResults([]); return; }
@@ -46,7 +51,7 @@ export function PlacePicker({ label, tone, value, onChange }: Props) {
     const { latitude, longitude } = event.nativeEvent.coordinate;
     try {
       setMessage("Résolution de l’adresse…");
-      const place = await reverse.mutateAsync({ latitude, longitude });
+      const place = await reverseGeocode({ latitude, longitude });
       if (!place) { setMessage("Impossible d’identifier ce point. Essayez une autre position."); return; }
       latestSearch.current += 1;
       onChange(place);
