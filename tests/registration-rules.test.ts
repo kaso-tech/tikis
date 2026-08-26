@@ -27,6 +27,9 @@ describe("règles d’inscription internationale Tikis", () => {
     expect(sanitizeFullName("Mariam--Ouédraogo")).toBe("Mariam-Ouédraogo");
     expect(sanitizeFullName("Mariam - Ouédraogo")).toBe("Mariam Ouédraogo");
     expect(sanitizeFullName("Mariam' Ouédraogo")).toBe("Mariam'Ouédraogo");
+    expect(sanitizeFullName("Mariam ", { preserveTrailingSeparator: true })).toBe("Mariam ");
+    expect(sanitizeFullName("Mariam  Ouédraogo", { preserveTrailingSeparator: true })).toBe("Mariam Ouédraogo");
+    expect(validateFullName("Mariam Ouédraogo").valid).toBe(true);
   });
 
   it("verrouille le type de compte créé avec les engins du livreur", () => {

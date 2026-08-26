@@ -75,3 +75,5 @@
 - [x] Définir la temporisation, le seuil de saisie et l’annulation des recherches d’adresse obsolètes.
 - [x] Intégrer les suggestions Places en autocomplétion dans les sélecteurs de collecte et destination.
 - [x] Tester l’autocomplétion, le nettoyage des requêtes et la sélection de suggestion avant la livraison.
+- [x] Corriger la conservation des espaces simples dans le champ de nom complet.
+- [x] Tester les noms composés avec espaces tout en conservant les protections de séparateurs.

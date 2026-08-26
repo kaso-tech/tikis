@@ -63,7 +63,7 @@ export function isValidInternationalPhone(value: string, country: CountrySpec) {
 const NAME_PATTERN = /^[\p{L}]+(?:[ '-][\p{L}]+)*$/u;
 const ALLOWED_NAME_CHARACTERS = /[^\p{L} '-]/gu;
 
-export function sanitizeFullName(value: string) {
+export function sanitizeFullName(value: string, options: { preserveTrailingSeparator?: boolean } = {}) {
   let sanitized = "";
   for (const character of value.normalize("NFC").replace(/[’‘]/g, "'").replace(ALLOWED_NAME_CHARACTERS, "")) {
     const isLetter = /^\p{L}$/u.test(character);
@@ -74,7 +74,8 @@ export function sanitizeFullName(value: string) {
     const isSeparator = character === " " || character === "-" || character === "'";
     if (isSeparator && sanitized && /^\p{L}$/u.test(sanitized.at(-1) ?? "")) sanitized += character;
   }
-  return sanitized.replace(/[ '-]+$/g, "").slice(0, 70);
+  const capped = sanitized.slice(0, 70);
+  return options.preserveTrailingSeparator ? capped : capped.replace(/[ '-]+$/g, "");
 }
 
 export function validateFullName(value: string) {
