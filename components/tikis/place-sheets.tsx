@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { PlacePicker } from "@/components/tikis/place-picker";
 import { TikisButton } from "@/components/tikis/ui";
-import type { LocationLabel } from "@/shared/tikis-domain";
+import { locationSubtitle, locationTitle, type LocationLabel } from "@/shared/tikis-domain";
 
 type LocationTarget = "pickup" | "dropoff";
 
@@ -139,7 +139,7 @@ export function FavoritePlacesSheet({
                   </View>
                   <View style={styles.favoriteCopy}>
                     <Text style={styles.favoriteTitle} numberOfLines={1}>{favorite.label}</Text>
-                    <Text style={styles.favoriteMeta} numberOfLines={2}>{[favorite.location.district, favorite.location.city, favorite.location.formattedAddress].filter(Boolean).join(" · ") || favorite.location.name}</Text>
+                    <Text style={styles.favoriteMeta} numberOfLines={2}>{locationTitle(favorite.location)} · {locationSubtitle(favorite.location)}</Text>
                   </View>
                 </View>
                 <View style={styles.favoriteActions}>

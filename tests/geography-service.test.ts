@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { computeRoute, geocodeAddress, searchPlaces } from "../server/geography";
+import { computeRoute, geocodeAddress, resolveMapboxPlace, reverseGeocodeLocation, searchPlaces } from "../server/geography";
 
 const originalFetch = global.fetch;
 
@@ -33,5 +33,34 @@ describe("services géographiques backend Tikis", () => {
     await geocodeAddress(" <Karpala> ");
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("Karpala");
     expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain("%3C");
+  });
+
+  it("privilégie les suggestions Mapbox d’adresse, rue et quartier", async () => {
+    process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ suggestions: [{ mapbox_id: "address-1", name: "12 Avenue Kwame Nkrumah", full_address: "12 Avenue Kwame Nkrumah, Koulouba, Ouagadougou, Burkina Faso", place_formatted: "Ouagadougou, Burkina Faso", context: { neighborhood: { name: "Koulouba" }, place: { name: "Ouagadougou" }, country: { name: "Burkina Faso" } } }] })));
+    global.fetch = fetchMock as typeof fetch;
+    const result = await searchPlaces("Kwame Nkrumah");
+    const url = String(fetchMock.mock.calls[0]?.[0]);
+    expect(url).toContain("types=address%2Cpoi%2Cstreet%2Cneighborhood%2Clocality%2Cplace");
+    expect(result[0]).toMatchObject({ name: "12 Avenue Kwame Nkrumah", district: "Koulouba", city: "Ouagadougou", formattedAddress: "12 Avenue Kwame Nkrumah, Koulouba, Ouagadougou, Burkina Faso" });
+  });
+
+  it("conserve les contextes Mapbox structurés lors de la résolution d’une suggestion", async () => {
+    process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
+    global.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ features: [{ id: "address-1", geometry: { coordinates: [-1.5203, 12.3699] }, properties: { feature_type: "address", mapbox_id: "address-1", name: "12 Avenue Kwame Nkrumah", full_address: "12 Avenue Kwame Nkrumah", context: { neighborhood: { name: "Koulouba" }, place: { name: "Ouagadougou" }, region: { name: "Centre" }, country: { name: "Burkina Faso" } } } }] }))) as typeof fetch;
+    const place = await resolveMapboxPlace("address-1", "session-1");
+    expect(place).toMatchObject({ name: "12 Avenue Kwame Nkrumah", district: "Koulouba", city: "Ouagadougou", province: "Centre", country: "Burkina Faso", latitude: 12.3699, longitude: -1.5203 });
+  });
+
+  it("retient l’adresse la plus précise lors d’un appui sur la carte", async () => {
+    process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ features: [
+      { id: "place-ouaga", geometry: { coordinates: [-1.52, 12.37] }, properties: { feature_type: "place", name: "Ouagadougou", context: { place: { name: "Ouagadougou" }, country: { name: "Burkina Faso" } } } },
+      { id: "street-kwame", geometry: { coordinates: [-1.5202, 12.3698] }, properties: { feature_type: "street", name: "Avenue Kwame Nkrumah", full_address: "Avenue Kwame Nkrumah", context: { neighborhood: { name: "Koulouba" }, place: { name: "Ouagadougou" }, country: { name: "Burkina Faso" } } } },
+    ] })));
+    global.fetch = fetchMock as typeof fetch;
+    const place = await reverseGeocodeLocation(12.3698, -1.5202);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("types=address%2Cstreet%2Cneighborhood%2Clocality%2Cplace");
+    expect(place).toMatchObject({ name: "Avenue Kwame Nkrumah", district: "Koulouba", city: "Ouagadougou" });
   });
 });

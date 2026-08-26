@@ -3,6 +3,9 @@
 
 ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "tikis_delivery_members_can_receive_positions" ON realtime.messages;
+DROP POLICY IF EXISTS "tikis_delivery_members_can_send_positions" ON realtime.messages;
+
 CREATE POLICY "tikis_delivery_members_can_receive_positions"
 ON realtime.messages
 FOR SELECT

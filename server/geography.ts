@@ -7,8 +7,10 @@ type MapboxSuggestion = {
   mapbox_id?: string;
   name?: string;
   name_preferred?: string;
+  address?: string;
   full_address?: string;
   place_formatted?: string;
+  context?: Record<string, unknown>;
 };
 
 type MapboxFeature = {
@@ -26,6 +28,19 @@ function backendToken() {
 function stringField(input: Record<string, unknown> | undefined, key: string) {
   const value = input?.[key];
   return typeof value === "string" ? value : "";
+}
+
+function contextField(input: Record<string, unknown> | undefined, key: string) {
+  const value = input?.[key];
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object") return "";
+  const record = value as Record<string, unknown>;
+  return typeof record.name === "string" ? record.name : typeof record.text === "string" ? record.text : "";
+}
+
+function featurePrecision(feature: MapboxFeature) {
+  const type = stringField(feature.properties, "feature_type");
+  return type === "address" || type === "secondary_address" ? 0 : type === "street" ? 1 : type === "neighborhood" ? 2 : type === "locality" ? 3 : type === "place" ? 4 : 5;
 }
 
 function coordinatePair(feature: MapboxFeature) {
@@ -52,11 +67,18 @@ function suggestionToLocation(suggestion: MapboxSuggestion, sessionToken: string
   const mapboxId = suggestion.mapbox_id;
   const name = suggestion.name_preferred || suggestion.name;
   if (!mapboxId || !name) return null;
+  const context = suggestion.context;
+  const street = suggestion.address || contextField(context, "street");
+  const district = contextField(context, "neighborhood") || contextField(context, "district") || contextField(context, "locality");
+  const city = contextField(context, "place") || contextField(context, "locality") || suggestion.place_formatted || "";
   return normalizeLocation({
     name,
-    district: "",
-    city: suggestion.place_formatted ?? "",
-    formattedAddress: [suggestion.full_address, suggestion.place_formatted].filter(Boolean).join(", "),
+    district,
+    city,
+    street,
+    province: contextField(context, "region"),
+    country: contextField(context, "country"),
+    formattedAddress: suggestion.full_address || [street, district, city].filter(Boolean).join(", ") || name,
     mapboxId,
     mapboxSessionToken: sessionToken,
     latitude: 0,
@@ -69,17 +91,23 @@ function featureToLocation(feature: MapboxFeature): LocationLabel | null {
   if (!coordinates) return null;
   const properties = feature.properties;
   const context = (properties?.context ?? {}) as Record<string, unknown>;
-  const contextField = (key: string) => stringField(context, key);
-  const name = stringField(properties, "name_preferred") || stringField(properties, "name") || stringField(properties, "full_address");
+  const type = stringField(properties, "feature_type");
+  const street = stringField(properties, "address") || contextField(context, "street");
+  const district = contextField(context, "neighborhood") || contextField(context, "district") || contextField(context, "locality");
+  const city = contextField(context, "place") || contextField(context, "locality") || contextField(context, "region");
+  const rawName = stringField(properties, "name_preferred") || stringField(properties, "name");
+  const fullAddress = stringField(properties, "full_address") || stringField(properties, "place_formatted");
+  const name = rawName || street || district || fullAddress || (city ? "Point sélectionné" : "");
   if (!name) return null;
+  const preciseName = (type === "place" || type === "locality") && !street && !district ? "Point sélectionné" : name;
   return normalizeLocation({
-    name,
-    district: contextField("neighborhood") || contextField("locality") || contextField("district"),
-    city: contextField("place") || contextField("locality") || contextField("region"),
-    street: stringField(properties, "address") || contextField("street"),
-    province: contextField("region"),
-    country: contextField("country"),
-    formattedAddress: stringField(properties, "full_address") || stringField(properties, "place_formatted") || name,
+    name: preciseName,
+    district,
+    city,
+    street,
+    province: contextField(context, "region"),
+    country: contextField(context, "country"),
+    formattedAddress: fullAddress || [street, district, city].filter(Boolean).join(", ") || preciseName,
     mapboxId: stringField(properties, "mapbox_id") || feature.id,
     latitude: coordinates.latitude,
     longitude: coordinates.longitude,
@@ -100,7 +128,8 @@ export async function searchPlaces(query: string, bias?: { latitude: number; lon
   const url = new URL("https://api.mapbox.com/search/searchbox/v1/suggest");
   url.searchParams.set("q", textQuery);
   url.searchParams.set("language", "fr");
-  url.searchParams.set("limit", "6");
+  url.searchParams.set("limit", "10");
+  url.searchParams.set("types", "address,poi,street,neighborhood,locality,place");
   url.searchParams.set("session_token", sessionToken);
   if (bias) url.searchParams.set("proximity", `${bias.longitude},${bias.latitude}`);
   const payload = await mapboxJson(url, "Search") as { suggestions?: MapboxSuggestion[] };
@@ -123,8 +152,9 @@ export async function reverseGeocodeLocation(latitude: number, longitude: number
   url.searchParams.set("longitude", String(longitude));
   url.searchParams.set("latitude", String(latitude));
   url.searchParams.set("language", "fr");
+  url.searchParams.set("types", "address,street,neighborhood,locality,place");
   const payload = await mapboxJson(url, "Search") as { features?: MapboxFeature[] };
-  return payload.features?.map(featureToLocation).find((item): item is LocationLabel => Boolean(item)) ?? null;
+  return (payload.features ?? []).sort((left, right) => featurePrecision(left) - featurePrecision(right)).map(featureToLocation).find((item): item is LocationLabel => Boolean(item)) ?? null;
 }
 
 export async function geocodeAddress(address: string) {

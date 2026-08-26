@@ -121,3 +121,12 @@
 - [ ] Appliquer les politiques RLS Supabase et relier les autorisations de livraison au JWT de production.
 - [ ] Préparer Mapbox GL dans un build de développement Expo, tout en conservant la carte actuelle dans Expo Go.
 - [x] Tester la migration cartographique et enregistrer la version.
+- [ ] Vérifier le modèle d’autorisation Supabase pour les canaux de livraison privés.
+- [ ] Appliquer et tester les politiques RLS Supabase pour le suivi GPS.
+- [ ] Installer et configurer Mapbox GL pour un build de développement Expo.
+- [ ] Valider la configuration native et préparer le build de développement Mapbox GL.
+- [ ] Adapter l’autorisation Realtime aux JWT Signing Keys modernes de Supabase.
+- [x] Diagnostiquer les libellés d’adresse imprécis issus de la sélection et du géocodage inverse.
+- [x] Améliorer la récupération Mapbox des détails de suggestion et de point sélectionné.
+- [x] Afficher un libellé hiérarchisé précis plutôt qu’un simple nom de ville.
+- [x] Tester la recherche, la sélection de carte et la réutilisation des lieux favoris.

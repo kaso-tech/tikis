@@ -141,8 +141,18 @@ export const commissionFor = (price: number, policy: CommissionPolicy) =>
 
 export const availableWalletBalance = (wallet: WalletSnapshot) => wallet.total - wallet.blocked;
 
-export const displayLocation = (location: LocationLabel) =>
-  [location.name, location.district, location.city].filter(Boolean).filter((item, index, values) => values.findIndex((value) => value.toLocaleLowerCase("fr") === item.toLocaleLowerCase("fr")) === index).join(" · ");
+const distinctLocationParts = (parts: Array<string | undefined>) => parts
+  .filter((item): item is string => Boolean(item))
+  .filter((item, index, values) => values.findIndex((value) => value.toLocaleLowerCase("fr") === item.toLocaleLowerCase("fr")) === index);
+
+export const locationTitle = (location: LocationLabel) => {
+  const nameIsCity = Boolean(location.city) && location.name.localeCompare(location.city, "fr", { sensitivity: "base" }) === 0;
+  return !nameIsCity ? location.name : location.street || location.district || "Point sélectionné";
+};
+
+export const locationSubtitle = (location: LocationLabel) => distinctLocationParts([location.street, location.district, location.city, location.province, location.country]).filter((part) => part.localeCompare(locationTitle(location), "fr", { sensitivity: "base" }) !== 0).join(" · ") || location.formattedAddress || "Coordonnées GPS enregistrées";
+
+export const displayLocation = (location: LocationLabel) => distinctLocationParts([locationTitle(location), location.street, location.district, location.city]).join(" · ");
 
 export const formatMoney = (amount: number) =>
   `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(amount)} FCFA`;
