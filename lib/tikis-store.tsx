@@ -201,7 +201,7 @@ type Store = {
   selectCandidate: (deliveryId: string, candidateId: string) => void;
   confirmAssignedDelivery: (deliveryId: string) => void;
   completeDelivery: (deliveryId: string) => void;
-  createDemoDelivery: (input: Pick<Delivery, "title" | "pickup" | "dropoff" | "estimatedPrice" | "vehicleTypes" | "type" | "details" | "weightKg" | "dimensions" | "passengers"> & { distanceKm: number }) => Delivery;
+  createDemoDelivery: (input: Pick<Delivery, "title" | "pickup" | "dropoff" | "estimatedPrice" | "offeredPrice" | "vehicleTypes" | "type" | "details" | "weightKg" | "dimensions" | "passengers"> & { distanceKm: number }) => Delivery;
   submitReview: (input: { deliveryId: string; rating: 1 | 2 | 3 | 4 | 5; comment?: string }) => { ok: boolean; message?: string };
   claimReferralReward: (referralId: string) => { ok: boolean; message?: string };
   addNotification: (notification: Pick<InAppNotification, "title" | "body" | "tone">) => void;
@@ -269,10 +269,11 @@ export function TikisStoreProvider({ children }: { children: React.ReactNode }) 
     if (!delivery) return { ok: false, message: "Livraison introuvable." };
     const existing = driverCandidateForDelivery(deliveryId);
     if (existing) return { ok: true };
-    if (!canApplyToDelivery(wallet, delivery.estimatedPrice, POLICY)) {
+    const publishedPrice = delivery.offeredPrice ?? delivery.estimatedPrice;
+    if (!canApplyToDelivery(wallet, publishedPrice, POLICY)) {
       return { ok: false, message: "Votre Wallet ne couvre pas la commission de mise en relation." };
     }
-    const commission = commissionFor(delivery.estimatedPrice, POLICY);
+    const commission = commissionFor(publishedPrice, POLICY);
     setCandidates((items) => [
       ...items,
       {
@@ -352,7 +353,7 @@ export function TikisStoreProvider({ children }: { children: React.ReactNode }) 
     setNotifications((items) => [makeNotification("Livraison terminée", "La course a été ajoutée à votre historique et à vos statistiques.", "success"), ...items]);
   };
 
-  const createDemoDelivery = (input: Pick<Delivery, "title" | "pickup" | "dropoff" | "estimatedPrice" | "vehicleTypes" | "type" | "details" | "weightKg" | "dimensions" | "passengers"> & { distanceKm: number }) => {
+  const createDemoDelivery = (input: Pick<Delivery, "title" | "pickup" | "dropoff" | "estimatedPrice" | "offeredPrice" | "vehicleTypes" | "type" | "details" | "weightKg" | "dimensions" | "passengers"> & { distanceKm: number }) => {
     const delivery: Delivery = {
       ...input,
       id: `liv-${Date.now()}`,

@@ -94,3 +94,7 @@
 - [x] Ajouter les routes backend de mise à jour et suppression des lieux favoris.
 - [x] Ajouter la recherche instantanée, le renommage et la suppression confirmée à l’écran favoris.
 - [x] Tester les actions de gestion des favoris avant la livraison.
+- [x] Définir les règles de saisie et de comparaison du prix proposé indépendant.
+- [x] Ajouter un champ de prix proposé sécurisé à la création de livraison.
+- [x] Enregistrer et afficher le prix publié distinct de l’estimation intelligente.
+- [x] Tester les validations et les indicateurs d’écart tarifaire avant la livraison.
