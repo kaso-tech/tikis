@@ -224,3 +224,8 @@
 - [x] Ajouter des filtres de distance, engin et rémunération aux livraisons disponibles.
 - [x] Ajouter le tri, les états vides et les retours d’interaction des filtres.
 - [x] Tester les filtres, vérifier le serveur et enregistrer la version.
+- [x] Analyser les captures Yango et les écrans actuels de sélection d’adresse.
+- [x] Refondre le panneau de recherche d’adresse réductible et le choix des adresses enregistrées.
+- [x] Créer le sélecteur plein écran sur carte avec marqueur fixe, position GPS et favori.
+- [x] Déplacer la gestion des adresses vers le footer et retirer le Wallet du footer expéditeur.
+- [x] Tester les parcours d’adresse, la navigation et enregistrer la version.

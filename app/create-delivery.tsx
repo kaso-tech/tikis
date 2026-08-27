@@ -1,10 +1,11 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { FavoritePlacesSheet, FloatingPlacePicker, type SavedFavorite } from "@/components/tikis/place-sheets";
+import { type SavedFavorite } from "@/components/tikis/place-sheets";
+import { YangoAddressPicker } from "@/components/tikis/yango-address-picker";
 import { SurfaceCard, TikisButton } from "@/components/tikis/ui";
 import { offeredPriceError, parseOfferedPrice, priceDifferencePercent, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
 import { formatFavoritePlace, formatListRoute, estimateDeliveryPrice, provisionalRoute, sanitizePlaceText, validateDeliveryMeasurement } from "@/lib/geo-rules";
@@ -50,16 +51,12 @@ export default function CreateDeliveryScreen() {
   const [inputIssues, setInputIssues] = useState<Partial<Record<DeliveryFieldName, string>>>({});
   const [loading, setLoading] = useState(false);
   const [publicationStage, setPublicationStage] = useState("");
-  const [favoriteTarget, setFavoriteTarget] = useState<"pickup" | "dropoff" | null>(null);
   const [pickerTarget, setPickerTarget] = useState<"pickup" | "dropoff" | null>(null);
-  const [favoritesVisible, setFavoritesVisible] = useState(false);
   const { mutateAsync: requestRoute } = trpc.geography.route.useMutation();
   const createDeliveryMutation = trpc.deliveries.create.useMutation();
   const updateDeliveryMutation = trpc.deliveries.update.useMutation();
   const savePlaceMutation = trpc.geography.savePlace.useMutation();
   const favoriteMutation = trpc.geography.favorites.add.useMutation();
-  const renameFavoriteMutation = trpc.geography.favorites.rename.useMutation();
-  const removeFavoriteMutation = trpc.geography.favorites.remove.useMutation();
   const favoritesQuery = trpc.geography.favorites.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
   const deliveryQuery = trpc.deliveries.get.useQuery({ id: deliveryId ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(deliveryId && profile?.phone) });
   const initializedDeliveryId = useRef<string | null>(null);
@@ -123,28 +120,13 @@ export default function CreateDeliveryScreen() {
   const priceDifference = parsedOfferedPrice && estimate ? priceDifferencePercent(parsedOfferedPrice, estimate) : 0;
   const favoriteLocations: SavedFavorite[] = useMemo(() => (favoritesQuery.data ?? []).map((item) => ({ id: item.id, label: item.label, location: favoriteToLocation(item) })), [favoritesQuery.data]);
 
-  async function addFavorite(target: "pickup" | "dropoff") {
-    const place = target === "pickup" ? pickup : dropoff;
-    if (!place || !profile?.phone) return;
-    setFavoriteTarget(target);
+  async function addFavorite(place: LocationLabel) {
+    if (!profile?.phone) return;
     try {
       const persisted = await savePlaceMutation.mutateAsync(toPlacePayload(place));
       await favoriteMutation.mutateAsync({ placeId: persisted.id, label: sanitizePlaceText(formatFavoritePlace(place), 80) || "Lieu favori" });
       await favoritesQuery.refetch();
     } catch { /* The favorite sheet keeps the location selected; the action can be retried. */ }
-    finally { setFavoriteTarget(null); }
-  }
-
-  async function renameFavorite(favorite: SavedFavorite, label: string) {
-    if (!profile?.phone) return;
-    await renameFavoriteMutation.mutateAsync({ favoriteId: Number(favorite.id), label });
-    await favoritesQuery.refetch();
-  }
-
-  async function removeFavorite(favorite: SavedFavorite) {
-    if (!profile?.phone) return;
-    await removeFavoriteMutation.mutateAsync({ favoriteId: Number(favorite.id) });
-    await favoritesQuery.refetch();
   }
 
   async function executePublication() {
@@ -211,11 +193,11 @@ export default function CreateDeliveryScreen() {
           {deliveryType === "Personne" ? <Field label="Nombre de personnes" value={passengers} error={passengerIssue} onBlur={() => { setTouched((current) => ({ ...current, passengers: true })); }} onChangeText={(value) => { setPassengers(value.replace(/\D/g, "").slice(0, 1)); setInputIssues((current) => ({ ...current, passengers: /\D/.test(value) ? "Caractères non autorisés." : "" })); }} placeholder="1" keyboardType="number-pad" icon="groups" /> : null}
           {deliveryType === "Autre" ? <SurfaceCard style={styles.measureCard}><Text style={styles.measureTitle}>Mesures facultatives</Text><Text style={styles.measureSubtitle}>Ajoutez le poids et les dimensions si vous les connaissez pour affiner l’estimation.</Text><Field label="Poids (kg)" value={weightKg} onChangeText={(value) => setWeightKg(value.replace(/[^0-9.]/g, "").slice(0, 6))} placeholder="Ex. 12" keyboardType="decimal-pad" icon="scale" /><Text style={styles.fieldLabel}>Dimensions (cm)</Text><View style={styles.dimensionRow}><MiniNumber value={lengthCm} onChangeText={setLengthCm} placeholder="Long." /><MiniNumber value={widthCm} onChangeText={setWidthCm} placeholder="Larg." /><MiniNumber value={heightCm} onChangeText={setHeightCm} placeholder="Haut." /></View></SurfaceCard> : null}
 
-          <View style={styles.routeHeader}><Text style={styles.sectionLabel}>TRAJET</Text><Pressable onPress={() => setFavoritesVisible(true)} style={({ pressed }) => [styles.favoritesButton, pressed && styles.pressed]}><MaterialIcons name="star" size={16} color="#A86600" /><Text style={styles.favoritesButtonText}>Favoris</Text></Pressable></View>
+          <Text style={styles.sectionLabel}>TRAJET</Text>
           <SurfaceCard style={styles.routeCard}>
-            <CompactLocationField label="Récupération" tone="pickup" value={pickup} invalid={Boolean(pickupIssue)} loading={favoriteTarget === "pickup"} onPress={() => setPickerTarget("pickup")} onFavorite={() => void addFavorite("pickup")} />
+            <CompactLocationField label="Récupération" tone="pickup" value={pickup} invalid={Boolean(pickupIssue)} onPress={() => setPickerTarget("pickup")} />
             <View style={styles.routeDivider} />
-            <CompactLocationField label="Destination" tone="dropoff" value={dropoff} invalid={Boolean(dropoffIssue)} loading={favoriteTarget === "dropoff"} onPress={() => setPickerTarget("dropoff")} onFavorite={() => void addFavorite("dropoff")} />
+            <CompactLocationField label="Destination" tone="dropoff" value={dropoff} invalid={Boolean(dropoffIssue)} onPress={() => setPickerTarget("dropoff")} />
           </SurfaceCard>
 
           <Text style={styles.sectionLabel}>ENGIN ET ESTIMATION</Text>
@@ -236,15 +218,14 @@ export default function CreateDeliveryScreen() {
           <Text style={styles.footerNote}>Aucun débit immédiat. Les coordonnées complètes servent uniquement à la course et au calcul de distance.</Text>
         </ScrollView>
       </KeyboardAvoidingView>
-      <FloatingPlacePicker visible={Boolean(pickerTarget)} target={pickerTarget} value={pickerTarget === "pickup" ? pickup : dropoff} countryCode={profile?.countryCode} onClose={() => { if (pickerTarget && !(pickerTarget === "pickup" ? pickup : dropoff)) setTouched((current) => ({ ...current, [pickerTarget]: true })); setPickerTarget(null); }} onSelect={(place) => { if (pickerTarget) selectPlace(pickerTarget, place); }} />
-      <FavoritePlacesSheet visible={favoritesVisible} favorites={favoriteLocations} onClose={() => setFavoritesVisible(false)} onPickup={(place) => selectPlace("pickup", place)} onDropoff={(place) => selectPlace("dropoff", place)} onRename={renameFavorite} onRemove={removeFavorite} />
+      <YangoAddressPicker visible={Boolean(pickerTarget)} target={pickerTarget} value={pickerTarget === "pickup" ? pickup : dropoff} countryCode={profile?.countryCode} favorites={favoriteLocations} onClose={() => { if (pickerTarget && !(pickerTarget === "pickup" ? pickup : dropoff)) setTouched((current) => ({ ...current, [pickerTarget]: true })); setPickerTarget(null); }} onSelect={(place) => { if (pickerTarget) selectPlace(pickerTarget, place); }} onFavorite={addFavorite} />
     </SafeAreaView>
   );
 }
 
-function CompactLocationField({ label, tone, value, invalid, loading, onPress, onFavorite }: { label: string; tone: "pickup" | "dropoff"; value: LocationLabel | null; invalid: boolean; loading: boolean; onPress: () => void; onFavorite: () => void }) {
+function CompactLocationField({ label, tone, value, invalid, onPress }: { label: string; tone: "pickup" | "dropoff"; value: LocationLabel | null; invalid: boolean; onPress: () => void }) {
   const accent = tone === "pickup" ? "#007B8B" : "#C23B45";
-  return <View style={[styles.locationRow, invalid && styles.locationRowInvalid]}><Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.locationPressable, pressed && styles.pressed]}><View style={[styles.locationIcon, { backgroundColor: tone === "pickup" ? "#E6F5F6" : "#FFF0F1" }]}><MaterialIcons name={tone === "pickup" ? "trip-origin" : "location-on"} size={18} color={accent} /></View><View style={styles.locationCopy}><Text style={[styles.locationLabel, invalid && styles.fieldLabelInvalid]}>{label}</Text><Text style={[styles.locationValue, !value && styles.locationPlaceholder]} numberOfLines={1}>{value ? locationTitle(value) : "Choisir une adresse"}</Text>{value ? <Text style={styles.locationMeta} numberOfLines={1}>{locationSubtitle(value)}</Text> : invalid ? <Text style={styles.locationIssue}>Lieu requis</Text> : null}</View><MaterialIcons name="chevron-right" size={21} color="#9AA5B6" /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Ajouter ${label} aux favoris`} onPress={onFavorite} disabled={!value || loading} style={({ pressed }) => [styles.starButton, (!value || loading) && styles.disabled, pressed && styles.pressed]}>{loading ? <ActivityIndicator size="small" color="#A86600" /> : <MaterialIcons name={value ? "star-outline" : "star-border"} size={19} color="#A86600" />}</Pressable></View>;
+  return <View style={[styles.locationRow, invalid && styles.locationRowInvalid]}><Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.locationPressable, pressed && styles.pressed]}><View style={[styles.locationIcon, { backgroundColor: tone === "pickup" ? "#E6F5F6" : "#FFF0F1" }]}><MaterialIcons name={tone === "pickup" ? "trip-origin" : "location-on"} size={18} color={accent} /></View><View style={styles.locationCopy}><Text style={[styles.locationLabel, invalid && styles.fieldLabelInvalid]}>{label}</Text><Text style={[styles.locationValue, !value && styles.locationPlaceholder]} numberOfLines={1}>{value ? locationTitle(value) : "Choisir une adresse"}</Text>{value ? <Text style={styles.locationMeta} numberOfLines={1}>{locationSubtitle(value)}</Text> : invalid ? <Text style={styles.locationIssue}>Lieu requis</Text> : null}</View><MaterialIcons name="chevron-right" size={21} color="#9AA5B6" /></Pressable></View>;
 }
 
 function Field({ label, icon, keyboardType, error, ...props }: { label: string; icon?: React.ComponentProps<typeof MaterialIcons>["name"]; keyboardType?: "default" | "number-pad" | "decimal-pad"; value: string; onChangeText: (value: string) => void; onBlur?: () => void; placeholder: string; multiline?: boolean; error?: string }) { return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#C23B45" : "#007B8B"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor="#9AA5B6" /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>; }
