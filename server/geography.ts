@@ -1,7 +1,10 @@
 import { randomUUID } from "node:crypto";
 
 import { normalizeLocation, sanitizePlaceText } from "../lib/geo-rules";
-import type { LocationLabel } from "../shared/tikis-domain";
+import { COUNTRIES } from "../lib/registration-rules";
+import type { LocationLabel, PlaceSuggestion } from "../shared/tikis-domain";
+import * as db from "./db";
+import { recordGeographicMetric } from "./geography-observability";
 
 type MapboxSuggestion = {
   mapbox_id?: string;
@@ -10,6 +13,7 @@ type MapboxSuggestion = {
   address?: string;
   full_address?: string;
   place_formatted?: string;
+  feature_type?: string;
   context?: Record<string, unknown>;
 };
 
@@ -18,6 +22,82 @@ type MapboxFeature = {
   properties?: Record<string, unknown>;
   geometry?: { coordinates?: unknown };
 };
+
+type CacheEntry<T> = { value: T; expiresAt: number };
+const searchCache = new Map<string, CacheEntry<PlaceSuggestion[]>>();
+const routeCache = new Map<string, CacheEntry<{ distanceKm: number; durationMinutes: number }>>();
+const SEARCH_CACHE_TTL_MS = 20_000;
+const ROUTE_CACHE_TTL_MS = 5 * 60_000;
+const CACHE_LIMIT = 200;
+const MAPBOX_TIMEOUT_MS = 8_000;
+
+function readCache<T>(cache: Map<string, CacheEntry<T>>, key: string) {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.value;
+}
+
+function writeCache<T>(cache: Map<string, CacheEntry<T>>, key: string, value: T, ttlMs: number) {
+  if (cache.size >= CACHE_LIMIT) cache.delete(cache.keys().next().value as string);
+  cache.set(key, { value, expiresAt: Date.now() + ttlMs });
+}
+
+export function resetGeographicCachesForTests() {
+  searchCache.clear();
+  routeCache.clear();
+}
+
+function searchCacheKey(query: string, bias?: { latitude: number; longitude: number }, countryCode?: string) {
+  const biasKey = bias ? `${bias.latitude.toFixed(3)}:${bias.longitude.toFixed(3)}` : "none";
+  return `${query.toLocaleLowerCase("fr")}::${countryCode ?? "all"}::${biasKey}`;
+}
+
+function routeCacheKey(origin: LocationLabel, destination: LocationLabel) {
+  return `${db.coordinateCacheKey(origin.latitude, origin.longitude)}>${db.coordinateCacheKey(destination.latitude, destination.longitude)}`;
+}
+
+function placePersistenceInput(place: LocationLabel) {
+  return {
+    googlePlaceId: place.googlePlaceId,
+    mapboxPlaceId: place.mapboxId,
+    latitude: String(place.latitude),
+    longitude: String(place.longitude),
+    formattedAddress: place.formattedAddress ?? place.name,
+    placeName: place.name,
+    street: place.street,
+    district: place.district,
+    city: place.city,
+    province: place.province,
+    country: place.country,
+    provider: place.provider ?? (place.mapboxId ? "mapbox" : "manual"),
+    source: place.source ?? (place.mapboxId ? "retrieve" : "manual"),
+    featureType: place.featureType ?? "unknown",
+    precision: place.precision ?? "unknown",
+  };
+}
+
+async function rememberResolvedPlace(place: LocationLabel) {
+  try {
+    const persisted = await db.saveTikisPlace(placePersistenceInput(place));
+    return db.tikisPlaceToLocation(persisted);
+  } catch {
+    // Le cache améliore les performances mais ne doit jamais empêcher une sélection géographique valide.
+    return place;
+  }
+}
+
+function ensureCountry(place: LocationLabel, countryCode?: string) {
+  if (!countryCode || !place.country) return place;
+  const expectedCountry = COUNTRIES.find((country) => country.id === countryCode)?.name;
+  if (expectedCountry && place.country.localeCompare(expectedCountry, "fr", { sensitivity: "base" }) !== 0) {
+    throw new Error("Ce lieu se trouve hors du pays associé à votre profil.");
+  }
+  return place;
+}
 
 function backendToken() {
   const token = process.env.MAPBOX_SECRET_ACCESS_TOKEN;
@@ -43,6 +123,18 @@ function featurePrecision(feature: MapboxFeature) {
   return type === "address" || type === "secondary_address" ? 0 : type === "street" ? 1 : type === "neighborhood" ? 2 : type === "locality" ? 3 : type === "place" ? 4 : 5;
 }
 
+function mapboxFeatureType(value: string): NonNullable<LocationLabel["featureType"]> {
+  return ["address", "secondary_address", "poi", "street", "neighborhood", "locality", "place"].includes(value) ? value as NonNullable<LocationLabel["featureType"]> : "unknown";
+}
+
+function mapboxPrecision(value: NonNullable<LocationLabel["featureType"]>): NonNullable<LocationLabel["precision"]> {
+  if (value === "address" || value === "secondary_address" || value === "poi") return "exact";
+  if (value === "street") return "street";
+  if (value === "neighborhood" || value === "locality") return "area";
+  if (value === "place") return "city";
+  return "unknown";
+}
+
 function coordinatePair(feature: MapboxFeature) {
   const properties = feature.properties;
   const propertyCoordinates = properties?.coordinates as Record<string, unknown> | undefined;
@@ -63,7 +155,7 @@ function mapboxError(response: Response, service: "Search" | "Directions") {
   return fallback;
 }
 
-function suggestionToLocation(suggestion: MapboxSuggestion, sessionToken: string): LocationLabel | null {
+function suggestionToPlaceSuggestion(suggestion: MapboxSuggestion, sessionToken: string): PlaceSuggestion | null {
   const mapboxId = suggestion.mapbox_id;
   const name = suggestion.name_preferred || suggestion.name;
   if (!mapboxId || !name) return null;
@@ -71,7 +163,7 @@ function suggestionToLocation(suggestion: MapboxSuggestion, sessionToken: string
   const street = suggestion.address || contextField(context, "street");
   const district = contextField(context, "neighborhood") || contextField(context, "district") || contextField(context, "locality");
   const city = contextField(context, "place") || contextField(context, "locality") || suggestion.place_formatted || "";
-  return normalizeLocation({
+  return {
     name,
     district,
     city,
@@ -81,17 +173,16 @@ function suggestionToLocation(suggestion: MapboxSuggestion, sessionToken: string
     formattedAddress: suggestion.full_address || [street, district, city].filter(Boolean).join(", ") || name,
     mapboxId,
     mapboxSessionToken: sessionToken,
-    latitude: 0,
-    longitude: 0,
-  });
+    featureType: mapboxFeatureType(suggestion.feature_type ?? ""),
+  };
 }
 
-function featureToLocation(feature: MapboxFeature): LocationLabel | null {
+function featureToLocation(feature: MapboxFeature, source: NonNullable<LocationLabel["source"]>): LocationLabel | null {
   const coordinates = coordinatePair(feature);
   if (!coordinates) return null;
   const properties = feature.properties;
   const context = (properties?.context ?? {}) as Record<string, unknown>;
-  const type = stringField(properties, "feature_type");
+  const type = mapboxFeatureType(stringField(properties, "feature_type"));
   const street = stringField(properties, "address") || contextField(context, "street");
   const district = contextField(context, "neighborhood") || contextField(context, "district") || contextField(context, "locality");
   const city = contextField(context, "place") || contextField(context, "locality") || contextField(context, "region");
@@ -111,19 +202,37 @@ function featureToLocation(feature: MapboxFeature): LocationLabel | null {
     mapboxId: stringField(properties, "mapbox_id") || feature.id,
     latitude: coordinates.latitude,
     longitude: coordinates.longitude,
+    provider: "mapbox",
+    source,
+    featureType: type,
+    precision: mapboxPrecision(type),
   });
 }
 
 async function mapboxJson(url: URL, service: "Search" | "Directions") {
   url.searchParams.set("access_token", backendToken());
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(mapboxError(response, service));
-  return response.json() as Promise<unknown>;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), MAPBOX_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(mapboxError(response, service));
+    return response.json() as Promise<unknown>;
+  } catch (cause) {
+    if (cause instanceof DOMException && cause.name === "AbortError") throw new Error("Le service géographique prend trop de temps. Réessayez dans quelques instants.");
+    throw cause;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 export async function searchPlaces(query: string, bias?: { latitude: number; longitude: number }, countryCode?: string) {
   const textQuery = sanitizePlaceText(query, 120);
   if (textQuery.length < 2) return [];
+  const safeCountryCode = countryCode && /^[A-Z]{2}$/.test(countryCode) ? countryCode : undefined;
+  const cacheKey = searchCacheKey(textQuery, bias, safeCountryCode);
+  const cached = readCache(searchCache, cacheKey);
+  if (cached) { recordGeographicMetric("search", "cache_hit"); return cached; }
+  const startedAt = Date.now();
   const sessionToken = randomUUID();
   const url = new URL("https://api.mapbox.com/search/searchbox/v1/suggest");
   url.searchParams.set("q", textQuery);
@@ -131,52 +240,88 @@ export async function searchPlaces(query: string, bias?: { latitude: number; lon
   url.searchParams.set("limit", "10");
   url.searchParams.set("types", "address,poi,street,neighborhood,locality,place");
   url.searchParams.set("session_token", sessionToken);
-  if (countryCode && /^[A-Z]{2}$/.test(countryCode)) url.searchParams.set("country", countryCode);
+  if (safeCountryCode) url.searchParams.set("country", safeCountryCode);
   if (bias) url.searchParams.set("proximity", `${bias.longitude},${bias.latitude}`);
-  const payload = await mapboxJson(url, "Search") as { suggestions?: MapboxSuggestion[] };
-  return (payload.suggestions ?? []).map((item) => suggestionToLocation(item, sessionToken)).filter((item): item is LocationLabel => Boolean(item));
+  try {
+    const payload = await mapboxJson(url, "Search") as { suggestions?: MapboxSuggestion[] };
+    const suggestions = (payload.suggestions ?? []).map((item) => suggestionToPlaceSuggestion(item, sessionToken)).filter((item): item is PlaceSuggestion => Boolean(item));
+    writeCache(searchCache, cacheKey, suggestions, SEARCH_CACHE_TTL_MS);
+    recordGeographicMetric("search", "success", Date.now() - startedAt);
+    return suggestions;
+  } catch (cause) { recordGeographicMetric("search", "failure", Date.now() - startedAt); throw cause; }
 }
 
-export async function resolveMapboxPlace(mapboxId: string, sessionToken?: string) {
+export async function resolveMapboxPlace(mapboxId: string, sessionToken?: string, countryCode?: string) {
   const safeId = mapboxId.trim();
   if (!safeId || safeId.length > 255) throw new Error("Identifiant Mapbox invalide.");
+  const cached = await db.getTikisPlaceByMapboxId(safeId);
+  if (cached) { recordGeographicMetric("resolve", "cache_hit"); return ensureCountry(db.tikisPlaceToLocation(cached), countryCode); }
+  const startedAt = Date.now();
   const url = new URL(`https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(safeId)}`);
   url.searchParams.set("session_token", sessionToken?.trim() || randomUUID());
-  const payload = await mapboxJson(url, "Search") as { features?: MapboxFeature[] };
-  const place = payload.features?.map(featureToLocation).find((item): item is LocationLabel => Boolean(item));
-  if (!place) throw new Error("Mapbox n’a pas renvoyé de coordonnées exploitables pour ce lieu.");
-  return place;
+  try {
+    const payload = await mapboxJson(url, "Search") as { features?: MapboxFeature[] };
+    const place = payload.features?.map((feature) => featureToLocation(feature, "retrieve")).find((item): item is LocationLabel => Boolean(item));
+    if (!place) throw new Error("Mapbox n’a pas renvoyé de coordonnées exploitables pour ce lieu.");
+    const resolved = await rememberResolvedPlace(ensureCountry(place, countryCode));
+    recordGeographicMetric("resolve", "success", Date.now() - startedAt);
+    return resolved;
+  } catch (cause) { recordGeographicMetric("resolve", "failure", Date.now() - startedAt); throw cause; }
 }
 
-export async function reverseGeocodeLocation(latitude: number, longitude: number) {
+export async function reverseGeocodeLocation(latitude: number, longitude: number, countryCode?: string) {
+  const cached = await db.getTikisPlaceByCoordinate(latitude, longitude);
+  if (cached) { recordGeographicMetric("reverse", "cache_hit"); return ensureCountry(db.tikisPlaceToLocation(cached), countryCode); }
+  const startedAt = Date.now();
   const url = new URL("https://api.mapbox.com/search/geocode/v6/reverse");
   url.searchParams.set("longitude", String(longitude));
   url.searchParams.set("latitude", String(latitude));
   url.searchParams.set("language", "fr");
   url.searchParams.set("types", "address,street,neighborhood,locality,place");
-  const payload = await mapboxJson(url, "Search") as { features?: MapboxFeature[] };
-  return (payload.features ?? []).sort((left, right) => featurePrecision(left) - featurePrecision(right)).map(featureToLocation).find((item): item is LocationLabel => Boolean(item)) ?? null;
+  try {
+    const payload = await mapboxJson(url, "Search") as { features?: MapboxFeature[] };
+    const place = (payload.features ?? []).sort((left, right) => featurePrecision(left) - featurePrecision(right)).map((feature) => featureToLocation(feature, "reverse")).find((item): item is LocationLabel => Boolean(item));
+    const resolved = place ? await rememberResolvedPlace(ensureCountry(place, countryCode)) : null;
+    recordGeographicMetric("reverse", "success", Date.now() - startedAt);
+    return resolved;
+  } catch (cause) { recordGeographicMetric("reverse", "failure", Date.now() - startedAt); throw cause; }
 }
 
-export async function geocodeAddress(address: string) {
+export async function geocodeAddress(address: string, countryCode?: string) {
   const query = sanitizePlaceText(address, 180);
   if (query.length < 3) return null;
+  const startedAt = Date.now();
   const url = new URL("https://api.mapbox.com/search/geocode/v6/forward");
   url.searchParams.set("q", query);
   url.searchParams.set("language", "fr");
   url.searchParams.set("limit", "1");
-  const payload = await mapboxJson(url, "Search") as { features?: MapboxFeature[] };
-  return payload.features?.map(featureToLocation).find((item): item is LocationLabel => Boolean(item)) ?? null;
+  if (countryCode && /^[A-Z]{2}$/.test(countryCode)) url.searchParams.set("country", countryCode);
+  try {
+    const payload = await mapboxJson(url, "Search") as { features?: MapboxFeature[] };
+    const place = payload.features?.map((feature) => featureToLocation(feature, "forward")).find((item): item is LocationLabel => Boolean(item));
+    const resolved = place ? await rememberResolvedPlace(ensureCountry(place, countryCode)) : null;
+    recordGeographicMetric("forward", "success", Date.now() - startedAt);
+    return resolved;
+  } catch (cause) { recordGeographicMetric("forward", "failure", Date.now() - startedAt); throw cause; }
 }
 
 export async function computeRoute(origin: LocationLabel, destination: LocationLabel) {
+  const cacheKey = routeCacheKey(origin, destination);
+  const cached = readCache(routeCache, cacheKey);
+  if (cached) { recordGeographicMetric("route", "cache_hit"); return cached; }
+  const startedAt = Date.now();
   const coordinates = `${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}`;
   const url = new URL(`https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${coordinates}`);
   url.searchParams.set("alternatives", "false");
   url.searchParams.set("overview", "false");
   url.searchParams.set("language", "fr");
-  const payload = await mapboxJson(url, "Directions") as { routes?: Array<{ distance?: number; duration?: number }> };
-  const route = payload.routes?.[0];
-  if (!route?.distance) throw new Error("Aucun itinéraire routier n’a été trouvé.");
-  return { distanceKm: route.distance / 1000, durationMinutes: Math.max(1, Math.round((route.duration ?? 0) / 60)) };
+  try {
+    const payload = await mapboxJson(url, "Directions") as { routes?: Array<{ distance?: number; duration?: number }> };
+    const route = payload.routes?.[0];
+    if (!route?.distance) throw new Error("Aucun itinéraire routier n’a été trouvé.");
+    const result = { distanceKm: route.distance / 1000, durationMinutes: Math.max(1, Math.round((route.duration ?? 0) / 60)) };
+    writeCache(routeCache, cacheKey, result, ROUTE_CACHE_TTL_MS);
+    recordGeographicMetric("route", "success", Date.now() - startedAt);
+    return result;
+  } catch (cause) { recordGeographicMetric("route", "failure", Date.now() - startedAt); throw cause; }
 }

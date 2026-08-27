@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { computeRoute, geocodeAddress, resolveMapboxPlace, reverseGeocodeLocation, searchPlaces } from "../server/geography";
+import { computeRoute, geocodeAddress, resetGeographicCachesForTests, resolveMapboxPlace, reverseGeocodeLocation, searchPlaces } from "../server/geography";
 
 const originalFetch = global.fetch;
 
 afterEach(() => {
   global.fetch = originalFetch;
   delete process.env.MAPBOX_SECRET_ACCESS_TOKEN;
+  resetGeographicCachesForTests();
 });
 
 describe("services géographiques backend Tikis", () => {
@@ -17,6 +18,7 @@ describe("services géographiques backend Tikis", () => {
     expect(result[0]?.mapboxId).toBe("dXJuOm1ieHBsYzpwbGFjZQ");
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("searchbox/v1/suggest");
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("access_token=backend-test-token");
+    expect(result[0]).not.toHaveProperty("latitude");
   });
 
   it("retourne une distance et une durée depuis Mapbox Directions", async () => {
@@ -63,21 +65,36 @@ describe("services géographiques backend Tikis", () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).not.toContain("country=");
   });
 
+  it("réutilise les mêmes suggestions récentes pour limiter les appels Mapbox", async () => {
+    process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ suggestions: [{ mapbox_id: "cache-1", name: "Bureau Tikis" }] })));
+    global.fetch = fetchMock as typeof fetch;
+    await searchPlaces("Bureau Tikis", undefined, "BF");
+    await searchPlaces("Bureau Tikis", undefined, "BF");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("conserve les contextes Mapbox structurés lors de la résolution d’une suggestion", async () => {
     process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
     global.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ features: [{ id: "address-1", geometry: { coordinates: [-1.5203, 12.3699] }, properties: { feature_type: "address", mapbox_id: "address-1", name: "12 Avenue Kwame Nkrumah", full_address: "12 Avenue Kwame Nkrumah", context: { neighborhood: { name: "Koulouba" }, place: { name: "Ouagadougou" }, region: { name: "Centre" }, country: { name: "Burkina Faso" } } } }] }))) as typeof fetch;
     const place = await resolveMapboxPlace("address-1", "session-1");
-    expect(place).toMatchObject({ name: "12 Avenue Kwame Nkrumah", district: "Koulouba", city: "Ouagadougou", province: "Centre", country: "Burkina Faso", latitude: 12.3699, longitude: -1.5203 });
+    expect(place).toMatchObject({ name: "12 Avenue Kwame Nkrumah", district: "Koulouba", city: "Ouagadougou", province: "Centre", country: "Burkina Faso", latitude: 12.3699, longitude: -1.5203, provider: "mapbox", source: "retrieve", featureType: "address", precision: "exact" });
+  });
+
+  it("refuse la résolution d’un lieu retourné hors du pays du profil", async () => {
+    process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
+    global.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ features: [{ id: "cross-border", geometry: { coordinates: [-1.52, 12.37] }, properties: { feature_type: "poi", mapbox_id: "cross-border", name: "Lieu frontalier", context: { place: { name: "Ouagadougou" }, country: { name: "Burkina Faso" } } } }] }))) as typeof fetch;
+    await expect(resolveMapboxPlace("cross-border", "session-1", "CI")).rejects.toThrow("hors du pays");
   });
 
   it("retient l’adresse la plus précise lors d’un appui sur la carte", async () => {
     process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ features: [
-      { id: "place-ouaga", geometry: { coordinates: [-1.52, 12.37] }, properties: { feature_type: "place", name: "Ouagadougou", context: { place: { name: "Ouagadougou" }, country: { name: "Burkina Faso" } } } },
-      { id: "street-kwame", geometry: { coordinates: [-1.5202, 12.3698] }, properties: { feature_type: "street", name: "Avenue Kwame Nkrumah", full_address: "Avenue Kwame Nkrumah", context: { neighborhood: { name: "Koulouba" }, place: { name: "Ouagadougou" }, country: { name: "Burkina Faso" } } } },
+      { id: "place-ouaga", geometry: { coordinates: [-1.62, 12.47] }, properties: { feature_type: "place", name: "Ouagadougou", context: { place: { name: "Ouagadougou" }, country: { name: "Burkina Faso" } } } },
+      { id: "street-kwame", geometry: { coordinates: [-1.6202, 12.4698] }, properties: { feature_type: "street", name: "Avenue Kwame Nkrumah", full_address: "Avenue Kwame Nkrumah", context: { neighborhood: { name: "Koulouba" }, place: { name: "Ouagadougou" }, country: { name: "Burkina Faso" } } } },
     ] })));
     global.fetch = fetchMock as typeof fetch;
-    const place = await reverseGeocodeLocation(12.3698, -1.5202);
+    const place = await reverseGeocodeLocation(12.4698, -1.6202);
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain("types=address%2Cstreet%2Cneighborhood%2Clocality%2Cplace");
     expect(place).toMatchObject({ name: "Avenue Kwame Nkrumah", district: "Koulouba", city: "Ouagadougou" });
   });

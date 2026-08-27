@@ -6,8 +6,10 @@ import { storagePut } from "./storage";
 import * as geography from "./geography";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, router, tikisProtectedProcedure } from "./_core/trpc";
 import { findCountryForPhone } from "../lib/registration-rules";
+import { createTikisProfileSession } from "./tikis-session";
+import { recordGeographicMetric } from "./geography-observability";
 
 const phoneSchema = z.string().regex(/^\+[1-9]\d{7,14}$/, "Numéro de téléphone international invalide.");
 const simulationOtpSchema = z.literal("730512", { error: "Code OTP de simulation invalide." });
@@ -39,6 +41,30 @@ function toPublicProfile(profile: { phone: string; fullName: string; accountType
   } catch { vehicles = []; }
   return { phone: profile.phone, fullName: profile.fullName, countryCode: findCountryForPhone(profile.phone).id, role: profile.accountType, vehicles, roleLocked: true as const, photoUrl: profile.photoKey ? `/manus-storage/${profile.photoKey}` : undefined, referralCode: profile.accountType === "driver" ? profile.referralCode ?? undefined : undefined };
 }
+
+function sessionCountryCode(profilePhone: string) {
+  return findCountryForPhone(profilePhone).id;
+}
+
+const GEO_RATE_LIMIT_WINDOW_MS = 60_000;
+const GEO_RATE_LIMIT_MAX_REQUESTS = 40;
+const geographyRequests = new Map<string, number[]>();
+
+function enforceGeographyRateLimit(profilePhone: string) {
+  const now = Date.now();
+  const recent = (geographyRequests.get(profilePhone) ?? []).filter((timestamp) => now - timestamp < GEO_RATE_LIMIT_WINDOW_MS);
+  if (recent.length >= GEO_RATE_LIMIT_MAX_REQUESTS) {
+    recordGeographicMetric("search", "rate_limited");
+    throw new Error("Trop de demandes de lieux en cours. Réessayez dans une minute.");
+  }
+  recent.push(now);
+  geographyRequests.set(profilePhone, recent);
+}
+
+const protectedGeographyProcedure = tikisProtectedProcedure.use(async ({ ctx, next }) => {
+  enforceGeographyRateLimit(ctx.tikisProfilePhone);
+  return next();
+});
 
 function newReferralCode(fullName: string) {
   const prefix = fullName.normalize("NFC").replace(/[^\p{L}]/gu, "").toLocaleUpperCase("fr-FR").slice(0, 3);
@@ -73,7 +99,7 @@ export const appRouter = router({
     /** Called after local OTP verification in the simulation flow. A production build must verify OTP server-side before this query. */
     lookup: publicProcedure.input(z.object({ phone: phoneSchema, otp: simulationOtpSchema })).mutation(async ({ input }) => {
       const profile = await db.getTikisProfileByPhone(input.phone);
-      return profile ? toPublicProfile(profile) : null;
+      return profile ? { profile: toPublicProfile(profile), sessionToken: await createTikisProfileSession(profile.phone) } : null;
     }),
     register: publicProcedure.input(registrationInputSchema).mutation(async ({ input }) => {
       const referralCode = input.role === "driver" ? await generateUniqueReferralCode(input.fullName) : undefined;
@@ -84,7 +110,7 @@ export const appRouter = router({
         vehicles: JSON.stringify(input.role === "driver" ? input.vehicles : []),
         referralCode,
       });
-      return toPublicProfile(profile);
+      return { profile: toPublicProfile(profile), sessionToken: await createTikisProfileSession(profile.phone) };
     }),
     update: publicProcedure.input(z.object({ phone: phoneSchema, otp: simulationOtpSchema, fullName: fullNameSchema.optional(), photoBase64: base64ImageSchema.optional(), photoMime: photoMimeSchema.optional() }).superRefine((value, ctx) => {
       if (!value.fullName && !value.photoBase64) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Aucune modification à enregistrer." });
@@ -106,17 +132,17 @@ export const appRouter = router({
     }),
   }),
   geography: router({
-    search: publicProcedure.input(z.object({ query: z.string().min(2).max(120), countryCode: countryCodeSchema.optional(), biasLatitude: coordinateSchema.min(-90).max(90).optional(), biasLongitude: coordinateSchema.min(-180).max(180).optional() })).mutation(async ({ input }) => geography.searchPlaces(input.query, input.biasLatitude !== undefined && input.biasLongitude !== undefined ? { latitude: input.biasLatitude, longitude: input.biasLongitude } : undefined, input.countryCode)),
-    resolve: publicProcedure.input(z.object({ mapboxId: z.string().min(1).max(255), mapboxSessionToken: z.string().uuid().optional() })).mutation(async ({ input }) => geography.resolveMapboxPlace(input.mapboxId, input.mapboxSessionToken)),
-    geocode: publicProcedure.input(z.object({ address: z.string().min(3).max(180) })).mutation(async ({ input }) => geography.geocodeAddress(input.address)),
-    reverse: publicProcedure.input(z.object({ latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180) })).mutation(async ({ input }) => geography.reverseGeocodeLocation(input.latitude, input.longitude)),
-    route: publicProcedure.input(z.object({ origin: placeSchema, destination: placeSchema })).mutation(async ({ input }) => geography.computeRoute(input.origin, input.destination)),
-    savePlace: publicProcedure.input(placeSchema).mutation(async ({ input }) => db.saveTikisPlace({ googlePlaceId: input.googlePlaceId, mapboxPlaceId: input.mapboxId, latitude: String(input.latitude), longitude: String(input.longitude), formattedAddress: input.formattedAddress ?? input.name, placeName: input.name, street: input.street, district: input.district, city: input.city, province: input.province, country: input.country })),
+    search: protectedGeographyProcedure.input(z.object({ query: z.string().min(2).max(120), countryCode: countryCodeSchema.optional(), biasLatitude: coordinateSchema.min(-90).max(90).optional(), biasLongitude: coordinateSchema.min(-180).max(180).optional() })).mutation(async ({ ctx, input }) => geography.searchPlaces(input.query, input.biasLatitude !== undefined && input.biasLongitude !== undefined ? { latitude: input.biasLatitude, longitude: input.biasLongitude } : undefined, sessionCountryCode(ctx.tikisProfilePhone))),
+    resolve: protectedGeographyProcedure.input(z.object({ mapboxId: z.string().min(1).max(255), mapboxSessionToken: z.string().uuid().optional() })).mutation(async ({ ctx, input }) => geography.resolveMapboxPlace(input.mapboxId, input.mapboxSessionToken, sessionCountryCode(ctx.tikisProfilePhone))),
+    geocode: protectedGeographyProcedure.input(z.object({ address: z.string().min(3).max(180) })).mutation(async ({ ctx, input }) => geography.geocodeAddress(input.address, sessionCountryCode(ctx.tikisProfilePhone))),
+    reverse: protectedGeographyProcedure.input(z.object({ latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180) })).mutation(async ({ ctx, input }) => geography.reverseGeocodeLocation(input.latitude, input.longitude, sessionCountryCode(ctx.tikisProfilePhone))),
+    route: protectedGeographyProcedure.input(z.object({ origin: placeSchema, destination: placeSchema })).mutation(async ({ input }) => geography.computeRoute(input.origin, input.destination)),
+    savePlace: protectedGeographyProcedure.input(placeSchema).mutation(async ({ input }) => db.saveTikisPlace({ googlePlaceId: input.googlePlaceId, mapboxPlaceId: input.mapboxId, latitude: String(input.latitude), longitude: String(input.longitude), formattedAddress: input.formattedAddress ?? input.name, placeName: input.name, street: input.street, district: input.district, city: input.city, province: input.province, country: input.country, provider: input.mapboxId ? "mapbox" : "manual", source: input.mapboxId ? "retrieve" : "manual", featureType: "unknown", precision: "unknown" })),
     favorites: router({
-      list: publicProcedure.input(z.object({ phone: phoneSchema })).query(async ({ input }) => db.listFavoritePlaces(input.phone)),
-      add: publicProcedure.input(z.object({ phone: phoneSchema, placeId: z.number().int().positive(), label: favoriteLabelSchema })).mutation(async ({ input }) => db.saveFavoritePlace(input.phone, input.placeId, input.label)),
-      rename: publicProcedure.input(z.object({ phone: phoneSchema, favoriteId: z.number().int().positive(), label: favoriteLabelSchema })).mutation(async ({ input }) => db.renameFavoritePlace(input.phone, input.favoriteId, input.label)),
-      remove: publicProcedure.input(z.object({ phone: phoneSchema, favoriteId: z.number().int().positive() })).mutation(async ({ input }) => db.deleteFavoritePlace(input.phone, input.favoriteId)),
+      list: tikisProtectedProcedure.query(({ ctx }) => db.listFavoritePlaces(ctx.tikisProfilePhone)),
+      add: tikisProtectedProcedure.input(z.object({ placeId: z.number().int().positive(), label: favoriteLabelSchema })).mutation(async ({ ctx, input }) => db.saveFavoritePlace(ctx.tikisProfilePhone, input.placeId, input.label)),
+      rename: tikisProtectedProcedure.input(z.object({ favoriteId: z.number().int().positive(), label: favoriteLabelSchema })).mutation(async ({ ctx, input }) => db.renameFavoritePlace(ctx.tikisProfilePhone, input.favoriteId, input.label)),
+      remove: tikisProtectedProcedure.input(z.object({ favoriteId: z.number().int().positive() })).mutation(async ({ ctx, input }) => db.deleteFavoritePlace(ctx.tikisProfilePhone, input.favoriteId)),
     }),
   }),
 });

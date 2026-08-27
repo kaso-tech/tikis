@@ -1,11 +1,12 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { PlacePicker } from "@/components/tikis/place-picker";
-import { TikisButton } from "@/components/tikis/ui";
-import { locationSubtitle, locationTitle, type LocationLabel } from "@/shared/tikis-domain";
+import { SurfaceCard, TikisButton } from "@/components/tikis/ui";
+import { formatDeliveryDetailPlace, formatNavigationTarget, locationSubtitle, locationTitle } from "@/lib/geo-rules";
+import type { LocationLabel } from "@/shared/tikis-domain";
 
 type LocationTarget = "pickup" | "dropoff";
 
@@ -31,6 +32,23 @@ export function FloatingPlacePicker({
   onSelect: (place: LocationLabel) => void;
 }) {
   const title = target === "pickup" ? "Choisir la récupération" : "Choisir la destination";
+  const [pendingPlace, setPendingPlace] = useState<LocationLabel | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const formattedPendingPlace = pendingPlace ? formatDeliveryDetailPlace(pendingPlace) : null;
+
+  useEffect(() => {
+    if (!visible) {
+      setPendingPlace(null);
+      setConfirming(false);
+    }
+  }, [visible]);
+
+  function confirmPlace() {
+    if (!pendingPlace || confirming) return;
+    setConfirming(true);
+    onSelect(pendingPlace);
+    onClose();
+  }
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -46,19 +64,23 @@ export function FloatingPlacePicker({
           <View style={styles.closeSpacer} />
         </View>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={styles.subtitle}>Recherchez une adresse ou sélectionnez un point directement sur la carte.</Text>
+          <Text style={styles.subtitle}>Recherchez une adresse ou sélectionnez un point directement sur la carte, puis confirmez le lieu.</Text>
           {target ? (
             <PlacePicker
               label={target === "pickup" ? "Adresse de récupération" : "Adresse de destination"}
               tone={target}
-              value={value}
+              value={pendingPlace ?? value}
               countryCode={countryCode}
-              onChange={(place) => {
-                onSelect(place);
-                onClose();
-              }}
+              onChange={(place) => setPendingPlace(place)}
             />
           ) : null}
+          {pendingPlace && formattedPendingPlace ? <SurfaceCard style={styles.confirmationCard}>
+            <View style={styles.confirmationHeading}><View style={styles.confirmationIcon}><MaterialIcons name="verified" size={18} color="#147A58" /></View><View style={styles.confirmationCopy}><Text style={styles.confirmationEyebrow}>LIEU SÉLECTIONNÉ</Text><Text style={styles.confirmationTitle}>{formattedPendingPlace.title}</Text></View></View>
+            <Text style={styles.confirmationMeta}>{formattedPendingPlace.subtitle}</Text>
+            <Text style={styles.confirmationAddress} numberOfLines={2}>{formatNavigationTarget(pendingPlace)}</Text>
+            <View style={styles.confirmationFacts}><Text style={styles.confirmationFact}>{pendingPlace.precision === "exact" ? "Position précise" : pendingPlace.precision === "street" ? "Niveau rue" : pendingPlace.precision === "area" ? "Niveau quartier" : "Position GPS enregistrée"}</Text>{pendingPlace.country ? <Text style={styles.confirmationFact}>{pendingPlace.country}</Text> : null}</View>
+            <View style={styles.confirmationActions}><TikisButton label="Modifier" variant="secondary" onPress={() => setPendingPlace(null)} disabled={confirming} style={styles.confirmationAction} /><TikisButton label="Confirmer ce lieu" icon="check" onPress={confirmPlace} loading={confirming} loadingLabel="Validation…" style={styles.confirmationAction} /></View>
+          </SurfaceCard> : null}
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -191,6 +213,18 @@ const styles = StyleSheet.create({
   title: { color: "#0B1F3A", fontSize: 18, fontWeight: "900", marginTop: 2 },
   content: { padding: 20, paddingBottom: 38 },
   subtitle: { color: "#697386", fontSize: 13, lineHeight: 19, marginBottom: 18 },
+  confirmationCard: { marginTop: 4, borderColor: "#BDE3D2", backgroundColor: "#F1FBF6" },
+  confirmationHeading: { flexDirection: "row", alignItems: "center", gap: 10 },
+  confirmationIcon: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: "#DBF4E6" },
+  confirmationCopy: { flex: 1 },
+  confirmationEyebrow: { color: "#147A58", fontSize: 9, fontWeight: "900", letterSpacing: 0.8 },
+  confirmationTitle: { color: "#0B1F3A", fontSize: 15, fontWeight: "900", marginTop: 2 },
+  confirmationMeta: { color: "#39745F", fontSize: 12, fontWeight: "700", marginTop: 10 },
+  confirmationAddress: { color: "#697386", fontSize: 11, lineHeight: 16, marginTop: 3 },
+  confirmationFacts: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 11 },
+  confirmationFact: { color: "#147A58", fontSize: 10, fontWeight: "800", backgroundColor: "#DBF4E6", borderRadius: 8, overflow: "hidden", paddingHorizontal: 8, paddingVertical: 4 },
+  confirmationActions: { flexDirection: "row", gap: 10, marginTop: 16 },
+  confirmationAction: { flex: 1, minHeight: 45 },
   searchBox: { height: 48, flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 13, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#DDE5ED", borderRadius: 14, marginBottom: 13 },
   searchInput: { flex: 1, color: "#0B1F3A", fontSize: 14, fontWeight: "700", height: "100%" },
   clearSearch: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#EEF2F6" },

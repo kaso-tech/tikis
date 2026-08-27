@@ -43,6 +43,13 @@
       "when": 1787777240500,
       "tag": "0005_harsh_captain_britain",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1787791505396,
+      "tag": "0006_lazy_zaladane",
+      "breakpoints": true
     }
   ]
 }

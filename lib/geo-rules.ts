@@ -1,4 +1,4 @@
-import type { DeliveryType, LocationLabel, SelectableVehicleType } from "@/shared/tikis-domain";
+import type { DeliveryType, LocationLabel, LocationPresentation, SelectableVehicleType } from "@/shared/tikis-domain";
 
 const safeWhitespace = /\s+/g;
 const forbiddenPlaceChars = /[^\p{L}\p{N}\s,.'’\-()/]/gu;
@@ -25,6 +25,10 @@ export function normalizeLocation(input: Partial<LocationLabel>): LocationLabel 
   const street = sanitizePlaceText(input.street ?? "");
   const province = sanitizePlaceText(input.province ?? "");
   const country = sanitizePlaceText(input.country ?? "");
+  const provider = input.provider;
+  const source = input.source;
+  const featureType = input.featureType;
+  const precision = input.precision;
   return {
     name: name || district || city || formattedAddress,
     district,
@@ -38,22 +42,85 @@ export function normalizeLocation(input: Partial<LocationLabel>): LocationLabel 
     ...(street ? { street } : {}),
     ...(province ? { province } : {}),
     ...(country ? { country } : {}),
+    ...(provider ? { provider } : {}),
+    ...(source ? { source } : {}),
+    ...(featureType ? { featureType } : {}),
+    ...(precision ? { precision } : {}),
   };
 }
 
-function shortPart(location: LocationLabel) {
-  return location.name || location.district || location.street || location.city || location.province || location.formattedAddress || "Lieu";
+function distinctParts(parts: Array<string | undefined>) {
+  return parts
+    .map((part) => sanitizePlaceText(part ?? ""))
+    .filter(Boolean)
+    .filter((item, index, values) => values.findIndex((value) => value.localeCompare(item, "fr", { sensitivity: "base" }) === 0) === index);
 }
 
-export function compactRouteLabel(pickup: LocationLabel, dropoff: LocationLabel) {
+function samePart(left: string | undefined, right: string | undefined) {
+  return Boolean(left && right && left.localeCompare(right, "fr", { sensitivity: "base" }) === 0);
+}
+
+function isGenericName(location: LocationPresentation) {
+  return !location.name || samePart(location.name, location.city) || location.name.localeCompare("Point sélectionné", "fr", { sensitivity: "base" }) === 0;
+}
+
+function localPart(location: LocationPresentation) {
+  if (!isGenericName(location)) return location.name;
+  return location.street || location.district || location.city || location.province || location.formattedAddress || "Lieu sélectionné";
+}
+
+export function locationTitle(location: LocationPresentation) {
+  if (isGenericName(location) && !location.street && !location.district && location.city) return "Point sélectionné";
+  return localPart(location);
+}
+
+export function locationSubtitle(location: LocationPresentation) {
+  return distinctParts([location.street, location.district, location.city, location.province, location.country])
+    .filter((part) => !samePart(part, locationTitle(location)))
+    .join(" · ") || location.formattedAddress || "Lieu à confirmer";
+}
+
+export function formatListRouteParts(pickup: LocationLabel, dropoff: LocationLabel) {
   const sameCity = Boolean(pickup.city && dropoff.city && pickup.city.localeCompare(dropoff.city, "fr", { sensitivity: "base" }) === 0);
-  return sameCity ? `${shortPart(pickup)} → ${shortPart(dropoff)}` : `${pickup.city || pickup.province || shortPart(pickup)} → ${dropoff.city || dropoff.province || shortPart(dropoff)}`;
+  return sameCity
+    ? { pickup: localPart(pickup), dropoff: localPart(dropoff), sameCity: true }
+    : { pickup: pickup.city || pickup.province || localPart(pickup), dropoff: dropoff.city || dropoff.province || localPart(dropoff), sameCity: false };
 }
 
-export function detailedPlaceLabel(location: LocationLabel) {
-  const details = [location.name, location.district, location.city, location.province].filter((item): item is string => Boolean(item));
-  return details.filter((item, index, values) => values.findIndex((value) => value.localeCompare(item, "fr", { sensitivity: "base" }) === 0) === index).join(" / ") || location.formattedAddress || "Lieu sélectionné";
+export function formatListRoute(pickup: LocationLabel, dropoff: LocationLabel) {
+  const route = formatListRouteParts(pickup, dropoff);
+  return `${route.pickup} → ${route.dropoff}`;
 }
+
+export function formatDeliveryDetailPlace(location: LocationLabel) {
+  return {
+    title: locationTitle(location),
+    subtitle: distinctParts([location.district, location.street, location.city, location.province])
+      .filter((part) => !samePart(part, localPart(location)))
+      .join(" / ") || location.formattedAddress || "Coordonnées GPS enregistrées",
+  };
+}
+
+export function formatFavoritePlace(location: LocationLabel) {
+  return localPart(location);
+}
+
+export function formatNavigationTarget(location: LocationLabel) {
+  return location.formattedAddress || distinctParts([localPart(location), location.street, location.district, location.city, location.province, location.country]).join(", ");
+}
+
+/** @deprecated Utiliser formatListRoute. */
+export const compactRouteLabel = formatListRoute;
+/** @deprecated Utiliser formatDeliveryDetailPlace. */
+export const detailedPlaceLabel = (location: LocationLabel) => {
+  const formatted = formatDeliveryDetailPlace(location);
+  return `${formatted.title}${formatted.subtitle ? ` / ${formatted.subtitle}` : ""}`;
+};
+/** @deprecated Utiliser formatDeliveryDetailPlace. */
+export const displayLocation = (location: LocationLabel) => {
+  const formatted = formatDeliveryDetailPlace(location);
+  return `${formatted.title}${formatted.subtitle ? ` · ${formatted.subtitle.replaceAll(" / ", " · ")}` : ""}`;
+};
 
 export function geodesicDistanceKm(origin: Pick<LocationLabel, "latitude" | "longitude">, destination: Pick<LocationLabel, "latitude" | "longitude">) {
   const radians = (value: number) => (value * Math.PI) / 180;

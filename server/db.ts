@@ -1,7 +1,8 @@
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertTikisPlace, InsertUser, tikisFavoritePlaces, tikisPlaces, tikisProfiles, users } from "../drizzle/schema";
+import { InsertTikisPlace, InsertUser, TikisPlace, tikisFavoritePlaces, tikisPlaces, tikisProfiles, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import type { LocationLabel } from "../shared/tikis-domain";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -105,7 +106,41 @@ export async function getTikisPlaceByMapboxId(mapboxPlaceId: string) {
   return result[0];
 }
 
-export async function saveTikisPlace(input: InsertTikisPlace) {
+export function coordinateCacheKey(latitude: string | number, longitude: string | number) {
+  const safeLatitude = Number(latitude);
+  const safeLongitude = Number(longitude);
+  if (!Number.isFinite(safeLatitude) || !Number.isFinite(safeLongitude)) throw new Error("Coordonnées de lieu invalides.");
+  return `${safeLatitude.toFixed(5)}:${safeLongitude.toFixed(5)}`;
+}
+
+export function tikisPlaceToLocation(place: TikisPlace): LocationLabel {
+  return {
+    name: place.placeName,
+    district: place.district ?? "",
+    city: place.city ?? "",
+    latitude: Number(place.latitude),
+    longitude: Number(place.longitude),
+    ...(place.googlePlaceId ? { googlePlaceId: place.googlePlaceId } : {}),
+    ...(place.mapboxPlaceId ? { mapboxId: place.mapboxPlaceId } : {}),
+    ...(place.formattedAddress ? { formattedAddress: place.formattedAddress } : {}),
+    ...(place.street ? { street: place.street } : {}),
+    ...(place.province ? { province: place.province } : {}),
+    ...(place.country ? { country: place.country } : {}),
+    provider: place.provider === "mapbox" ? "mapbox" : place.provider === "manual" ? "manual" : "legacy",
+    source: ["retrieve", "reverse", "forward", "favorite", "manual", "legacy"].includes(place.source) ? place.source as LocationLabel["source"] : "legacy",
+    featureType: ["address", "secondary_address", "poi", "street", "neighborhood", "locality", "place", "point", "unknown"].includes(place.featureType) ? place.featureType as LocationLabel["featureType"] : "unknown",
+    precision: ["exact", "street", "area", "city", "unknown"].includes(place.precision) ? place.precision as LocationLabel["precision"] : "unknown",
+  };
+}
+
+export async function getTikisPlaceByCoordinate(latitude: string | number, longitude: string | number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(tikisPlaces).where(eq(tikisPlaces.coordinateKey, coordinateCacheKey(latitude, longitude))).limit(1);
+  return result[0];
+}
+
+export async function saveTikisPlace(input: Omit<InsertTikisPlace, "coordinateKey" | "resolvedAt">) {
   const db = await getDb();
   if (!db) throw new Error("La base de lieux est temporairement indisponible.");
   if (input.googlePlaceId) {
@@ -116,7 +151,9 @@ export async function saveTikisPlace(input: InsertTikisPlace) {
     const cached = await getTikisPlaceByMapboxId(input.mapboxPlaceId);
     if (cached) return cached;
   }
-  const inserted = await db.insert(tikisPlaces).values(input);
+  const cachedByCoordinate = await getTikisPlaceByCoordinate(input.latitude, input.longitude);
+  if (cachedByCoordinate) return cachedByCoordinate;
+  const inserted = await db.insert(tikisPlaces).values({ ...input, coordinateKey: coordinateCacheKey(input.latitude, input.longitude) });
   const result = await db.select().from(tikisPlaces).where(eq(tikisPlaces.id, Number(inserted[0].insertId))).limit(1);
   if (!result[0]) throw new Error("Le lieu n’a pas pu être enregistré.");
   return result[0];

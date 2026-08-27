@@ -9,6 +9,7 @@ import { OTP_MAX_ATTEMPTS, verifySimulationOtp } from "@/lib/otp-simulator";
 import { COUNTRIES, createRegisteredProfile, detectCountry, findSimulatedAccount, formatLocalPhone, isValidInternationalPhone, normalizedInternationalPhone, sanitizeFullName, sanitizePhoneInput, validateFullName, type CountrySpec } from "@/lib/registration-rules";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
+import { setTikisSessionToken } from "@/lib/tikis-session";
 import type { UserRole, VehicleType } from "@/shared/tikis-domain";
 import { SIMULATION_OTP } from "@/shared/tikis-domain";
 
@@ -124,14 +125,16 @@ export function AuthFlow() {
       const demoProfile = findSimulatedAccount(phone);
       haptic.success();
       if (existingProfile) {
-        signInProfile(existingProfile);
+        await setTikisSessionToken(existingProfile.sessionToken);
+        signInProfile(existingProfile.profile);
         router.replace("/(tabs)");
         return;
       }
       if (demoProfile) {
         try {
           const persistedDemoProfile = await registerProfileMutation.mutateAsync({ phone: demoProfile.phone, fullName: demoProfile.fullName, countryCode: demoProfile.countryCode, role: demoProfile.role, vehicles: demoProfile.vehicles, otp: otp as "730512" });
-          signInProfile(persistedDemoProfile);
+          await setTikisSessionToken(persistedDemoProfile.sessionToken);
+          signInProfile(persistedDemoProfile.profile);
         } catch {
           signInProfile(demoProfile);
         }
@@ -197,7 +200,8 @@ export function AuthFlow() {
     const localProfile = createRegisteredProfile({ fullName: validatedName, phone, countryCode: country.id, role: selectedRole, vehicles: selectedVehicles });
     try {
       const persistedProfile = await registerProfileMutation.mutateAsync({ phone: localProfile.phone, fullName: localProfile.fullName, countryCode: localProfile.countryCode, role: localProfile.role, vehicles: localProfile.vehicles, otp: otp as "730512" });
-      registerProfile(persistedProfile);
+      await setTikisSessionToken(persistedProfile.sessionToken);
+      registerProfile(persistedProfile.profile);
     } catch {
       setFinishing(false);
       setNameError("Impossible d’enregistrer votre profil de façon sécurisée. Vérifiez votre connexion puis réessayez.");

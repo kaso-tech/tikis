@@ -1,4 +1,4 @@
-import { decimal, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { decimal, index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 /** Core Manus user table kept for the template OAuth layer. */
 export const users = mysqlTable("users", {
@@ -43,9 +43,15 @@ export const tikisPlaces = mysqlTable("tikis_places", {
   city: varchar("city", { length: 120 }),
   province: varchar("province", { length: 120 }),
   country: varchar("country", { length: 120 }),
+  provider: varchar("provider", { length: 16 }).notNull().default("legacy"),
+  source: varchar("source", { length: 16 }).notNull().default("legacy"),
+  featureType: varchar("featureType", { length: 32 }).notNull().default("unknown"),
+  precision: varchar("precision", { length: 16 }).notNull().default("unknown"),
+  coordinateKey: varchar("coordinateKey", { length: 32 }).notNull().default("legacy"),
+  resolvedAt: timestamp("resolvedAt").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (table) => [index("tikis_places_coordinate_key_index").on(table.coordinateKey)]);
 
 /** Sender-owned shortcuts to canonical places; natural labels make favourites recognisable in the form. */
 export const tikisFavoritePlaces = mysqlTable("tikis_favorite_places", {

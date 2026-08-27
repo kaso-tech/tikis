@@ -8,7 +8,7 @@ import { sanitizePlaceText } from "@/lib/geo-rules";
 import { autocompleteQuery, PLACE_AUTOCOMPLETE_DEBOUNCE_MS } from "@/lib/place-autocomplete";
 import { trpc } from "@/lib/trpc";
 import { useSearchLocationBias } from "@/hooks/use-search-location-bias";
-import { locationSubtitle, locationTitle, type LocationLabel } from "@/shared/tikis-domain";
+import { locationSubtitle, locationTitle, type LocationLabel, type PlaceSuggestion } from "@/shared/tikis-domain";
 
 type Props = { label: string; tone: "pickup" | "dropoff"; value: LocationLabel | null; countryCode?: string; onChange: (place: LocationLabel) => void };
 const INITIAL_REGION = { latitude: 12.3714, longitude: -1.5197, latitudeDelta: 0.12, longitudeDelta: 0.12 };
@@ -16,7 +16,7 @@ const INITIAL_REGION = { latitude: 12.3714, longitude: -1.5197, latitudeDelta: 0
 export function PlacePicker({ label, tone, value, countryCode, onChange }: Props) {
   const mapRef = useRef<MapView>(null);
   const [query, setQuery] = useState(value?.name ?? "");
-  const [results, setResults] = useState<LocationLabel[]>([]);
+  const [results, setResults] = useState<PlaceSuggestion[]>([]);
   const [message, setMessage] = useState("");
   const search = trpc.geography.search.useMutation();
   const reverse = trpc.geography.reverse.useMutation();
@@ -67,12 +67,10 @@ export function PlacePicker({ label, tone, value, countryCode, onChange }: Props
     } catch (cause) { setMessage(cause instanceof Error ? cause.message : "Le géocodage est indisponible."); }
   }
 
-  async function selectSuggestion(suggestion: LocationLabel) {
+  async function selectSuggestion(suggestion: PlaceSuggestion) {
     try {
       setMessage("Chargement des coordonnées…");
-      const place = suggestion.mapboxId
-        ? await resolve.mutateAsync({ mapboxId: suggestion.mapboxId, ...(suggestion.mapboxSessionToken ? { mapboxSessionToken: suggestion.mapboxSessionToken } : {}) })
-        : suggestion;
+      const place = await resolve.mutateAsync({ mapboxId: suggestion.mapboxId, mapboxSessionToken: suggestion.mapboxSessionToken });
       latestSearch.current += 1;
       onChange(place);
       setResults([]);
@@ -100,7 +98,7 @@ export function PlacePicker({ label, tone, value, countryCode, onChange }: Props
         <Pressable accessibilityRole="button" accessibilityLabel={`Rechercher ${label}`} onPress={() => void runSearch(query)} disabled={search.isPending} style={({ pressed }) => [styles.searchButton, { backgroundColor: accent }, (pressed || search.isPending) && styles.pressed]}>{search.isPending ? <ActivityIndicator size="small" color="#FFFFFF" /> : <MaterialIcons name="search" size={19} color="#FFFFFF" />}</Pressable>
       </View>
       <View style={styles.mapWrap}><MapView provider={PROVIDER_GOOGLE} ref={mapRef} style={styles.map} initialRegion={value ? { latitude: value.latitude, longitude: value.longitude, latitudeDelta: 0.025, longitudeDelta: 0.025 } : INITIAL_REGION} onPress={(event) => void selectOnMap(event)}>{value ? <Marker coordinate={{ latitude: value.latitude, longitude: value.longitude }} pinColor={accent} title={locationTitle(value)} description={locationSubtitle(value)} /> : null}</MapView><View pointerEvents="none" style={styles.mapHint}><MaterialIcons name="touch-app" size={14} color="#FFFFFF" /><Text style={styles.mapHintText}>Touchez la carte pour sélectionner</Text></View></View>
-      {results.map((place, index) => <Pressable key={`${place.mapboxId ?? place.googlePlaceId ?? place.latitude}-${index}`} onPress={() => void selectSuggestion(place)} disabled={resolve.isPending} style={({ pressed }) => [styles.result, (pressed || resolve.isPending) && styles.pressed]}><MaterialIcons name="place" size={18} color="#007B8B" /><View style={styles.resultText}><Text style={styles.resultName}>{locationTitle(place)}</Text><Text style={styles.resultMeta} numberOfLines={1}>{locationSubtitle(place)}</Text></View>{resolve.isPending ? <ActivityIndicator size="small" color="#007B8B" /> : <MaterialIcons name="chevron-right" size={20} color="#A1ADBC" />}</Pressable>)}
+      {results.map((place, index) => <Pressable key={`${place.mapboxId}-${index}`} onPress={() => void selectSuggestion(place)} disabled={resolve.isPending} style={({ pressed }) => [styles.result, (pressed || resolve.isPending) && styles.pressed]}><MaterialIcons name="place" size={18} color="#007B8B" /><View style={styles.resultText}><Text style={styles.resultName}>{locationTitle(place)}</Text><Text style={styles.resultMeta} numberOfLines={1}>{locationSubtitle(place)}</Text></View>{resolve.isPending ? <ActivityIndicator size="small" color="#007B8B" /> : <MaterialIcons name="chevron-right" size={20} color="#A1ADBC" />}</Pressable>)}
       {value ? <View style={styles.selected}><MaterialIcons name="check-circle" size={16} color="#147A58" /><Text style={styles.selectedText} numberOfLines={2}>{locationTitle(value)}{"\n"}{locationSubtitle(value)}</Text></View> : null}
       {message ? <Text style={styles.message}>{message}</Text> : null}
     </SurfaceCard>

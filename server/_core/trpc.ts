@@ -27,6 +27,15 @@ const requireUser = t.middleware(async (opts) => {
 
 export const protectedProcedure = t.procedure.use(requireUser);
 
+const requireTikisProfile = t.middleware(async (opts) => {
+  if (!opts.ctx.tikisProfilePhone) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Votre session Tikis a expiré. Connectez-vous de nouveau." });
+  }
+  return opts.next({ ctx: { ...opts.ctx, tikisProfilePhone: opts.ctx.tikisProfilePhone } });
+});
+
+export const tikisProtectedProcedure = t.procedure.use(requireTikisProfile);
+
 export const adminProcedure = t.procedure.use(
   t.middleware(async (opts) => {
     const { ctx, next } = opts;

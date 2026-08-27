@@ -27,6 +27,7 @@ function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] }
   
   const ctx: TrpcContext = {
     user,
+    tikisProfilePhone: null,
     req: {
       protocol: "https",
       headers: {},

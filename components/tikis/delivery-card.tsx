@@ -2,10 +2,12 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { StatusBadge } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
-import { deliveryStatusMeta, displayLocation, formatMoney, type Delivery } from "@/shared/tikis-domain";
+import { formatListRouteParts } from "@/lib/geo-rules";
+import { deliveryStatusMeta, formatMoney, type Delivery } from "@/shared/tikis-domain";
 
 export function DeliveryCard({ delivery, onPress }: { delivery: Delivery; onPress: () => void }) {
   const status = deliveryStatusMeta[delivery.status];
+  const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
 
   return (
     <Pressable
@@ -31,8 +33,8 @@ export function DeliveryCard({ delivery, onPress }: { delivery: Delivery; onPres
           <View style={styles.dropoffDot} />
         </View>
         <View style={styles.routeLabels}>
-          <Text numberOfLines={1} style={styles.routeText}>{displayLocation(delivery.pickup)}</Text>
-          <Text numberOfLines={1} style={[styles.routeText, styles.dropoff]}>{displayLocation(delivery.dropoff)}</Text>
+          <Text numberOfLines={1} style={styles.routeText}>{route.pickup}</Text>
+          <Text numberOfLines={1} style={[styles.routeText, styles.dropoff]}>{route.dropoff}</Text>
         </View>
       </View>
       <View style={styles.footer}>
@@ -63,4 +65,3 @@ const styles = StyleSheet.create({
   distance: { color: "#0B1F3A", fontSize: 12, fontWeight: "700" },
   price: { color: "#007B8B", fontSize: 15, fontWeight: "900" },
 });
-

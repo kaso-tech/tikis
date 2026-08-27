@@ -138,3 +138,18 @@
 - [x] Intégrer la récupération de position actuelle aux sélecteurs d’adresse mobile et web.
 - [x] Configurer les permissions de géolocalisation au premier plan pour les builds natifs.
 - [x] Tester la priorisation Mapbox par proximité, le refus de permission et la disponibilité du serveur.
+- [x] Analyser la nouvelle logique métier des lieux et inventorier le système actuel.
+- [x] Comparer les exigences de gestion des lieux aux flux et données Tikis.
+- [x] Évaluer les risques de sécurité, fiabilité, performance et expérience utilisateur.
+- [x] Rédiger un rapport d’audit détaillé et priorisé de la gestion des lieux.
+- [x] Définir une stratégie de migration non régressive du système de gestion des lieux.
+- [x] Sécuriser l’identité applicative et les accès aux lieux, recherche et favoris.
+- [x] Séparer les suggestions non résolues des lieux GPS résolus et classifier leur précision.
+- [x] Centraliser la normalisation, l’enrichissement et le formatage contextuel des lieux.
+- [x] Étendre le stockage canonique avec provenance, précision et clés de cache.
+- [x] Réutiliser les lieux connus avant tout appel Mapbox et limiter les requêtes géographiques.
+- [x] Ajouter une confirmation explicite de lieu après recherche ou sélection sur carte.
+- [x] Appliquer les libellés liste, détail, favoris et navigation dans tous les écrans concernés.
+- [x] Mettre en place les métriques de cache, erreurs et limitation de requêtes géographiques.
+- [x] Couvrir les cas métier A à J, la résilience et les contrôles d’accès par des tests.
+- [x] Valider l’intégralité de la refonte, redémarrer le serveur et enregistrer une version livrable.

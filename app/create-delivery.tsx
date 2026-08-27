@@ -7,7 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { FavoritePlacesSheet, FloatingPlacePicker, type SavedFavorite } from "@/components/tikis/place-sheets";
 import { SurfaceCard, TikisButton } from "@/components/tikis/ui";
 import { offeredPriceError, parseOfferedPrice, priceDifferencePercent, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
-import { compactRouteLabel, estimateDeliveryPrice, provisionalRoute, sanitizePlaceText, validateDeliveryMeasurement } from "@/lib/geo-rules";
+import { formatFavoritePlace, formatListRoute, estimateDeliveryPrice, provisionalRoute, sanitizePlaceText, validateDeliveryMeasurement } from "@/lib/geo-rules";
 import { isAllowedDeliveryText, sanitizeDeliveryText } from "@/lib/tikis-engine";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
@@ -24,13 +24,12 @@ function toPlacePayload(place: LocationLabel) {
   return { name: place.name, district: place.district, city: place.city, latitude: place.latitude, longitude: place.longitude, ...(place.googlePlaceId ? { googlePlaceId: place.googlePlaceId } : {}), ...(place.mapboxId ? { mapboxId: place.mapboxId } : {}), ...(place.mapboxSessionToken ? { mapboxSessionToken: place.mapboxSessionToken } : {}), ...(place.formattedAddress ? { formattedAddress: place.formattedAddress } : {}), ...(place.street ? { street: place.street } : {}), ...(place.province ? { province: place.province } : {}), ...(place.country ? { country: place.country } : {}) };
 }
 
-function favoriteToLocation(item: { place: { placeName: string; district: string | null; city: string | null; latitude: string; longitude: string; googlePlaceId: string | null; mapboxPlaceId: string | null; formattedAddress: string; street: string | null; province: string | null; country: string | null } }): LocationLabel {
-  return { name: item.place.placeName, district: item.place.district ?? "", city: item.place.city ?? "", latitude: Number(item.place.latitude), longitude: Number(item.place.longitude), ...(item.place.googlePlaceId ? { googlePlaceId: item.place.googlePlaceId } : {}), ...(item.place.mapboxPlaceId ? { mapboxId: item.place.mapboxPlaceId } : {}), ...(item.place.formattedAddress ? { formattedAddress: item.place.formattedAddress } : {}), ...(item.place.street ? { street: item.place.street } : {}), ...(item.place.province ? { province: item.place.province } : {}), ...(item.place.country ? { country: item.place.country } : {}) };
+function favoriteToLocation(item: { place: { placeName: string; district: string | null; city: string | null; latitude: string; longitude: string; googlePlaceId: string | null; mapboxPlaceId: string | null; formattedAddress: string; street: string | null; province: string | null; country: string | null; provider: string; source: string; featureType: string; precision: string } }): LocationLabel {
+  return { name: item.place.placeName, district: item.place.district ?? "", city: item.place.city ?? "", latitude: Number(item.place.latitude), longitude: Number(item.place.longitude), ...(item.place.googlePlaceId ? { googlePlaceId: item.place.googlePlaceId } : {}), ...(item.place.mapboxPlaceId ? { mapboxId: item.place.mapboxPlaceId } : {}), ...(item.place.formattedAddress ? { formattedAddress: item.place.formattedAddress } : {}), ...(item.place.street ? { street: item.place.street } : {}), ...(item.place.province ? { province: item.place.province } : {}), ...(item.place.country ? { country: item.place.country } : {}), provider: item.place.provider === "mapbox" ? "mapbox" : item.place.provider === "manual" ? "manual" : "legacy", source: ["retrieve", "reverse", "forward", "favorite", "manual", "legacy"].includes(item.place.source) ? item.place.source as LocationLabel["source"] : "legacy", featureType: ["address", "secondary_address", "poi", "street", "neighborhood", "locality", "place", "point", "unknown"].includes(item.place.featureType) ? item.place.featureType as LocationLabel["featureType"] : "unknown", precision: ["exact", "street", "area", "city", "unknown"].includes(item.place.precision) ? item.place.precision as LocationLabel["precision"] : "unknown" };
 }
 
 export default function CreateDeliveryScreen() {
   const { createDemoDelivery, profile } = useTikisStore();
-  const phone = profile?.phone ?? "+22670000000";
   const [title, setTitle] = useState("Documents confidentiels");
   const [details, setDetails] = useState("À remettre contre signature.");
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("Plis");
@@ -56,7 +55,7 @@ export default function CreateDeliveryScreen() {
   const favoriteMutation = trpc.geography.favorites.add.useMutation();
   const renameFavoriteMutation = trpc.geography.favorites.rename.useMutation();
   const removeFavoriteMutation = trpc.geography.favorites.remove.useMutation();
-  const favoritesQuery = trpc.geography.favorites.list.useQuery({ phone }, { enabled: Boolean(profile?.phone) });
+  const favoritesQuery = trpc.geography.favorites.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
 
   const dimensions = useMemo(() => ({ ...(lengthCm ? { lengthCm: Number(lengthCm) } : {}), ...(widthCm ? { widthCm: Number(widthCm) } : {}), ...(heightCm ? { heightCm: Number(heightCm) } : {}) }), [lengthCm, widthCm, heightCm]);
   const measurement = useMemo(() => ({ ...(weightKg ? { weightKg: Number(weightKg) } : {}), ...(deliveryType === "Personne" ? { passengers: Number(passengers) } : {}), ...(Object.keys(dimensions).length ? { dimensions } : {}) }), [weightKg, deliveryType, passengers, dimensions]);
@@ -94,7 +93,7 @@ export default function CreateDeliveryScreen() {
     setFavoriteTarget(target);
     try {
       const persisted = await savePlaceMutation.mutateAsync(toPlacePayload(place));
-      await favoriteMutation.mutateAsync({ phone: profile.phone, placeId: persisted.id, label: sanitizePlaceText(place.name, 80) || "Lieu favori" });
+      await favoriteMutation.mutateAsync({ placeId: persisted.id, label: sanitizePlaceText(formatFavoritePlace(place), 80) || "Lieu favori" });
       await favoritesQuery.refetch();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Impossible d’ajouter ce favori."); }
     finally { setFavoriteTarget(null); }
@@ -102,13 +101,13 @@ export default function CreateDeliveryScreen() {
 
   async function renameFavorite(favorite: SavedFavorite, label: string) {
     if (!profile?.phone) return;
-    await renameFavoriteMutation.mutateAsync({ phone: profile.phone, favoriteId: Number(favorite.id), label });
+    await renameFavoriteMutation.mutateAsync({ favoriteId: Number(favorite.id), label });
     await favoritesQuery.refetch();
   }
 
   async function removeFavorite(favorite: SavedFavorite) {
     if (!profile?.phone) return;
-    await removeFavoriteMutation.mutateAsync({ phone: profile.phone, favoriteId: Number(favorite.id) });
+    await removeFavoriteMutation.mutateAsync({ favoriteId: Number(favorite.id) });
     await favoritesQuery.refetch();
   }
 
@@ -185,7 +184,7 @@ export default function CreateDeliveryScreen() {
           </View>
           {routeMessage ? <Text style={[styles.routeMessage, !route?.precise && styles.routeWarning]}>{routeMessage}</Text> : null}
           {pickup && dropoff && (!route || !route.precise) ? <Pressable accessibilityRole="button" onPress={retryRoute} style={({ pressed }) => [styles.retryRoute, pressed && styles.pressed]}><MaterialIcons name="refresh" size={16} color="#007B8B" /><Text style={styles.retryRouteText}>{route ? "Recalculer avec Routes API" : "Réessayer le calcul d’itinéraire"}</Text></Pressable> : null}
-          {pickup && dropoff ? <Text style={styles.routeTitle}>{compactRouteLabel(pickup, dropoff)}</Text> : null}
+          {pickup && dropoff ? <Text style={styles.routeTitle}>{formatListRoute(pickup, dropoff)}</Text> : null}
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <TikisButton label={`Publier · ${publishedPrice ? `${publishedPrice.toLocaleString("fr-FR")} FCFA` : "prix à définir"}`} icon="publish" onPress={() => void publish()} loading={loading} loadingLabel={publicationStage || "Publication en cours…"} style={styles.publish} />
           {loading ? <Text style={styles.publicationLoadingHint}>Veuillez patienter, votre course est en cours de publication.</Text> : null}
