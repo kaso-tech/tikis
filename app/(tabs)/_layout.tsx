@@ -20,8 +20,8 @@ export default function TabLayout() {
         headerStyle: { height: 80 },
         tabBarActiveTintColor: "#007B8B",
         tabBarInactiveTintColor: "#767676",
-        tabBarLabelStyle: { fontSize: 10, fontWeight: "700", marginTop: 1 },
-        tabBarStyle: { height: 54 + bottomPadding, paddingTop: 5, paddingBottom: bottomPadding, borderTopWidth: 1, borderTopColor: "#E3E3E3", backgroundColor: "#FFFFFF" },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: "600", marginTop: 1 },
+        tabBarStyle: { height: 54 + bottomPadding, paddingTop: 5, paddingBottom: bottomPadding, borderTopWidth: 0, backgroundColor: "#FFFFFF" },
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Accueil", tabBarIcon: ({ color, size }) => <MaterialIcons name="home-filled" size={size} color={color} /> }} />

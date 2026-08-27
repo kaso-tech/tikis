@@ -6,9 +6,9 @@ type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 const buttonColors: Record<ButtonVariant, { background: string; foreground: string; border?: string }> = {
   primary: { background: "#007B8B", foreground: "#FFFFFF" },
-  secondary: { background: "#FFFFFF", foreground: "#111111", border: "#D7D7D7" },
-  ghost: { background: "#F7F7F7", foreground: "#111111", border: "#E3E3E3" },
-  danger: { background: "#FFFFFF", foreground: "#B4232D", border: "#EAB4B8" },
+  secondary: { background: "#FFFFFF", foreground: "#111111" },
+  ghost: { background: "#E4E3E9", foreground: "#111111" },
+  danger: { background: "#F8E8E9", foreground: "#B4232D" },
 };
 
 export function TikisButton({
@@ -59,28 +59,28 @@ export function Avatar({ initials, color = "#111111", size = 44 }: { initials: s
 }
 
 export const tikisStyles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F7F7F7" },
+  screen: { flex: 1, backgroundColor: "#EEEDF3" },
   screenContent: { paddingHorizontal: 16, paddingBottom: 104 },
-  eyebrow: { color: "#007B8B", fontSize: 12, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
-  title: { color: "#111111", fontSize: 26, lineHeight: 32, fontWeight: "700", letterSpacing: -0.35 },
+  eyebrow: { color: "#007B8B", fontSize: 12, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },
+  title: { color: "#111111", fontSize: 26, lineHeight: 32, fontWeight: "600", letterSpacing: -0.35 },
   subtitle: { color: "#667085", fontSize: 14, lineHeight: 20 },
   body: { color: "#252525", fontSize: 14, lineHeight: 20 },
   muted: { color: "#667085", fontSize: 12, lineHeight: 18 },
 });
 
 const styles = StyleSheet.create({
-  button: { minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 10, borderWidth: 1, paddingHorizontal: 15, flexDirection: "row", gap: 8 },
+  button: { minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 9, borderWidth: 0, paddingHorizontal: 15, flexDirection: "row", gap: 8 },
   buttonPressed: { opacity: 0.84, transform: [{ scale: 0.98 }] },
-  buttonText: { fontSize: 15, fontWeight: "700" },
-  iconButton: { width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "#F7F7F7", borderWidth: 1, borderColor: "#E3E3E3" },
+  buttonText: { fontSize: 15, fontWeight: "600" },
+  iconButton: { width: 40, height: 40, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF", borderWidth: 0 },
   iconButtonPressed: { opacity: 0.68 },
-  card: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, borderWidth: 1, borderColor: "#E3E3E3", elevation: 0 },
+  card: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 13, borderWidth: 0, elevation: 0 },
   sectionHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  sectionTitle: { fontSize: 17, fontWeight: "700", color: "#111111", letterSpacing: -0.15 },
-  sectionAction: { color: "#007B8B", fontSize: 13, fontWeight: "700" },
+  sectionTitle: { fontSize: 17, fontWeight: "600", color: "#111111", letterSpacing: -0.15 },
+  sectionAction: { color: "#007B8B", fontSize: 13, fontWeight: "600" },
   statusBadge: { alignSelf: "flex-start", paddingHorizontal: 8, height: 24, borderRadius: 6, flexDirection: "row", alignItems: "center", gap: 5 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontSize: 11, fontWeight: "700" },
+  statusText: { fontSize: 11, fontWeight: "600" },
   avatar: { alignItems: "center", justifyContent: "center" },
-  avatarText: { color: "#FFFFFF", fontWeight: "700" },
+  avatarText: { color: "#FFFFFF", fontWeight: "600" },
 });

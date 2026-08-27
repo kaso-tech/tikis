@@ -240,6 +240,9 @@
 - [x] Vérifier le comportement actuel de la barre de recherche d’adresse.
 - [x] Ajouter et valider l’icône d’effacement rapide de recherche.
 - [x] Vérifier le serveur et enregistrer la correction.
+- [x] Examiner les styles restaurés des surfaces et des composants partagés.
+- [x] Appliquer le fond #EEEDF3, retirer les ombres et bordures décoratives, et alléger les textes.
+- [x] Tester le thème affiné, vérifier le serveur et enregistrer la version.
 - [x] Auditer le thème, les composants partagés et les commentaires existants.
 - [x] Définir une palette réduite noir-blanc et une hiérarchie typographique système.
 - [x] Densifier les composants et écrans prioritaires avec angles et ombres sobres.
