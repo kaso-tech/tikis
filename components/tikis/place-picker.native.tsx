@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 
 
 import { SurfaceCard } from "@/components/tikis/ui";
 import { sanitizePlaceText } from "@/lib/geo-rules";
-import { autocompleteQuery, PLACE_AUTOCOMPLETE_DEBOUNCE_MS } from "@/lib/place-autocomplete";
+import { autocompleteQuery, haveSameSuggestionIds, PLACE_AUTOCOMPLETE_DEBOUNCE_MS } from "@/lib/place-autocomplete";
 import { trpc } from "@/lib/trpc";
 import { useSearchLocationBias } from "@/hooks/use-search-location-bias";
 import { locationSubtitle, locationTitle, type LocationLabel, type PlaceSuggestion } from "@/shared/tikis-domain";
@@ -22,14 +22,23 @@ export function PlacePicker({ label, tone, value, countryCode, onChange }: Props
   const reverse = trpc.geography.reverse.useMutation();
   const resolve = trpc.geography.resolve.useMutation();
   const latestSearch = useRef(0);
+  const searchMutationRef = useRef(search.mutateAsync);
+  const valueRef = useRef(value);
+  searchMutationRef.current = search.mutateAsync;
+  valueRef.current = value;
   const { bias: deviceBias, status: gpsStatus, requestBias } = useSearchLocationBias();
   const accent = tone === "pickup" ? "#007B8B" : "#C23B45";
+  const valueName = value?.name ?? null;
+  const valueLatitude = value?.latitude ?? null;
+  const valueLongitude = value?.longitude ?? null;
+  const biasLatitude = deviceBias?.latitude ?? null;
+  const biasLongitude = deviceBias?.longitude ?? null;
 
   useEffect(() => {
-    if (!value) return;
-    if (query !== value.name) setQuery(value.name);
-    mapRef.current?.animateToRegion({ latitude: value.latitude, longitude: value.longitude, latitudeDelta: 0.025, longitudeDelta: 0.025 }, 350);
-  }, [query, value]);
+    if (!valueName || valueLatitude === null || valueLongitude === null) return;
+    setQuery((current) => current === valueName ? current : valueName);
+    mapRef.current?.animateToRegion({ latitude: valueLatitude, longitude: valueLongitude, latitudeDelta: 0.025, longitudeDelta: 0.025 }, 350);
+  }, [valueLatitude, valueLongitude, valueName]);
 
   const runSearch = useCallback(async (rawQuery: string) => {
     const clean = autocompleteQuery(rawQuery);
@@ -37,19 +46,20 @@ export function PlacePicker({ label, tone, value, countryCode, onChange }: Props
     const requestId = ++latestSearch.current;
     try {
       setMessage("");
-      const preferredBias = deviceBias ?? (value ? { latitude: value.latitude, longitude: value.longitude } : null);
-      const places = await search.mutateAsync({ query: clean, ...(countryCode ? { countryCode } : {}), ...(preferredBias ? { biasLatitude: preferredBias.latitude, biasLongitude: preferredBias.longitude } : {}) });
+      const selectedPlace = valueRef.current;
+      const preferredBias = biasLatitude !== null && biasLongitude !== null ? { latitude: biasLatitude, longitude: biasLongitude } : (selectedPlace ? { latitude: selectedPlace.latitude, longitude: selectedPlace.longitude } : null);
+      const places = await searchMutationRef.current({ query: clean, ...(countryCode ? { countryCode } : {}), ...(preferredBias ? { biasLatitude: preferredBias.latitude, biasLongitude: preferredBias.longitude } : {}) });
       if (requestId === latestSearch.current) {
-        setResults(places);
+        setResults((current) => haveSameSuggestionIds(current, places) ? current : places);
         if (!places.length) setMessage("Aucun lieu trouvé. Touchez la carte pour choisir une position.");
       }
     } catch (cause) {
       if (requestId === latestSearch.current) setMessage(cause instanceof Error ? cause.message : "La recherche est indisponible.");
     }
-  }, [countryCode, deviceBias, search, value]);
+  }, [biasLatitude, biasLongitude, countryCode]);
 
   useEffect(() => {
-    if (!autocompleteQuery(query)) { latestSearch.current += 1; setResults([]); return; }
+    if (!autocompleteQuery(query)) { latestSearch.current += 1; setResults((current) => current.length ? [] : current); return; }
     const timer = setTimeout(() => { void runSearch(query); }, PLACE_AUTOCOMPLETE_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [query, runSearch]);

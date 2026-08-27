@@ -190,3 +190,7 @@
 - [x] Stabiliser la signature et la vérification de session en environnement de développement.
 - [x] Corriger les parcours OTP des comptes existants et des nouvelles inscriptions.
 - [x] Tester les deux parcours, redémarrer les services et enregistrer la correction.
+- [x] Diagnostiquer la boucle de mises à jour dans le sélecteur de lieu de création.
+- [x] Stabiliser les effets et callbacks de recherche, carte et confirmation de lieu.
+- [x] Ajouter une régression et valider le parcours de sélection sans boucle de rendu.
+- [x] Redémarrer, vérifier le serveur et enregistrer la correction du sélecteur.

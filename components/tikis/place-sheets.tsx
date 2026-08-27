@@ -1,5 +1,5 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -35,6 +35,9 @@ export function FloatingPlacePicker({
   const [pendingPlace, setPendingPlace] = useState<LocationLabel | null>(null);
   const [confirming, setConfirming] = useState(false);
   const formattedPendingPlace = pendingPlace ? formatDeliveryDetailPlace(pendingPlace) : null;
+  const receivePendingPlace = useCallback((place: LocationLabel) => {
+    setPendingPlace((current) => current?.mapboxId === place.mapboxId && current?.latitude === place.latitude && current?.longitude === place.longitude ? current : place);
+  }, []);
 
   useEffect(() => {
     if (!visible) {
@@ -71,7 +74,7 @@ export function FloatingPlacePicker({
               tone={target}
               value={pendingPlace ?? value}
               countryCode={countryCode}
-              onChange={(place) => setPendingPlace(place)}
+              onChange={receivePendingPlace}
             />
           ) : null}
           {pendingPlace && formattedPendingPlace ? <SurfaceCard style={styles.confirmationCard}>
