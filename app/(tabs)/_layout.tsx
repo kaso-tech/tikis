@@ -8,7 +8,7 @@ import { useTikisStore } from "@/lib/tikis-store";
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { profile } = useTikisStore();
-  const bottomPadding = Platform.OS === "web" ? 8 : Math.max(8, insets.bottom);
+  const bottomPadding = Platform.OS === "web" ? 10 : Math.max(9, insets.bottom);
 
   if (!profile) return <Redirect href="/auth" />;
 
@@ -17,11 +17,11 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: true,
         header: () => <TikisHeader />,
-        headerStyle: { height: 80 },
+        headerStyle: { height: 86 },
         tabBarActiveTintColor: "#007B8B",
-        tabBarInactiveTintColor: "#767676",
-        tabBarLabelStyle: { fontSize: 10, fontWeight: "700", marginTop: 1 },
-        tabBarStyle: { height: 54 + bottomPadding, paddingTop: 5, paddingBottom: bottomPadding, borderTopWidth: 1, borderTopColor: "#E3E3E3", backgroundColor: "#FFFFFF" },
+        tabBarInactiveTintColor: "#8A96A8",
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "800", marginTop: 2 },
+        tabBarStyle: { height: 58 + bottomPadding, paddingTop: 7, paddingBottom: bottomPadding, borderTopWidth: 1, borderTopColor: "#E7ECF2", backgroundColor: "#FFFFFF" },
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Accueil", tabBarIcon: ({ color, size }) => <MaterialIcons name="home-filled" size={size} color={color} /> }} />
