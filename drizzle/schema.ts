@@ -25,6 +25,7 @@ export const tikisProfiles = mysqlTable("tikis_profiles", {
   vehicles: text("vehicles").notNull(),
   photoKey: varchar("photoKey", { length: 512 }),
   referralCode: varchar("referralCode", { length: 8 }).unique(),
+  supabaseUserId: varchar("supabaseUserId", { length: 64 }).unique(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -164,6 +165,23 @@ export const tikisWalletLedger = mysqlTable("tikis_wallet_ledger", {
   index("tikis_wallet_ledger_delivery_index").on(table.deliveryId),
 ]);
 
+/** Payment request lifecycle; balance movements are written only once the provider outcome is confirmed. */
+export const tikisPaymentTransactions = mysqlTable("tikis_payment_transactions", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  profilePhone: varchar("profilePhone", { length: 20 }).notNull(),
+  type: mysqlEnum("type", ["deposit", "withdrawal"]).notNull(),
+  provider: mysqlEnum("provider", ["ligdi_simulated"]).notNull().default("ligdi_simulated"),
+  amount: int("amount").notNull(),
+  status: mysqlEnum("status", ["pending", "succeeded", "failed", "cancelled"]).notNull().default("pending"),
+  providerReference: varchar("providerReference", { length: 80 }).notNull().unique(),
+  idempotencyKey: varchar("idempotencyKey", { length: 100 }).notNull().unique(),
+  settledAt: timestamp("settledAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("tikis_payment_transactions_profile_created_index").on(table.profilePhone, table.createdAt),
+  index("tikis_payment_transactions_status_index").on(table.status, table.createdAt),
+]);
+
 /** Durable, recipient-scoped activity stream used by the in-app and realtime notification layers. */
 export const tikisDeliveryEvents = mysqlTable("tikis_delivery_events", {
   id: varchar("id", { length: 40 }).primaryKey(),
@@ -198,4 +216,5 @@ export type TikisDeliveryReview = typeof tikisDeliveryReviews.$inferSelect;
 export type TikisWallet = typeof tikisWallets.$inferSelect;
 export type TikisPlatformSettings = typeof tikisPlatformSettings.$inferSelect;
 export type TikisWalletLedger = typeof tikisWalletLedger.$inferSelect;
+export type TikisPaymentTransaction = typeof tikisPaymentTransactions.$inferSelect;
 export type TikisDeliveryEvent = typeof tikisDeliveryEvents.$inferSelect;

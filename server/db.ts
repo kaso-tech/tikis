@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisDelivery, TikisPlace, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryReviews, tikisFavoritePlaces, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisWalletLedger, tikisWallets, users } from "../drizzle/schema";
+import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisDelivery, TikisPlace, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryReviews, tikisFavoritePlaces, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisWalletLedger, tikisWallets, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppNotification, LocationLabel, SelectableVehicleType, WalletOperation, WalletSnapshot } from "../shared/tikis-domain";
 
@@ -56,6 +56,7 @@ export type PersistedTikisProfile = {
   vehicles: string;
   photoKey?: string | null;
   referralCode?: string | null;
+  supabaseUserId?: string | null;
 };
 
 export async function getTikisProfileByPhone(phone: string) {
@@ -91,6 +92,19 @@ export async function updateTikisProfile(phone: string, changes: Pick<PersistedT
   const profile = await getTikisProfileByPhone(phone);
   if (!profile) throw new Error("Le profil est introuvable.");
   return profile;
+}
+
+/** Links a profile only after the server has verified the matching Supabase phone session. */
+export async function linkTikisProfileToSupabaseUser(phone: string, supabaseUserId: string) {
+  const database = await getDb();
+  if (!database) throw new Error("La base de données sécurisée est temporairement indisponible.");
+  const profile = await getTikisProfileByPhone(phone);
+  if (!profile) throw new Error("Profil introuvable.");
+  if (profile.supabaseUserId && profile.supabaseUserId !== supabaseUserId) throw new Error("Ce profil est déjà associé à une autre session sécurisée.");
+  const conflicting = await database.select({ phone: tikisProfiles.phone }).from(tikisProfiles).where(eq(tikisProfiles.supabaseUserId, supabaseUserId)).limit(1);
+  if (conflicting[0] && conflicting[0].phone !== phone) throw new Error("Cette session Supabase est déjà utilisée par un autre profil Tikis.");
+  if (!profile.supabaseUserId) await database.update(tikisProfiles).set({ supabaseUserId, updatedAt: new Date() }).where(eq(tikisProfiles.phone, phone));
+  return (await getTikisProfileByPhone(phone))!;
 }
 
 export async function getTikisPlaceByGoogleId(googlePlaceId: string) {
@@ -382,6 +396,57 @@ export async function requestTikisWalletOperation(profilePhone: string, type: "d
     });
   });
   return { success: true } as const;
+}
+
+type SimulatedPaymentView = { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; createdAt: string; settledAt?: string };
+
+function simulatedPaymentToView(payment: { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; createdAt: Date; settledAt: Date | null }): SimulatedPaymentView {
+  return { id: payment.id, type: payment.type, amount: payment.amount, status: payment.status, providerReference: payment.providerReference, createdAt: payment.createdAt.toISOString(), ...(payment.settledAt ? { settledAt: payment.settledAt.toISOString() } : {}) };
+}
+
+export async function initiateSimulatedLigdiPayment(input: { profilePhone: string; type: "deposit" | "withdrawal"; amount: number; idempotencyKey: string }) {
+  if (!Number.isSafeInteger(input.amount) || input.amount < 100 || input.amount > 10_000_000) throw new Error("Le montant demandé est invalide.");
+  if (!/^[A-Za-z0-9_-]{16,96}$/.test(input.idempotencyKey)) throw new Error("Référence de paiement invalide.");
+  const db = await getDb();
+  if (!db) throw new Error("Le paiement est temporairement indisponible.");
+  return db.transaction(async (tx) => {
+    const existing = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.idempotencyKey, input.idempotencyKey)).limit(1).for("update"))[0];
+    if (existing) {
+      if (existing.profilePhone !== input.profilePhone) throw new Error("Référence de paiement invalide.");
+      return simulatedPaymentToView(existing);
+    }
+    const wallet = await ensureTikisWallet(tx, input.profilePhone);
+    if (input.type === "withdrawal" && wallet.availableBalance < input.amount) throw new Error("Votre solde disponible est insuffisant pour ce retrait.");
+    const id = randomUUID();
+    const providerReference = `LIGDI-SIM-${randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
+    await tx.insert(tikisPaymentTransactions).values({ id, profilePhone: input.profilePhone, type: input.type, amount: input.amount, status: "pending", providerReference, idempotencyKey: input.idempotencyKey });
+    await tx.insert(tikisWalletLedger).values({ id: randomUUID(), profilePhone: input.profilePhone, deliveryId: null, operation: input.type === "deposit" ? "deposit_request" : "withdrawal_request", amount: input.amount, availableBefore: wallet.availableBalance, availableAfter: wallet.availableBalance, heldBefore: wallet.heldBalance, heldAfter: wallet.heldBalance, reason: `Demande ${input.type === "deposit" ? "de dépôt" : "de retrait"} Ligdi Cash simulée`, idempotencyKey: `${id}:requested` });
+    const created = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, id)).limit(1))[0];
+    if (!created) throw new Error("La demande de paiement n’a pas pu être créée.");
+    return simulatedPaymentToView(created);
+  });
+}
+
+export async function settleSimulatedLigdiPayment(input: { profilePhone: string; paymentId: string; outcome: "succeeded" | "failed" }) {
+  const db = await getDb();
+  if (!db) throw new Error("Le paiement est temporairement indisponible.");
+  return db.transaction(async (tx) => {
+    const payment = (await tx.select().from(tikisPaymentTransactions).where(and(eq(tikisPaymentTransactions.id, input.paymentId), eq(tikisPaymentTransactions.profilePhone, input.profilePhone))).limit(1).for("update"))[0];
+    if (!payment) throw new Error("Transaction Ligdi Cash introuvable.");
+    if (payment.status !== "pending") return simulatedPaymentToView(payment);
+    if (input.outcome === "failed") {
+      await tx.update(tikisPaymentTransactions).set({ status: "failed", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
+    } else if (payment.type === "deposit") {
+      await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "credit", amount: payment.amount, availableDelta: payment.amount, heldDelta: 0, reason: "Dépôt Ligdi Cash simulé confirmé", idempotencyKey: `${payment.id}:settled` });
+      await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
+    } else {
+      await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "debit", amount: payment.amount, availableDelta: -payment.amount, heldDelta: 0, reason: "Retrait Ligdi Cash simulé confirmé", idempotencyKey: `${payment.id}:settled` });
+      await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
+    }
+    const settled = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, payment.id)).limit(1))[0];
+    if (!settled) throw new Error("La transaction n’a pas pu être finalisée.");
+    return simulatedPaymentToView(settled);
+  });
 }
 
 export async function listTikisDeliveryEvents(profilePhone: string): Promise<InAppNotification[]> {

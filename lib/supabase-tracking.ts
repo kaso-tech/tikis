@@ -1,4 +1,5 @@
-import { createClient, type RealtimeChannel, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
+import type { RealtimeChannel, Session, SupabaseClient } from "@supabase/supabase-js";
 
 export type DeliveryPosition = {
   latitude: number;
@@ -19,13 +20,36 @@ type DeliveryStatusListener = (event: DeliveryStatusEvent) => void;
 
 let client: SupabaseClient | null = null;
 
-function supabaseClient() {
+const supabaseSessionStorage = {
+  async getItem(key: string) { if (typeof window !== "undefined") return window.sessionStorage?.getItem(key) ?? null; return (await import("expo-secure-store")).getItemAsync(key); },
+  async setItem(key: string, value: string) { if (typeof window !== "undefined") window.sessionStorage?.setItem(key, value); else await (await import("expo-secure-store")).setItemAsync(key, value); },
+  async removeItem(key: string) { if (typeof window !== "undefined") window.sessionStorage?.removeItem(key); else await (await import("expo-secure-store")).deleteItemAsync(key); },
+};
+
+export function supabaseClient() {
   const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
   const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
-  if (!client) client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  if (!client) client = createClient(url, key, { auth: { storage: supabaseSessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
   return client;
 }
+
+export async function requestSupabasePhoneOtp(phone: string) {
+  const supabase = supabaseClient();
+  if (!supabase) throw new Error("Supabase Auth n’est pas configuré.");
+  const { error } = await supabase.auth.signInWithOtp({ phone });
+  if (error) throw new Error("Le code SMS Supabase n’a pas pu être envoyé.");
+}
+
+export async function verifySupabasePhoneOtp(phone: string, token: string): Promise<Session> {
+  const supabase = supabaseClient();
+  if (!supabase) throw new Error("Supabase Auth n’est pas configuré.");
+  const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: "sms" });
+  if (error || !data.session) throw new Error("Le code SMS Supabase est invalide ou a expiré.");
+  return data.session;
+}
+
+export async function clearSupabaseSession() { await supabaseClient()?.auth.signOut(); }
 
 export function normalizeDeliveryPosition(input: unknown): DeliveryPosition | null {
   if (!input || typeof input !== "object") return null;

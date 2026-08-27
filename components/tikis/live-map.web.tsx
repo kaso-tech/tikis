@@ -1,40 +1,18 @@
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { remainingMinutes, routeProgress, SIMULATED_ROUTE, trackingEventAtStep, type TrackingEvent } from "@/lib/gps-simulator";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { closeDeliveryTrackingChannel, createDeliveryTrackingChannel, type DeliveryPosition } from "@/lib/supabase-tracking";
+import type { TrackingEvent } from "@/lib/gps-simulator";
 
-export function LiveMap({ deliveryId: _deliveryId, driverName, onTrackingEvent }: { deliveryId: string; driverName: string; onTrackingEvent?: (event: TrackingEvent) => void }) {
-  const [step, setStep] = useState(3);
-  const sentEvents = useRef<Set<TrackingEvent["type"]>>(new Set());
-  const trackingEventHandler = useRef(onTrackingEvent);
-  const progress = routeProgress(step);
-  const x = 20 + (step / (SIMULATED_ROUTE.length - 1)) * 63;
-  const y = 70 - (step / (SIMULATED_ROUTE.length - 1)) * 43;
-
+export function LiveMap({ deliveryId, driverName }: { deliveryId: string; driverName: string; onTrackingEvent?: (event: TrackingEvent) => void }) {
+  const [position, setPosition] = useState<DeliveryPosition | null>(null);
   useEffect(() => {
-    const interval = setInterval(() => setStep((current) => current >= SIMULATED_ROUTE.length - 1 ? 0 : current + 1), 2800);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    trackingEventHandler.current = onTrackingEvent;
-  }, [onTrackingEvent]);
-
-  useEffect(() => {
-    if (step === 0) {
-      sentEvents.current.clear();
-      return;
-    }
-    const event = trackingEventAtStep(step);
-    if (event && !sentEvents.current.has(event.type)) {
-      sentEvents.current.add(event.type);
-      trackingEventHandler.current?.(event);
-    }
-  }, [step]);
-
-  return <View style={styles.container}><View style={styles.water} /><View style={[styles.road, styles.roadOne]} /><View style={[styles.road, styles.roadTwo]} /><View style={[styles.road, styles.roadThree]} /><View style={styles.routeStart}><MaterialIcons name="inventory-2" size={13} color="#FFFFFF" /></View><View style={styles.destination}><MaterialIcons name="location-on" size={27} color="#E45858" /></View><View style={[styles.driver, { left: `${x}%`, top: `${y}%` }]}><MaterialIcons name="two-wheeler" size={21} color="#FFFFFF" /></View><View style={styles.liveBadge}><View style={styles.liveDot} /><Text style={styles.liveText}>POSITION MISE À JOUR</Text></View><View style={styles.progressBubble}><Text style={styles.progressMain}>{progress} %</Text><Text style={styles.progressSub}>{driverName} · arrivée estimée dans {remainingMinutes(step)} min</Text></View></View>;
+    const channel = createDeliveryTrackingChannel(deliveryId, setPosition);
+    return () => { void closeDeliveryTrackingChannel(channel); };
+  }, [deliveryId]);
+  return <View style={styles.container}><View style={styles.grid} /><View style={styles.route}><View style={styles.routeDot} /><View style={styles.routeLine} /><View style={styles.destination}><MaterialIcons name="location-on" size={24} color="#E45858" /></View></View><View style={styles.content}><View style={[styles.statusPill, position ? styles.statusPillLive : styles.statusPillWaiting]}><View style={[styles.statusDot, position ? styles.statusDotLive : styles.statusDotWaiting]} /><Text style={[styles.statusText, position ? styles.statusTextLive : styles.statusTextWaiting]}>{position ? "POSITION GPS REÇUE" : "EN ATTENTE DU GPS"}</Text></View><View style={styles.icon}><MaterialIcons name={position ? "my-location" : "location-searching"} size={31} color="#FFFFFF" /></View><Text style={styles.title}>{position ? "Position transmise par le livreur" : "Position réelle à venir"}</Text><Text style={styles.text}>{position ? `${driverName} a partagé une position GPS il y a quelques instants.` : `La position de ${driverName} apparaîtra ici dès qu’il ouvrira le suivi sur son appareil.`}</Text>{position ? <Text style={styles.coordinates}>Mise à jour · {new Date(position.recordedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</Text> : null}</View></View>;
 }
 
 const styles = StyleSheet.create({
-  container: { height: 360, overflow: "hidden", borderRadius: 24, backgroundColor: "#DCE9D2", position: "relative" }, water: { position: "absolute", backgroundColor: "#C9E7EE", right: -40, top: -20, height: 170, width: 160, borderRadius: 90 }, road: { position: "absolute", height: 10, borderRadius: 10, backgroundColor: "#F7F3E9", borderWidth: 1, borderColor: "#C9C4B8" }, roadOne: { left: -35, top: 235, width: "120%", transform: [{ rotate: "-31deg" }] }, roadTwo: { left: 15, top: 120, width: "90%", transform: [{ rotate: "-19deg" }] }, roadThree: { left: 90, top: 60, width: 230, transform: [{ rotate: "62deg" }] }, routeStart: { position: "absolute", left: "16%", top: "68%", width: 31, height: 31, borderRadius: 12, backgroundColor: "#007B8B", borderWidth: 2, borderColor: "#FFFFFF", alignItems: "center", justifyContent: "center" }, destination: { position: "absolute", right: "11%", top: "23%", width: 35, height: 35, borderRadius: 18, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" }, driver: { position: "absolute", marginLeft: -23, marginTop: -23, width: 46, height: 46, borderRadius: 23, backgroundColor: "#0B1F3A", borderWidth: 3, borderColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowColor: "#0B1F3A", shadowOpacity: 0.32, shadowRadius: 7 }, liveBadge: { position: "absolute", top: 14, left: 14, flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 10, height: 30, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.95)" }, liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#18A572" }, liveText: { color: "#147A58", fontSize: 10, fontWeight: "900", letterSpacing: 0.45 }, progressBubble: { position: "absolute", left: 14, right: 14, bottom: 14, padding: 12, borderRadius: 17, backgroundColor: "rgba(11,31,58,0.94)" }, progressMain: { color: "#FFFFFF", fontSize: 18, fontWeight: "900" }, progressSub: { color: "#BED0E7", fontSize: 12, marginTop: 2 },
+  container: { height: 360, overflow: "hidden", borderRadius: 24, backgroundColor: "#EAF4F2", position: "relative", alignItems: "center", justifyContent: "center" }, grid: { ...StyleSheet.absoluteFillObject, opacity: 0.55, backgroundColor: "#EAF4F2" }, route: { position: "absolute", width: "76%", height: 120, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }, routeDot: { width: 29, height: 29, borderRadius: 11, backgroundColor: "#007B8B", borderWidth: 3, borderColor: "#FFFFFF" }, routeLine: { height: 4, flex: 1, marginHorizontal: 6, backgroundColor: "#94CFD5", borderRadius: 2, borderStyle: "dashed" }, destination: { width: 37, height: 37, borderRadius: 19, backgroundColor: "#FFFFFF", justifyContent: "center", alignItems: "center", shadowColor: "#0B1F3A", shadowOpacity: 0.14, shadowRadius: 6, elevation: 3 }, content: { width: "78%", alignItems: "center", backgroundColor: "rgba(255,255,255,0.94)", padding: 18, borderRadius: 20, borderWidth: 1, borderColor: "#D5E8E8" }, statusPill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 9, height: 27, borderRadius: 14 }, statusPillLive: { backgroundColor: "#DCFCE7" }, statusPillWaiting: { backgroundColor: "#FFF5E4" }, statusDot: { width: 6, height: 6, borderRadius: 3 }, statusDotLive: { backgroundColor: "#18A572" }, statusDotWaiting: { backgroundColor: "#C98119" }, statusText: { fontSize: 9, fontWeight: "900", letterSpacing: 0.55 }, statusTextLive: { color: "#147A58" }, statusTextWaiting: { color: "#8A5A0E" }, icon: { marginTop: 12, width: 54, height: 54, borderRadius: 19, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center" }, title: { color: "#0B1F3A", fontSize: 15, fontWeight: "900", textAlign: "center", marginTop: 10 }, text: { color: "#697386", fontSize: 12, textAlign: "center", lineHeight: 18, marginTop: 4 }, coordinates: { color: "#007B8B", fontSize: 11, fontWeight: "800", marginTop: 8 },
 });

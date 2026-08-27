@@ -23,19 +23,31 @@ export default function WalletScreen() {
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 12_000 });
   const wallet = walletQuery.data?.wallet ?? { total: 0, blocked: 0 };
   const journal = walletQuery.data?.journal ?? [];
-  const requestMutation = trpc.wallet.requestOperation.useMutation({ onSuccess: () => void walletQuery.refetch() });
+  const initiateMutation = trpc.wallet.initiateLigdiSimulation.useMutation();
+  const settleMutation = trpc.wallet.settleLigdiSimulation.useMutation({ onSuccess: () => void walletQuery.refetch() });
   const [requestType, setRequestType] = useState<"deposit" | "withdrawal" | null>(null);
   const [amountInput, setAmountInput] = useState("");
   const [requestError, setRequestError] = useState("");
-  const requestLoading = requestMutation.isPending;
+  const [payment, setPayment] = useState<{ id: string; type: "deposit" | "withdrawal"; amount: number; providerReference: string } | null>(null);
+  const requestLoading = initiateMutation.isPending || settleMutation.isPending;
   const isDriver = role === "driver";
 
-  function openRequest(type: "deposit" | "withdrawal") { setRequestError(""); setAmountInput(""); setRequestType(type); }
+  function openRequest(type: "deposit" | "withdrawal") { setRequestError(""); setAmountInput(""); setPayment(null); setRequestType(type); }
   async function confirmRequest() {
     const amount = parseOfferedPrice(amountInput);
     const error = offeredPriceError(amountInput) ?? (!amount || amount < 100 ? "Saisissez au moins 100 FCFA." : "");
     if (error || !amount) { setRequestError(error || "Montant invalide."); return; }
-    try { await requestMutation.mutateAsync({ type: requestType!, amount }); setRequestType(null); } catch (cause) { setRequestError(cause instanceof Error ? cause.message : "La demande n’a pas pu être enregistrée."); }
+    try {
+      const result = await initiateMutation.mutateAsync({ type: requestType!, amount, idempotencyKey: `ligdi-${Date.now()}-${Math.random().toString(36).slice(2, 14)}` });
+      setPayment(result);
+    } catch (cause) { setRequestError(cause instanceof Error ? cause.message : "La demande Ligdi Cash n’a pas pu être initialisée."); }
+  }
+  async function settlePayment(outcome: "succeeded" | "failed") {
+    if (!payment) return;
+    try {
+      await settleMutation.mutateAsync({ paymentId: payment.id, outcome });
+      setPayment(null); setRequestType(null); setAmountInput("");
+    } catch (cause) { setRequestError(cause instanceof Error ? cause.message : "La confirmation Ligdi Cash a échoué."); }
   }
 
   return (
@@ -66,7 +78,7 @@ export default function WalletScreen() {
       />
       <Modal visible={requestType !== null} transparent animationType="fade" onRequestClose={() => !requestLoading && setRequestType(null)}>
         <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.modalOverlay}>
-          <SurfaceCard style={styles.requestModal}><View style={styles.requestIcon}><MaterialIcons name={requestType === "deposit" ? "add-card" : "account-balance-wallet"} size={24} color="#007B8B" /></View><Text style={styles.requestTitle}>{requestType === "deposit" ? "Demander un dépôt" : "Demander un retrait"}</Text><Text style={styles.requestDescription}>{requestType === "deposit" ? "Votre demande sera enregistrée. Le solde ne sera crédité qu’après validation par le moyen de paiement autorisé." : "Votre demande sera enregistrée puis traitée. Aucun solde ne sera débité avant son traitement."}</Text><View style={styles.amountWrap}><TextInput value={amountInput} onChangeText={(value) => setAmountInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} autoFocus style={styles.amountInput} placeholder="Montant" placeholderTextColor="#9AA5B6" /><Text style={styles.amountCurrency}>FCFA</Text></View>{requestError ? <Text style={styles.requestError}>{requestError}</Text> : <Text style={styles.requestHint}>Le montant et les conséquences seront enregistrés dans votre journal financier.</Text>}<View style={styles.requestActions}><TikisButton label="Annuler" variant="secondary" disabled={requestLoading} onPress={() => setRequestType(null)} style={styles.requestAction} /><TikisButton label={requestType === "deposit" ? "Confirmer le dépôt" : "Confirmer le retrait"} loading={requestLoading} disabled={requestLoading} onPress={() => void confirmRequest()} style={styles.requestAction} /></View></SurfaceCard>
+          <SurfaceCard style={styles.requestModal}>{payment ? <><View style={styles.requestIcon}><MaterialIcons name="verified-user" size={24} color="#007B8B" /></View><Text style={styles.requestTitle}>Validation Ligdi Cash</Text><Text style={styles.requestDescription}>Mode simulation : confirmez le résultat de votre paiement de {formatMoney(payment.amount)}. Votre Wallet ne changera qu’après cette confirmation serveur.</Text><View style={styles.referenceCard}><Text style={styles.referenceLabel}>RÉFÉRENCE SIMULÉE</Text><Text style={styles.referenceValue}>{payment.providerReference}</Text></View>{requestError ? <Text style={styles.requestError}>{requestError}</Text> : <Text style={styles.requestHint}>Aucun moyen de paiement réel n’est débité dans ce mode.</Text>}<View style={styles.requestActions}><TikisButton label="Échouer" variant="secondary" disabled={requestLoading} onPress={() => void settlePayment("failed")} style={styles.requestAction} /><TikisButton label="Simuler réussite" icon="check-circle" loading={requestLoading} disabled={requestLoading} onPress={() => void settlePayment("succeeded")} style={styles.requestAction} /></View></> : <><View style={styles.requestIcon}><MaterialIcons name={requestType === "deposit" ? "add-card" : "account-balance-wallet"} size={24} color="#007B8B" /></View><Text style={styles.requestTitle}>{requestType === "deposit" ? "Dépôt Ligdi Cash" : "Retrait Ligdi Cash"}</Text><Text style={styles.requestDescription}>{requestType === "deposit" ? "Initialisez un dépôt simulé. Le solde ne sera crédité qu’après la confirmation suivante." : "Initialisez un retrait simulé. Le solde ne sera débité qu’après la confirmation suivante."}</Text><View style={styles.amountWrap}><TextInput value={amountInput} onChangeText={(value) => setAmountInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} autoFocus style={styles.amountInput} placeholder="Montant" placeholderTextColor="#9AA5B6" /><Text style={styles.amountCurrency}>FCFA</Text></View>{requestError ? <Text style={styles.requestError}>{requestError}</Text> : <Text style={styles.requestHint}>Le montant et le statut de simulation seront enregistrés dans votre journal financier.</Text>}<View style={styles.requestActions}><TikisButton label="Annuler" variant="secondary" disabled={requestLoading} onPress={() => setRequestType(null)} style={styles.requestAction} /><TikisButton label="Initialiser" loading={requestLoading} disabled={requestLoading} onPress={() => void confirmRequest()} style={styles.requestAction} /></View></>}</SurfaceCard>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -95,6 +107,7 @@ const styles = StyleSheet.create({
   transactionReason: { color: "#697386", fontSize: 12, lineHeight: 16, marginTop: 2 },
   transactionTime: { color: "#9AA5B6", fontSize: 11, marginTop: 3 },
   transactionAmount: { fontWeight: "900", fontSize: 13 }, modalOverlay: { flex: 1, backgroundColor: "rgba(11,31,58,0.48)", justifyContent: "center", padding: 22 }, requestModal: { padding: 20 }, requestIcon: { width: 48, height: 48, borderRadius: 16, alignSelf: "center", alignItems: "center", justifyContent: "center", backgroundColor: "#E5F6F7", marginBottom: 10 }, requestTitle: { color: "#0B1F3A", fontSize: 18, fontWeight: "900", textAlign: "center" }, requestDescription: { color: "#697386", fontSize: 13, lineHeight: 19, marginTop: 7, textAlign: "center" }, amountWrap: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#B8DDE0", borderRadius: 14, paddingHorizontal: 14, marginTop: 18 }, amountInput: { flex: 1, minHeight: 50, color: "#0B1F3A", fontSize: 16, fontWeight: "900" }, amountCurrency: { color: "#697386", fontSize: 12, fontWeight: "900" }, requestHint: { color: "#4D7075", fontSize: 11, lineHeight: 16, textAlign: "center", marginTop: 8 }, requestError: { color: "#C23B45", fontSize: 11, fontWeight: "700", lineHeight: 16, textAlign: "center", marginTop: 8 }, requestActions: { flexDirection: "row", gap: 10, marginTop: 18 }, requestAction: { flex: 1, minHeight: 45 },
+  referenceCard: { marginTop: 16, padding: 12, backgroundColor: "#F1F7F8", borderRadius: 12, borderWidth: 1, borderColor: "#C6E8EB" }, referenceLabel: { color: "#4D7075", fontSize: 10, fontWeight: "900", letterSpacing: 0.6, textAlign: "center" }, referenceValue: { color: "#0B1F3A", fontSize: 12, fontWeight: "900", textAlign: "center", marginTop: 5, letterSpacing: 0.3 },
   guarantees: { gap: 10 },
   guarantee: { flexDirection: "row", gap: 10, alignItems: "flex-start", backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7ECF2", borderRadius: 15, padding: 13 },
   guaranteeText: { flex: 1, color: "#485569", fontSize: 13, lineHeight: 19 },

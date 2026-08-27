@@ -8,6 +8,7 @@ import { useTikisNavigation } from "@/lib/tikis-navigation";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { clearTikisSessionToken } from "@/lib/tikis-session";
+import { clearSupabaseSession } from "@/lib/supabase-tracking";
 
 type LogoutContextValue = { openLogoutConfirmation: () => void };
 const LogoutContext = createContext<LogoutContextValue | null>(null);
@@ -28,6 +29,7 @@ export function TikisLogoutProvider({ children }: { children: React.ReactNode })
       // The local session still needs to be cleared when the server is unavailable.
     } finally {
       await clearTikisSessionToken();
+      await clearSupabaseSession();
       logout();
       closeDrawer();
       haptic.success();

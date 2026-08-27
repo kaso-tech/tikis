@@ -2,7 +2,7 @@ import { z } from "zod";
 import { COOKIE_NAME } from "../shared/const";
 import { randomInt, randomUUID } from "node:crypto";
 import * as db from "./db";
-import { publishDeliveryStatusBroadcast } from "./supabase-realtime";
+import { publishDeliveryStatusBroadcast, syncDeliveryRealtimeMembers } from "./supabase-realtime";
 import { storagePut } from "./storage";
 import * as geography from "./geography";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -20,6 +20,7 @@ const fullNameSchema = z.string().trim().min(3).max(70).regex(/^[\p{L}]+(?:[ '-]
 const vehicleSchema = z.enum(["Vélo", "Moto", "Tricycle", "Voiture", "Fourgonnette"]);
 type ValidVehicle = z.infer<typeof vehicleSchema>;
 const countryCodeSchema = z.string().regex(/^[A-Z]{2}$/, "Code pays ISO invalide.");
+const supabaseAccessTokenSchema = z.string().min(80).max(8_000, "Session Supabase invalide.");
 const profileFieldsSchema = z.object({
   phone: phoneSchema,
   fullName: fullNameSchema,
@@ -36,6 +37,24 @@ function validateProfileRole(value: z.infer<typeof profileFieldsSchema>, ctx: z.
 const profileInputSchema = profileFieldsSchema.superRefine(validateProfileRole);
 const registrationInputSchema = profileFieldsSchema.extend({ otp: simulationOtpSchema }).superRefine(validateProfileRole);
 
+async function verifySupabasePhoneSession(phone: string, accessToken: string) {
+  const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) throw new Error("Supabase Auth n’est pas configuré pour le moment.");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  try {
+    const response = await fetch(`${url.replace(/\/$/, "")}/auth/v1/user`, { headers: { apikey: anonKey, authorization: `Bearer ${accessToken}` }, signal: controller.signal });
+    if (!response.ok) throw new Error("La session Supabase a expiré ou n’est pas valide.");
+    const user = await response.json() as { id?: unknown; phone?: unknown };
+    if (typeof user.id !== "string" || typeof user.phone !== "string" || user.phone !== phone) throw new Error("La session Supabase ne correspond pas à ce numéro Tikis.");
+    return user.id;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") throw new Error("La vérification Supabase a expiré. Réessayez.");
+    throw error;
+  } finally { clearTimeout(timeout); }
+}
+
 function toPublicProfile(profile: { phone: string; fullName: string; accountType: "sender" | "driver"; vehicles: string; photoKey?: string | null; referralCode?: string | null }) {
   let vehicles: ValidVehicle[] = [];
   try {
@@ -47,6 +66,12 @@ function toPublicProfile(profile: { phone: string; fullName: string; accountType
 
 function sessionCountryCode(profilePhone: string) {
   return findCountryForPhone(profilePhone).id;
+}
+
+async function syncDeliveryParticipants(delivery: ResolvedDelivery) {
+  const [sender, driver] = await Promise.all([delivery.senderPhone ? db.getTikisProfileByPhone(delivery.senderPhone) : Promise.resolve(undefined), delivery.driverPhone ? db.getTikisProfileByPhone(delivery.driverPhone) : Promise.resolve(undefined)]);
+  const members = [sender?.supabaseUserId ? { userId: sender.supabaseUserId, role: "sender" as const } : null, driver?.supabaseUserId ? { userId: driver.supabaseUserId, role: "driver" as const } : null].filter((member): member is { userId: string; role: "sender" | "driver" } => member !== null);
+  void syncDeliveryRealtimeMembers(delivery.id, members);
 }
 
 const GEO_RATE_LIMIT_WINDOW_MS = 60_000;
@@ -159,6 +184,13 @@ export const appRouter = router({
       const profile = await db.getTikisProfileByPhone(input.phone);
       return profile ? { profile: toPublicProfile(profile), sessionToken: await createTikisProfileSession(profile.phone) } : null;
     }),
+    lookupSupabase: publicProcedure.input(z.object({ phone: phoneSchema, accessToken: supabaseAccessTokenSchema })).mutation(async ({ input }) => {
+      const supabaseUserId = await verifySupabasePhoneSession(input.phone, input.accessToken);
+      const profile = await db.getTikisProfileByPhone(input.phone);
+      if (!profile) return null;
+      const linked = await db.linkTikisProfileToSupabaseUser(profile.phone, supabaseUserId);
+      return { profile: toPublicProfile(linked), sessionToken: await createTikisProfileSession(linked.phone) };
+    }),
     register: publicProcedure.input(registrationInputSchema).mutation(async ({ input }) => {
       const referralCode = input.role === "driver" ? await generateUniqueReferralCode(input.fullName) : undefined;
       const profile = await db.createTikisProfile({
@@ -169,6 +201,13 @@ export const appRouter = router({
         referralCode,
       });
       return { profile: toPublicProfile(profile), sessionToken: await createTikisProfileSession(profile.phone) };
+    }),
+    registerSupabase: publicProcedure.input(profileFieldsSchema.extend({ accessToken: supabaseAccessTokenSchema }).superRefine(validateProfileRole)).mutation(async ({ input }) => {
+      const supabaseUserId = await verifySupabasePhoneSession(input.phone, input.accessToken);
+      const referralCode = input.role === "driver" ? await generateUniqueReferralCode(input.fullName) : undefined;
+      const profile = await db.createTikisProfile({ phone: input.phone, fullName: input.fullName, accountType: input.role, vehicles: JSON.stringify(input.role === "driver" ? input.vehicles : []), referralCode, supabaseUserId });
+      const linked = await db.linkTikisProfileToSupabaseUser(profile.phone, supabaseUserId);
+      return { profile: toPublicProfile(linked), sessionToken: await createTikisProfileSession(linked.phone) };
     }),
     update: publicProcedure.input(z.object({ phone: phoneSchema, otp: simulationOtpSchema, fullName: fullNameSchema.optional(), photoBase64: base64ImageSchema.optional(), photoMime: photoMimeSchema.optional() }).superRefine((value, ctx) => {
       if (!value.fullName && !value.photoBase64) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Aucune modification à enregistrer." });
@@ -279,20 +318,20 @@ export const appRouter = router({
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "sender") throw new Error("Seul l’expéditeur peut choisir un livreur.");
       const delivery = await db.selectTikisDeliveryCandidateWithWallet(input.deliveryId, input.candidateId, profile.phone);
-      if (delivery) void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livreur sélectionné", body: "La livraison attend la confirmation du livreur.", occurredAt: new Date().toISOString() });
+      if (delivery) { await syncDeliveryParticipants(delivery); void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livreur sélectionné", body: "La livraison attend la confirmation du livreur.", occurredAt: new Date().toISOString() }); }
       return delivery;
     }),
     confirm: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("Seul le livreur sélectionné peut confirmer.");
       const delivery = await db.confirmTikisDeliveryWithEvents(input.deliveryId, profile.phone);
-      if (delivery) void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livraison activée", body: "Le livreur a confirmé sa disponibilité.", occurredAt: new Date().toISOString() });
+      if (delivery) { await syncDeliveryParticipants(delivery); void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livraison activée", body: "Le livreur a confirmé sa disponibilité.", occurredAt: new Date().toISOString() }); }
       return delivery;
     }),
     complete: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       const delivery = await db.completeTikisDeliveryWithEvents(input.deliveryId, profile.phone);
-      if (delivery) void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livraison terminée", body: "La livraison a été déclarée terminée.", occurredAt: new Date().toISOString() });
+      if (delivery) { await syncDeliveryParticipants(delivery); void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livraison terminée", body: "La livraison a été déclarée terminée.", occurredAt: new Date().toISOString() }); }
       return delivery;
     }),
   }),
@@ -305,6 +344,14 @@ export const appRouter = router({
     requestOperation: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000) })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       return db.requestTikisWalletOperation(profile.phone, input.type, input.amount);
+    }),
+    initiateLigdiSimulation: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000), idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{16,96}$/) })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      return db.initiateSimulatedLigdiPayment({ ...input, profilePhone: profile.phone });
+    }),
+    settleLigdiSimulation: tikisProtectedProcedure.input(z.object({ paymentId: z.string().uuid(), outcome: z.enum(["succeeded", "failed"]) })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      return db.settleSimulatedLigdiPayment({ ...input, profilePhone: profile.phone });
     }),
   }),
   notifications: router({

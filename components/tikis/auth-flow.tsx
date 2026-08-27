@@ -10,6 +10,7 @@ import { COUNTRIES, createRegisteredProfile, detectCountry, findSimulatedAccount
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { setTikisSessionToken } from "@/lib/tikis-session";
+import { requestSupabasePhoneOtp, verifySupabasePhoneOtp } from "@/lib/supabase-tracking";
 import type { UserRole, VehicleType } from "@/shared/tikis-domain";
 import { SIMULATION_OTP } from "@/shared/tikis-domain";
 
@@ -33,6 +34,8 @@ export function AuthFlow() {
   const { signInProfile, registerProfile } = useTikisStore();
   const lookupProfileMutation = trpc.profiles.lookup.useMutation();
   const registerProfileMutation = trpc.profiles.register.useMutation();
+  const lookupSupabaseProfileMutation = trpc.profiles.lookupSupabase.useMutation();
+  const registerSupabaseProfileMutation = trpc.profiles.registerSupabase.useMutation();
   const [stage, setStage] = useState<Stage>("welcome");
   const [language, setLanguage] = useState<Language>("fr");
   const [country, setCountry] = useState<CountrySpec>(() => detectCountry());
@@ -44,6 +47,8 @@ export function AuthFlow() {
   const [otpError, setOtpError] = useState("");
   const [verifying, setVerifying] = useState(false);
   const [attempts, setAttempts] = useState(0);
+  const [otpProvider, setOtpProvider] = useState<"simulation" | "supabase">("simulation");
+  const [supabaseAccessToken, setSupabaseAccessToken] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
   const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
   const [selectedVehicles, setSelectedVehicles] = useState<VehicleType[]>([]);
@@ -83,7 +88,7 @@ export function AuthFlow() {
     }
     setPhoneError("");
     setSending(true);
-    await new Promise((resolve) => setTimeout(resolve, 550));
+    try { await requestSupabasePhoneOtp(phone); setOtpProvider("supabase"); } catch { setOtpProvider("simulation"); }
     setSending(false);
     setStage("otp");
     setSecondsLeft(RESEND_SECONDS);
@@ -114,14 +119,12 @@ export function AuthFlow() {
     if (otp.length !== 6 || verifying) return;
     Keyboard.dismiss();
     setVerifying(true);
-    await new Promise((resolve) => setTimeout(resolve, 650));
-    if (verifySimulationOtp(otp)) {
-      let existingProfile = null;
-      try {
-        existingProfile = await lookupProfileMutation.mutateAsync({ phone, otp: otp as "730512" });
-      } catch {
-        // The simulation remains usable offline; the profile is persisted on the next successful registration call.
-      }
+    let accessToken: string | null = null;
+    try {
+      if (otpProvider === "supabase") accessToken = (await verifySupabasePhoneOtp(phone, otp)).access_token;
+      else if (!verifySimulationOtp(otp)) throw new Error("Code incorrect");
+      const existingProfile = accessToken ? await lookupSupabaseProfileMutation.mutateAsync({ phone, accessToken }) : await lookupProfileMutation.mutateAsync({ phone, otp: otp as "730512" });
+      setSupabaseAccessToken(accessToken);
       const demoProfile = findSimulatedAccount(phone);
       haptic.success();
       if (existingProfile) {
@@ -130,7 +133,7 @@ export function AuthFlow() {
         router.replace("/(tabs)");
         return;
       }
-      if (demoProfile) {
+      if (demoProfile && !accessToken) {
         try {
           const persistedDemoProfile = await registerProfileMutation.mutateAsync({ phone: demoProfile.phone, fullName: demoProfile.fullName, countryCode: demoProfile.countryCode, role: demoProfile.role, vehicles: demoProfile.vehicles, otp: otp as "730512" });
           await setTikisSessionToken(persistedDemoProfile.sessionToken);
@@ -144,6 +147,13 @@ export function AuthFlow() {
       setVerifying(false);
       setStage("role");
       return;
+    } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message && !/code incorrect|code sms/i.test(message)) {
+      setVerifying(false);
+      setOtpError("Impossible de vérifier votre profil existant pour le moment. Réessayez sans poursuivre l’inscription.");
+      haptic.error();
+      return;
     }
     const nextAttempts = attempts + 1;
     setAttempts(nextAttempts);
@@ -152,10 +162,14 @@ export function AuthFlow() {
     setOtpError(nextAttempts >= OTP_MAX_ATTEMPTS ? "Nombre maximal de tentatives atteint. Demandez un nouveau code." : `Code incorrect. Il reste ${OTP_MAX_ATTEMPTS - nextAttempts} tentative${OTP_MAX_ATTEMPTS - nextAttempts > 1 ? "s" : ""}.`);
     haptic.error();
     setTimeout(() => inputs.current[0]?.focus(), 80);
+    }
   }
 
-  function resendOtp() {
+  async function resendOtp() {
     if (secondsLeft > 0) return;
+    if (otpProvider === "supabase") {
+      try { await requestSupabasePhoneOtp(phone); } catch { setOtpProvider("simulation"); }
+    }
     setDigits(["", "", "", "", "", ""]);
     setOtpError("");
     setAttempts(0);
@@ -199,7 +213,7 @@ export function AuthFlow() {
     await new Promise((resolve) => setTimeout(resolve, 550));
     const localProfile = createRegisteredProfile({ fullName: validatedName, phone, countryCode: country.id, role: selectedRole, vehicles: selectedVehicles });
     try {
-      const persistedProfile = await registerProfileMutation.mutateAsync({ phone: localProfile.phone, fullName: localProfile.fullName, countryCode: localProfile.countryCode, role: localProfile.role, vehicles: localProfile.vehicles, otp: otp as "730512" });
+      const persistedProfile = supabaseAccessToken ? await registerSupabaseProfileMutation.mutateAsync({ phone: localProfile.phone, fullName: localProfile.fullName, countryCode: localProfile.countryCode, role: localProfile.role, vehicles: localProfile.vehicles, accessToken: supabaseAccessToken }) : await registerProfileMutation.mutateAsync({ phone: localProfile.phone, fullName: localProfile.fullName, countryCode: localProfile.countryCode, role: localProfile.role, vehicles: localProfile.vehicles, otp: otp as "730512" });
       await setTikisSessionToken(persistedProfile.sessionToken);
       registerProfile(persistedProfile.profile);
     } catch {
@@ -214,7 +228,7 @@ export function AuthFlow() {
 
   const top = stage === "welcome" ? null : <OnboardingTop step={onboardingStep} onBack={() => { if (stage === "phone") setStage("welcome"); else if (stage === "otp") setStage("phone"); else if (stage === "role") setStage("phone"); else if (stage === "vehicles") setStage("role"); else setStage(selectedRole === "driver" ? "vehicles" : "role"); }} />;
 
-  return <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}><KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">{top}{stage === "welcome" ? <WelcomeScreen language={language} onLanguageChange={setLanguage} onContinue={() => setStage("phone")} copy={copy} /> : null}{stage === "phone" ? <PhoneScreen country={country} value={phoneInput} error={phoneError} loading={sending} onCountryPress={() => setCountryPickerOpen(true)} onChange={(value) => { setPhoneInput(sanitizePhoneInput(value, country)); setPhoneError(""); }} onContinue={() => void requestOtp()} /> : null}{stage === "otp" ? <OtpScreen phone={phone} digits={digits} error={otpError} verifying={verifying} secondsLeft={secondsLeft} onChangeDigit={updateDigit} onKeyPress={handleKeyPress} inputRefs={inputs} onResend={resendOtp} onSubmit={() => void submitOtp()} /> : null}{stage === "role" ? <RoleScreen selectedRole={selectedRole} onSelect={setSelectedRole} onContinue={continueRole} /> : null}{stage === "vehicles" ? <VehiclesScreen selected={selectedVehicles} onToggle={toggleVehicle} onContinue={continueVehicles} /> : null}{stage === "name" ? <NameScreen role={selectedRole} value={fullName} error={nameError} loading={finishing} onChange={(value) => { setFullName(sanitizeFullName(value, { preserveTrailingSeparator: true })); setNameError(""); }} onContinue={() => void finishRegistration()} /> : null}</ScrollView></KeyboardAvoidingView><CountryPicker visible={isCountryPickerOpen} selected={country} onClose={() => setCountryPickerOpen(false)} onSelect={selectCountry} /></SafeAreaView>;
+  return <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}><KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">{top}{stage === "welcome" ? <WelcomeScreen language={language} onLanguageChange={setLanguage} onContinue={() => setStage("phone")} copy={copy} /> : null}{stage === "phone" ? <PhoneScreen country={country} value={phoneInput} error={phoneError} loading={sending} onCountryPress={() => setCountryPickerOpen(true)} onChange={(value) => { setPhoneInput(sanitizePhoneInput(value, country)); setPhoneError(""); }} onContinue={() => void requestOtp()} /> : null}{stage === "otp" ? <OtpScreen phone={phone} digits={digits} error={otpError} verifying={verifying} secondsLeft={secondsLeft} provider={otpProvider} onChangeDigit={updateDigit} onKeyPress={handleKeyPress} inputRefs={inputs} onResend={() => void resendOtp()} onSubmit={() => void submitOtp()} /> : null}{stage === "role" ? <RoleScreen selectedRole={selectedRole} onSelect={setSelectedRole} onContinue={continueRole} /> : null}{stage === "vehicles" ? <VehiclesScreen selected={selectedVehicles} onToggle={toggleVehicle} onContinue={continueVehicles} /> : null}{stage === "name" ? <NameScreen role={selectedRole} value={fullName} error={nameError} loading={finishing} onChange={(value) => { setFullName(sanitizeFullName(value, { preserveTrailingSeparator: true })); setNameError(""); }} onContinue={() => void finishRegistration()} /> : null}</ScrollView></KeyboardAvoidingView><CountryPicker visible={isCountryPickerOpen} selected={country} onClose={() => setCountryPickerOpen(false)} onSelect={selectCountry} /></SafeAreaView>;
 }
 
 function OnboardingTop({ step, onBack }: { step: number; onBack: () => void }) { return <View style={styles.top}><Pressable accessibilityRole="button" accessibilityLabel="Étape précédente" onPress={onBack} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}><MaterialIcons name="arrow-back" size={21} color="#0B1F3A" /></Pressable><View style={styles.stepInfo}><Text style={styles.stepLabel}>INSCRIPTION</Text><Text style={styles.stepCount}>Étape {step} sur 5</Text></View><View style={styles.stepDots}>{[1, 2, 3, 4, 5].map((item) => <View key={item} style={[styles.stepDot, item <= step && styles.stepDotActive]} />)}</View></View>; }
@@ -225,7 +239,7 @@ function TrustRow({ icon, title, text }: { icon: React.ComponentProps<typeof Mat
 
 function PhoneScreen({ country, value, error, loading, onCountryPress, onChange, onContinue }: { country: CountrySpec; value: string; error: string; loading: boolean; onCountryPress: () => void; onChange: (value: string) => void; onContinue: () => void }) { return <View style={styles.form}><View style={styles.heroIcon}><MaterialIcons name="phone-iphone" size={30} color="#007B8B" /></View><Text style={styles.title}>Quel est votre numéro ?</Text><Text style={styles.subtitle}>Nous l’utiliserons pour sécuriser votre compte et vous connecter à Tikis.</Text><Text style={styles.fieldLabel}>PAYS / RÉGION</Text><Pressable accessibilityRole="button" onPress={onCountryPress} style={({ pressed }) => [styles.countryField, pressed && styles.pressed]}><View style={styles.countryBadge}><Text style={styles.countryFlag}>{country.flag}</Text></View><View style={styles.countryInfo}><Text style={styles.countryName}>{country.name}</Text><Text style={styles.countryHint}>{country.dialCode} · {country.digits} chiffres</Text></View><MaterialIcons name="keyboard-arrow-down" size={24} color="#697386" /></Pressable><Text style={styles.fieldLabel}>NUMÉRO DE TÉLÉPHONE</Text><View style={[styles.phoneField, error && styles.fieldError]}><View style={styles.dialCode}><Text style={styles.dialCodeText}>{country.dialCode}</Text></View><TextInput accessibilityLabel="Numéro de téléphone" keyboardType="phone-pad" placeholder={country.groups.map((size) => "0".repeat(size)).join(" ")} placeholderTextColor="#A1ADBC" value={formatLocalPhone(value, country)} onChangeText={onChange} style={styles.phoneInput} returnKeyType="done" onSubmitEditing={onContinue} /></View>{error ? <Text style={styles.error}>{error}</Text> : <Text style={styles.helper}>Les espaces sont ajoutés automatiquement selon le format de votre pays.</Text>}<TikisButton label="Recevoir mon code" icon="sms" onPress={onContinue} loading={loading} style={styles.actionButton} /></View>; }
 
-function OtpScreen({ phone, digits, error, verifying, secondsLeft, onChangeDigit, onKeyPress, inputRefs, onResend, onSubmit }: { phone: string; digits: string[]; error: string; verifying: boolean; secondsLeft: number; onChangeDigit: (index: number, value: string) => void; onKeyPress: (index: number, key: string) => void; inputRefs: React.MutableRefObject<(TextInput | null)[]>; onResend: () => void; onSubmit: () => void }) { return <View style={styles.form}><View style={styles.heroIcon}><MaterialIcons name="mark-unread-chat-alt" size={30} color="#007B8B" /></View><Text style={styles.title}>Confirmez votre numéro</Text><Text style={styles.subtitle}>Saisissez le code à 6 chiffres envoyé au <Text style={styles.phoneHighlight}>{phone}</Text>.</Text><View style={styles.simulationNotice}><MaterialIcons name="science" size={18} color="#006572" /><Text style={styles.simulationText}>Mode simulation : utilisez le code <Text style={styles.simulationCode}>{SIMULATION_OTP}</Text>.</Text></View><View style={styles.otpRow}>{digits.map((digit, index) => <TextInput key={index} ref={(node) => { inputRefs.current[index] = node; }} accessibilityLabel={`Chiffre ${index + 1} du code`} keyboardType="number-pad" maxLength={6} value={digit} onChangeText={(value) => onChangeDigit(index, value)} onKeyPress={({ nativeEvent }) => onKeyPress(index, nativeEvent.key)} style={[styles.otpInput, error && styles.otpError]} textAlign="center" />)}</View>{error ? <Text style={styles.error}>{error}</Text> : null}<TikisButton label="Vérifier le code" icon="verified" onPress={onSubmit} loading={verifying} disabled={digits.join("").length !== 6} style={styles.actionButton} /><Pressable disabled={secondsLeft > 0} onPress={onResend} style={({ pressed }) => [styles.resend, (pressed || secondsLeft > 0) && styles.pressed]}><Text style={[styles.resendText, secondsLeft > 0 && styles.resendDisabled]}>{secondsLeft > 0 ? `Renvoyer le code dans ${secondsLeft}s` : "Renvoyer le code"}</Text></Pressable></View>; }
+function OtpScreen({ phone, digits, error, verifying, secondsLeft, provider, onChangeDigit, onKeyPress, inputRefs, onResend, onSubmit }: { phone: string; digits: string[]; error: string; verifying: boolean; secondsLeft: number; provider: "simulation" | "supabase"; onChangeDigit: (index: number, value: string) => void; onKeyPress: (index: number, key: string) => void; inputRefs: React.MutableRefObject<(TextInput | null)[]>; onResend: () => void; onSubmit: () => void }) { return <View style={styles.form}><View style={styles.heroIcon}><MaterialIcons name="mark-unread-chat-alt" size={30} color="#007B8B" /></View><Text style={styles.title}>Confirmez votre numéro</Text><Text style={styles.subtitle}>Saisissez le code à 6 chiffres envoyé au <Text style={styles.phoneHighlight}>{phone}</Text>.</Text><View style={styles.simulationNotice}><MaterialIcons name={provider === "supabase" ? "verified-user" : "science"} size={18} color="#006572" /><Text style={styles.simulationText}>{provider === "supabase" ? "Code SMS sécurisé envoyé par Supabase Auth." : <>Mode simulation : utilisez le code <Text style={styles.simulationCode}>{SIMULATION_OTP}</Text>.</>}</Text></View><View style={styles.otpRow}>{digits.map((digit, index) => <TextInput key={index} ref={(node) => { inputRefs.current[index] = node; }} accessibilityLabel={`Chiffre ${index + 1} du code`} keyboardType="number-pad" maxLength={6} value={digit} onChangeText={(value) => onChangeDigit(index, value)} onKeyPress={({ nativeEvent }) => onKeyPress(index, nativeEvent.key)} style={[styles.otpInput, error && styles.otpError]} textAlign="center" />)}</View>{error ? <Text style={styles.error}>{error}</Text> : null}<TikisButton label="Vérifier le code" icon="verified" onPress={onSubmit} loading={verifying} disabled={digits.join("").length !== 6} style={styles.actionButton} /><Pressable disabled={secondsLeft > 0} onPress={onResend} style={({ pressed }) => [styles.resend, (pressed || secondsLeft > 0) && styles.pressed]}><Text style={[styles.resendText, secondsLeft > 0 && styles.resendDisabled]}>{secondsLeft > 0 ? `Renvoyer le code dans ${secondsLeft}s` : "Renvoyer le code"}</Text></Pressable></View>; }
 
 function RoleScreen({ selectedRole, onSelect, onContinue }: { selectedRole: UserRole | null; onSelect: (role: UserRole) => void; onContinue: () => void }) { return <View style={styles.form}><View style={styles.heroIcon}><MaterialIcons name="account-tree" size={30} color="#007B8B" /></View><Text style={styles.title}>Comment utiliserez-vous Tikis ?</Text><Text style={styles.subtitle}>Choisissez votre type de compte. Ce choix sera définitif après la création de votre compte.</Text><RoleChoice role="sender" selected={selectedRole === "sender"} icon="inventory-2" title="Je suis expéditeur" text="Je publie des livraisons et choisis un livreur." onPress={() => onSelect("sender")} /><RoleChoice role="driver" selected={selectedRole === "driver"} icon="two-wheeler" title="Je suis livreur" text="Je propose mes services sur les courses compatibles." onPress={() => onSelect("driver")} /><TikisButton label="Continuer" icon="arrow-forward" onPress={onContinue} disabled={!selectedRole} style={styles.actionButton} /></View>; }
 

@@ -166,3 +166,14 @@
 - [x] Diffuser en temps réel les changements de statut et les notifications aux participants autorisés.
 - [x] Améliorer les indicateurs visuels et les animations du suivi de livraison selon son statut.
 - [x] Tester les transactions, transitions, alertes temps réel et valider la version livrable.
+- [ ] Auditer les prérequis techniques et les identifiants nécessaires au paiement réel, à Supabase Auth Phone et au GPS natif.
+- [ ] Préparer la création, vérification et réception webhook des paiements de dépôt et retrait côté serveur.
+- [ ] Intégrer Supabase Auth Phone au parcours OTP et associer les profils Tikis aux utilisateurs Supabase.
+- [ ] Appliquer les règles RLS Realtime aux canaux de livraison et valider l’accès privé par participant.
+- [ ] Remplacer la position simulée par la localisation native du livreur pendant une livraison active.
+- [ ] Tester les paiements confirmés, les canaux privés et le suivi GPS natif avant la livraison.
+- [ ] Simuler Ligdi Cash avec initiation, confirmation contrôlée et écritures Wallet idempotentes.
+- [x] Diagnostiquer pourquoi les comptes existants passent à tort par l’inscription après OTP.
+- [x] Corriger la reconnaissance et la connexion sécurisée des profils existants.
+- [x] Ajouter des tests de régression pour la connexion OTP des comptes existants et nouveaux.
+- [x] Valider, redémarrer le serveur et enregistrer la correction du parcours OTP.
