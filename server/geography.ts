@@ -62,6 +62,7 @@ function writeCache<T>(cache: Map<string, CacheEntry<T>>, key: string, value: T,
 export function resetGeographicCachesForTests() {
   searchCache.clear();
   routeCache.clear();
+  nextOpenStreetMapRequestAt = 0;
 }
 
 function searchCacheKey(query: string, bias?: { latitude: number; longitude: number }, countryCode?: string, includeCommunityFallback = false) {
@@ -243,6 +244,31 @@ async function searchOpenStreetMapPlaces(query: string, countryCode?: string) {
   }
 }
 
+async function reverseOpenStreetMapLocation(latitude: number, longitude: number, countryCode?: string) {
+  const now = Date.now();
+  if (now < nextOpenStreetMapRequestAt) return null;
+  nextOpenStreetMapRequestAt = now + OSM_MINIMUM_INTERVAL_MS;
+  const url = new URL(OSM_SEARCH_URL.replace(/\/search\/?$/, "/reverse"));
+  url.searchParams.set("lat", String(latitude));
+  url.searchParams.set("lon", String(longitude));
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("addressdetails", "1");
+  url.searchParams.set("zoom", "18");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OSM_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { headers: { "User-Agent": "Tikis development place search/1.0", "Accept-Language": "fr" }, signal: controller.signal });
+    if (!response.ok) return null;
+    const item = await response.json() as OpenStreetMapPlace;
+    const place = openStreetMapLocation({ ...item, lat: String(latitude), lon: String(longitude) });
+    return place ? ensureCountry(place, countryCode) : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function searchMapboxForward(query: string, bias?: { latitude: number; longitude: number }, countryCode?: string) {
   const url = new URL("https://api.mapbox.com/search/searchbox/v1/forward");
   url.searchParams.set("q", query);
@@ -357,6 +383,8 @@ export async function reverseGeocodeLocation(latitude: number, longitude: number
   const cached = await db.getTikisPlaceByCoordinate(latitude, longitude);
   if (cached) { recordGeographicMetric("reverse", "cache_hit"); return ensureCountry(db.tikisPlaceToLocation(cached), countryCode); }
   const startedAt = Date.now();
+  let mapboxPlace: LocationLabel | null = null;
+  let mapboxErrorCause: unknown = null;
   const url = new URL("https://api.mapbox.com/search/geocode/v6/reverse");
   url.searchParams.set("longitude", String(longitude));
   url.searchParams.set("latitude", String(latitude));
@@ -364,11 +392,28 @@ export async function reverseGeocodeLocation(latitude: number, longitude: number
   url.searchParams.set("types", "address,street,neighborhood,locality,place");
   try {
     const payload = await mapboxJson(url, "Search") as { features?: MapboxFeature[] };
-    const place = (payload.features ?? []).sort((left, right) => featurePrecision(left) - featurePrecision(right)).map((feature) => featureToLocation(feature, "reverse")).find((item): item is LocationLabel => Boolean(item));
-    const resolved = place ? await rememberResolvedPlace(ensureCountry(place, countryCode)) : null;
+    mapboxPlace = (payload.features ?? []).sort((left, right) => featurePrecision(left) - featurePrecision(right)).map((feature) => featureToLocation(feature, "reverse")).find((item): item is LocationLabel => Boolean(item)) ?? null;
+    if (mapboxPlace) mapboxPlace = ensureCountry(mapboxPlace, countryCode);
+  } catch (cause) {
+    mapboxErrorCause = cause;
+  }
+  const needsCommunityFallback = !mapboxPlace || mapboxPlace.precision === "city" || mapboxPlace.precision === "unknown" || mapboxPlace.featureType === "place" || mapboxPlace.featureType === "locality";
+  if (needsCommunityFallback) {
+    const communityPlace = await reverseOpenStreetMapLocation(latitude, longitude, countryCode);
+    if (communityPlace && (communityPlace.precision === "exact" || communityPlace.precision === "street" || !mapboxPlace)) {
+      const resolved = await rememberResolvedPlace(communityPlace);
+      recordGeographicMetric("reverse", "success", Date.now() - startedAt);
+      return resolved;
+    }
+  }
+  if (mapboxPlace) {
+    const resolved = await rememberResolvedPlace(mapboxPlace);
     recordGeographicMetric("reverse", "success", Date.now() - startedAt);
     return resolved;
-  } catch (cause) { recordGeographicMetric("reverse", "failure", Date.now() - startedAt); throw cause; }
+  }
+  recordGeographicMetric("reverse", "failure", Date.now() - startedAt);
+  if (mapboxErrorCause) throw mapboxErrorCause;
+  return null;
 }
 
 export async function geocodeAddress(address: string, countryCode?: string) {
