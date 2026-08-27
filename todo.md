@@ -134,3 +134,7 @@
 - [x] Valider et transmettre le filtre de pays vers Mapbox Search côté backend.
 - [x] Appliquer automatiquement le pays du profil aux sélecteurs d’adresse mobile et web.
 - [x] Tester le filtrage géographique, le repli sans pays et la sécurité des entrées.
+- [x] Définir la demande de permission GPS et le repli non bloquant pour la recherche de lieux.
+- [x] Intégrer la récupération de position actuelle aux sélecteurs d’adresse mobile et web.
+- [x] Configurer les permissions de géolocalisation au premier plan pour les builds natifs.
+- [x] Tester la priorisation Mapbox par proximité, le refus de permission et la disponibilité du serveur.

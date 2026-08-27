@@ -74,7 +74,7 @@ const config: ExpoConfig = {
         apiKey: env.googleMapsAndroidKey,
       },
     },
-    permissions: ["POST_NOTIFICATIONS"],
+    permissions: ["POST_NOTIFICATIONS", "ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"],
     intentFilters: [
       {
         action: "VIEW",
@@ -107,6 +107,12 @@ const config: ExpoConfig = {
       "expo-image-picker",
       {
         photosPermission: "Autoriser $(PRODUCT_NAME) à accéder à vos photos pour modifier votre photo de profil.",
+      },
+    ],
+    [
+      "expo-location",
+      {
+        locationWhenInUsePermission: "Autoriser $(PRODUCT_NAME) à utiliser votre position pour prioriser les adresses proches de vous.",
       },
     ],
     [

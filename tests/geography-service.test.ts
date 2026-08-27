@@ -49,8 +49,10 @@ describe("services géographiques backend Tikis", () => {
     process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ suggestions: [] })));
     global.fetch = fetchMock as typeof fetch;
-    await searchPlaces("Abidjan", undefined, "CI");
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("country=CI");
+    await searchPlaces("Abidjan", { latitude: 5.36, longitude: -4.01 }, "CI");
+    const url = new URL(String(fetchMock.mock.calls[0]?.[0]));
+    expect(url.searchParams.get("country")).toBe("CI");
+    expect(url.searchParams.get("proximity")).toBe("-4.01,5.36");
   });
 
   it("ignore les codes pays non conformes et conserve le repli sans filtre", async () => {
