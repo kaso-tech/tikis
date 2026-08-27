@@ -23,9 +23,9 @@ describe("services géographiques backend Tikis", () => {
 
   it("retourne une distance et une durée depuis Mapbox Directions", async () => {
     process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
-    global.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ routes: [{ distance: 5400, duration: 721 }] }))) as typeof fetch;
+    global.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ routes: [{ distance: 5400, duration: 721, geometry: { coordinates: [[-1.52, 12.37], [-1.54, 12.35]] } }] }))) as typeof fetch;
     const result = await computeRoute({ name: "Coris", district: "Koulouba", city: "Ouagadougou", latitude: 12.37, longitude: -1.52 }, { name: "Maison", district: "Ouaga 2000", city: "Ouagadougou", latitude: 12.35, longitude: -1.54 });
-    expect(result).toEqual({ distanceKm: 5.4, durationMinutes: 12 });
+    expect(result).toEqual({ distanceKm: 5.4, durationMinutes: 12, coordinates: [{ latitude: 12.37, longitude: -1.52 }, { latitude: 12.35, longitude: -1.54 }] });
   });
 
   it("assainit une adresse avant le géocodage backend", async () => {

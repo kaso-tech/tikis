@@ -1,7 +1,7 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { router } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { FavoritePlacesSheet, FloatingPlacePicker, type SavedFavorite } from "@/components/tikis/place-sheets";
@@ -30,6 +30,7 @@ function favoriteToLocation(item: { place: { placeName: string; district: string
 }
 
 export default function CreateDeliveryScreen() {
+  const { deliveryId } = useLocalSearchParams<{ deliveryId?: string }>();
   const { profile } = useTikisStore();
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
@@ -54,11 +55,33 @@ export default function CreateDeliveryScreen() {
   const [favoritesVisible, setFavoritesVisible] = useState(false);
   const { mutateAsync: requestRoute } = trpc.geography.route.useMutation();
   const createDeliveryMutation = trpc.deliveries.create.useMutation();
+  const updateDeliveryMutation = trpc.deliveries.update.useMutation();
   const savePlaceMutation = trpc.geography.savePlace.useMutation();
   const favoriteMutation = trpc.geography.favorites.add.useMutation();
   const renameFavoriteMutation = trpc.geography.favorites.rename.useMutation();
   const removeFavoriteMutation = trpc.geography.favorites.remove.useMutation();
   const favoritesQuery = trpc.geography.favorites.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
+  const deliveryQuery = trpc.deliveries.get.useQuery({ id: deliveryId ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(deliveryId && profile?.phone) });
+  const initializedDeliveryId = useRef<string | null>(null);
+  const isEditing = Boolean(deliveryId);
+
+  useEffect(() => {
+    const delivery = deliveryQuery.data;
+    if (!delivery || initializedDeliveryId.current === delivery.id) return;
+    initializedDeliveryId.current = delivery.id;
+    setTitle(delivery.title);
+    setDetails(delivery.details);
+    setDeliveryType(delivery.type);
+    setVehicle(delivery.vehicleTypes[0] ?? "Moto");
+    setPickup(delivery.pickup);
+    setDropoff(delivery.dropoff);
+    setWeightKg(delivery.weightKg ? String(delivery.weightKg) : "");
+    setLengthCm(delivery.dimensions?.lengthCm ? String(delivery.dimensions.lengthCm) : "");
+    setWidthCm(delivery.dimensions?.widthCm ? String(delivery.dimensions.widthCm) : "");
+    setHeightCm(delivery.dimensions?.heightCm ? String(delivery.dimensions.heightCm) : "");
+    setPassengers(delivery.passengers ? String(delivery.passengers) : "");
+    setOfferedPriceInput(delivery.offeredPrice ? String(delivery.offeredPrice) : "");
+  }, [deliveryQuery.data]);
 
   const dimensions = useMemo(() => ({ ...(lengthCm ? { lengthCm: Number(lengthCm) } : {}), ...(widthCm ? { widthCm: Number(widthCm) } : {}), ...(heightCm ? { heightCm: Number(heightCm) } : {}) }), [lengthCm, widthCm, heightCm]);
   const measurement = useMemo(() => ({ ...(weightKg ? { weightKg: Number(weightKg) } : {}), ...(deliveryType === "Personne" ? { passengers: Number(passengers) } : {}), ...(Object.keys(dimensions).length ? { dimensions } : {}) }), [weightKg, deliveryType, passengers, dimensions]);
@@ -124,7 +147,7 @@ export default function CreateDeliveryScreen() {
     await favoritesQuery.refetch();
   }
 
-  async function publish() {
+  async function executePublication() {
     if (loading || !canPublish) {
       setTouched({ title: true, details: true, passengers: deliveryType === "Personne", pickup: true, dropoff: true, price: Boolean(offeredPriceInput) });
       setInputIssues((current) => ({ ...current, title: deliveryTextInputIssue(title), details: deliveryTextInputIssue(details), passengers: deliveryType === "Personne" && (!Number(passengers) || Number(passengers) > 4) ? "Indiquez entre 1 et 4 personnes." : "", price: priceInputError || "" }));
@@ -136,11 +159,25 @@ export default function CreateDeliveryScreen() {
     if (!pickup || !dropoff || !route || !isAllowedDeliveryText(cleanTitle) || !isAllowedDeliveryText(cleanDetails)) return;
     setPublicationStage("Enregistrement des lieux…"); setLoading(true);
     try {
-      setPublicationStage("Publication auprès des livreurs…");
-      const delivery = await createDeliveryMutation.mutateAsync({ title: cleanTitle, type: deliveryType, pickup: toPlacePayload(pickup), dropoff: toPlacePayload(dropoff), distanceKm: route.distanceKm, routeSource: route.source, estimatedPrice: estimate, ...(parsedOfferedPrice ? { offeredPrice: parsedOfferedPrice } : {}), vehicleTypes: [vehicle], details: cleanDetails, ...(deliveryType === "Autre" && weightKg ? { weightKg: Number(weightKg) } : {}), ...(deliveryType === "Autre" && Object.keys(dimensions).length ? { dimensions } : {}), ...(deliveryType === "Personne" ? { passengers: Number(passengers) } : {}) });
+      setPublicationStage(isEditing ? "Mise à jour de la livraison…" : "Publication auprès des livreurs…");
+      const payload = { title: cleanTitle, type: deliveryType, pickup: toPlacePayload(pickup), dropoff: toPlacePayload(dropoff), distanceKm: route.distanceKm, routeSource: route.source, estimatedPrice: estimate, ...(parsedOfferedPrice ? { offeredPrice: parsedOfferedPrice } : {}), vehicleTypes: [vehicle], details: cleanDetails, ...(deliveryType === "Autre" && weightKg ? { weightKg: Number(weightKg) } : {}), ...(deliveryType === "Autre" && Object.keys(dimensions).length ? { dimensions } : {}), ...(deliveryType === "Personne" ? { passengers: Number(passengers) } : {}) };
+      const delivery = isEditing && deliveryId ? await updateDeliveryMutation.mutateAsync({ ...payload, deliveryId }) : await createDeliveryMutation.mutateAsync(payload);
+      if (!delivery) throw new Error("La livraison n’a pas pu être enregistrée.");
       router.replace(`/delivery/${delivery.id}` as any);
-    } catch { setPublicationStage("Publication indisponible. Vérifiez votre connexion puis réessayez."); }
+    } catch { setPublicationStage(isEditing ? "Modification indisponible. Vérifiez votre connexion puis réessayez." : "Publication indisponible. Vérifiez votre connexion puis réessayez."); }
     finally { setLoading(false); setPublicationStage(""); }
+  }
+
+  function publish() {
+    if (loading || !canPublish) {
+      void executePublication();
+      return;
+    }
+    if (!isEditing) { void executePublication(); return; }
+    Alert.alert("Enregistrer les modifications", "Les livreurs qui se sont déjà proposés seront informés et leurs candidatures seront annulées afin qu’ils puissent se proposer à nouveau avec les bonnes informations.", [
+      { text: "Continuer l’édition", style: "cancel" },
+      { text: "Enregistrer", onPress: () => void executePublication() },
+    ]);
   }
 
   function selectPlace(target: "pickup" | "dropoff", place: LocationLabel) {
@@ -160,11 +197,11 @@ export default function CreateDeliveryScreen() {
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <View style={styles.topBar}>
             <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.back, pressed && styles.pressed]}><MaterialIcons name="arrow-back" size={22} color="#0B1F3A" /></Pressable>
-            <Text style={styles.topTitle}>Nouvelle livraison</Text>
+            <Text style={styles.topTitle}>{isEditing ? "Modifier la livraison" : "Nouvelle livraison"}</Text>
             <View style={styles.placeholder} />
           </View>
-          <Text style={styles.title}>Composez une course précise.</Text>
-          <Text style={styles.subtitle}>Choisissez vos lieux dans un écran dédié pour garder ce formulaire clair et rapide.</Text>
+          <Text style={styles.title}>{isEditing ? "Actualisez votre course." : "Composez une course précise."}</Text>
+          <Text style={styles.subtitle}>{isEditing ? "Toute modification réinitialise les candidatures afin de protéger chaque partie." : "Choisissez vos lieux dans un écran dédié pour garder ce formulaire clair et rapide."}</Text>
 
           <Text style={styles.sectionLabel}>TYPE DE COURSE</Text>
           <View style={styles.typeRow}>{DELIVERY_TYPES.map((item) => <Pressable key={item.value} onPress={() => setDeliveryType(item.value)} style={({ pressed }) => [styles.typeChip, deliveryType === item.value && styles.typeChipActive, pressed && styles.pressed]}><MaterialIcons name={item.icon} size={17} color={deliveryType === item.value ? "#FFFFFF" : "#007B8B"} /><Text style={[styles.typeText, deliveryType === item.value && styles.typeTextActive]}>{item.label}</Text></Pressable>)}</View>
@@ -193,9 +230,9 @@ export default function CreateDeliveryScreen() {
           {routeMessage ? <Text style={[styles.routeMessage, !route?.precise && styles.routeWarning]}>{routeMessage}</Text> : null}
           {pickup && dropoff && (!route || !route.precise) ? <Pressable accessibilityRole="button" onPress={retryRoute} style={({ pressed }) => [styles.retryRoute, pressed && styles.pressed]}><MaterialIcons name="refresh" size={16} color="#007B8B" /><Text style={styles.retryRouteText}>{route ? "Recalculer avec Routes API" : "Réessayer le calcul d’itinéraire"}</Text></Pressable> : null}
           {pickup && dropoff ? <Text style={styles.routeTitle}>{formatListRoute(pickup, dropoff)}</Text> : null}
-          <TikisButton label={`Publier · ${publishedPrice ? `${publishedPrice.toLocaleString("fr-FR")} FCFA` : "prix à définir"}`} icon="publish" onPress={() => void publish()} disabled={!canPublish || loading} loading={loading} loadingLabel={publicationStage || "Publication en cours…"} style={styles.publish} />
-          {loading ? <Text style={styles.publicationLoadingHint}>Veuillez patienter, votre course est en cours de publication.</Text> : null}
-          {!loading && !canPublish ? <Text style={styles.publicationHint}>Complétez les champs requis et sélectionnez les deux lieux GPS pour publier.</Text> : null}
+          <TikisButton label={`${isEditing ? "Enregistrer" : "Publier"} · ${publishedPrice ? `${publishedPrice.toLocaleString("fr-FR")} FCFA` : "prix à définir"}`} icon={isEditing ? "save" : "publish"} onPress={publish} disabled={!canPublish || loading || (isEditing && deliveryQuery.isLoading)} loading={loading || (isEditing && deliveryQuery.isLoading)} loadingLabel={publicationStage || (isEditing && deliveryQuery.isLoading ? "Chargement de la livraison…" : "Publication en cours…")} style={styles.publish} />
+          {loading ? <Text style={styles.publicationLoadingHint}>Veuillez patienter, votre course est en cours de traitement.</Text> : null}
+          {!loading && !canPublish ? <Text style={styles.publicationHint}>Complétez les champs requis et sélectionnez les deux lieux GPS pour {isEditing ? "enregistrer" : "publier"}.</Text> : null}
           <Text style={styles.footerNote}>Aucun débit immédiat. Les coordonnées complètes servent uniquement à la course et au calcul de distance.</Text>
         </ScrollView>
       </KeyboardAvoidingView>

@@ -9,6 +9,8 @@ export type DeliveryStatus =
   | "disabled"
   | "cancelled";
 
+export type DeliveryRouteVisibility = "exact" | "approximate";
+
 export type CandidateStatus = "applied" | "selected" | "confirmed" | "withdrawn" | "replaced";
 
 export type WalletOperation = "block" | "unblock" | "debit" | "compensation" | "credit" | "refund" | "deposit_request" | "withdrawal_request";
@@ -113,6 +115,9 @@ export interface Delivery {
   weightKg?: number;
   dimensions?: { lengthCm?: number; widthCm?: number; heightCm?: number };
   passengers?: number;
+  ownCandidateStatus?: CandidateStatus;
+  candidateCount?: number;
+  routeVisibility?: DeliveryRouteVisibility;
 }
 
 export interface DriverCandidate {

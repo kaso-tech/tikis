@@ -34,7 +34,7 @@ type OpenStreetMapPlace = {
 
 type CacheEntry<T> = { value: T; expiresAt: number };
 const searchCache = new Map<string, CacheEntry<PlaceSuggestion[]>>();
-const routeCache = new Map<string, CacheEntry<{ distanceKm: number; durationMinutes: number }>>();
+const routeCache = new Map<string, CacheEntry<{ distanceKm: number; durationMinutes: number; coordinates: { latitude: number; longitude: number }[] }>>();
 const SEARCH_CACHE_TTL_MS = 20_000;
 const ROUTE_CACHE_TTL_MS = 5 * 60_000;
 const CACHE_LIMIT = 200;
@@ -442,13 +442,17 @@ export async function computeRoute(origin: LocationLabel, destination: LocationL
   const coordinates = `${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}`;
   const url = new URL(`https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${coordinates}`);
   url.searchParams.set("alternatives", "false");
-  url.searchParams.set("overview", "false");
+  url.searchParams.set("overview", "full");
+  url.searchParams.set("geometries", "geojson");
   url.searchParams.set("language", "fr");
   try {
-    const payload = await mapboxJson(url, "Directions") as { routes?: Array<{ distance?: number; duration?: number }> };
+    const payload = await mapboxJson(url, "Directions") as { routes?: Array<{ distance?: number; duration?: number; geometry?: { coordinates?: unknown } }> };
     const route = payload.routes?.[0];
     if (!route?.distance) throw new Error("Aucun itinéraire routier n’a été trouvé.");
-    const result = { distanceKm: route.distance / 1000, durationMinutes: Math.max(1, Math.round((route.duration ?? 0) / 60)) };
+    const coordinates = Array.isArray(route.geometry?.coordinates)
+      ? route.geometry.coordinates.flatMap((value) => Array.isArray(value) && value.length >= 2 && Number.isFinite(Number(value[0])) && Number.isFinite(Number(value[1])) ? [{ latitude: Number(value[1]), longitude: Number(value[0]) }] : [])
+      : [];
+    const result = { distanceKm: route.distance / 1000, durationMinutes: Math.max(1, Math.round((route.duration ?? 0) / 60)), coordinates };
     writeCache(routeCache, cacheKey, result, ROUTE_CACHE_TTL_MS);
     recordGeographicMetric("route", "success", Date.now() - startedAt);
     return result;

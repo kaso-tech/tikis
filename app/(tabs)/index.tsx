@@ -21,7 +21,7 @@ export default function HomeScreen() {
         data={visibleDeliveries}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        renderItem={({ item }) => <DeliveryCard delivery={item} onPress={() => router.push(`/delivery/${item.id}` as any)} />}
+        renderItem={({ item }) => <DeliveryCard delivery={item} onPress={() => router.push(`/delivery/${item.id}` as any)} onMap={() => router.push(`/delivery/${item.id}/map` as any)} />}
         ListHeaderComponent={
           <>
             <View style={styles.header}>

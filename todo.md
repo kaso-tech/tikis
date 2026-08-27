@@ -214,3 +214,9 @@
 - [x] Supprimer l’erreur générale de publication et désactiver le bouton tant que le formulaire est invalide.
 - [x] Ajouter la validation dynamique et localisée de chaque champ requis de création de livraison.
 - [x] Tester les soldes et validations de formulaire, redémarrer et enregistrer la correction.
+- [x] Examiner les cartes, détails et transitions de livraison existants.
+- [x] Ajouter les actions expéditeur persistées de modification, activation, désactivation et annulation.
+- [x] Refondre les cartes de livraison avec actions directes pour les livreurs.
+- [x] Créer une vue professionnelle d’itinéraire avec récupération, destination et tracé.
+- [x] Refondre la fiche de détail avec actions conditionnelles, confirmations et chargements.
+- [x] Tester les parcours expéditeur/livreur, la carte, les contrôles d’accès et enregistrer la version.

@@ -29,7 +29,7 @@ export default function DeliveriesScreen() {
         data={data}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        renderItem={({ item }) => <DeliveryCard delivery={item} onPress={() => router.push(`/delivery/${item.id}` as any)} />}
+        renderItem={({ item }) => <DeliveryCard delivery={item} onPress={() => router.push(`/delivery/${item.id}` as any)} onMap={() => router.push(`/delivery/${item.id}/map` as any)} />}
         ListHeaderComponent={<>
           <Text style={tikisStyles.eyebrow}>{role === "sender" ? "Gestion des demandes" : "Vos missions"}</Text>
           <Text style={[tikisStyles.title, styles.title]}>{role === "sender" ? "Vos courses" : "Vos livraisons"}</Text>

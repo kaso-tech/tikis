@@ -68,7 +68,7 @@ function sessionCountryCode(profilePhone: string) {
   return findCountryForPhone(profilePhone).id;
 }
 
-async function syncDeliveryParticipants(delivery: ResolvedDelivery) {
+async function syncDeliveryParticipants(delivery: Pick<ResolvedDelivery, "id" | "senderPhone" | "driverPhone">) {
   const [sender, driver] = await Promise.all([delivery.senderPhone ? db.getTikisProfileByPhone(delivery.senderPhone) : Promise.resolve(undefined), delivery.driverPhone ? db.getTikisProfileByPhone(delivery.driverPhone) : Promise.resolve(undefined)]);
   const members = [sender?.supabaseUserId ? { userId: sender.supabaseUserId, role: "sender" as const } : null, driver?.supabaseUserId ? { userId: driver.supabaseUserId, role: "driver" as const } : null].filter((member): member is { userId: string; role: "sender" | "driver" } => member !== null);
   void syncDeliveryRealtimeMembers(delivery.id, members);
@@ -164,8 +164,32 @@ async function saveDeliveryPlace(place: z.infer<typeof placeSchema>) {
 type ResolvedDelivery = NonNullable<Awaited<ReturnType<typeof db.getTikisDeliveryById>>>;
 
 function deliveryForProfile(delivery: ResolvedDelivery, profile: Awaited<ReturnType<typeof currentTikisProfile>>): ResolvedDelivery {
-  if (profile.accountType !== "driver" || delivery.driverId === profile.phone) return delivery;
-  return { ...delivery, senderName: "Expéditeur Tikis", senderPhone: undefined, driverName: undefined, driverPhone: undefined };
+  if (profile.accountType === "sender") return { ...delivery, routeVisibility: "exact" };
+  const maySeeExactRoute = delivery.driverId === profile.phone && (delivery.status === "active" || delivery.status === "completed");
+  if (maySeeExactRoute) return { ...delivery, routeVisibility: "exact" };
+  const concealPlace = (place: ResolvedDelivery["pickup"]) => ({
+    ...place,
+    name: place.city || "Zone indicative",
+    district: "",
+    formattedAddress: place.city || "Zone indicative",
+    street: undefined,
+    googlePlaceId: undefined,
+    mapboxId: undefined,
+    mapboxSessionToken: undefined,
+    latitude: Math.round(place.latitude * 10) / 10,
+    longitude: Math.round(place.longitude * 10) / 10,
+    precision: "area" as const,
+  });
+  return {
+    ...delivery,
+    pickup: concealPlace(delivery.pickup),
+    dropoff: concealPlace(delivery.dropoff),
+    senderName: "Expéditeur Tikis",
+    senderPhone: undefined,
+    driverName: undefined,
+    driverPhone: undefined,
+    routeVisibility: "approximate",
+  };
 }
 
 export const appRouter = router({
@@ -251,7 +275,15 @@ export const appRouter = router({
           try { return JSON.parse(profile.vehicles).includes(vehicle); } catch { return false; }
         }))
         : deliveries;
-      return compatible.map((delivery) => deliveryForProfile(delivery, profile));
+      if (profile.accountType !== "driver") {
+        const candidateCounts = await db.countTikisDeliveryCandidates(compatible.map((delivery) => delivery.id));
+        return compatible.map((delivery) => ({ ...deliveryForProfile(delivery, profile), candidateCount: candidateCounts.get(delivery.id) ?? 0 }));
+      }
+      const candidatesByDelivery = await db.listTikisDeliveryCandidateStatesForDriver(compatible.map((delivery) => delivery.id), profile.phone);
+      return compatible.map((delivery) => {
+        const candidate = candidatesByDelivery.get(delivery.id);
+        return { ...deliveryForProfile(delivery, profile), ...(candidate ? { ownCandidateStatus: candidate.status } : {}) };
+      });
     }),
     get: tikisProtectedProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
@@ -308,6 +340,57 @@ export const appRouter = router({
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("Seul un livreur peut candidater.");
       return db.applyForTikisDelivery({ id: randomUUID(), deliveryId: input.deliveryId, driverPhone: profile.phone, ...(input.offerPrice ? { offerPrice: input.offerPrice } : {}) });
+    }),
+    update: tikisProtectedProcedure.input(deliveryInputSchema.safeExtend({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "sender") throw new Error("Seul l’expéditeur peut modifier une livraison.");
+      const [pickup, dropoff] = await Promise.all([saveDeliveryPlace(input.pickup), saveDeliveryPlace(input.dropoff)]);
+      const delivery = await db.updateTikisDeliveryFromSender({
+        deliveryId: input.deliveryId,
+        senderPhone: profile.phone,
+        pickupPlaceId: pickup.id,
+        dropoffPlaceId: dropoff.id,
+        title: sanitizeDeliveryText(input.title),
+        details: sanitizeDeliveryText(input.details),
+        deliveryType: input.type,
+        distanceKm: String(input.distanceKm),
+        routeSource: input.routeSource,
+        estimatedPrice: input.estimatedPrice,
+        offeredPrice: input.offeredPrice ?? null,
+        vehicleTypes: JSON.stringify(input.vehicleTypes),
+        weightKg: input.type === "Autre" && input.weightKg ? String(input.weightKg) : null,
+        lengthCm: input.type === "Autre" ? input.dimensions?.lengthCm ?? null : null,
+        widthCm: input.type === "Autre" ? input.dimensions?.widthCm ?? null : null,
+        heightCm: input.type === "Autre" ? input.dimensions?.heightCm ?? null : null,
+        passengers: input.type === "Personne" ? input.passengers ?? null : null,
+      });
+      if (delivery) {
+        const record = await db.getTikisDeliveryRecordById(delivery.id);
+        if (record) await syncDeliveryParticipants({ id: delivery.id, senderPhone: record.senderPhone, driverPhone: record.driverPhone ?? undefined } as ResolvedDelivery);
+        void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livraison mise à jour", body: "Les informations de la livraison ont été actualisées.", occurredAt: new Date().toISOString() });
+      }
+      return delivery;
+    }),
+    disable: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "sender") throw new Error("Seul l’expéditeur peut désactiver une livraison.");
+      const delivery = await db.disableTikisDeliveryFromSender(input.deliveryId, profile.phone);
+      if (delivery) void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livraison désactivée", body: "La livraison n’accepte plus de candidatures.", occurredAt: new Date().toISOString() });
+      return delivery;
+    }),
+    reactivate: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "sender") throw new Error("Seul l’expéditeur peut activer une livraison.");
+      const delivery = await db.reactivateTikisDeliveryFromSender(input.deliveryId, profile.phone);
+      if (delivery) void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livraison activée", body: "La livraison est à nouveau disponible pour les livreurs compatibles.", occurredAt: new Date().toISOString() });
+      return delivery;
+    }),
+    cancel: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "sender") throw new Error("Seul l’expéditeur peut annuler une livraison.");
+      const delivery = await db.cancelTikisDeliveryFromSender(input.deliveryId, profile.phone);
+      if (delivery) void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livraison annulée", body: "Cette livraison a été annulée par l’expéditeur.", occurredAt: new Date().toISOString() });
+      return delivery;
     }),
     withdraw: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
