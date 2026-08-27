@@ -237,3 +237,6 @@
 - [x] Agrandir le panneau de sélection et déplacer les adresses récentes sous Mes adresses.
 - [x] Maintenir la carte déplaçable et élargir la recherche d’adresses et de lieux.
 - [x] Tester les interactions, vérifier le serveur et enregistrer la version.
+- [x] Vérifier le comportement actuel de la barre de recherche d’adresse.
+- [x] Ajouter et valider l’icône d’effacement rapide de recherche.
+- [x] Vérifier le serveur et enregistrer la correction.
