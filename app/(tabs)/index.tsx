@@ -1,5 +1,6 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router } from "expo-router";
+import { useMemo } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
 import { DeliveryCard } from "@/components/tikis/delivery-card";
 import { SectionHeading, SurfaceCard, TikisButton, tikisStyles } from "@/components/tikis/ui";
@@ -13,7 +14,10 @@ export default function HomeScreen() {
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 12_000 });
   const driverWallet = walletQuery.data?.wallet;
   const firstName = profile?.fullName.split(" ")[0] ?? "";
-  const visibleDeliveries = (deliveriesQuery.data ?? []).filter((delivery) => role === "sender" ? delivery.status !== "completed" : delivery.status !== "completed");
+  const visibleDeliveries = useMemo(() => {
+    const deliveries = (deliveriesQuery.data ?? []).filter((delivery) => delivery.status !== "completed");
+    return role === "driver" ? [...deliveries].sort((left, right) => left.distanceKm - right.distanceKm || (right.offeredPrice ?? right.estimatedPrice) - (left.offeredPrice ?? left.estimatedPrice)) : deliveries;
+  }, [deliveriesQuery.data, role]);
 
   return (
     <View style={tikisStyles.screen}>

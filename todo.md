@@ -220,3 +220,7 @@
 - [x] Créer une vue professionnelle d’itinéraire avec récupération, destination et tracé.
 - [x] Refondre la fiche de détail avec actions conditionnelles, confirmations et chargements.
 - [x] Tester les parcours expéditeur/livreur, la carte, les contrôles d’accès et enregistrer la version.
+- [x] Examiner les listes et données de livraison disponibles pour les filtres livreur.
+- [x] Ajouter des filtres de distance, engin et rémunération aux livraisons disponibles.
+- [x] Ajouter le tri, les états vides et les retours d’interaction des filtres.
+- [x] Tester les filtres, vérifier le serveur et enregistrer la version.
