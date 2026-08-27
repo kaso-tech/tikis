@@ -1,12 +1,33 @@
 import { Platform } from "react-native";
-import * as Notifications from "expo-notifications";
+import Constants from "expo-constants";
 import type { TrackingEvent } from "./gps-simulator";
 
 const TRACKING_CHANNEL = "tikis-delivery-tracking";
 let configured = false;
+const runsInExpoGo = Constants.appOwnership === "expo";
+let notificationHandlerConfigured = false;
+
+async function getNativeNotifications() {
+  if (Platform.OS === "web" || runsInExpoGo) return null;
+  const Notifications = await import("expo-notifications");
+  if (!notificationHandlerConfigured) {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+    notificationHandlerConfigured = true;
+  }
+  return Notifications;
+}
 
 export async function configureSimulatedPushNotifications() {
-  if (Platform.OS === "web" || configured) return false;
+  if (configured) return true;
+  const Notifications = await getNativeNotifications();
+  if (!Notifications) return false;
 
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync(TRACKING_CHANNEL, {
@@ -24,8 +45,9 @@ export async function configureSimulatedPushNotifications() {
 }
 
 export async function presentSimulatedTrackingPush(event: TrackingEvent, deliveryId: string) {
-  if (Platform.OS === "web") return false;
   try {
+    const Notifications = await getNativeNotifications();
+    if (!Notifications) return false;
     const granted = await configureSimulatedPushNotifications();
     if (!granted) return false;
     await Notifications.scheduleNotificationAsync({
@@ -45,8 +67,9 @@ export async function presentSimulatedTrackingPush(event: TrackingEvent, deliver
 }
 
 export async function presentDeliveryStatusPush(event: { deliveryId: string; status: string; title: string; body: string }) {
-  if (Platform.OS === "web") return false;
   try {
+    const Notifications = await getNativeNotifications();
+    if (!Notifications) return false;
     const granted = await configureSimulatedPushNotifications();
     if (!granted) return false;
     await Notifications.scheduleNotificationAsync({
@@ -57,15 +80,4 @@ export async function presentDeliveryStatusPush(event: { deliveryId: string; sta
   } catch {
     return false;
   }
-}
-
-if (Platform.OS !== "web") {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
 }

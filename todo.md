@@ -177,3 +177,8 @@
 - [x] Corriger la reconnaissance et la connexion sécurisée des profils existants.
 - [x] Ajouter des tests de régression pour la connexion OTP des comptes existants et nouveaux.
 - [x] Valider, redémarrer le serveur et enregistrer la correction du parcours OTP.
+- [x] Diagnostiquer le blocage permanent du bundling Expo Go et identifier sa cause.
+- [x] Stabiliser Metro et les dépendances Expo sans régression native ou web.
+- [x] Vérifier le bundle Expo Go, TypeScript, lint et la réponse du serveur après correction.
+- [x] Enregistrer la correction de stabilité du bundling Expo Go.
+- [x] Rétablir le serveur de développement et vérifier sa disponibilité après le redémarrage.

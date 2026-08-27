@@ -103,6 +103,8 @@ const config: ExpoConfig = {
       },
     ],
     "expo-router",
+    "expo-font",
+    "expo-web-browser",
     [
       "expo-image-picker",
       {
