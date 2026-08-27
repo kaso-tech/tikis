@@ -76,6 +76,36 @@ export default function ProfileScreen() {
 function Summary({ icon, value, label }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; value: string; label: string }) { return <SurfaceCard style={styles.summary}><MaterialIcons name={icon} size={20} color="#007B8B" /><Text style={styles.summaryValue}>{value}</Text><Text style={styles.summaryLabel}>{label}</Text></SurfaceCard>; }
 function InfoRow({ icon, label, value, last = false }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; label: string; value: string; last?: boolean }) { return <View style={[styles.infoRow, last && styles.infoLast]}><MaterialIcons name={icon} size={19} color="#007B8B" /><View style={styles.infoText}><Text style={styles.infoLabel}>{label}</Text><Text style={styles.infoValue}>{value}</Text></View></View>; }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   list: { padding: 20, paddingBottom: 116 }, title: { marginTop: 3, marginBottom: 18 }, profileCard: { flexDirection: "row", alignItems: "center", gap: 13 }, avatarWrap: { position: "relative", width: 76, height: 76 }, photo: { width: 76, height: 76, borderRadius: 38, backgroundColor: "#E5F6F7" }, photoEdit: { position: "absolute", right: -2, bottom: -2, width: 28, height: 28, borderRadius: 14, backgroundColor: "#007B8B", borderWidth: 2, borderColor: "#FFFFFF", alignItems: "center", justifyContent: "center" }, profileInfo: { flex: 1 }, name: { color: "#0B1F3A", fontSize: 17, fontWeight: "900" }, phone: { color: "#697386", fontSize: 13, marginTop: 3 }, rolePill: { flexDirection: "row", gap: 5, alignItems: "center", marginTop: 8 }, roleText: { color: "#006572", fontSize: 11, fontWeight: "900" }, editButton: { width: 38, height: 38, borderRadius: 13, backgroundColor: "#E5F6F7", alignItems: "center", justifyContent: "center" }, summaryRow: { flexDirection: "row", gap: 9, marginTop: 13 }, summary: { flex: 1, padding: 12, minHeight: 104 }, summaryValue: { color: "#0B1F3A", fontSize: 17, fontWeight: "900", marginTop: 10 }, summaryLabel: { color: "#78869A", fontSize: 10, lineHeight: 14, marginTop: 3 }, roleLabel: { color: "#8A96A8", fontSize: 11, fontWeight: "900", letterSpacing: 0.7, marginTop: 25, marginBottom: 8 }, infoCard: { paddingVertical: 0 }, infoRow: { flexDirection: "row", alignItems: "center", gap: 11, paddingVertical: 13, borderBottomWidth: 1, borderColor: "#EEF2F6" }, infoLast: { borderBottomWidth: 0 }, infoText: { flex: 1 }, infoLabel: { color: "#78869A", fontSize: 11, fontWeight: "800" }, infoValue: { color: "#0B1F3A", fontSize: 13, lineHeight: 18, fontWeight: "800", marginTop: 2 }, sectionLabel: { color: "#8A96A8", fontSize: 11, fontWeight: "900", letterSpacing: 0.7, marginTop: 25, marginBottom: 8 }, menuRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderColor: "#E7ECF2" }, menuIcon: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#E5F6F7", marginRight: 11 }, menuInfo: { flex: 1 }, menuLabel: { color: "#0B1F3A", fontWeight: "800", fontSize: 14 }, menuDetail: { color: "#778398", fontSize: 12, marginTop: 2 }, logout: { marginTop: 28 }, modal: { flex: 1, justifyContent: "flex-end" }, scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(8,22,42,0.48)" }, sheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 27, borderTopRightRadius: 27, padding: 20, paddingBottom: 32 }, handle: { width: 42, height: 4, borderRadius: 2, backgroundColor: "#D5DEE7", alignSelf: "center", marginBottom: 18 }, sheetTitle: { color: "#0B1F3A", fontSize: 21, fontWeight: "900" }, sheetSubtitle: { color: "#697386", fontSize: 13, marginTop: 4 }, photoPicker: { minHeight: 82, padding: 12, marginTop: 19, borderRadius: 18, backgroundColor: "#E5F6F7", flexDirection: "row", gap: 12, alignItems: "center" }, pickerPreview: { width: 58, height: 58, borderRadius: 29 }, photoPickerText: { color: "#006572", fontSize: 14, fontWeight: "900" }, fieldLabel: { color: "#8A96A8", fontSize: 11, fontWeight: "900", letterSpacing: 0.7, marginTop: 20, marginBottom: 8 }, input: { minHeight: 56, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: "#DDE5ED", color: "#0B1F3A", fontSize: 16, fontWeight: "800" }, inputError: { borderColor: "#C23B45" }, error: { color: "#C23B45", fontSize: 12, fontWeight: "700", marginTop: 7 }, helper: { color: "#78869A", fontSize: 12, marginTop: 7 }, saveButton: { marginTop: 21 }, pressed: { opacity: 0.67 },
+});
+
+const styles = StyleSheet.create({
+  ...baseStyles,
+  list: { ...baseStyles.list, padding: 16, paddingBottom: 98 },
+  title: { ...baseStyles.title, marginTop: 2, marginBottom: 13 },
+  photoEdit: { ...baseStyles.photoEdit, borderWidth: 0 },
+  name: { ...baseStyles.name, color: "#111111", fontWeight: "600" },
+  roleText: { ...baseStyles.roleText, fontWeight: "600" },
+  editButton: { ...baseStyles.editButton, borderRadius: 8, backgroundColor: "#EEEDF3" },
+  summaryRow: { ...baseStyles.summaryRow, gap: 8, marginTop: 10 },
+  summary: { ...baseStyles.summary, padding: 11, minHeight: 94 },
+  summaryValue: { ...baseStyles.summaryValue, color: "#111111", fontWeight: "600", marginTop: 8 },
+  roleLabel: { ...baseStyles.roleLabel, fontWeight: "600", marginTop: 20 },
+  infoRow: { ...baseStyles.infoRow, paddingVertical: 11, borderBottomWidth: 0 },
+  infoLabel: { ...baseStyles.infoLabel, fontWeight: "600" },
+  infoValue: { ...baseStyles.infoValue, color: "#111111", fontWeight: "500" },
+  sectionLabel: { ...baseStyles.sectionLabel, fontWeight: "600", marginTop: 20 },
+  menuRow: { ...baseStyles.menuRow, paddingVertical: 11, borderBottomWidth: 0, marginBottom: 3, backgroundColor: "#FFFFFF", borderRadius: 9, paddingHorizontal: 10 },
+  menuIcon: { ...baseStyles.menuIcon, borderRadius: 8, backgroundColor: "#EEEDF3" },
+  menuLabel: { ...baseStyles.menuLabel, color: "#111111", fontWeight: "600" },
+  logout: { ...baseStyles.logout, marginTop: 20 },
+  scrim: { ...baseStyles.scrim, backgroundColor: "rgba(0,0,0,0.42)" },
+  sheet: { ...baseStyles.sheet, borderTopLeftRadius: 14, borderTopRightRadius: 14, padding: 16, paddingBottom: 24 },
+  sheetTitle: { ...baseStyles.sheetTitle, color: "#111111", fontWeight: "600" },
+  photoPicker: { ...baseStyles.photoPicker, borderRadius: 10, backgroundColor: "#E2F3F4", marginTop: 15 },
+  photoPickerText: { ...baseStyles.photoPickerText, fontWeight: "600" },
+  fieldLabel: { ...baseStyles.fieldLabel, fontWeight: "600" },
+  input: { ...baseStyles.input, borderRadius: 10, borderWidth: 0, backgroundColor: "#EEEDF3", color: "#111111", fontWeight: "500" },
+  error: { ...baseStyles.error, fontWeight: "600" },
 });

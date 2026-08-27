@@ -27,5 +27,5 @@ export function DeliveryRouteMap({ pickup, dropoff, coordinates }: { pickup: Loc
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#D8E8E5" }, map: { ...StyleSheet.absoluteFillObject }, startMarker: { width: 32, height: 32, borderRadius: 12, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF", shadowColor: "#0B1F3A", shadowOpacity: 0.2, shadowRadius: 6, elevation: 4 }, destinationMarker: { width: 34, height: 34, borderRadius: 17, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowColor: "#0B1F3A", shadowOpacity: 0.24, shadowRadius: 7, elevation: 5 },
+  container: { flex: 1, backgroundColor: "#D8E8E5" }, map: { ...StyleSheet.absoluteFillObject }, startMarker: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", borderWidth: 0, shadowOpacity: 0, shadowRadius: 0, elevation: 0 }, destinationMarker: { width: 34, height: 34, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
 });

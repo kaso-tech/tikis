@@ -37,6 +37,22 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F6F8FC" }, content: { padding: 20, paddingBottom: 35, flexGrow: 1 }, header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }, eyebrow: { color: "#007B8B", fontSize: 12, fontWeight: "900", letterSpacing: 0.7, textTransform: "uppercase" }, title: { color: "#0B1F3A", fontSize: 28, fontWeight: "900", marginTop: 3, letterSpacing: -0.5 }, close: { width: 42, height: 42, alignItems: "center", justifyContent: "center", borderRadius: 21, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7ECF2" }, item: { flexDirection: "row", gap: 12, padding: 14, borderRadius: 18, marginBottom: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7ECF2" }, itemUnread: { borderColor: "#B9DDE1", backgroundColor: "#FBFFFF" }, icon: { width: 42, height: 42, borderRadius: 14, alignItems: "center", justifyContent: "center" }, itemBody: { flex: 1 }, itemTop: { flexDirection: "row", alignItems: "center", gap: 8 }, itemTitle: { color: "#0B1F3A", fontSize: 14, fontWeight: "900", flex: 1 }, unread: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#007B8B" }, itemText: { color: "#697386", fontSize: 12, lineHeight: 18, marginTop: 3 }, itemTime: { color: "#9AA5B6", fontSize: 11, marginTop: 6 }, markAll: { alignItems: "center", paddingVertical: 18 }, markAllText: { color: "#007B8B", fontWeight: "900", fontSize: 14 }, empty: { alignItems: "center", justifyContent: "center", paddingTop: 70, paddingHorizontal: 35 }, emptyTitle: { color: "#0B1F3A", fontSize: 16, fontWeight: "900", marginTop: 12 }, emptyText: { color: "#697386", fontSize: 13, textAlign: "center", marginTop: 5 }, pressed: { opacity: 0.67 },
+});
+
+const styles = StyleSheet.create({
+  ...baseStyles,
+  safe: { ...baseStyles.safe, backgroundColor: "#EEEDF3" },
+  content: { ...baseStyles.content, padding: 16, paddingBottom: 28 },
+  header: { ...baseStyles.header, marginBottom: 16 },
+  eyebrow: { ...baseStyles.eyebrow, fontWeight: "600" },
+  title: { ...baseStyles.title, color: "#111111", fontWeight: "600", fontSize: 25 },
+  close: { ...baseStyles.close, borderRadius: 8, borderWidth: 0 },
+  item: { ...baseStyles.item, gap: 10, padding: 12, borderRadius: 10, marginBottom: 7, borderWidth: 0 },
+  itemUnread: { ...baseStyles.itemUnread, borderWidth: 0, backgroundColor: "#FFFFFF" },
+  icon: { ...baseStyles.icon, borderRadius: 8 },
+  itemTitle: { ...baseStyles.itemTitle, color: "#111111", fontWeight: "600" },
+  markAllText: { ...baseStyles.markAllText, fontWeight: "600" },
+  emptyTitle: { ...baseStyles.emptyTitle, color: "#111111", fontWeight: "600" },
 });

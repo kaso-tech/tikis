@@ -254,11 +254,11 @@ function DriverActions({ deliveryStatus, ownCandidateStatus, loading, onApply, o
 function RouteLine({ label, title, subtitle, tone }: { label: string; title: string; subtitle: string; tone: "pickup" | "dropoff" }) { return <View style={styles.routeLineRow}><View style={[styles.routePin, tone === "pickup" ? styles.pickupPin : styles.dropoffPin]}>{tone === "pickup" ? <View style={styles.pinInner} /> : <MaterialIcons name="location-on" size={15} color="#FFFFFF" />}</View><View style={styles.routeLineInfo}><Text style={styles.routeLabel}>{label}</Text><Text style={styles.routeValue}>{title}</Text><Text style={styles.routeMeta} numberOfLines={2}>{subtitle}</Text></View></View>; }
 function DetailRow({ icon, label, value }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; label: string; value: string }) { return <View style={styles.detailRow}><MaterialIcons name={icon} size={18} color="#007B8B" /><Text style={styles.detailLabel}>{label}</Text><Text style={styles.detailValue}>{value}</Text></View>; }
 
-const styles: any = StyleSheet.create({
+const baseStyles: any = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F6F8FC" }, content: { padding: 20, paddingBottom: 45 }, topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }, back: { width: 42, height: 42, borderRadius: 21, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7ECF2", alignItems: "center", justifyContent: "center" }, report: { width: 42, height: 42, borderRadius: 21, backgroundColor: "#FDEBEC", alignItems: "center", justifyContent: "center" }, topTitle: { color: "#0B1F3A", fontSize: 16, fontWeight: "900" }, title: { color: "#0B1F3A", fontSize: 26, lineHeight: 33, fontWeight: "900", marginTop: 12, letterSpacing: -0.4 }, schedule: { color: "#697386", fontSize: 13, marginTop: 5 }, provisionalRoute: { color: "#9A6700", fontSize: 11, fontWeight: "800", lineHeight: 16, marginTop: 7 }, routeCard: { marginTop: 21 }, routeLineRow: { flexDirection: "row", alignItems: "center" }, routePin: { width: 29, height: 29, borderRadius: 10, alignItems: "center", justifyContent: "center", marginRight: 11 }, pickupPin: { backgroundColor: "#E5F6F7" }, dropoffPin: { backgroundColor: "#0B1F3A" }, pinInner: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#007B8B" }, routeLineInfo: { flex: 1 }, routeLabel: { color: "#8A96A8", fontSize: 11, fontWeight: "900", letterSpacing: 0.5, textTransform: "uppercase" }, routeValue: { color: "#0B1F3A", fontSize: 13, fontWeight: "700", marginTop: 2 }, routeMeta: { color: "#697386", fontSize: 11, lineHeight: 16, marginTop: 2 }, routeDivider: { height: 15, width: 1, backgroundColor: "#C9D4DF", marginLeft: 14, marginVertical: 3 }, detailCard: { paddingVertical: 3 }, detailRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderColor: "#EEF2F6", gap: 9 }, detailLabel: { color: "#697386", fontSize: 13, flex: 1 }, detailValue: { color: "#0B1F3A", fontSize: 13, fontWeight: "800", textAlign: "right", flex: 1.4 }, detailLast: { paddingVertical: 12 }, detailDescription: { color: "#485569", fontSize: 13, lineHeight: 19 }, pricingCard: { backgroundColor: "#E5F6F7", borderColor: "#CDE4E7" }, pricingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, pricingLabel: { color: "#35656C", fontSize: 13, fontWeight: "800" }, pricingValue: { color: "#006572", fontSize: 19, fontWeight: "900" }, estimateReference: { color: "#4D7075", fontSize: 11, fontWeight: "700", marginTop: 2 }, counterPrice: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 9, paddingTop: 9, borderTopWidth: 1, borderColor: "#C8E6E8" }, counterPriceLabel: { color: "#35656C", fontSize: 12, fontWeight: "800" }, counterPriceValue: { color: "#006572", fontSize: 15, fontWeight: "900" }, pricingNote: { color: "#4D7075", fontSize: 12, lineHeight: 18, marginTop: 5 }, trackButton: { marginTop: 12 }, contactCard: { padding: 15 }, contactTop: { flexDirection: "row", alignItems: "center", gap: 10 }, contactInfo: { flex: 1 }, contactName: { color: "#0B1F3A", fontSize: 16, fontWeight: "900" }, contactMeta: { color: "#697386", fontSize: 12, marginTop: 2 }, contactButton: { marginTop: 14 }, candidateCard: { marginBottom: 11 }, candidateHeader: { flexDirection: "row", alignItems: "center", gap: 10 }, candidateInfo: { flex: 1 }, candidateName: { color: "#0B1F3A", fontSize: 15, fontWeight: "900" }, candidateMeta: { color: "#697386", fontSize: 12, marginTop: 3 }, candidateFooter: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", paddingTop: 13, marginTop: 13, borderTopWidth: 1, borderColor: "#EEF2F6" }, candidateVehicle: { color: "#697386", fontSize: 12 }, candidatePrice: { color: "#007B8B", fontSize: 15, fontWeight: "900", marginTop: 3 }, candidateButton: { minHeight: 40, paddingHorizontal: 13, borderRadius: 12 }, driverAction: { marginTop: 24, marginBottom: 6 }, secondaryDriverAction: { marginTop: 10 }, driverHint: { color: "#697386", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 10, paddingHorizontal: 12 }, empty: { textAlign: "center", color: "#8A96A8", marginBottom: 18 }, message: { color: "#C23B45", textAlign: "center", fontSize: 13, fontWeight: "800", marginTop: 12 }, rateButton: { marginTop: 18 }, reviewDone: { marginTop: 18, flexDirection: "row", gap: 10, alignItems: "center", backgroundColor: "#FFF7E6", borderColor: "#F6D48F" }, reviewDoneInfo: { flex: 1 }, reviewDoneTitle: { color: "#8A5A0E", fontSize: 13, fontWeight: "900" }, reviewDoneText: { color: "#936C1B", fontSize: 12, lineHeight: 17, marginTop: 2 }, counterOverlay: { flex: 1, backgroundColor: "rgba(11,31,58,0.42)", alignItems: "center", justifyContent: "center", padding: 24 }, counterDialog: { width: "100%", maxWidth: 400, backgroundColor: "#FFFFFF", borderRadius: 22, padding: 20 }, counterIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: "#E6F5F6", alignSelf: "center", alignItems: "center", justifyContent: "center", marginBottom: 10 }, counterTitle: { color: "#0B1F3A", fontSize: 18, fontWeight: "900", textAlign: "center" }, counterText: { color: "#697386", fontSize: 13, lineHeight: 19, textAlign: "center", marginTop: 7 }, counterInputWrap: { minHeight: 52, flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#B8DDE0", borderRadius: 14, paddingHorizontal: 14, marginTop: 17 }, counterInput: { flex: 1, color: "#0B1F3A", fontSize: 16, fontWeight: "900", minHeight: 45 }, counterCurrency: { color: "#697386", fontSize: 12, fontWeight: "900", marginLeft: 8 }, counterHint: { color: "#4D7075", fontSize: 11, lineHeight: 16, textAlign: "center", marginTop: 7 }, counterError: { color: "#C23B45", fontSize: 11, fontWeight: "700", lineHeight: 16, textAlign: "center", marginTop: 7 }, counterActions: { flexDirection: "row", gap: 10, marginTop: 18 }, counterAction: { flex: 1, minHeight: 45 }, notFound: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 18 }, notFoundTitle: { color: "#0B1F3A", fontSize: 20, fontWeight: "900" }, pressed: { opacity: 0.67 },
 });
 
-Object.assign(styles, {
+Object.assign(baseStyles, {
   distanceText: { color: "#0B1F3A", fontWeight: "900" },
   mapButton: { marginTop: 11 },
   senderActions: { marginTop: 12, gap: 9 },
@@ -275,4 +275,53 @@ Object.assign(styles, {
   actionCancel: { marginTop: 7 },
   driverStatusLabel: { color: "#8A96A8", fontSize: 11, fontWeight: "900", letterSpacing: 0.5, marginTop: 12, textTransform: "uppercase" },
   driverStatus: { color: "#0B1F3A", fontSize: 15, fontWeight: "900", marginTop: 3 },
+});
+
+const styles: any = StyleSheet.create({
+  ...baseStyles,
+  safe: { ...baseStyles.safe, backgroundColor: "#EEEDF3" },
+  content: { ...baseStyles.content, padding: 16, paddingBottom: 28 },
+  topBar: { ...baseStyles.topBar, marginBottom: 16 },
+  back: { ...baseStyles.back, borderRadius: 8, borderWidth: 0 },
+  report: { ...baseStyles.report, borderRadius: 8 },
+  topTitle: { ...baseStyles.topTitle, color: "#111111", fontWeight: "600" },
+  title: { ...baseStyles.title, color: "#111111", fontWeight: "600", fontSize: 24, lineHeight: 30, marginTop: 10 },
+  provisionalRoute: { ...baseStyles.provisionalRoute, fontWeight: "600" },
+  routeCard: { ...baseStyles.routeCard, marginTop: 16 },
+  routePin: { ...baseStyles.routePin, borderRadius: 8 },
+  routeLabel: { ...baseStyles.routeLabel, fontWeight: "600" },
+  routeValue: { ...baseStyles.routeValue, color: "#111111", fontWeight: "600" },
+  detailRow: { ...baseStyles.detailRow, paddingVertical: 10, borderBottomWidth: 0 },
+  detailLast: { ...baseStyles.detailLast, paddingVertical: 10 },
+  detailValue: { ...baseStyles.detailValue, color: "#111111", fontWeight: "600" },
+  pricingCard: { ...baseStyles.pricingCard, backgroundColor: "#FFFFFF", borderWidth: 0 },
+  pricingLabel: { ...baseStyles.pricingLabel, color: "#555555", fontWeight: "600" },
+  pricingValue: { ...baseStyles.pricingValue, color: "#111111", fontWeight: "600" },
+  counterPrice: { ...baseStyles.counterPrice, borderTopWidth: 0 },
+  counterPriceLabel: { ...baseStyles.counterPriceLabel, color: "#555555", fontWeight: "600" },
+  counterPriceValue: { ...baseStyles.counterPriceValue, color: "#111111", fontWeight: "600" },
+  contactCard: { ...baseStyles.contactCard, padding: 13 },
+  contactName: { ...baseStyles.contactName, color: "#111111", fontWeight: "600" },
+  candidateCard: { ...baseStyles.candidateCard, marginBottom: 8 },
+  candidateName: { ...baseStyles.candidateName, color: "#111111", fontWeight: "600" },
+  candidateFooter: { ...baseStyles.candidateFooter, paddingTop: 10, marginTop: 10, borderTopWidth: 0 },
+  candidatePrice: { ...baseStyles.candidatePrice, fontWeight: "600" },
+  candidateButton: { ...baseStyles.candidateButton, borderRadius: 8 },
+  driverAction: { ...baseStyles.driverAction, marginTop: 18 },
+  reviewDone: { ...baseStyles.reviewDone, borderWidth: 0 },
+  reviewDoneTitle: { ...baseStyles.reviewDoneTitle, fontWeight: "600" },
+  counterOverlay: { ...baseStyles.counterOverlay, backgroundColor: "rgba(0,0,0,0.42)", padding: 16 },
+  counterDialog: { ...baseStyles.counterDialog, borderRadius: 12, padding: 16 },
+  counterIcon: { ...baseStyles.counterIcon, borderRadius: 9 },
+  counterTitle: { ...baseStyles.counterTitle, color: "#111111", fontWeight: "600" },
+  counterInputWrap: { ...baseStyles.counterInputWrap, borderWidth: 0, borderRadius: 9, backgroundColor: "#EEEDF3" },
+  counterInput: { ...baseStyles.counterInput, color: "#111111", fontWeight: "500" },
+  counterCurrency: { ...baseStyles.counterCurrency, fontWeight: "600" },
+  actionOverlay: { ...baseStyles.actionOverlay, backgroundColor: "rgba(0,0,0,0.42)" },
+  actionSheet: { ...baseStyles.actionSheet, borderTopLeftRadius: 14, borderTopRightRadius: 14, padding: 16, paddingBottom: 20 },
+  actionIcon: { ...baseStyles.actionIcon, borderRadius: 9 },
+  actionTitle: { ...baseStyles.actionTitle, color: "#111111", fontWeight: "600" },
+  driverStatusLabel: { ...baseStyles.driverStatusLabel, fontWeight: "600" },
+  driverStatus: { ...baseStyles.driverStatus, color: "#111111", fontWeight: "600" },
+  notFoundTitle: { ...baseStyles.notFoundTitle, color: "#111111", fontWeight: "600" },
 });

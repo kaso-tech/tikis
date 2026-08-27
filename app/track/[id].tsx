@@ -62,6 +62,35 @@ export default function TrackDeliveryScreen() {
 
 function RouteRow({ icon, label, value, color }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; label: string; value: string; color: string }) { return <View style={styles.routeRow}><View style={[styles.routeIcon, { backgroundColor: color }]}><MaterialIcons name={icon} size={17} color="#FFFFFF" /></View><View style={styles.routeInfo}><Text style={styles.routeLabel}>{label}</Text><Text style={styles.routeValue}>{value}</Text></View></View>; }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F6F8FC" }, content: { padding: 20, paddingBottom: 36 }, topBar: { flexDirection: "row", alignItems: "center", marginBottom: 23 }, back: { width: 42, height: 42, borderRadius: 21, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7ECF2", alignItems: "center", justifyContent: "center" }, heading: { flex: 1, marginLeft: 12 }, topTitle: { color: "#0B1F3A", fontSize: 16, fontWeight: "900" }, topSubtitle: { color: "#697386", fontSize: 11, marginTop: 1 }, live: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#DCFCE7", paddingHorizontal: 9, height: 27, borderRadius: 14 }, liveIdle: { backgroundColor: "#EAF0F5" }, liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#18A572" }, liveDotIdle: { backgroundColor: "#697386" }, liveLabel: { color: "#147A58", fontSize: 10, fontWeight: "900", letterSpacing: 0.6 }, liveLabelIdle: { color: "#58677A" }, title: { color: "#0B1F3A", fontSize: 25, fontWeight: "900", lineHeight: 31, letterSpacing: -0.4 }, subtitle: { color: "#697386", fontSize: 14, lineHeight: 21, marginTop: 6 }, statusBanner: { marginTop: 18, borderRadius: 18, padding: 14, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#0B1F3A" }, statusIcon: { width: 43, height: 43, borderRadius: 14, alignItems: "center", justifyContent: "center" }, statusInfo: { flex: 1 }, statusTitle: { color: "#FFFFFF", fontSize: 15, fontWeight: "900" }, statusText: { color: "#BED0E7", fontSize: 12, lineHeight: 18, marginTop: 3 }, timeline: { flexDirection: "row", marginTop: 20, marginBottom: 3 }, timelineStep: { flex: 1, alignItems: "center", position: "relative" }, timelineDot: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#EEF2F6", alignItems: "center", justifyContent: "center", zIndex: 1 }, timelineDotDone: { backgroundColor: "#007B8B" }, timelineLabel: { color: "#8A96A8", fontSize: 10, fontWeight: "800", textAlign: "center", marginTop: 6 }, timelineLabelDone: { color: "#0B1F3A" }, timelineLine: { position: "absolute", top: 14, left: "62%", width: "77%", height: 2, backgroundColor: "#E0E7EE" }, timelineLineDone: { backgroundColor: "#007B8B" }, mapWrap: { marginTop: 21, shadowColor: "#0B1F3A", shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 4 }, alert: { marginTop: 17, borderRadius: 17, padding: 13, flexDirection: "row", alignItems: "flex-start", gap: 10 }, alertNearby: { backgroundColor: "#FFF7E6", borderWidth: 1, borderColor: "#F8D89B" }, alertArrival: { backgroundColor: "#ECFBF4", borderWidth: 1, borderColor: "#BEEFD8" }, alertIcon: { width: 37, height: 37, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#007B8B" }, alertInfo: { flex: 1 }, alertTitle: { color: "#0B1F3A", fontSize: 14, fontWeight: "900" }, alertText: { color: "#5E6B7C", fontSize: 12, lineHeight: 18, marginTop: 2 }, alertClose: { padding: 2 }, routeCard: { marginTop: 18, backgroundColor: "#FFFFFF", borderRadius: 18, padding: 15, borderWidth: 1, borderColor: "#E7ECF2" }, routeRow: { flexDirection: "row", alignItems: "center", gap: 10 }, routeIcon: { width: 32, height: 32, borderRadius: 11, alignItems: "center", justifyContent: "center" }, routeInfo: { flex: 1 }, routeLabel: { color: "#8A96A8", fontSize: 10, fontWeight: "900", letterSpacing: 0.6, textTransform: "uppercase" }, routeValue: { color: "#0B1F3A", fontSize: 13, fontWeight: "700", marginTop: 2 }, connector: { width: 1.5, height: 16, backgroundColor: "#C9D4DF", marginLeft: 15, marginVertical: 3 }, notice: { marginTop: 16, padding: 13, borderRadius: 15, backgroundColor: "#E5F6F7", flexDirection: "row", alignItems: "flex-start", gap: 9 }, noticeText: { flex: 1, color: "#35656C", fontSize: 12, lineHeight: 18 }, empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: 30 }, emptyIcon: { width: 67, height: 67, borderRadius: 24, backgroundColor: "#FDEBEC", alignItems: "center", justifyContent: "center" }, emptyTitle: { color: "#0B1F3A", fontSize: 22, fontWeight: "900", marginTop: 17 }, emptyText: { color: "#697386", textAlign: "center", fontSize: 14, lineHeight: 21, marginTop: 7 }, emptyButton: { alignSelf: "stretch", marginTop: 24 }, pressed: { opacity: 0.67 },
+});
+
+const styles = StyleSheet.create({
+  ...baseStyles,
+  safe: { ...baseStyles.safe, backgroundColor: "#EEEDF3" },
+  content: { ...baseStyles.content, padding: 16, paddingBottom: 28 },
+  topBar: { ...baseStyles.topBar, marginBottom: 17 },
+  back: { ...baseStyles.back, borderRadius: 8, borderWidth: 0, backgroundColor: "#FFFFFF" },
+  topTitle: { ...baseStyles.topTitle, color: "#111111", fontWeight: "600" },
+  title: { ...baseStyles.title, color: "#111111", fontWeight: "600", fontSize: 24 },
+  liveLabel: { ...baseStyles.liveLabel, fontWeight: "600" },
+  statusBanner: { ...baseStyles.statusBanner, borderRadius: 10, marginTop: 14, padding: 12 },
+  statusIcon: { ...baseStyles.statusIcon, borderRadius: 9 },
+  statusTitle: { ...baseStyles.statusTitle, fontWeight: "600" },
+  timeline: { ...baseStyles.timeline, marginTop: 16 },
+  timelineLabel: { ...baseStyles.timelineLabel, fontWeight: "600" },
+  mapWrap: { ...baseStyles.mapWrap, shadowColor: "transparent", shadowOpacity: 0, shadowRadius: 0, shadowOffset: { width: 0, height: 0 }, elevation: 0, marginTop: 16 },
+  alert: { ...baseStyles.alert, borderRadius: 10, marginTop: 14 },
+  alertNearby: { ...baseStyles.alertNearby, borderWidth: 0 },
+  alertArrival: { ...baseStyles.alertArrival, borderWidth: 0 },
+  alertIcon: { ...baseStyles.alertIcon, borderRadius: 8 },
+  alertTitle: { ...baseStyles.alertTitle, color: "#111111", fontWeight: "600" },
+  routeCard: { ...baseStyles.routeCard, borderRadius: 10, borderWidth: 0, marginTop: 15, padding: 13 },
+  routeIcon: { ...baseStyles.routeIcon, borderRadius: 8 },
+  routeLabel: { ...baseStyles.routeLabel, fontWeight: "600" },
+  routeValue: { ...baseStyles.routeValue, color: "#111111", fontWeight: "600" },
+  notice: { ...baseStyles.notice, borderRadius: 9, marginTop: 13, backgroundColor: "#E2F3F4" },
+  emptyIcon: { ...baseStyles.emptyIcon, borderRadius: 12 },
+  emptyTitle: { ...baseStyles.emptyTitle, color: "#111111", fontWeight: "600" },
 });

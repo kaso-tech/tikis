@@ -5,10 +5,10 @@ import { haptic } from "@/lib/haptics";
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 const buttonColors: Record<ButtonVariant, { background: string; foreground: string; border?: string }> = {
-  primary: { background: "#007B8B", foreground: "#FFFFFF" },
-  secondary: { background: "#FFFFFF", foreground: "#111111" },
-  ghost: { background: "#E4E3E9", foreground: "#111111" },
-  danger: { background: "#F8E8E9", foreground: "#B4232D" },
+  primary: { background: "#007B8B", foreground: "#FFFFFF", border: "#006D7C" },
+  secondary: { background: "#FFFFFF", foreground: "#111111", border: "#D7D5DE" },
+  ghost: { background: "#E4E3E9", foreground: "#111111", border: "#D0CED7" },
+  danger: { background: "#F8E8E9", foreground: "#B4232D", border: "#E8C7CA" },
 };
 
 export function TikisButton({
@@ -69,7 +69,7 @@ export const tikisStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  button: { minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 9, borderWidth: 0, paddingHorizontal: 15, flexDirection: "row", gap: 8 },
+  button: { minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 9, borderWidth: 1, paddingHorizontal: 15, flexDirection: "row", gap: 8 },
   buttonPressed: { opacity: 0.84, transform: [{ scale: 0.98 }] },
   buttonText: { fontSize: 15, fontWeight: "600" },
   iconButton: { width: 40, height: 40, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF", borderWidth: 0 },

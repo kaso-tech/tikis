@@ -248,3 +248,8 @@
 - [x] Densifier les composants et écrans prioritaires avec angles et ombres sobres.
 - [x] Supprimer les commentaires non essentiels et vérifier la cohérence de l’application.
 - [x] Tester le thème, vérifier le serveur et enregistrer la version.
+- [x] Auditer les écrans restants pour leurs fonds, ombres, bordures et graisses de texte.
+- [x] Réintroduire une bordure discrète et cohérente sur les boutons partagés.
+- [x] Appliquer le style épuré aux parcours d’authentification, livraisons et suivi.
+- [x] Appliquer le style épuré aux profils, Wallet, avis et écrans secondaires.
+- [x] Tester l’ensemble des écrans, vérifier le serveur et enregistrer la version.

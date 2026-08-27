@@ -85,7 +85,7 @@ export default function WalletScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const baseStyles = StyleSheet.create({
   list: { padding: 20, paddingBottom: 115 },
   title: { marginTop: 3, marginBottom: 18 },
   balanceCard: { backgroundColor: "#0B1F3A", borderColor: "#0B1F3A", marginBottom: 27 },
@@ -111,4 +111,34 @@ const styles = StyleSheet.create({
   guarantees: { gap: 10 },
   guarantee: { flexDirection: "row", gap: 10, alignItems: "flex-start", backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7ECF2", borderRadius: 15, padding: 13 },
   guaranteeText: { flex: 1, color: "#485569", fontSize: 13, lineHeight: 19 },
+});
+
+const styles = StyleSheet.create({
+  ...baseStyles,
+  list: { ...baseStyles.list, padding: 16, paddingBottom: 98 },
+  title: { ...baseStyles.title, marginTop: 2, marginBottom: 13 },
+  balanceCard: { ...baseStyles.balanceCard, borderWidth: 0, borderRadius: 10, marginBottom: 20 },
+  balanceLabel: { ...baseStyles.balanceLabel, fontWeight: "500" },
+  balance: { ...baseStyles.balance, fontWeight: "600" },
+  balanceSubValue: { ...baseStyles.balanceSubValue, fontWeight: "600" },
+  walletActions: { ...baseStyles.walletActions, gap: 8, marginTop: -14, marginBottom: 17 },
+  senderCard: { ...baseStyles.senderCard, marginBottom: 20 },
+  senderIcon: { ...baseStyles.senderIcon, borderRadius: 9, backgroundColor: "#EEEDF3", marginBottom: 9 },
+  senderTitle: { ...baseStyles.senderTitle, color: "#111111", fontWeight: "600" },
+  transaction: { ...baseStyles.transaction, paddingVertical: 11, borderBottomWidth: 0, backgroundColor: "#FFFFFF", borderRadius: 9, paddingHorizontal: 10, marginBottom: 3 },
+  transactionIcon: { ...baseStyles.transactionIcon, borderRadius: 8 },
+  transactionTitle: { ...baseStyles.transactionTitle, color: "#111111", fontWeight: "600" },
+  transactionAmount: { ...baseStyles.transactionAmount, fontWeight: "600" },
+  modalOverlay: { ...baseStyles.modalOverlay, backgroundColor: "rgba(0,0,0,0.42)", padding: 16 },
+  requestModal: { ...baseStyles.requestModal, borderRadius: 12, padding: 16 },
+  requestIcon: { ...baseStyles.requestIcon, borderRadius: 9, backgroundColor: "#E2F3F4" },
+  requestTitle: { ...baseStyles.requestTitle, color: "#111111", fontWeight: "600" },
+  amountWrap: { ...baseStyles.amountWrap, borderWidth: 0, borderRadius: 9, backgroundColor: "#EEEDF3" },
+  amountInput: { ...baseStyles.amountInput, color: "#111111", fontWeight: "500" },
+  amountCurrency: { ...baseStyles.amountCurrency, fontWeight: "600" },
+  requestError: { ...baseStyles.requestError, fontWeight: "600" },
+  referenceCard: { ...baseStyles.referenceCard, borderWidth: 0, borderRadius: 9, backgroundColor: "#EEEDF3" },
+  referenceLabel: { ...baseStyles.referenceLabel, fontWeight: "600" },
+  referenceValue: { ...baseStyles.referenceValue, color: "#111111", fontWeight: "600" },
+  guarantee: { ...baseStyles.guarantee, borderWidth: 0, borderRadius: 10, padding: 12 },
 });
