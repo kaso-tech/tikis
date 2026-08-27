@@ -9,6 +9,7 @@ import { Platform } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { TikisDrawer } from "@/components/tikis/app-chrome";
+import { DeliveryRealtimeProvider } from "@/components/tikis/delivery-realtime-provider";
 import { TikisNavigationProvider } from "@/lib/tikis-navigation";
 import { TikisLogoutProvider } from "@/lib/tikis-logout";
 import { TikisStoreProvider } from "@/lib/tikis-store";
@@ -90,12 +91,12 @@ export default function RootLayout() {
           {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
           {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
           <TikisLogoutProvider>
-            <Stack screenOptions={{ headerShown: false }}>
+            <DeliveryRealtimeProvider><Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="oauth/callback" />
             </Stack>
-            <TikisDrawer />
+            <TikisDrawer /></DeliveryRealtimeProvider>
             <StatusBar style="auto" />
           </TikisLogoutProvider>
         </QueryClientProvider>

@@ -11,7 +11,7 @@ export type DeliveryStatus =
 
 export type CandidateStatus = "applied" | "selected" | "confirmed" | "withdrawn" | "replaced";
 
-export type WalletOperation = "block" | "unblock" | "debit" | "compensation" | "credit";
+export type WalletOperation = "block" | "unblock" | "debit" | "compensation" | "credit" | "refund" | "deposit_request" | "withdrawal_request";
 
 export type VehicleType = "Vélo" | "Moto" | "Tricycle" | "Voiture" | "Fourgonnette";
 export type SelectableVehicleType = Exclude<VehicleType, "Fourgonnette">;
@@ -145,6 +145,7 @@ export interface FinancialRecord {
 
 export interface InAppNotification {
   id: string;
+  deliveryId?: string;
   title: string;
   body: string;
   createdAt: string;

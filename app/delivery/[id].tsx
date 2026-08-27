@@ -16,8 +16,9 @@ type FinancialAction = "apply" | "withdraw" | "select" | "confirm" | "complete" 
 
 export default function DeliveryDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
-  const { role, profile, policy } = useTikisStore();
+  const { role, profile } = useTikisStore();
   const utilities = trpc.useUtils();
+  const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: Boolean(profile?.phone) });
   const deliveryQuery = trpc.deliveries.get.useQuery({ id: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
   const candidatesQuery = trpc.deliveries.candidates.useQuery({ deliveryId: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
   const applyMutation = trpc.deliveries.submitApplication.useMutation();
@@ -43,20 +44,22 @@ export default function DeliveryDetailScreen() {
       utilities.deliveries.get.invalidate({ id: params.id ?? "" }),
       utilities.deliveries.candidates.invalidate({ deliveryId: params.id ?? "" }),
       utilities.deliveries.list.invalidate(),
+      utilities.wallet.snapshot.invalidate(),
+      utilities.notifications.list.invalidate(),
     ]);
   }
 
   const actionConfig = useMemo(() => {
     if (!delivery) return null;
     const commissionBase = delivery.offeredPrice ?? delivery.estimatedPrice;
-    const commission = selectedCandidate?.commissionBlocked ?? Math.round(commissionBase * policy.rate);
-    if (action === "apply") return { title: "Envoyer votre candidature", description: "Cette commission sera temporairement bloquée sur votre Wallet. Elle sera prélevée seulement si vous êtes retenu puis confirmez la mission.", amount: commission, label: "Confirmer ma candidature", irreversible: false };
+    const commission = selectedCandidate?.commissionBlocked ?? Math.round(commissionBase * (walletQuery.data?.commissionRate ?? 0));
+    if (action === "apply") return { title: "Envoyer votre candidature", description: "Cette commission sera temporairement bloquée sur votre Wallet. Elle sera définitivement prélevée uniquement si l’expéditeur vous sélectionne.", amount: commission, label: "Confirmer ma candidature", irreversible: false };
     if (action === "withdraw") return { title: "Retirer votre candidature", description: "Votre candidature sera retirée et la commission temporairement bloquée redeviendra immédiatement disponible.", amount: ownCandidate?.commissionBlocked ?? commission, label: "Retirer ma candidature", irreversible: false };
-    if (action === "select") return { title: delivery.status === "active" ? "Remplacer le livreur" : "Choisir ce livreur", description: delivery.status === "active" ? "Le nouveau livreur devra confirmer sa disponibilité. Sa commission compensera automatiquement celle de l’ancien livreur : Tikis conservera une seule commission." : "Le livreur devra confirmer sa disponibilité avant le partage de vos coordonnées. La commission restera bloquée jusqu’à cette confirmation.", amount: commission, label: delivery.status === "active" ? "Demander le remplacement" : "Choisir ce livreur", irreversible: false };
+    if (action === "select") return { title: delivery.status === "active" ? "Remplacer le livreur" : "Choisir ce livreur", description: delivery.status === "active" ? "Le nouveau livreur devra confirmer sa disponibilité. Sa commission compensera automatiquement celle de l’ancien livreur : Tikis conservera une seule commission." : "Le choix rend la mise en relation effective. La commission bloquée du livreur sera définitivement prélevée et les autres commissions seront libérées.", amount: commission, label: delivery.status === "active" ? "Demander le remplacement" : "Choisir ce livreur", irreversible: true };
     if (action === "confirm") return { title: "Confirmer la mission", description: "Votre confirmation autorise le partage des coordonnées avec l’expéditeur et finalise la mise en relation Tikis.", amount: ownCandidate?.commissionBlocked ?? commission, label: "Confirmer la mission", irreversible: true };
     if (action === "complete") return { title: "Terminer la livraison", description: "Confirmez uniquement lorsque la remise et le paiement direct avec l’expéditeur sont finalisés.", amount: 0, label: "Marquer comme terminée", irreversible: false };
     return null;
-  }, [action, delivery, ownCandidate, policy.rate, selectedCandidate]);
+  }, [action, delivery, ownCandidate, selectedCandidate, walletQuery.data?.commissionRate]);
 
   if (deliveryQuery.isLoading) {
     return <SafeAreaView style={styles.safe}><View style={styles.notFound}><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;

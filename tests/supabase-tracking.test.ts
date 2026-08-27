@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deliveryChannelName, normalizeDeliveryPosition } from "../lib/supabase-tracking";
+import { deliveryChannelName, normalizeDeliveryPosition, normalizeDeliveryStatusEvent } from "../lib/supabase-tracking";
 
 describe("suivi Supabase Realtime", () => {
   it("normalise exclusivement des positions GPS exploitables", () => {
@@ -10,5 +10,11 @@ describe("suivi Supabase Realtime", () => {
   it("crée uniquement des canaux de livraison sûrs", () => {
     expect(deliveryChannelName("delivery_1<>test")).toBe("delivery:delivery_1test");
     expect(deliveryChannelName("***")).toBeNull();
+  });
+
+  it("accepte uniquement les événements de statut complets et non sensibles", () => {
+    expect(normalizeDeliveryStatusEvent({ deliveryId: "delivery_1", status: "active", title: "Livraison activée", body: "Le livreur a confirmé.", occurredAt: "2026-08-27T07:30:00.000Z" })).toEqual({ deliveryId: "delivery_1", status: "active", title: "Livraison activée", body: "Le livreur a confirmé.", occurredAt: "2026-08-27T07:30:00.000Z" });
+    expect(normalizeDeliveryStatusEvent({ deliveryId: "delivery_1", status: "unknown", title: "x", body: "y", occurredAt: "2026-08-27T07:30:00.000Z" })).toBeNull();
+    expect(normalizeDeliveryStatusEvent({ deliveryId: "delivery_1", status: "active", title: "x", body: "y", occurredAt: "invalide" })).toBeNull();
   });
 });

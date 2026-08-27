@@ -8,6 +8,14 @@ export type DeliveryPosition = {
 };
 
 type RealtimeListener = (position: DeliveryPosition) => void;
+export type DeliveryStatusEvent = {
+  deliveryId: string;
+  status: "draft" | "open" | "pending_confirmation" | "active" | "completed" | "disabled" | "cancelled";
+  title: string;
+  body: string;
+  occurredAt: string;
+};
+type DeliveryStatusListener = (event: DeliveryStatusEvent) => void;
 
 let client: SupabaseClient | null = null;
 
@@ -32,6 +40,16 @@ export function normalizeDeliveryPosition(input: unknown): DeliveryPosition | nu
   return { latitude, longitude, heading: Math.max(0, Math.min(360, heading)), recordedAt };
 }
 
+export function normalizeDeliveryStatusEvent(input: unknown): DeliveryStatusEvent | null {
+  if (!input || typeof input !== "object") return null;
+  const value = input as Record<string, unknown>;
+  const allowed = ["draft", "open", "pending_confirmation", "active", "completed", "disabled", "cancelled"] as const;
+  if (typeof value.deliveryId !== "string" || !allowed.includes(value.status as typeof allowed[number])) return null;
+  if (typeof value.title !== "string" || typeof value.body !== "string" || typeof value.occurredAt !== "string") return null;
+  if (value.deliveryId.length > 96 || value.title.length > 120 || value.body.length > 300 || !Number.isFinite(new Date(value.occurredAt).getTime())) return null;
+  return { deliveryId: value.deliveryId, status: value.status as DeliveryStatusEvent["status"], title: value.title, body: value.body, occurredAt: value.occurredAt };
+}
+
 export function deliveryChannelName(deliveryId: string) {
   const safeId = deliveryId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 96);
   return safeId ? `delivery:${safeId}` : null;
@@ -48,6 +66,18 @@ export function createDeliveryTrackingChannel(deliveryId: string, onPosition: Re
     })
     .subscribe();
   return channel;
+}
+
+export function createDeliveryStatusChannel(deliveryId: string, onStatus: DeliveryStatusListener) {
+  const supabase = supabaseClient();
+  const name = deliveryChannelName(deliveryId);
+  if (!supabase || !name) return null;
+  return supabase.channel(name, { config: { private: true } })
+    .on("broadcast", { event: "status" }, ({ payload }) => {
+      const event = normalizeDeliveryStatusEvent(payload);
+      if (event && event.deliveryId === deliveryId) onStatus(event);
+    })
+    .subscribe();
 }
 
 export async function broadcastDeliveryPosition(channel: RealtimeChannel | null, position: DeliveryPosition) {

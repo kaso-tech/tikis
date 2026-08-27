@@ -1,8 +1,9 @@
-import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisDelivery, TikisPlace, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryReviews, tikisFavoritePlaces, tikisPlaces, tikisProfiles, users } from "../drizzle/schema";
+import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisDelivery, TikisPlace, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryReviews, tikisFavoritePlaces, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisWalletLedger, tikisWallets, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
-import type { Delivery, DeliveryReview, DriverCandidate, LocationLabel, SelectableVehicleType } from "../shared/tikis-domain";
+import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppNotification, LocationLabel, SelectableVehicleType, WalletOperation, WalletSnapshot } from "../shared/tikis-domain";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -282,6 +283,232 @@ export async function listTikisDeliveriesForProfile(profilePhone: string, role: 
     : or(eq(tikisDeliveries.status, "open"), eq(tikisDeliveries.driverPhone, profilePhone));
   const rows = await db.select().from(tikisDeliveries).where(predicate).orderBy(desc(tikisDeliveries.createdAt));
   return deliveryJoins(rows);
+}
+
+type WalletMovement = {
+  profilePhone: string;
+  deliveryId?: string;
+  operation: WalletOperation;
+  amount: number;
+  availableDelta: number;
+  heldDelta: number;
+  reason: string;
+  idempotencyKey: string;
+};
+
+type DeliveryEventInput = {
+  deliveryId: string;
+  eventType: string;
+  status?: "draft" | "open" | "pending_confirmation" | "active" | "completed" | "disabled" | "cancelled";
+  actorPhone?: string;
+  recipientPhone: string;
+  title: string;
+  body: string;
+  tone: "info" | "success" | "warning";
+  idempotencyKey: string;
+};
+
+async function ensureTikisWallet(tx: any, profilePhone: string) {
+  await tx.insert(tikisWallets).values({ profilePhone }).onDuplicateKeyUpdate({ set: { profilePhone } });
+  const rows = await tx.select().from(tikisWallets).where(eq(tikisWallets.profilePhone, profilePhone)).limit(1).for("update");
+  if (!rows[0]) throw new Error("Le Wallet est temporairement indisponible.");
+  return rows[0];
+}
+
+async function applyWalletMovement(tx: any, movement: WalletMovement) {
+  if (!Number.isSafeInteger(movement.amount) || movement.amount <= 0) throw new Error("Montant financier invalide.");
+  const existing = await tx.select().from(tikisWalletLedger).where(eq(tikisWalletLedger.idempotencyKey, movement.idempotencyKey)).limit(1);
+  if (existing[0]) return existing[0];
+  const wallet = await ensureTikisWallet(tx, movement.profilePhone);
+  const availableBefore = wallet.availableBalance;
+  const heldBefore = wallet.heldBalance;
+  const availableAfter = availableBefore + movement.availableDelta;
+  const heldAfter = heldBefore + movement.heldDelta;
+  if (availableAfter < 0 || heldAfter < 0) throw new Error("Solde Wallet insuffisant pour cette opération.");
+  await tx.update(tikisWallets).set({ availableBalance: availableAfter, heldBalance: heldAfter, updatedAt: new Date() }).where(eq(tikisWallets.profilePhone, movement.profilePhone));
+  await tx.insert(tikisWalletLedger).values({
+    id: randomUUID(), profilePhone: movement.profilePhone, deliveryId: movement.deliveryId ?? null, operation: movement.operation,
+    amount: movement.amount, availableBefore, availableAfter, heldBefore, heldAfter, reason: movement.reason, idempotencyKey: movement.idempotencyKey,
+  });
+  return { availableAfter, heldAfter };
+}
+
+async function appendDeliveryEvent(tx: any, event: DeliveryEventInput) {
+  await tx.insert(tikisDeliveryEvents).values({
+    id: randomUUID(), deliveryId: event.deliveryId, eventType: event.eventType, status: event.status ?? null,
+    actorPhone: event.actorPhone ?? null, recipientPhone: event.recipientPhone, title: event.title, body: event.body,
+    tone: event.tone, metadata: null, idempotencyKey: event.idempotencyKey,
+  }).onDuplicateKeyUpdate({ set: { idempotencyKey: event.idempotencyKey } });
+}
+
+export async function getTikisCommissionRate() {
+  const db = await getDb();
+  if (!db) throw new Error("La configuration de commission est temporairement indisponible.");
+  await db.insert(tikisPlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  const settings = await db.select().from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1);
+  const rate = Number(settings[0]?.commissionRate);
+  if (!Number.isFinite(rate) || rate <= 0 || rate >= 1) throw new Error("Le taux de commission configuré est invalide.");
+  return rate;
+}
+
+export async function getTikisWalletSnapshot(profilePhone: string): Promise<WalletSnapshot> {
+  const db = await getDb();
+  if (!db) return { total: 0, blocked: 0 };
+  await db.insert(tikisWallets).values({ profilePhone }).onDuplicateKeyUpdate({ set: { profilePhone } });
+  const rows = await db.select().from(tikisWallets).where(eq(tikisWallets.profilePhone, profilePhone)).limit(1);
+  const wallet = rows[0];
+  if (!wallet) return { total: 0, blocked: 0 };
+  return { total: wallet.availableBalance + wallet.heldBalance, blocked: wallet.heldBalance };
+}
+
+export async function listTikisWalletLedger(profilePhone: string): Promise<FinancialRecord[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const entries = await db.select().from(tikisWalletLedger).where(eq(tikisWalletLedger.profilePhone, profilePhone)).orderBy(desc(tikisWalletLedger.createdAt));
+  return entries.map((entry) => ({ id: entry.id, deliveryId: entry.deliveryId ?? "", createdAt: entry.createdAt.toISOString(), operation: entry.operation as WalletOperation, amount: entry.amount, balanceBefore: entry.availableBefore + entry.heldBefore, balanceAfter: entry.availableAfter + entry.heldAfter, reason: entry.reason }));
+}
+
+export async function requestTikisWalletOperation(profilePhone: string, type: "deposit" | "withdrawal", amount: number) {
+  if (!Number.isSafeInteger(amount) || amount < 100 || amount > 10_000_000) throw new Error("Le montant demandé est invalide.");
+  const db = await getDb();
+  if (!db) throw new Error("Le Wallet est temporairement indisponible.");
+  await db.transaction(async (tx) => {
+    const wallet = await ensureTikisWallet(tx, profilePhone);
+    if (type === "withdrawal" && wallet.availableBalance < amount) throw new Error("Votre solde disponible est insuffisant pour ce retrait.");
+    await tx.insert(tikisWalletLedger).values({
+      id: randomUUID(), profilePhone, deliveryId: null, operation: type === "deposit" ? "deposit_request" : "withdrawal_request", amount,
+      availableBefore: wallet.availableBalance, availableAfter: wallet.availableBalance, heldBefore: wallet.heldBalance, heldAfter: wallet.heldBalance,
+      reason: type === "deposit" ? "Demande de dépôt en attente d’un moyen de paiement autorisé" : "Demande de retrait en attente de traitement", idempotencyKey: `${type}:${profilePhone}:${randomUUID()}`,
+    });
+  });
+  return { success: true } as const;
+}
+
+export async function listTikisDeliveryEvents(profilePhone: string): Promise<InAppNotification[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const events = await db.select().from(tikisDeliveryEvents).where(eq(tikisDeliveryEvents.recipientPhone, profilePhone)).orderBy(desc(tikisDeliveryEvents.createdAt));
+  return events.map((event) => ({ id: event.id, deliveryId: event.deliveryId, title: event.title, body: event.body, createdAt: event.createdAt.toISOString(), read: Boolean(event.readAt), tone: event.tone }));
+}
+
+export async function markTikisDeliveryEventsRead(profilePhone: string) {
+  const db = await getDb();
+  if (!db) return { success: true } as const;
+  await db.update(tikisDeliveryEvents).set({ readAt: new Date() }).where(and(eq(tikisDeliveryEvents.recipientPhone, profilePhone), isNull(tikisDeliveryEvents.readAt)));
+  return { success: true } as const;
+}
+
+export async function applyForTikisDelivery(input: { id: string; deliveryId: string; driverPhone: string; offerPrice?: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Les candidatures sont temporairement indisponibles.");
+  await db.transaction(async (tx) => {
+    const deliveries = await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, input.deliveryId), eq(tikisDeliveries.status, "open"))).limit(1).for("update");
+    const delivery = deliveries[0];
+    if (!delivery) throw new Error("Cette livraison n’accepte plus de candidatures.");
+    if (delivery.senderPhone === input.driverPhone) throw new Error("Vous ne pouvez pas candidater à votre propre livraison.");
+    await tx.insert(tikisPlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+    const rateRows = await tx.select().from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1);
+    const rate = Number(rateRows[0]?.commissionRate);
+    if (!Number.isFinite(rate) || rate <= 0 || rate >= 1) throw new Error("Le taux de commission configuré est invalide.");
+    const price = input.offerPrice ?? delivery.offeredPrice ?? delivery.estimatedPrice;
+    const commission = Math.round(price * rate);
+    const candidates = await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, input.deliveryId), eq(tikisDeliveryCandidates.driverPhone, input.driverPhone))).limit(1).for("update");
+    const existing = candidates[0];
+    if (existing && (existing.status === "selected" || existing.status === "confirmed")) throw new Error("Cette candidature ne peut plus être modifiée.");
+    const candidateId = existing?.id ?? input.id;
+    const previousCommission = existing?.status === "applied" ? existing.commissionBlocked : 0;
+    const delta = commission - previousCommission;
+    const movementVersion = existing?.status === "applied" ? `adjust:${previousCommission}` : "initial";
+    if (delta > 0) await applyWalletMovement(tx, { profilePhone: input.driverPhone, deliveryId: input.deliveryId, operation: "block", amount: delta, availableDelta: -delta, heldDelta: delta, reason: "Commission temporairement bloquée pour candidature", idempotencyKey: `${candidateId}:block:${movementVersion}:${commission}` });
+    if (delta < 0) await applyWalletMovement(tx, { profilePhone: input.driverPhone, deliveryId: input.deliveryId, operation: "unblock", amount: -delta, availableDelta: -delta, heldDelta: delta, reason: "Ajustement de la commission bloquée", idempotencyKey: `${candidateId}:unblock:${movementVersion}:${commission}` });
+    if (existing) await tx.update(tikisDeliveryCandidates).set({ status: "applied", offerPrice: input.offerPrice ?? null, commissionBlocked: commission, updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, existing.id));
+    else await tx.insert(tikisDeliveryCandidates).values({ id: candidateId, deliveryId: input.deliveryId, driverPhone: input.driverPhone, offerPrice: input.offerPrice ?? null, commissionBlocked: commission, status: "applied" });
+    await appendDeliveryEvent(tx, { deliveryId: input.deliveryId, eventType: "candidate_applied", status: "open", actorPhone: input.driverPhone, recipientPhone: delivery.senderPhone, title: "Nouvelle candidature", body: "Un livreur compatible s’est proposé pour votre livraison.", tone: "info", idempotencyKey: `${candidateId}:sender-applied` });
+    await appendDeliveryEvent(tx, { deliveryId: input.deliveryId, eventType: "candidate_applied", status: "open", actorPhone: input.driverPhone, recipientPhone: input.driverPhone, title: "Candidature envoyée", body: `La commission de ${commission} FCFA est temporairement bloquée.`, tone: "warning", idempotencyKey: `${candidateId}:driver-applied` });
+  });
+  return { success: true } as const;
+}
+
+async function releaseCandidateCommission(tx: any, candidate: { id: string; deliveryId: string; driverPhone: string; commissionBlocked: number }, reason: string, suffix: string) {
+  if (candidate.commissionBlocked <= 0) return;
+  await applyWalletMovement(tx, { profilePhone: candidate.driverPhone, deliveryId: candidate.deliveryId, operation: "unblock", amount: candidate.commissionBlocked, availableDelta: candidate.commissionBlocked, heldDelta: -candidate.commissionBlocked, reason, idempotencyKey: `${candidate.id}:${suffix}` });
+}
+
+export async function withdrawTikisDeliveryCandidateWithWallet(deliveryId: string, driverPhone: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Les candidatures sont temporairement indisponibles.");
+  await db.transaction(async (tx) => {
+    const candidates = await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, driverPhone), eq(tikisDeliveryCandidates.status, "applied"))).limit(1).for("update");
+    const candidate = candidates[0];
+    if (!candidate) throw new Error("Cette candidature ne peut plus être retirée.");
+    const delivery = (await tx.select().from(tikisDeliveries).where(eq(tikisDeliveries.id, deliveryId)).limit(1))[0];
+    if (!delivery) throw new Error("Livraison introuvable.");
+    await releaseCandidateCommission(tx, candidate, "Commission débloquée après retrait de candidature", "withdraw");
+    await tx.update(tikisDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, candidate.id));
+    await appendDeliveryEvent(tx, { deliveryId, eventType: "candidate_withdrawn", status: "open", actorPhone: driverPhone, recipientPhone: driverPhone, title: "Candidature retirée", body: "Votre commission bloquée a été immédiatement libérée.", tone: "success", idempotencyKey: `${candidate.id}:withdraw-driver` });
+    await appendDeliveryEvent(tx, { deliveryId, eventType: "candidate_withdrawn", status: "open", actorPhone: driverPhone, recipientPhone: delivery.senderPhone, title: "Candidature retirée", body: "Un livreur a retiré sa candidature.", tone: "info", idempotencyKey: `${candidate.id}:withdraw-sender` });
+  });
+  return { success: true } as const;
+}
+
+export async function selectTikisDeliveryCandidateWithWallet(deliveryId: string, candidateId: string, senderPhone: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
+  await db.transaction(async (tx) => {
+    const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.senderPhone, senderPhone))).limit(1).for("update"))[0];
+    if (!delivery || !["open", "active", "pending_confirmation"].includes(delivery.status)) throw new Error("Cette livraison ne peut pas recevoir de sélection.");
+    const chosen = (await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.id, candidateId), eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.status, "applied"))).limit(1).for("update"))[0];
+    if (!chosen) throw new Error("Cette candidature n’est plus sélectionnable.");
+    const priorDriverPhone = delivery.driverPhone;
+    const targetCommission = delivery.accruedCommission ?? chosen.commissionBlocked;
+    const difference = targetCommission - chosen.commissionBlocked;
+    if (difference > 0) await applyWalletMovement(tx, { profilePhone: chosen.driverPhone, deliveryId, operation: "block", amount: difference, availableDelta: -difference, heldDelta: difference, reason: "Ajustement de commission avant sélection", idempotencyKey: `${chosen.id}:selection-block:${targetCommission}` });
+    if (difference < 0) await applyWalletMovement(tx, { profilePhone: chosen.driverPhone, deliveryId, operation: "unblock", amount: -difference, availableDelta: -difference, heldDelta: difference, reason: "Ajustement de commission avant sélection", idempotencyKey: `${chosen.id}:selection-unblock:${targetCommission}` });
+    const appliedCandidates = await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.status, "applied"))).for("update");
+    for (const candidate of appliedCandidates) if (candidate.id !== chosen.id) {
+      await releaseCandidateCommission(tx, candidate, "Commission débloquée après sélection d’un autre livreur", `release:${chosen.id}`);
+      await appendDeliveryEvent(tx, { deliveryId, eventType: "candidate_not_selected", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: candidate.driverPhone, title: "Livreur non retenu", body: "Un autre livreur a été sélectionné ; votre commission bloquée a été libérée.", tone: "info", idempotencyKey: `${candidate.id}:not-selected:${chosen.id}` });
+    }
+    if (priorDriverPhone && delivery.accruedCommission) {
+      await applyWalletMovement(tx, { profilePhone: priorDriverPhone, deliveryId, operation: "compensation", amount: targetCommission, availableDelta: targetCommission, heldDelta: 0, reason: "Remboursement de commission après remplacement", idempotencyKey: `${deliveryId}:compensate:${priorDriverPhone}:${chosen.id}` });
+      await tx.update(tikisDeliveryCandidates).set({ status: "replaced", updatedAt: new Date() }).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, priorDriverPhone), eq(tikisDeliveryCandidates.status, "confirmed")));
+      await appendDeliveryEvent(tx, { deliveryId, eventType: "driver_replaced", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: priorDriverPhone, title: "Vous avez été remplacé", body: "Votre commission Tikis a été intégralement compensée.", tone: "warning", idempotencyKey: `${deliveryId}:replaced:${priorDriverPhone}:${chosen.id}` });
+    }
+    await applyWalletMovement(tx, { profilePhone: chosen.driverPhone, deliveryId, operation: "debit", amount: targetCommission, availableDelta: 0, heldDelta: -targetCommission, reason: "Commission Tikis définitivement prélevée après sélection", idempotencyKey: `${deliveryId}:commission-debit:${chosen.id}` });
+    await tx.update(tikisDeliveryCandidates).set({ status: "selected", commissionBlocked: targetCommission, updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, chosen.id));
+    await tx.update(tikisDeliveries).set({ status: "pending_confirmation", driverPhone: chosen.driverPhone, ...(priorDriverPhone ? { previousDriverPhone: priorDriverPhone } : {}), ...(chosen.offerPrice ? { offeredPrice: chosen.offerPrice } : {}), accruedCommission: targetCommission, selectedAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
+    await appendDeliveryEvent(tx, { deliveryId, eventType: priorDriverPhone ? "driver_replaced" : "driver_selected", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: senderPhone, title: priorDriverPhone ? "Livreur remplacé" : "Livreur sélectionné", body: "La mise en relation est confirmée et la commission Tikis devient acquise.", tone: "success", idempotencyKey: `${deliveryId}:sender-selected:${chosen.id}` });
+    await appendDeliveryEvent(tx, { deliveryId, eventType: priorDriverPhone ? "driver_replaced" : "driver_selected", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: chosen.driverPhone, title: priorDriverPhone ? "Vous êtes le nouveau livreur" : "Vous avez été sélectionné", body: "Votre commission Tikis a été prélevée ; confirmez votre disponibilité.", tone: "success", idempotencyKey: `${deliveryId}:driver-selected:${chosen.id}` });
+  });
+  return getTikisDeliveryById(deliveryId);
+}
+
+export async function confirmTikisDeliveryWithEvents(deliveryId: string, driverPhone: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
+  await db.transaction(async (tx) => {
+    const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.driverPhone, driverPhone), eq(tikisDeliveries.status, "pending_confirmation"))).limit(1).for("update"))[0];
+    if (!delivery) throw new Error("Cette livraison ne peut pas être confirmée.");
+    const result = await tx.update(tikisDeliveryCandidates).set({ status: "confirmed", updatedAt: new Date() }).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, driverPhone), eq(tikisDeliveryCandidates.status, "selected")));
+    if (result[0].affectedRows !== 1) throw new Error("Votre candidature ne peut pas être confirmée.");
+    await tx.update(tikisDeliveries).set({ status: "active", confirmedAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
+    await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_active", status: "active", actorPhone: driverPhone, recipientPhone: driverPhone, title: "Livraison activée", body: "Votre disponibilité est confirmée. Le suivi de la livraison est actif.", tone: "success", idempotencyKey: `${deliveryId}:active-driver` });
+    await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_active", status: "active", actorPhone: driverPhone, recipientPhone: delivery.senderPhone, title: "Livreur en route", body: "Le livreur a confirmé sa disponibilité ; le suivi est maintenant actif.", tone: "success", idempotencyKey: `${deliveryId}:active-sender` });
+  });
+  return getTikisDeliveryById(deliveryId);
+}
+
+export async function completeTikisDeliveryWithEvents(deliveryId: string, profilePhone: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
+  await db.transaction(async (tx) => {
+    const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.status, "active"), or(eq(tikisDeliveries.senderPhone, profilePhone), eq(tikisDeliveries.driverPhone, profilePhone)))).limit(1).for("update"))[0];
+    if (!delivery || !delivery.driverPhone) throw new Error("Cette livraison ne peut pas être terminée.");
+    await tx.update(tikisDeliveries).set({ status: "completed", completedAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
+    await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_completed", status: "completed", actorPhone: profilePhone, recipientPhone: delivery.senderPhone, title: "Livraison terminée", body: "Votre livraison est terminée. Vous pouvez maintenant évaluer le livreur.", tone: "success", idempotencyKey: `${deliveryId}:completed-sender` });
+    await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_completed", status: "completed", actorPhone: profilePhone, recipientPhone: delivery.driverPhone, title: "Course terminée", body: "La course est ajoutée à votre historique.", tone: "success", idempotencyKey: `${deliveryId}:completed-driver` });
+  });
+  return getTikisDeliveryById(deliveryId);
 }
 
 export async function createOrUpdateCandidate(input: { id: string; deliveryId: string; driverPhone: string; offerPrice?: number; commissionBlocked: number }) {

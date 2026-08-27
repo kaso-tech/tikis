@@ -159,3 +159,10 @@
 - [x] Connecter la création, les listes et les détails aux livraisons persistées de l’utilisateur.
 - [x] Migrer les transitions, candidatures et historique vers la source de données réelle.
 - [x] Tester les parcours expéditeur et livreur, valider le serveur et enregistrer la version livrable.
+- [x] Auditer les règles de commissions, Wallet, suivi et temps réel déjà présentes.
+- [x] Définir les écritures persistantes de solde disponible, solde bloqué, commission et journal financier.
+- [x] Créer les tables, contraintes et procédures sécurisées de Wallet et d’événements de livraison.
+- [x] Relier les candidatures, sélections, confirmations, retraits et fins de course aux écritures financières atomiques.
+- [x] Diffuser en temps réel les changements de statut et les notifications aux participants autorisés.
+- [x] Améliorer les indicateurs visuels et les animations du suivi de livraison selon son statut.
+- [x] Tester les transactions, transitions, alertes temps réel et valider la version livrable.

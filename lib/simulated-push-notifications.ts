@@ -44,6 +44,21 @@ export async function presentSimulatedTrackingPush(event: TrackingEvent, deliver
   }
 }
 
+export async function presentDeliveryStatusPush(event: { deliveryId: string; status: string; title: string; body: string }) {
+  if (Platform.OS === "web") return false;
+  try {
+    const granted = await configureSimulatedPushNotifications();
+    if (!granted) return false;
+    await Notifications.scheduleNotificationAsync({
+      content: { title: event.title, body: event.body, data: { deliveryId: event.deliveryId, status: event.status, url: `/track/${event.deliveryId}` }, sound: false, color: "#007B8B" },
+      trigger: null,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 if (Platform.OS !== "web") {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -54,4 +69,3 @@ if (Platform.OS !== "web") {
     }),
   });
 }
-

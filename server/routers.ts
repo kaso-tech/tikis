@@ -2,6 +2,7 @@ import { z } from "zod";
 import { COOKIE_NAME } from "../shared/const";
 import { randomInt, randomUUID } from "node:crypto";
 import * as db from "./db";
+import { publishDeliveryStatusBroadcast } from "./supabase-realtime";
 import { storagePut } from "./storage";
 import * as geography from "./geography";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -267,32 +268,53 @@ export const appRouter = router({
     submitApplication: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid(), offerPrice: z.number().int().positive().max(10_000_000).optional() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("Seul un livreur peut candidater.");
-      const record = await db.getTikisDeliveryRecordById(input.deliveryId);
-      const delivery = await db.getTikisDeliveryById(input.deliveryId);
-      if (!record || !delivery || record.status !== "open") throw new Error("Cette livraison n’accepte plus de candidatures.");
-      if (record.senderPhone === profile.phone) throw new Error("Vous ne pouvez pas candidater à votre propre livraison.");
-      const price = input.offerPrice ?? delivery.offeredPrice ?? delivery.estimatedPrice;
-      await db.createOrUpdateCandidate({ id: randomUUID(), deliveryId: delivery.id, driverPhone: profile.phone, ...(input.offerPrice ? { offerPrice: input.offerPrice } : {}), commissionBlocked: Math.round(price * 0.1) });
-      return { success: true } as const;
+      return db.applyForTikisDelivery({ id: randomUUID(), deliveryId: input.deliveryId, driverPhone: profile.phone, ...(input.offerPrice ? { offerPrice: input.offerPrice } : {}) });
     }),
     withdraw: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("Seul un livreur peut retirer sa candidature.");
-      return db.withdrawTikisDeliveryCandidate(input.deliveryId, profile.phone);
+      return db.withdrawTikisDeliveryCandidateWithWallet(input.deliveryId, profile.phone);
     }),
     selectCandidate: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid(), candidateId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "sender") throw new Error("Seul l’expéditeur peut choisir un livreur.");
-      return db.selectTikisDeliveryCandidate(input.deliveryId, input.candidateId, profile.phone);
+      const delivery = await db.selectTikisDeliveryCandidateWithWallet(input.deliveryId, input.candidateId, profile.phone);
+      if (delivery) void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livreur sélectionné", body: "La livraison attend la confirmation du livreur.", occurredAt: new Date().toISOString() });
+      return delivery;
     }),
     confirm: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("Seul le livreur sélectionné peut confirmer.");
-      return db.confirmTikisDelivery(input.deliveryId, profile.phone);
+      const delivery = await db.confirmTikisDeliveryWithEvents(input.deliveryId, profile.phone);
+      if (delivery) void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livraison activée", body: "Le livreur a confirmé sa disponibilité.", occurredAt: new Date().toISOString() });
+      return delivery;
     }),
     complete: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
-      return db.completeTikisDelivery(input.deliveryId, profile.phone);
+      const delivery = await db.completeTikisDeliveryWithEvents(input.deliveryId, profile.phone);
+      if (delivery) void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livraison terminée", body: "La livraison a été déclarée terminée.", occurredAt: new Date().toISOString() });
+      return delivery;
+    }),
+  }),
+  wallet: router({
+    snapshot: tikisProtectedProcedure.query(async ({ ctx }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      const [wallet, journal, commissionRate] = await Promise.all([db.getTikisWalletSnapshot(profile.phone), db.listTikisWalletLedger(profile.phone), db.getTikisCommissionRate()]);
+      return { wallet, journal, commissionRate };
+    }),
+    requestOperation: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000) })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      return db.requestTikisWalletOperation(profile.phone, input.type, input.amount);
+    }),
+  }),
+  notifications: router({
+    list: tikisProtectedProcedure.query(async ({ ctx }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      return db.listTikisDeliveryEvents(profile.phone);
+    }),
+    markRead: tikisProtectedProcedure.mutation(async ({ ctx }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      return db.markTikisDeliveryEventsRead(profile.phone);
     }),
   }),
   reviews: router({

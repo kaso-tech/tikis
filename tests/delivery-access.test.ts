@@ -11,11 +11,17 @@ const dbMock = vi.hoisted(() => ({
   listTikisDeliveriesForProfile: vi.fn(),
   getTikisDeliveryCandidateForDriver: vi.fn(),
   listTikisDeliveryCandidates: vi.fn(),
-  createOrUpdateCandidate: vi.fn(),
-  withdrawTikisDeliveryCandidate: vi.fn(),
-  selectTikisDeliveryCandidate: vi.fn(),
-  confirmTikisDelivery: vi.fn(),
-  completeTikisDelivery: vi.fn(),
+  applyForTikisDelivery: vi.fn(),
+  withdrawTikisDeliveryCandidateWithWallet: vi.fn(),
+  selectTikisDeliveryCandidateWithWallet: vi.fn(),
+  confirmTikisDeliveryWithEvents: vi.fn(),
+  completeTikisDeliveryWithEvents: vi.fn(),
+  getTikisWalletSnapshot: vi.fn(),
+  listTikisWalletLedger: vi.fn(),
+  getTikisCommissionRate: vi.fn(),
+  requestTikisWalletOperation: vi.fn(),
+  listTikisDeliveryEvents: vi.fn(),
+  markTikisDeliveryEventsRead: vi.fn(),
   getTikisDeliveryReview: vi.fn(),
   saveTikisDeliveryReview: vi.fn(),
   deliveryReviewToView: vi.fn(),
@@ -51,6 +57,10 @@ describe("livraisons persistées Tikis", () => {
     vi.clearAllMocks();
     dbMock.saveTikisPlace.mockResolvedValue(place);
     dbMock.createTikisDelivery.mockResolvedValue({ id: deliveryId });
+    dbMock.getTikisWalletSnapshot.mockResolvedValue({ total: 12_000, blocked: 500 });
+    dbMock.listTikisWalletLedger.mockResolvedValue([]);
+    dbMock.getTikisCommissionRate.mockResolvedValue(0.1);
+    dbMock.listTikisDeliveryEvents.mockResolvedValue([]);
   });
 
   it("refuse la création sans session Tikis", async () => {
@@ -74,9 +84,25 @@ describe("livraisons persistées Tikis", () => {
 
   it("empêche un livreur de se proposer à sa propre livraison", async () => {
     dbMock.getTikisProfileByPhone.mockResolvedValue(driver);
-    dbMock.getTikisDeliveryRecordById.mockResolvedValue({ id: deliveryId, status: "open", senderPhone: driver.phone });
-    dbMock.getTikisDeliveryById.mockResolvedValue({ id: deliveryId, status: "open", estimatedPrice: 3200 });
+    dbMock.applyForTikisDelivery.mockRejectedValue(new Error("Vous ne pouvez pas candidater à votre propre livraison."));
     const caller = appRouter.createCaller(contextFor(driver.phone));
     await expect(caller.deliveries.submitApplication({ deliveryId })).rejects.toThrow("propre livraison");
+    expect(dbMock.applyForTikisDelivery).toHaveBeenCalledWith(expect.objectContaining({ deliveryId, driverPhone: driver.phone }));
+  });
+
+  it("retourne uniquement le Wallet et le journal du profil connecté", async () => {
+    dbMock.getTikisProfileByPhone.mockResolvedValue(driver);
+    const caller = appRouter.createCaller(contextFor(driver.phone));
+    await expect(caller.wallet.snapshot()).resolves.toMatchObject({ wallet: { total: 12_000, blocked: 500 }, commissionRate: 0.1 });
+    expect(dbMock.getTikisWalletSnapshot).toHaveBeenCalledWith(driver.phone);
+    expect(dbMock.listTikisWalletLedger).toHaveBeenCalledWith(driver.phone);
+  });
+
+  it("enregistre une demande Wallet pour le profil connecté uniquement", async () => {
+    dbMock.getTikisProfileByPhone.mockResolvedValue(driver);
+    dbMock.requestTikisWalletOperation.mockResolvedValue({ success: true });
+    const caller = appRouter.createCaller(contextFor(driver.phone));
+    await expect(caller.wallet.requestOperation({ type: "withdrawal", amount: 1_500 })).resolves.toEqual({ success: true });
+    expect(dbMock.requestTikisWalletOperation).toHaveBeenCalledWith(driver.phone, "withdrawal", 1_500);
   });
 });
