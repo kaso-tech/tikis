@@ -4,6 +4,7 @@ import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "rea
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView from "react-native-maps";
 import { TikisButton } from "@/components/tikis/ui";
+import { SaveAddressDialog } from "@/components/tikis/save-address-dialog";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
 import { useSearchLocationBias } from "@/hooks/use-search-location-bias";
 import { trpc } from "@/lib/trpc";
@@ -12,7 +13,7 @@ import type { LocationLabel } from "@/shared/tikis-domain";
 type Coordinate = { latitude: number; longitude: number };
 const FALLBACK_REGION = { latitude: 12.3714, longitude: -1.5197, latitudeDelta: 0.09, longitudeDelta: 0.09 };
 
-export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, onUse, onFavorite }: { visible: boolean; targetTitle: string; initialPlace: LocationLabel | null; countryCode?: string; onClose: () => void; onUse: (place: LocationLabel) => void; onFavorite: (place: LocationLabel) => Promise<void> }) {
+export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, onUse, onFavorite }: { visible: boolean; targetTitle: string; initialPlace: LocationLabel | null; countryCode?: string; onClose: () => void; onUse: (place: LocationLabel) => void; onFavorite: (place: LocationLabel, label: string) => Promise<void> }) {
   const mapRef = useRef<MapView>(null);
   const reverseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const initializedForOpening = useRef(false);
@@ -20,6 +21,7 @@ export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, 
   const [isMoving, setIsMoving] = useState(false);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveDialogVisible, setSaveDialogVisible] = useState(false);
   const reverse = trpc.geography.reverse.useMutation();
   const { status: gpsStatus, requestBias } = useSearchLocationBias();
 
@@ -62,15 +64,16 @@ export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, 
     if (reverseTimer.current) clearTimeout(reverseTimer.current);
     reverseTimer.current = setTimeout(() => { void resolveCenter({ latitude: region.latitude, longitude: region.longitude }); }, 240);
   }
-  async function saveFavorite() { if (!place || saving) return; setSaving(true); try { await onFavorite(place); } finally { setSaving(false); } }
+  async function saveFavorite(label: string) { if (!place || saving) return; setSaving(true); try { await onFavorite(place, label); setMessage("Adresse enregistrée dans Mes adresses."); } finally { setSaving(false); } }
   const presentation = place ? formatDeliveryDetailPlace(place) : null;
 
   return <Modal visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent><View style={styles.screen}>
     <MapView ref={mapRef} style={styles.map} initialRegion={FALLBACK_REGION} onRegionChange={handleRegionChange} onRegionChangeComplete={handleRegionChangeComplete} showsUserLocation showsMyLocationButton={false} toolbarEnabled={false} rotateEnabled={false} />
     <View pointerEvents="none" style={styles.centerMarker}><View style={styles.markerBubble}><MaterialIcons name="location-on" size={34} color="#FFFFFF" /></View><View style={styles.markerStem} /><View style={styles.markerShadow} /></View>
     {!isMoving ? <SafeAreaView style={styles.controls} edges={["top", "bottom"]}><Text style={styles.instruction}>Déplacez la carte pour choisir l’adresse</Text><View style={styles.floatingControls}><Pressable accessibilityRole="button" accessibilityLabel="Retour à la recherche" onPress={onClose} style={({ pressed }) => [styles.roundButton, pressed && styles.pressed]}><MaterialIcons name="arrow-back" size={25} color="#17212B" /></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Utiliser ma position actuelle" onPress={() => void moveToPosition()} disabled={gpsStatus === "loading" || reverse.isPending} style={({ pressed }) => [styles.roundButton, (pressed || gpsStatus === "loading" || reverse.isPending) && styles.pressed]}>{gpsStatus === "loading" ? <ActivityIndicator color="#17212B" /> : <MaterialIcons name="my-location" size={24} color="#17212B" />}</Pressable></View>
-      <View style={styles.bottomSheet}><View style={styles.sheetHandle} /><Text style={styles.sheetEyebrow}>{targetTitle.toUpperCase()}</Text>{reverse.isPending ? <View style={styles.resolving}><ActivityIndicator size="small" color="#007B8B" /><Text style={styles.resolvingText}>Identification de l’adresse…</Text></View> : presentation ? <><Text style={styles.placeTitle} numberOfLines={1}>{presentation.title}</Text><Text style={styles.placeMeta} numberOfLines={2}>{presentation.subtitle}</Text></> : <Text style={styles.placePlaceholder}>Placez le marqueur sur une adresse précise.</Text>}{message ? <Text style={styles.message}>{message}</Text> : null}<View style={styles.sheetActions}><TikisButton label="Utiliser" icon="check" onPress={() => place && onUse(place)} disabled={!place || reverse.isPending} style={styles.useButton} /><Pressable accessibilityRole="button" accessibilityLabel="Ajouter aux adresses enregistrées" onPress={() => void saveFavorite()} disabled={!place || saving} style={({ pressed }) => [styles.favoriteButton, (!place || saving || pressed) && styles.pressed]}>{saving ? <ActivityIndicator size="small" color="#A86600" /> : <MaterialIcons name="bookmark-border" size={25} color="#A86600" />}</Pressable></View></View>
+      <View style={styles.bottomSheet}><View style={styles.sheetHandle} /><Text style={styles.sheetEyebrow}>{targetTitle.toUpperCase()}</Text>{reverse.isPending ? <View style={styles.resolving}><ActivityIndicator size="small" color="#007B8B" /><Text style={styles.resolvingText}>Identification de l’adresse…</Text></View> : presentation ? <><Text style={styles.placeTitle} numberOfLines={1}>{presentation.title}</Text><Text style={styles.placeMeta} numberOfLines={2}>{presentation.subtitle}</Text></> : <Text style={styles.placePlaceholder}>Placez le marqueur sur une adresse précise.</Text>}{message ? <Text style={styles.message}>{message}</Text> : null}<View style={styles.sheetActions}><TikisButton label="Utiliser" icon="check" onPress={() => place && onUse(place)} disabled={!place || reverse.isPending} style={styles.useButton} /><Pressable accessibilityRole="button" accessibilityLabel="Ajouter aux adresses enregistrées" onPress={() => setSaveDialogVisible(true)} disabled={!place || saving} style={({ pressed }) => [styles.favoriteButton, (!place || saving || pressed) && styles.pressed]}>{saving ? <ActivityIndicator size="small" color="#A86600" /> : <MaterialIcons name="bookmark-border" size={25} color="#A86600" />}</Pressable></View></View>
     </SafeAreaView> : null}
+    <SaveAddressDialog visible={saveDialogVisible} place={place} onClose={() => setSaveDialogVisible(false)} onSave={saveFavorite} />
   </View></Modal>;
 }
 

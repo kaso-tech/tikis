@@ -229,3 +229,7 @@
 - [x] Créer le sélecteur plein écran sur carte avec marqueur fixe, position GPS et favori.
 - [x] Déplacer la gestion des adresses vers le footer et retirer le Wallet du footer expéditeur.
 - [x] Tester les parcours d’adresse, la navigation et enregistrer la version.
+- [x] Examiner les données d’adresses enregistrées et le calcul de distance existant.
+- [x] Ajouter un libellé personnalisé lors de l’enregistrement d’une adresse.
+- [x] Afficher les adresses récentes et une estimation de distance immédiate dans la création.
+- [x] Tester les nouveaux parcours, vérifier le serveur et enregistrer la version.

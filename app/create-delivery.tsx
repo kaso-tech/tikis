@@ -87,15 +87,16 @@ export default function CreateDeliveryScreen() {
     let active = true;
     async function calculateRoute() {
       if (!pickup || !dropoff) { setRoute(null); setRouteMessage(""); return; }
-      setRouteMessage("Calcul de l’itinéraire sécurisé…");
+      const fallback = provisionalRoute(pickup, dropoff);
+      setRoute(fallback);
+      setRouteMessage("Estimation de distance en cours de précision…");
       try {
         const result = await requestRoute({ origin: toPlacePayload(pickup), destination: toPlacePayload(dropoff) });
-        if (active) { setRoute({ ...result, precise: true, source: "routes" }); setRouteMessage("Distance routière calculée avec Routes API."); }
+        if (active) { setRoute({ ...result, precise: true, source: "routes" }); setRouteMessage("Distance routière calculée."); }
       } catch {
         if (active) {
-          const fallback = provisionalRoute(pickup, dropoff);
           setRoute(fallback);
-          setRouteMessage("Itinéraire provisoire basé sur la distance GPS. Routes API recalculera la distance routière dès son activation.");
+          setRouteMessage("Estimation provisoire basée sur les coordonnées GPS.");
         }
       }
     }
@@ -120,13 +121,13 @@ export default function CreateDeliveryScreen() {
   const priceDifference = parsedOfferedPrice && estimate ? priceDifferencePercent(parsedOfferedPrice, estimate) : 0;
   const favoriteLocations: SavedFavorite[] = useMemo(() => (favoritesQuery.data ?? []).map((item) => ({ id: item.id, label: item.label, location: favoriteToLocation(item) })), [favoritesQuery.data]);
 
-  async function addFavorite(place: LocationLabel) {
+  async function addFavorite(place: LocationLabel, label: string) {
     if (!profile?.phone) return;
     try {
       const persisted = await savePlaceMutation.mutateAsync(toPlacePayload(place));
-      await favoriteMutation.mutateAsync({ placeId: persisted.id, label: sanitizePlaceText(formatFavoritePlace(place), 80) || "Lieu favori" });
+      await favoriteMutation.mutateAsync({ placeId: persisted.id, label: sanitizePlaceText(label, 80) || formatFavoritePlace(place) || "Lieu favori" });
       await favoritesQuery.refetch();
-    } catch { /* The favorite sheet keeps the location selected; the action can be retried. */ }
+    } catch { throw new Error("Impossible d’enregistrer cette adresse. Vérifiez votre connexion puis réessayez."); }
   }
 
   async function executePublication() {
@@ -199,6 +200,7 @@ export default function CreateDeliveryScreen() {
             <View style={styles.routeDivider} />
             <CompactLocationField label="Destination" tone="dropoff" value={dropoff} invalid={Boolean(dropoffIssue)} onPress={() => setPickerTarget("dropoff")} />
           </SurfaceCard>
+          {pickup && dropoff && route ? <View style={[styles.distancePreview, route.precise ? styles.distancePreviewPrecise : styles.distancePreviewProvisional]}><MaterialIcons name={route.precise ? "route" : "near-me"} size={18} color={route.precise ? "#147A58" : "#007B8B"} /><View style={styles.distancePreviewCopy}><Text style={styles.distancePreviewTitle}>{route.distanceKm.toFixed(1)} km entre les deux adresses</Text><Text style={styles.distancePreviewMeta}>{route.precise ? "Distance routière calculée" : "Estimation instantanée, calcul routier en cours"}</Text></View></View> : null}
 
           <Text style={styles.sectionLabel}>ENGIN ET ESTIMATION</Text>
           <Text style={styles.helper}>Sélectionnez un seul engin compatible. La fourgonnette n’est pas disponible.</Text>
@@ -218,7 +220,7 @@ export default function CreateDeliveryScreen() {
           <Text style={styles.footerNote}>Aucun débit immédiat. Les coordonnées complètes servent uniquement à la course et au calcul de distance.</Text>
         </ScrollView>
       </KeyboardAvoidingView>
-      <YangoAddressPicker visible={Boolean(pickerTarget)} target={pickerTarget} value={pickerTarget === "pickup" ? pickup : dropoff} countryCode={profile?.countryCode} favorites={favoriteLocations} onClose={() => { if (pickerTarget && !(pickerTarget === "pickup" ? pickup : dropoff)) setTouched((current) => ({ ...current, [pickerTarget]: true })); setPickerTarget(null); }} onSelect={(place) => { if (pickerTarget) selectPlace(pickerTarget, place); }} onFavorite={addFavorite} />
+      <YangoAddressPicker visible={Boolean(pickerTarget)} target={pickerTarget} value={pickerTarget === "pickup" ? pickup : dropoff} countryCode={profile?.countryCode} profilePhone={profile?.phone} favorites={favoriteLocations} onClose={() => { if (pickerTarget && !(pickerTarget === "pickup" ? pickup : dropoff)) setTouched((current) => ({ ...current, [pickerTarget]: true })); setPickerTarget(null); }} onSelect={(place) => { if (pickerTarget) selectPlace(pickerTarget, place); }} onFavorite={addFavorite} />
     </SafeAreaView>
   );
 }
@@ -276,6 +278,12 @@ const styles = StyleSheet.create({
   locationMeta: { color: "#78869A", fontSize: 10.5, lineHeight: 14, fontWeight: "600", marginTop: 1 },
   locationPlaceholder: { color: "#9AA5B6" },
   locationIssue: { color: "#C23B45", fontSize: 10, fontWeight: "800", marginTop: 2 },
+  distancePreview: { marginTop: 11, minHeight: 57, borderRadius: 15, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1 },
+  distancePreviewProvisional: { backgroundColor: "#F0FAFA", borderColor: "#C6E9EB" },
+  distancePreviewPrecise: { backgroundColor: "#F1FBF6", borderColor: "#BDE3D2" },
+  distancePreviewCopy: { flex: 1 },
+  distancePreviewTitle: { color: "#183044", fontSize: 13, fontWeight: "900" },
+  distancePreviewMeta: { color: "#68788A", fontSize: 11, marginTop: 3 },
   starButton: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center", marginLeft: 6, backgroundColor: "#FFF8E8" },
   routeDivider: { height: 1, backgroundColor: "#EEF2F6", marginHorizontal: 9 },
   helper: { color: "#697386", fontSize: 12, lineHeight: 18, marginBottom: 10 },
