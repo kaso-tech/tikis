@@ -8,7 +8,7 @@ import { FavoritePlacesSheet, FloatingPlacePicker, type SavedFavorite } from "@/
 import { SurfaceCard, TikisButton } from "@/components/tikis/ui";
 import { offeredPriceError, parseOfferedPrice, priceDifferencePercent, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
 import { formatFavoritePlace, formatListRoute, estimateDeliveryPrice, provisionalRoute, sanitizePlaceText, validateDeliveryMeasurement } from "@/lib/geo-rules";
-import { isAllowedDeliveryText, sanitizeDeliveryText } from "@/lib/tikis-engine";
+import { deliveryTextInputIssue, isAllowedDeliveryText, sanitizeDeliveryText } from "@/lib/tikis-engine";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { locationSubtitle, locationTitle, type DeliveryType, type LocationLabel, type SelectableVehicleType } from "@/shared/tikis-domain";
@@ -19,6 +19,7 @@ const DELIVERY_TYPES: { value: DeliveryType; icon: React.ComponentProps<typeof M
   { value: "Personne", icon: "person", label: "Personne" },
   { value: "Autre", icon: "inventory-2", label: "Autre" },
 ];
+type DeliveryFieldName = "title" | "details" | "passengers" | "pickup" | "dropoff" | "price";
 
 function toPlacePayload(place: LocationLabel) {
   return { name: place.name, district: place.district, city: place.city, latitude: place.latitude, longitude: place.longitude, ...(place.googlePlaceId ? { googlePlaceId: place.googlePlaceId } : {}), ...(place.mapboxId ? { mapboxId: place.mapboxId } : {}), ...(place.mapboxSessionToken ? { mapboxSessionToken: place.mapboxSessionToken } : {}), ...(place.formattedAddress ? { formattedAddress: place.formattedAddress } : {}), ...(place.street ? { street: place.street } : {}), ...(place.province ? { province: place.province } : {}), ...(place.country ? { country: place.country } : {}) };
@@ -44,7 +45,8 @@ export default function CreateDeliveryScreen() {
   const [offeredPriceInput, setOfferedPriceInput] = useState("");
   const [route, setRoute] = useState<{ distanceKm: number; durationMinutes: number; precise: boolean; source: "routes" | "provisional" } | null>(null);
   const [routeMessage, setRouteMessage] = useState("");
-  const [error, setError] = useState("");
+  const [touched, setTouched] = useState<Partial<Record<DeliveryFieldName, boolean>>>({});
+  const [inputIssues, setInputIssues] = useState<Partial<Record<DeliveryFieldName, string>>>({});
   const [loading, setLoading] = useState(false);
   const [publicationStage, setPublicationStage] = useState("");
   const [favoriteTarget, setFavoriteTarget] = useState<"pickup" | "dropoff" | null>(null);
@@ -84,6 +86,16 @@ export default function CreateDeliveryScreen() {
   const estimate = useMemo(() => route ? estimateDeliveryPrice({ distanceKm: route.distanceKm, durationMinutes: route.durationMinutes, type: deliveryType, vehicle, ...measurement }) : 0, [route, deliveryType, vehicle, measurement]);
   const parsedOfferedPrice = useMemo(() => parseOfferedPrice(offeredPriceInput), [offeredPriceInput]);
   const priceInputError = useMemo(() => offeredPriceError(offeredPriceInput), [offeredPriceInput]);
+  const titleIssue = inputIssues.title || (touched.title ? deliveryTextInputIssue(title) : "");
+  const detailsIssue = inputIssues.details || (touched.details ? deliveryTextInputIssue(details) : "");
+  const passengerIssue = inputIssues.passengers || (deliveryType === "Personne" && touched.passengers && (!Number(passengers) || Number(passengers) > 4) ? "Indiquez entre 1 et 4 personnes." : "");
+  const pickupIssue = touched.pickup && !pickup ? "Choisissez le lieu de récupération." : "";
+  const dropoffIssue = touched.dropoff && !dropoff ? "Choisissez la destination." : "";
+  const measurementIssue = useMemo(() => validateDeliveryMeasurement(deliveryType, measurement), [deliveryType, measurement]);
+  const titleReady = !deliveryTextInputIssue(title) && !inputIssues.title;
+  const detailsReady = !deliveryTextInputIssue(details) && !inputIssues.details;
+  const passengerReady = deliveryType !== "Personne" || (Number(passengers) >= 1 && Number(passengers) <= 4 && !inputIssues.passengers);
+  const canPublish = Boolean(titleReady && detailsReady && pickup && dropoff && route && estimate && passengerReady && !measurementIssue && !priceInputError);
   const publishedPrice = parsedOfferedPrice ?? estimate;
   const priceDifference = parsedOfferedPrice && estimate ? priceDifferencePercent(parsedOfferedPrice, estimate) : 0;
   const favoriteLocations: SavedFavorite[] = useMemo(() => (favoritesQuery.data ?? []).map((item) => ({ id: item.id, label: item.label, location: favoriteToLocation(item) })), [favoritesQuery.data]);
@@ -96,7 +108,7 @@ export default function CreateDeliveryScreen() {
       const persisted = await savePlaceMutation.mutateAsync(toPlacePayload(place));
       await favoriteMutation.mutateAsync({ placeId: persisted.id, label: sanitizePlaceText(formatFavoritePlace(place), 80) || "Lieu favori" });
       await favoritesQuery.refetch();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Impossible d’ajouter ce favori."); }
+    } catch { /* The favorite sheet keeps the location selected; the action can be retried. */ }
     finally { setFavoriteTarget(null); }
   }
 
@@ -113,34 +125,31 @@ export default function CreateDeliveryScreen() {
   }
 
   async function publish() {
-    if (loading) return;
+    if (loading || !canPublish) {
+      setTouched({ title: true, details: true, passengers: deliveryType === "Personne", pickup: true, dropoff: true, price: Boolean(offeredPriceInput) });
+      setInputIssues((current) => ({ ...current, title: deliveryTextInputIssue(title), details: deliveryTextInputIssue(details), passengers: deliveryType === "Personne" && (!Number(passengers) || Number(passengers) > 4) ? "Indiquez entre 1 et 4 personnes." : "", price: priceInputError || "" }));
+      if (!pickup || !dropoff) setRouteMessage("Sélectionnez les deux lieux requis pour calculer l’itinéraire.");
+      return;
+    }
     const cleanTitle = sanitizeDeliveryText(title);
     const cleanDetails = sanitizeDeliveryText(details);
-    const measurementError = validateDeliveryMeasurement(deliveryType, measurement);
-    if (!cleanTitle || !cleanDetails) { setError("Renseignez le titre et les consignes de la livraison."); return; }
-    if (!pickup || !dropoff) { setError("Sélectionnez une adresse de récupération et une destination sur la carte."); return; }
-    if (!route) { setError(routeMessage || "Le calcul d’itinéraire est requis avant la publication. Vérifiez les deux lieux puis réessayez."); return; }
-    if (!estimate) { setError("L’estimation n’est pas encore disponible. Vérifiez les informations de la course."); return; }
-    if (!isAllowedDeliveryText(cleanTitle) || !isAllowedDeliveryText(cleanDetails)) { setError("Les informations contiennent des caractères non autorisés."); return; }
-    if (measurementError) { setError(measurementError); return; }
-    if (priceInputError) { setError(priceInputError); return; }
-    setError(""); setPublicationStage("Enregistrement des lieux…"); setLoading(true);
+    if (!pickup || !dropoff || !route || !isAllowedDeliveryText(cleanTitle) || !isAllowedDeliveryText(cleanDetails)) return;
+    setPublicationStage("Enregistrement des lieux…"); setLoading(true);
     try {
       setPublicationStage("Publication auprès des livreurs…");
       const delivery = await createDeliveryMutation.mutateAsync({ title: cleanTitle, type: deliveryType, pickup: toPlacePayload(pickup), dropoff: toPlacePayload(dropoff), distanceKm: route.distanceKm, routeSource: route.source, estimatedPrice: estimate, ...(parsedOfferedPrice ? { offeredPrice: parsedOfferedPrice } : {}), vehicleTypes: [vehicle], details: cleanDetails, ...(deliveryType === "Autre" && weightKg ? { weightKg: Number(weightKg) } : {}), ...(deliveryType === "Autre" && Object.keys(dimensions).length ? { dimensions } : {}), ...(deliveryType === "Personne" ? { passengers: Number(passengers) } : {}) });
       router.replace(`/delivery/${delivery.id}` as any);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "La livraison n’a pas pu être publiée."); }
+    } catch { setPublicationStage("Publication indisponible. Vérifiez votre connexion puis réessayez."); }
     finally { setLoading(false); setPublicationStage(""); }
   }
 
   function selectPlace(target: "pickup" | "dropoff", place: LocationLabel) {
     if (target === "pickup") setPickup(place); else setDropoff(place);
-    setError("");
+    setTouched((current) => ({ ...current, [target]: true }));
   }
 
   function retryRoute() {
     if (!pickup || !dropoff) return;
-    setError("");
     setRouteMessage("Nouvelle tentative de calcul de l’itinéraire sécurisé…");
     setPickup((current) => current ? { ...current } : current);
   }
@@ -160,16 +169,16 @@ export default function CreateDeliveryScreen() {
           <Text style={styles.sectionLabel}>TYPE DE COURSE</Text>
           <View style={styles.typeRow}>{DELIVERY_TYPES.map((item) => <Pressable key={item.value} onPress={() => setDeliveryType(item.value)} style={({ pressed }) => [styles.typeChip, deliveryType === item.value && styles.typeChipActive, pressed && styles.pressed]}><MaterialIcons name={item.icon} size={17} color={deliveryType === item.value ? "#FFFFFF" : "#007B8B"} /><Text style={[styles.typeText, deliveryType === item.value && styles.typeTextActive]}>{item.label}</Text></Pressable>)}</View>
 
-          <Field label="Titre de la course" value={title} onChangeText={(value) => setTitle(sanitizeDeliveryText(value, { preserveTrailingSpace: true }))} placeholder={deliveryType === "Plis" ? "Ex. Documents de bureau" : deliveryType === "Personne" ? "Ex. Trajet vers l’aéroport" : "Ex. Petit matériel"} />
-          <Field label="Consignes" value={details} onChangeText={(value) => setDetails(sanitizeDeliveryText(value, { preserveTrailingSpace: true }))} placeholder="Informations utiles pour le livreur" multiline />
-          {deliveryType === "Personne" ? <Field label="Nombre de personnes" value={passengers} onChangeText={(value) => setPassengers(value.replace(/\D/g, "").slice(0, 1))} placeholder="1" keyboardType="number-pad" icon="groups" /> : null}
+          <Field label="Titre de la course" value={title} error={titleIssue} onBlur={() => { setTouched((current) => ({ ...current, title: true })); setInputIssues((current) => ({ ...current, title: deliveryTextInputIssue(title) })); }} onChangeText={(value) => { const issue = !isAllowedDeliveryText(value) ? "Caractères non autorisés." : ""; setTitle(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setInputIssues((current) => ({ ...current, title: issue || (touched.title ? deliveryTextInputIssue(value) : "") })); }} placeholder={deliveryType === "Plis" ? "Ex. Documents de bureau" : deliveryType === "Personne" ? "Ex. Trajet vers l’aéroport" : "Ex. Petit matériel"} />
+          <Field label="Consignes" value={details} error={detailsIssue} onBlur={() => { setTouched((current) => ({ ...current, details: true })); setInputIssues((current) => ({ ...current, details: deliveryTextInputIssue(details) })); }} onChangeText={(value) => { const issue = !isAllowedDeliveryText(value) ? "Caractères non autorisés." : ""; setDetails(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setInputIssues((current) => ({ ...current, details: issue || (touched.details ? deliveryTextInputIssue(value) : "") })); }} placeholder="Informations utiles pour le livreur" multiline />
+          {deliveryType === "Personne" ? <Field label="Nombre de personnes" value={passengers} error={passengerIssue} onBlur={() => { setTouched((current) => ({ ...current, passengers: true })); }} onChangeText={(value) => { setPassengers(value.replace(/\D/g, "").slice(0, 1)); setInputIssues((current) => ({ ...current, passengers: /\D/.test(value) ? "Caractères non autorisés." : "" })); }} placeholder="1" keyboardType="number-pad" icon="groups" /> : null}
           {deliveryType === "Autre" ? <SurfaceCard style={styles.measureCard}><Text style={styles.measureTitle}>Mesures facultatives</Text><Text style={styles.measureSubtitle}>Ajoutez le poids et les dimensions si vous les connaissez pour affiner l’estimation.</Text><Field label="Poids (kg)" value={weightKg} onChangeText={(value) => setWeightKg(value.replace(/[^0-9.]/g, "").slice(0, 6))} placeholder="Ex. 12" keyboardType="decimal-pad" icon="scale" /><Text style={styles.fieldLabel}>Dimensions (cm)</Text><View style={styles.dimensionRow}><MiniNumber value={lengthCm} onChangeText={setLengthCm} placeholder="Long." /><MiniNumber value={widthCm} onChangeText={setWidthCm} placeholder="Larg." /><MiniNumber value={heightCm} onChangeText={setHeightCm} placeholder="Haut." /></View></SurfaceCard> : null}
 
           <View style={styles.routeHeader}><Text style={styles.sectionLabel}>TRAJET</Text><Pressable onPress={() => setFavoritesVisible(true)} style={({ pressed }) => [styles.favoritesButton, pressed && styles.pressed]}><MaterialIcons name="star" size={16} color="#A86600" /><Text style={styles.favoritesButtonText}>Favoris</Text></Pressable></View>
           <SurfaceCard style={styles.routeCard}>
-            <CompactLocationField label="Récupération" tone="pickup" value={pickup} loading={favoriteTarget === "pickup"} onPress={() => setPickerTarget("pickup")} onFavorite={() => void addFavorite("pickup")} />
+            <CompactLocationField label="Récupération" tone="pickup" value={pickup} invalid={Boolean(pickupIssue)} loading={favoriteTarget === "pickup"} onPress={() => setPickerTarget("pickup")} onFavorite={() => void addFavorite("pickup")} />
             <View style={styles.routeDivider} />
-            <CompactLocationField label="Destination" tone="dropoff" value={dropoff} loading={favoriteTarget === "dropoff"} onPress={() => setPickerTarget("dropoff")} onFavorite={() => void addFavorite("dropoff")} />
+            <CompactLocationField label="Destination" tone="dropoff" value={dropoff} invalid={Boolean(dropoffIssue)} loading={favoriteTarget === "dropoff"} onPress={() => setPickerTarget("dropoff")} onFavorite={() => void addFavorite("dropoff")} />
           </SurfaceCard>
 
           <Text style={styles.sectionLabel}>ENGIN ET ESTIMATION</Text>
@@ -178,31 +187,30 @@ export default function CreateDeliveryScreen() {
           <View style={styles.estimate}><MaterialIcons name="auto-awesome" size={18} color="#007B8B" /><View style={styles.estimateInfo}><Text style={styles.estimateLabel}>{route ? `${route.precise ? "Estimation" : "Estimation provisoire"} ${vehicle.toLocaleLowerCase("fr-FR")} · ${route.distanceKm.toFixed(1)} km` : "Sélectionnez les deux lieux"}</Text><Text style={styles.estimateValue}>{estimate ? `${estimate.toLocaleString("fr-FR")} FCFA` : "—"}</Text></View></View>
           <View style={styles.priceFieldWrap}>
             <View style={styles.priceLabelRow}><Text style={styles.fieldLabel}>Prix proposé au livreur</Text><Text style={styles.optional}>Facultatif</Text></View>
-            <View style={styles.priceField}><MaterialIcons name="payments" size={18} color="#007B8B" style={styles.fieldIcon} /><TextInput value={offeredPriceInput} onChangeText={(value) => setOfferedPriceInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} placeholder={estimate ? `${estimate.toLocaleString("fr-FR")} FCFA` : "Ex. 4 500"} placeholderTextColor="#9AA5B6" style={styles.input} /><Text style={styles.currency}>FCFA</Text></View>
+            <View style={[styles.priceField, (priceInputError && touched.price) && styles.fieldInvalid]}><MaterialIcons name="payments" size={18} color="#007B8B" style={styles.fieldIcon} /><TextInput value={offeredPriceInput} onBlur={() => setTouched((current) => ({ ...current, price: true }))} onChangeText={(value) => setOfferedPriceInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} placeholder={estimate ? `${estimate.toLocaleString("fr-FR")} FCFA` : "Ex. 4 500"} placeholderTextColor="#9AA5B6" style={styles.input} /><Text style={styles.currency}>FCFA</Text></View>
             {priceInputError ? <Text style={styles.priceError}>{priceInputError}</Text> : parsedOfferedPrice && estimate ? <Text style={styles.priceHint}>{priceDifference === 0 ? "Aligné sur l’estimation intelligente." : `${priceDifference > 0 ? "+" : ""}${priceDifference}% par rapport à l’estimation.`}</Text> : <Text style={styles.priceHint}>Sans saisie, l’estimation intelligente sera publiée comme prix proposé.</Text>}
           </View>
           {routeMessage ? <Text style={[styles.routeMessage, !route?.precise && styles.routeWarning]}>{routeMessage}</Text> : null}
           {pickup && dropoff && (!route || !route.precise) ? <Pressable accessibilityRole="button" onPress={retryRoute} style={({ pressed }) => [styles.retryRoute, pressed && styles.pressed]}><MaterialIcons name="refresh" size={16} color="#007B8B" /><Text style={styles.retryRouteText}>{route ? "Recalculer avec Routes API" : "Réessayer le calcul d’itinéraire"}</Text></Pressable> : null}
           {pickup && dropoff ? <Text style={styles.routeTitle}>{formatListRoute(pickup, dropoff)}</Text> : null}
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          <TikisButton label={`Publier · ${publishedPrice ? `${publishedPrice.toLocaleString("fr-FR")} FCFA` : "prix à définir"}`} icon="publish" onPress={() => void publish()} loading={loading} loadingLabel={publicationStage || "Publication en cours…"} style={styles.publish} />
+          <TikisButton label={`Publier · ${publishedPrice ? `${publishedPrice.toLocaleString("fr-FR")} FCFA` : "prix à définir"}`} icon="publish" onPress={() => void publish()} disabled={!canPublish || loading} loading={loading} loadingLabel={publicationStage || "Publication en cours…"} style={styles.publish} />
           {loading ? <Text style={styles.publicationLoadingHint}>Veuillez patienter, votre course est en cours de publication.</Text> : null}
-          {!loading && (!pickup || !dropoff || !route) ? <Text style={styles.publicationHint}>Le bouton affichera précisément l’information manquante. Deux lieux GPS sont nécessaires avant publication.</Text> : null}
+          {!loading && !canPublish ? <Text style={styles.publicationHint}>Complétez les champs requis et sélectionnez les deux lieux GPS pour publier.</Text> : null}
           <Text style={styles.footerNote}>Aucun débit immédiat. Les coordonnées complètes servent uniquement à la course et au calcul de distance.</Text>
         </ScrollView>
       </KeyboardAvoidingView>
-      <FloatingPlacePicker visible={Boolean(pickerTarget)} target={pickerTarget} value={pickerTarget === "pickup" ? pickup : dropoff} countryCode={profile?.countryCode} onClose={() => setPickerTarget(null)} onSelect={(place) => { if (pickerTarget) selectPlace(pickerTarget, place); }} />
+      <FloatingPlacePicker visible={Boolean(pickerTarget)} target={pickerTarget} value={pickerTarget === "pickup" ? pickup : dropoff} countryCode={profile?.countryCode} onClose={() => { if (pickerTarget && !(pickerTarget === "pickup" ? pickup : dropoff)) setTouched((current) => ({ ...current, [pickerTarget]: true })); setPickerTarget(null); }} onSelect={(place) => { if (pickerTarget) selectPlace(pickerTarget, place); }} />
       <FavoritePlacesSheet visible={favoritesVisible} favorites={favoriteLocations} onClose={() => setFavoritesVisible(false)} onPickup={(place) => selectPlace("pickup", place)} onDropoff={(place) => selectPlace("dropoff", place)} onRename={renameFavorite} onRemove={removeFavorite} />
     </SafeAreaView>
   );
 }
 
-function CompactLocationField({ label, tone, value, loading, onPress, onFavorite }: { label: string; tone: "pickup" | "dropoff"; value: LocationLabel | null; loading: boolean; onPress: () => void; onFavorite: () => void }) {
+function CompactLocationField({ label, tone, value, invalid, loading, onPress, onFavorite }: { label: string; tone: "pickup" | "dropoff"; value: LocationLabel | null; invalid: boolean; loading: boolean; onPress: () => void; onFavorite: () => void }) {
   const accent = tone === "pickup" ? "#007B8B" : "#C23B45";
-  return <View style={styles.locationRow}><Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.locationPressable, pressed && styles.pressed]}><View style={[styles.locationIcon, { backgroundColor: tone === "pickup" ? "#E6F5F6" : "#FFF0F1" }]}><MaterialIcons name={tone === "pickup" ? "trip-origin" : "location-on"} size={18} color={accent} /></View><View style={styles.locationCopy}><Text style={styles.locationLabel}>{label}</Text><Text style={[styles.locationValue, !value && styles.locationPlaceholder]} numberOfLines={1}>{value ? locationTitle(value) : "Choisir une adresse"}</Text>{value ? <Text style={styles.locationMeta} numberOfLines={1}>{locationSubtitle(value)}</Text> : null}</View><MaterialIcons name="chevron-right" size={21} color="#9AA5B6" /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Ajouter ${label} aux favoris`} onPress={onFavorite} disabled={!value || loading} style={({ pressed }) => [styles.starButton, (!value || loading) && styles.disabled, pressed && styles.pressed]}>{loading ? <ActivityIndicator size="small" color="#A86600" /> : <MaterialIcons name={value ? "star-outline" : "star-border"} size={19} color="#A86600" />}</Pressable></View>;
+  return <View style={[styles.locationRow, invalid && styles.locationRowInvalid]}><Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.locationPressable, pressed && styles.pressed]}><View style={[styles.locationIcon, { backgroundColor: tone === "pickup" ? "#E6F5F6" : "#FFF0F1" }]}><MaterialIcons name={tone === "pickup" ? "trip-origin" : "location-on"} size={18} color={accent} /></View><View style={styles.locationCopy}><Text style={[styles.locationLabel, invalid && styles.fieldLabelInvalid]}>{label}</Text><Text style={[styles.locationValue, !value && styles.locationPlaceholder]} numberOfLines={1}>{value ? locationTitle(value) : "Choisir une adresse"}</Text>{value ? <Text style={styles.locationMeta} numberOfLines={1}>{locationSubtitle(value)}</Text> : invalid ? <Text style={styles.locationIssue}>Lieu requis</Text> : null}</View><MaterialIcons name="chevron-right" size={21} color="#9AA5B6" /></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Ajouter ${label} aux favoris`} onPress={onFavorite} disabled={!value || loading} style={({ pressed }) => [styles.starButton, (!value || loading) && styles.disabled, pressed && styles.pressed]}>{loading ? <ActivityIndicator size="small" color="#A86600" /> : <MaterialIcons name={value ? "star-outline" : "star-border"} size={19} color="#A86600" />}</Pressable></View>;
 }
 
-function Field({ label, icon, keyboardType, ...props }: { label: string; icon?: React.ComponentProps<typeof MaterialIcons>["name"]; keyboardType?: "default" | "number-pad" | "decimal-pad"; value: string; onChangeText: (value: string) => void; placeholder: string; multiline?: boolean }) { return <View style={styles.fieldWrap}><Text style={styles.fieldLabel}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline]}>{icon ? <MaterialIcons name={icon} size={18} color="#007B8B" style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor="#9AA5B6" /></View></View>; }
+function Field({ label, icon, keyboardType, error, ...props }: { label: string; icon?: React.ComponentProps<typeof MaterialIcons>["name"]; keyboardType?: "default" | "number-pad" | "decimal-pad"; value: string; onChangeText: (value: string) => void; onBlur?: () => void; placeholder: string; multiline?: boolean; error?: string }) { return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#C23B45" : "#007B8B"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor="#9AA5B6" /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>; }
 function MiniNumber({ value, onChangeText, placeholder }: { value: string; onChangeText: (value: string) => void; placeholder: string }) { return <TextInput value={value} onChangeText={(text) => onChangeText(text.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" placeholder={placeholder} placeholderTextColor="#9AA5B6" style={styles.miniInput} />; }
 
 const styles = StyleSheet.create({
@@ -224,6 +232,9 @@ const styles = StyleSheet.create({
   fieldWrap: { marginBottom: 13 },
   fieldLabel: { color: "#485569", fontWeight: "800", fontSize: 13, marginBottom: 7 },
   field: { minHeight: 50, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#DDE5ED", borderRadius: 15, flexDirection: "row", alignItems: "center", paddingHorizontal: 14 },
+  fieldInvalid: { borderColor: "#C23B45", backgroundColor: "#FFF8F8" },
+  fieldLabelInvalid: { color: "#C23B45" },
+  fieldIssue: { color: "#C23B45", fontSize: 11, fontWeight: "700", marginTop: 5, lineHeight: 15 },
   fieldMultiline: { minHeight: 78, alignItems: "flex-start", paddingTop: 13 },
   fieldIcon: { marginRight: 9, marginTop: 1 },
   input: { flex: 1, color: "#0B1F3A", fontSize: 14, fontWeight: "600", minHeight: 39 },
@@ -238,6 +249,7 @@ const styles = StyleSheet.create({
   favoritesButtonText: { color: "#8A5A0E", fontSize: 11, fontWeight: "900" },
   routeCard: { padding: 4, overflow: "hidden" },
   locationRow: { minHeight: 70, flexDirection: "row", alignItems: "center", paddingLeft: 10, paddingRight: 7 },
+  locationRowInvalid: { borderWidth: 1, borderColor: "#C23B45", borderRadius: 14, backgroundColor: "#FFF8F8" },
   locationPressable: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, minWidth: 0 },
   locationIcon: { width: 34, height: 34, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   locationCopy: { flex: 1, minWidth: 0 },
@@ -245,6 +257,7 @@ const styles = StyleSheet.create({
   locationValue: { color: "#0B1F3A", fontSize: 13, fontWeight: "800", marginTop: 3 },
   locationMeta: { color: "#78869A", fontSize: 10.5, lineHeight: 14, fontWeight: "600", marginTop: 1 },
   locationPlaceholder: { color: "#9AA5B6" },
+  locationIssue: { color: "#C23B45", fontSize: 10, fontWeight: "800", marginTop: 2 },
   starButton: { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center", marginLeft: 6, backgroundColor: "#FFF8E8" },
   routeDivider: { height: 1, backgroundColor: "#EEF2F6", marginHorizontal: 9 },
   helper: { color: "#697386", fontSize: 12, lineHeight: 18, marginBottom: 10 },
@@ -269,7 +282,6 @@ const styles = StyleSheet.create({
   retryRoute: { flexDirection: "row", alignSelf: "flex-start", alignItems: "center", gap: 6, marginTop: 8, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: "#E6F5F6" },
   retryRouteText: { color: "#007B8B", fontSize: 11, fontWeight: "900" },
   routeTitle: { color: "#0B1F3A", fontSize: 12, fontWeight: "800", marginTop: 5 },
-  error: { color: "#C23B45", fontWeight: "800", fontSize: 13, textAlign: "center", marginTop: 18 },
   publicationHint: { color: "#8A5A0E", fontSize: 11, lineHeight: 16, textAlign: "center", marginTop: 8, paddingHorizontal: 14 },
   publicationLoadingHint: { color: "#007B8B", fontSize: 11, fontWeight: "800", textAlign: "center", marginTop: 8 },
   publish: { marginTop: 23 },

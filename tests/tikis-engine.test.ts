@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canApplyToDelivery, isAllowedDeliveryText, sanitizeDeliveryText } from "../lib/tikis-engine";
+import { canApplyToDelivery, deliveryTextInputIssue, isAllowedDeliveryText, sanitizeDeliveryText } from "../lib/tikis-engine";
 import { availableWalletBalance, commissionFor } from "../shared/tikis-domain";
 
 describe("règles métier Tikis de démonstration", () => {
@@ -23,5 +23,11 @@ describe("règles métier Tikis de démonstration", () => {
     expect(sanitizeDeliveryText("Documents   confidentiels ", { preserveTrailingSpace: true })).toBe("Documents confidentiels ");
     expect(sanitizeDeliveryText("Documents   confidentiels ")).toBe("Documents confidentiels");
     expect(sanitizeDeliveryText("Consignes <script> importantes", { preserveTrailingSpace: true })).toBe("Consignes script importantes");
+  });
+
+  it("signale les caractères refusés et les champs requis vides sans empêcher les espaces simples", () => {
+    expect(deliveryTextInputIssue("Documents de bureau")).toBe("");
+    expect(deliveryTextInputIssue("Documents <script>")).toBe("Caractères non autorisés.");
+    expect(deliveryTextInputIssue("   ")).toBe("Ce champ est requis.");
   });
 });

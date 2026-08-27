@@ -13,3 +13,9 @@ export function sanitizeDeliveryText(value: string, options: { preserveTrailingS
 export function isAllowedDeliveryText(value: string) {
   return /^[a-zA-Z0-9\s'\-.,àâçéèêëîïôùûüÿñæœÀÂÇÉÈÊËÎÏÔÙÛÜŸÑÆŒ]*$/.test(value);
 }
+
+export function deliveryTextInputIssue(value: string, required = true) {
+  if (!isAllowedDeliveryText(value)) return "Caractères non autorisés.";
+  if (required && !value.trim()) return "Ce champ est requis.";
+  return "";
+}

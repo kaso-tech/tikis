@@ -1,6 +1,6 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router } from "expo-router";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
 import { DeliveryCard } from "@/components/tikis/delivery-card";
 import { SectionHeading, SurfaceCard, TikisButton, tikisStyles } from "@/components/tikis/ui";
 import { useTikisStore } from "@/lib/tikis-store";
@@ -8,8 +8,10 @@ import { trpc } from "@/lib/trpc";
 import { availableWalletBalance, formatMoney } from "@/shared/tikis-domain";
 
 export default function HomeScreen() {
-  const { role, profile, wallet } = useTikisStore();
+  const { role, profile } = useTikisStore();
   const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
+  const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 12_000 });
+  const driverWallet = walletQuery.data?.wallet;
   const firstName = profile?.fullName.split(" ")[0] ?? "";
   const visibleDeliveries = (deliveriesQuery.data ?? []).filter((delivery) => role === "sender" ? delivery.status !== "completed" : delivery.status !== "completed");
 
@@ -42,8 +44,7 @@ export default function HomeScreen() {
               <SurfaceCard style={styles.walletCard}>
                 <View>
                   <Text style={styles.walletLabel}>Solde disponible</Text>
-                  <Text style={styles.walletValue}>{formatMoney(availableWalletBalance(wallet))}</Text>
-                  <Text style={styles.walletSub}>Commission bloquée : {formatMoney(wallet.blocked)}</Text>
+                  {walletQuery.isLoading ? <View style={styles.walletLoading}><ActivityIndicator size="small" color="#007B8B" /><Text style={styles.walletLoadingText}>Chargement sécurisé…</Text></View> : driverWallet ? <><Text style={styles.walletValue}>{formatMoney(availableWalletBalance(driverWallet))}</Text><Text style={styles.walletSub}>Commission bloquée : {formatMoney(driverWallet.blocked)}</Text></> : <Text style={styles.walletUnavailable}>Solde momentanément indisponible</Text>}
                 </View>
                 <View style={styles.walletIcon}><MaterialIcons name="account-balance-wallet" size={27} color="#007B8B" /></View>
               </SurfaceCard>
@@ -73,6 +74,9 @@ const styles = StyleSheet.create({
   walletLabel: { color: "#35656C", fontWeight: "700", fontSize: 13 },
   walletValue: { color: "#0B1F3A", fontWeight: "900", fontSize: 24, marginTop: 2 },
   walletSub: { color: "#697386", fontSize: 12, marginTop: 2 },
+  walletLoading: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 34, marginTop: 3 },
+  walletLoadingText: { color: "#35656C", fontSize: 12, fontWeight: "700" },
+  walletUnavailable: { color: "#C23B45", fontSize: 12, fontWeight: "800", marginTop: 5 },
   walletIcon: { width: 50, height: 50, borderRadius: 17, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
   empty: { textAlign: "center", color: "#697386", marginTop: 38 },
   pressed: { opacity: 0.7 },

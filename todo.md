@@ -209,3 +209,8 @@
 - [x] Étendre la recherche à des sources POI pertinentes et améliorer le géocodage inverse sur la carte.
 - [x] Afficher et classer les résultats de lieux publics, commerces, rues et quartiers de façon utile.
 - [x] Tester des requêtes représentatives, redémarrer et enregistrer l’amélioration de recherche.
+- [x] Identifier le solde de démonstration encore affiché sur le tableau de bord livreur.
+- [x] Afficher le solde Wallet persistant sur l’accueil livreur avec état de chargement et repli explicite.
+- [x] Supprimer l’erreur générale de publication et désactiver le bouton tant que le formulaire est invalide.
+- [x] Ajouter la validation dynamique et localisée de chaque champ requis de création de livraison.
+- [x] Tester les soldes et validations de formulaire, redémarrer et enregistrer la correction.

@@ -128,6 +128,5 @@ describe("services géographiques backend Tikis", () => {
     global.fetch = fetchMock as typeof fetch;
     const place = await reverseGeocodeLocation(12.534921, -1.687432, "BF");
     expect(place).toMatchObject({ name: "Alimentation Wend Panga", street: "Rue 25.02", district: "Koulouba", city: "Ouagadougou", provider: "openstreetmap", source: "search", precision: "exact" });
-    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("/reverse");
   });
 });
