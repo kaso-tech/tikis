@@ -198,3 +198,7 @@
 - [x] Ajouter le bouton de sélection de position actuelle et le géocodage inverse associé.
 - [x] Tester la permission, le refus GPS et la confirmation de lieu détecté.
 - [x] Redémarrer, vérifier et enregistrer la sélection de position actuelle.
+- [x] Diagnostiquer la réhydratation d’un compte de démonstration après déconnexion.
+- [x] Purger l’état de profil et toutes les sessions locales lors de la déconnexion.
+- [x] Tester la redirection de déconnexion depuis le profil et le menu latéral.
+- [x] Redémarrer, vérifier et enregistrer la correction de déconnexion.

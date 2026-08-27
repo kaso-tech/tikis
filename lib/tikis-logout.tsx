@@ -35,7 +35,7 @@ export function TikisLogoutProvider({ children }: { children: React.ReactNode })
       haptic.success();
       setVisible(false);
       setLoading(false);
-      router.replace("/" as any);
+      router.replace("/auth" as any);
     }
   }
 

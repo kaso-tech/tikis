@@ -1,12 +1,16 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { Tabs } from "expo-router";
+import { Redirect, Tabs } from "expo-router";
 import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TikisHeader } from "@/components/tikis/app-chrome";
+import { useTikisStore } from "@/lib/tikis-store";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
+  const { profile } = useTikisStore();
   const bottomPadding = Platform.OS === "web" ? 10 : Math.max(9, insets.bottom);
+
+  if (!profile) return <Redirect href="/auth" />;
 
   return (
     <Tabs

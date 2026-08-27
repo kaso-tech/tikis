@@ -10,7 +10,7 @@ import { availableWalletBalance, formatMoney } from "@/shared/tikis-domain";
 export default function HomeScreen() {
   const { role, profile, wallet } = useTikisStore();
   const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
-  const firstName = (profile?.fullName ?? (role === "sender" ? "Aïcha Traoré" : "Antoine Kaboré")).split(" ")[0];
+  const firstName = profile?.fullName.split(" ")[0] ?? "";
   const visibleDeliveries = (deliveriesQuery.data ?? []).filter((delivery) => role === "sender" ? delivery.status !== "completed" : delivery.status !== "completed");
 
   return (
