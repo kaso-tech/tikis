@@ -202,3 +202,6 @@
 - [x] Purger l’état de profil et toutes les sessions locales lors de la déconnexion.
 - [x] Tester la redirection de déconnexion depuis le profil et le menu latéral.
 - [x] Redémarrer, vérifier et enregistrer la correction de déconnexion.
+- [x] Identifier les nettoyages qui suppriment les espaces pendant la saisie du titre et des consignes.
+- [x] Préserver les espaces simples à la saisie et nettoyer les valeurs finales côté serveur.
+- [x] Tester les champs Titre et Consignes, redémarrer et enregistrer la correction.

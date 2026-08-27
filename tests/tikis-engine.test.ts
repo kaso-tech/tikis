@@ -17,4 +17,11 @@ describe("règles métier Tikis de démonstration", () => {
     expect(isAllowedDeliveryText("<script>alert(1)</script>")).toBe(false);
     expect(sanitizeDeliveryText("  Colis   urgent <test> ")).toBe("Colis urgent test");
   });
+
+  it("préserve un espace simple pendant la saisie puis nettoie la valeur finale", () => {
+    expect(sanitizeDeliveryText("Documents ", { preserveTrailingSpace: true })).toBe("Documents ");
+    expect(sanitizeDeliveryText("Documents   confidentiels ", { preserveTrailingSpace: true })).toBe("Documents confidentiels ");
+    expect(sanitizeDeliveryText("Documents   confidentiels ")).toBe("Documents confidentiels");
+    expect(sanitizeDeliveryText("Consignes <script> importantes", { preserveTrailingSpace: true })).toBe("Consignes script importantes");
+  });
 });
