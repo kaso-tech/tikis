@@ -23,6 +23,15 @@ type MapboxFeature = {
   geometry?: { coordinates?: unknown };
 };
 
+type OpenStreetMapPlace = {
+  lat?: string;
+  lon?: string;
+  name?: string;
+  display_name?: string;
+  category?: string;
+  address?: Record<string, unknown>;
+};
+
 type CacheEntry<T> = { value: T; expiresAt: number };
 const searchCache = new Map<string, CacheEntry<PlaceSuggestion[]>>();
 const routeCache = new Map<string, CacheEntry<{ distanceKm: number; durationMinutes: number }>>();
@@ -30,6 +39,10 @@ const SEARCH_CACHE_TTL_MS = 20_000;
 const ROUTE_CACHE_TTL_MS = 5 * 60_000;
 const CACHE_LIMIT = 200;
 const MAPBOX_TIMEOUT_MS = 8_000;
+const OSM_TIMEOUT_MS = 6_000;
+const OSM_MINIMUM_INTERVAL_MS = 1_000;
+const OSM_SEARCH_URL = process.env.TIKIS_OSM_SEARCH_URL || "https://nominatim.openstreetmap.org/search";
+let nextOpenStreetMapRequestAt = 0;
 
 function readCache<T>(cache: Map<string, CacheEntry<T>>, key: string) {
   const entry = cache.get(key);
@@ -51,9 +64,9 @@ export function resetGeographicCachesForTests() {
   routeCache.clear();
 }
 
-function searchCacheKey(query: string, bias?: { latitude: number; longitude: number }, countryCode?: string) {
+function searchCacheKey(query: string, bias?: { latitude: number; longitude: number }, countryCode?: string, includeCommunityFallback = false) {
   const biasKey = bias ? `${bias.latitude.toFixed(3)}:${bias.longitude.toFixed(3)}` : "none";
-  return `${query.toLocaleLowerCase("fr")}::${countryCode ?? "all"}::${biasKey}`;
+  return `${query.toLocaleLowerCase("fr")}::${countryCode ?? "all"}::${biasKey}::${includeCommunityFallback ? "expanded" : "mapbox"}`;
 }
 
 function routeCacheKey(origin: LocationLabel, destination: LocationLabel) {
@@ -158,12 +171,13 @@ function mapboxError(response: Response, service: "Search" | "Directions") {
 function suggestionToPlaceSuggestion(suggestion: MapboxSuggestion, sessionToken: string): PlaceSuggestion | null {
   const mapboxId = suggestion.mapbox_id;
   const name = suggestion.name_preferred || suggestion.name;
-  if (!mapboxId || !name) return null;
+  if (!mapboxId || !name || suggestion.feature_type === "category") return null;
   const context = suggestion.context;
   const street = suggestion.address || contextField(context, "street");
   const district = contextField(context, "neighborhood") || contextField(context, "district") || contextField(context, "locality");
   const city = contextField(context, "place") || contextField(context, "locality") || suggestion.place_formatted || "";
   return {
+    id: `mapbox:${mapboxId}`,
     name,
     district,
     city,
@@ -175,6 +189,71 @@ function suggestionToPlaceSuggestion(suggestion: MapboxSuggestion, sessionToken:
     mapboxSessionToken: sessionToken,
     featureType: mapboxFeatureType(suggestion.feature_type ?? ""),
   };
+}
+
+function locationToDirectSuggestion(place: LocationLabel): PlaceSuggestion {
+  return {
+    id: `${place.provider ?? "manual"}:${place.mapboxId ?? `${place.latitude.toFixed(5)}:${place.longitude.toFixed(5)}`}`,
+    ...(place.mapboxId ? { mapboxId: place.mapboxId } : {}),
+    name: place.name,
+    district: place.district,
+    city: place.city,
+    ...(place.formattedAddress ? { formattedAddress: place.formattedAddress } : {}),
+    ...(place.street ? { street: place.street } : {}),
+    ...(place.province ? { province: place.province } : {}),
+    ...(place.country ? { country: place.country } : {}),
+    ...(place.featureType ? { featureType: place.featureType } : {}),
+    ...(place.provider ? { provider: place.provider } : {}),
+    directLocation: place,
+  };
+}
+
+function openStreetMapLocation(item: OpenStreetMapPlace): LocationLabel | null {
+  const latitude = Number(item.lat);
+  const longitude = Number(item.lon);
+  const address = item.address ?? {};
+  const street = [contextField(address, "house_number"), contextField(address, "road")].filter(Boolean).join(" ");
+  const district = contextField(address, "neighbourhood") || contextField(address, "suburb") || contextField(address, "city_district");
+  const city = contextField(address, "city") || contextField(address, "town") || contextField(address, "village") || contextField(address, "municipality") || contextField(address, "county");
+  const name = item.name || street || district || city;
+  return normalizeLocation({ name, street, district, city, province: contextField(address, "state"), country: contextField(address, "country"), formattedAddress: item.display_name, latitude, longitude, provider: "openstreetmap", source: "search", featureType: item.category === "place" ? "place" : "poi", precision: street || item.category === "amenity" || item.category === "shop" ? "exact" : district ? "area" : city ? "city" : "unknown" });
+}
+
+async function searchOpenStreetMapPlaces(query: string, countryCode?: string) {
+  const now = Date.now();
+  if (now < nextOpenStreetMapRequestAt) return [];
+  nextOpenStreetMapRequestAt = now + OSM_MINIMUM_INTERVAL_MS;
+  const url = new URL(OSM_SEARCH_URL);
+  url.searchParams.set("q", query);
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("addressdetails", "1");
+  url.searchParams.set("limit", "5");
+  if (countryCode) url.searchParams.set("countrycodes", countryCode.toLowerCase());
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), OSM_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { headers: { "User-Agent": "Tikis development place search/1.0", "Accept-Language": "fr" }, signal: controller.signal });
+    if (!response.ok) return [];
+    const payload = await response.json() as unknown;
+    return Array.isArray(payload) ? payload.map((item) => openStreetMapLocation(item as OpenStreetMapPlace)).filter((item): item is LocationLabel => Boolean(item)) : [];
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function searchMapboxForward(query: string, bias?: { latitude: number; longitude: number }, countryCode?: string) {
+  const url = new URL("https://api.mapbox.com/search/searchbox/v1/forward");
+  url.searchParams.set("q", query);
+  url.searchParams.set("language", "fr");
+  url.searchParams.set("limit", "10");
+  url.searchParams.set("types", "poi,address,street,neighborhood,locality,place");
+  url.searchParams.set("auto_complete", "true");
+  if (countryCode) url.searchParams.set("country", countryCode);
+  if (bias) url.searchParams.set("proximity", `${bias.longitude},${bias.latitude}`);
+  const payload = await mapboxJson(url, "Search") as { features?: MapboxFeature[] };
+  return (payload.features ?? []).map((feature) => featureToLocation(feature, "forward")).filter((item): item is LocationLabel => Boolean(item));
 }
 
 function featureToLocation(feature: MapboxFeature, source: NonNullable<LocationLabel["source"]>): LocationLabel | null {
@@ -225,11 +304,11 @@ async function mapboxJson(url: URL, service: "Search" | "Directions") {
   }
 }
 
-export async function searchPlaces(query: string, bias?: { latitude: number; longitude: number }, countryCode?: string) {
+export async function searchPlaces(query: string, bias?: { latitude: number; longitude: number }, countryCode?: string, includeCommunityFallback = false) {
   const textQuery = sanitizePlaceText(query, 120);
   if (textQuery.length < 2) return [];
   const safeCountryCode = countryCode && /^[A-Z]{2}$/.test(countryCode) ? countryCode : undefined;
-  const cacheKey = searchCacheKey(textQuery, bias, safeCountryCode);
+  const cacheKey = searchCacheKey(textQuery, bias, safeCountryCode, includeCommunityFallback);
   const cached = readCache(searchCache, cacheKey);
   if (cached) { recordGeographicMetric("search", "cache_hit"); return cached; }
   const startedAt = Date.now();
@@ -244,7 +323,12 @@ export async function searchPlaces(query: string, bias?: { latitude: number; lon
   if (bias) url.searchParams.set("proximity", `${bias.longitude},${bias.latitude}`);
   try {
     const payload = await mapboxJson(url, "Search") as { suggestions?: MapboxSuggestion[] };
-    const suggestions = (payload.suggestions ?? []).map((item) => suggestionToPlaceSuggestion(item, sessionToken)).filter((item): item is PlaceSuggestion => Boolean(item));
+    let suggestions = (payload.suggestions ?? []).map((item) => suggestionToPlaceSuggestion(item, sessionToken)).filter((item): item is PlaceSuggestion => Boolean(item));
+    if (!suggestions.length && includeCommunityFallback) {
+      const directMapbox = await searchMapboxForward(textQuery, bias, safeCountryCode);
+      suggestions = directMapbox.map(locationToDirectSuggestion);
+      if (!suggestions.length) suggestions = (await searchOpenStreetMapPlaces(textQuery, safeCountryCode)).map(locationToDirectSuggestion);
+    }
     writeCache(searchCache, cacheKey, suggestions, SEARCH_CACHE_TTL_MS);
     recordGeographicMetric("search", "success", Date.now() - startedAt);
     return suggestions;

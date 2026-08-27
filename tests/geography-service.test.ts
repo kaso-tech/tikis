@@ -74,6 +74,27 @@ describe("services géographiques backend Tikis", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("élargit volontairement une recherche de commerce vers un POI directement sélectionnable", async () => {
+    process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ suggestions: [] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ features: [] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify([{ lat: "12.3712", lon: "-1.5201", name: "Alimentation Wend Panga", category: "shop", display_name: "Alimentation Wend Panga, Koulouba, Ouagadougou, Burkina Faso", address: { neighbourhood: "Koulouba", city: "Ouagadougou", state: "Centre", country: "Burkina Faso" } }])));
+    global.fetch = fetchMock as typeof fetch;
+    const result = await searchPlaces("Alimentation", { latitude: 12.3714, longitude: -1.5197 }, "BF", true);
+    expect(result[0]).toMatchObject({ id: "openstreetmap:12.37120:-1.52010", name: "Alimentation Wend Panga", provider: "openstreetmap", directLocation: { latitude: 12.3712, longitude: -1.5201, featureType: "poi", precision: "exact" } });
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain("searchbox/v1/forward");
+    expect(String(fetchMock.mock.calls[2]?.[0])).toContain("nominatim.openstreetmap.org/search");
+  });
+
+  it("ne consulte pas le repli communautaire pendant l’autocomplétion automatique", async () => {
+    process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ suggestions: [] })));
+    global.fetch = fetchMock as typeof fetch;
+    await searchPlaces("Alimentation", { latitude: 12.3714, longitude: -1.5197 }, "BF");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("conserve les contextes Mapbox structurés lors de la résolution d’une suggestion", async () => {
     process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
     global.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ features: [{ id: "address-1", geometry: { coordinates: [-1.5203, 12.3699] }, properties: { feature_type: "address", mapbox_id: "address-1", name: "12 Avenue Kwame Nkrumah", full_address: "12 Avenue Kwame Nkrumah", context: { neighborhood: { name: "Koulouba" }, place: { name: "Ouagadougou" }, region: { name: "Centre" }, country: { name: "Burkina Faso" } } } }] }))) as typeof fetch;

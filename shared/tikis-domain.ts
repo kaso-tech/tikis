@@ -66,15 +66,16 @@ export interface LocationLabel {
   street?: string;
   province?: string;
   country?: string;
-  provider?: "mapbox" | "manual" | "legacy";
-  source?: "retrieve" | "reverse" | "forward" | "favorite" | "manual" | "legacy";
+  provider?: "mapbox" | "openstreetmap" | "manual" | "legacy";
+  source?: "search" | "retrieve" | "reverse" | "forward" | "favorite" | "manual" | "legacy";
   featureType?: "address" | "secondary_address" | "poi" | "street" | "neighborhood" | "locality" | "place" | "point" | "unknown";
   precision?: "exact" | "street" | "area" | "city" | "unknown";
 }
 
 export interface PlaceSuggestion {
-  mapboxId: string;
-  mapboxSessionToken: string;
+  id: string;
+  mapboxId?: string;
+  mapboxSessionToken?: string;
   name: string;
   district: string;
   city: string;
@@ -83,6 +84,8 @@ export interface PlaceSuggestion {
   province?: string;
   country?: string;
   featureType?: LocationLabel["featureType"];
+  provider?: LocationLabel["provider"];
+  directLocation?: LocationLabel;
 }
 
 export interface Delivery {

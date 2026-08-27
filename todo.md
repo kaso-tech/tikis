@@ -205,3 +205,7 @@
 - [x] Identifier les nettoyages qui suppriment les espaces pendant la saisie du titre et des consignes.
 - [x] Préserver les espaces simples à la saisie et nettoyer les valeurs finales côté serveur.
 - [x] Tester les champs Titre et Consignes, redémarrer et enregistrer la correction.
+- [x] Diagnostiquer pourquoi les recherches Mapbox manquent les commerces et lieux publics.
+- [x] Étendre la recherche à des sources POI pertinentes et améliorer le géocodage inverse sur la carte.
+- [x] Afficher et classer les résultats de lieux publics, commerces, rues et quartiers de façon utile.
+- [x] Tester des requêtes représentatives, redémarrer et enregistrer l’amélioration de recherche.

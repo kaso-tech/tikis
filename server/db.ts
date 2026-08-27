@@ -141,8 +141,8 @@ export function tikisPlaceToLocation(place: TikisPlace): LocationLabel {
     ...(place.street ? { street: place.street } : {}),
     ...(place.province ? { province: place.province } : {}),
     ...(place.country ? { country: place.country } : {}),
-    provider: place.provider === "mapbox" ? "mapbox" : place.provider === "manual" ? "manual" : "legacy",
-    source: ["retrieve", "reverse", "forward", "favorite", "manual", "legacy"].includes(place.source) ? place.source as LocationLabel["source"] : "legacy",
+    provider: place.provider === "mapbox" ? "mapbox" : place.provider === "openstreetmap" ? "openstreetmap" : place.provider === "manual" ? "manual" : "legacy",
+    source: ["search", "retrieve", "reverse", "forward", "favorite", "manual", "legacy"].includes(place.source) ? place.source as LocationLabel["source"] : "legacy",
     featureType: ["address", "secondary_address", "poi", "street", "neighborhood", "locality", "place", "point", "unknown"].includes(place.featureType) ? place.featureType as LocationLabel["featureType"] : "unknown",
     precision: ["exact", "street", "area", "city", "unknown"].includes(place.precision) ? place.precision as LocationLabel["precision"] : "unknown",
   };
@@ -167,7 +167,13 @@ export async function saveTikisPlace(input: Omit<InsertTikisPlace, "coordinateKe
     if (cached) return cached;
   }
   const cachedByCoordinate = await getTikisPlaceByCoordinate(input.latitude, input.longitude);
-  if (cachedByCoordinate) return cachedByCoordinate;
+  if (cachedByCoordinate) {
+    const quality = (precision: string, featureType: string) => (precision === "exact" ? 40 : precision === "street" ? 30 : precision === "area" ? 20 : precision === "city" ? 10 : 0) + (featureType === "poi" ? 5 : 0);
+    if (quality(cachedByCoordinate.precision, cachedByCoordinate.featureType) >= quality(input.precision ?? "unknown", input.featureType ?? "unknown")) return cachedByCoordinate;
+    await db.update(tikisPlaces).set({ ...input, coordinateKey: coordinateCacheKey(input.latitude, input.longitude) }).where(eq(tikisPlaces.id, cachedByCoordinate.id));
+    const updated = await db.select().from(tikisPlaces).where(eq(tikisPlaces.id, cachedByCoordinate.id)).limit(1);
+    if (updated[0]) return updated[0];
+  }
   const inserted = await db.insert(tikisPlaces).values({ ...input, coordinateKey: coordinateCacheKey(input.latitude, input.longitude) });
   const result = await db.select().from(tikisPlaces).where(eq(tikisPlaces.id, Number(inserted[0].insertId))).limit(1);
   if (!result[0]) throw new Error("Le lieu n’a pas pu être enregistré.");

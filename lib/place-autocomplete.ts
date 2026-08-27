@@ -9,6 +9,7 @@ export function autocompleteQuery(value: string) {
 }
 
 /** Évite une nouvelle écriture d’état lorsque la même liste de suggestions est déjà affichée. */
-export function haveSameSuggestionIds<T extends { mapboxId: string }>(current: readonly T[], next: readonly T[]) {
-  return current.length === next.length && current.every((place, index) => place.mapboxId === next[index]?.mapboxId);
+export function haveSameSuggestionIds<T extends { id?: string; mapboxId?: string }>(current: readonly T[], next: readonly T[]) {
+  const identity = (place: T | undefined) => place?.id ?? place?.mapboxId ?? "";
+  return current.length === next.length && current.every((place, index) => identity(place) === identity(next[index]));
 }
