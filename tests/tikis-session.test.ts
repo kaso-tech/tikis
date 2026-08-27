@@ -22,4 +22,10 @@ describe("session Tikis signée", () => {
     await expect(verifyTikisProfileSession("not-a-valid-session")).resolves.toBeNull();
     await expect(createTikisProfileSession("70000000")).rejects.toThrow("invalide");
   });
+
+  it("dérive une clé HMAC stable lorsque le secret plateforme est plus court que 32 caractères", async () => {
+    process.env.JWT_SECRET = "secret-plateforme-court";
+    const token = await createTikisProfileSession("+22676000000");
+    await expect(verifyTikisProfileSession(token)).resolves.toBe("+22676000000");
+  });
 });

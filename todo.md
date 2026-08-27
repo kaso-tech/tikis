@@ -186,3 +186,7 @@
 - [x] Corriger le contrat client/serveur responsable de l’inscription après OTP.
 - [x] Tester les créations de profil et reconnexions avec les numéros normalisés.
 - [x] Redémarrer, vérifier et enregistrer la correction définitive du parcours OTP.
+- [x] Diagnostiquer les échecs de lookup des profils existants et de signature de session Tikis.
+- [x] Stabiliser la signature et la vérification de session en environnement de développement.
+- [x] Corriger les parcours OTP des comptes existants et des nouvelles inscriptions.
+- [x] Tester les deux parcours, redémarrer les services et enregistrer la correction.

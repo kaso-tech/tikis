@@ -5,9 +5,11 @@ const SESSION_AUDIENCE = "tikis-profile";
 const PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
 
 function signingKey() {
-  const value = process.env.JWT_SECRET;
-  if (!value || value.length < 32) throw new Error("La signature de session Tikis est indisponible.");
-  return new TextEncoder().encode(value);
+  const value = process.env.TIKIS_SESSION_SECRET ?? process.env.JWT_SECRET;
+  if (!value || value.length < 16) throw new Error("La signature de session Tikis est indisponible.");
+  // Isole la signature Tikis de l’authentification interne tout en produisant
+  // toujours une clé HMAC de 256 bits, y compris avec le secret plateforme court.
+  return createHash("sha256").update(`tikis-profile-session:${value}`, "utf8").digest();
 }
 
 export async function createTikisProfileSession(phone: string) {
@@ -32,3 +34,4 @@ export async function verifyTikisProfileSession(token: string | undefined) {
     return null;
   }
 }
+import { createHash } from "node:crypto";
