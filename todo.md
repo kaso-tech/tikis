@@ -240,3 +240,8 @@
 - [x] Vérifier le comportement actuel de la barre de recherche d’adresse.
 - [x] Ajouter et valider l’icône d’effacement rapide de recherche.
 - [x] Vérifier le serveur et enregistrer la correction.
+- [x] Auditer le thème, les composants partagés et les commentaires existants.
+- [x] Définir une palette réduite noir-blanc et une hiérarchie typographique système.
+- [x] Densifier les composants et écrans prioritaires avec angles et ombres sobres.
+- [x] Supprimer les commentaires non essentiels et vérifier la cohérence de l’application.
+- [x] Tester le thème, vérifier le serveur et enregistrer la version.
