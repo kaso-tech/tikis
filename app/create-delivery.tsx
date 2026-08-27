@@ -29,9 +29,9 @@ function favoriteToLocation(item: { place: { placeName: string; district: string
 }
 
 export default function CreateDeliveryScreen() {
-  const { createDemoDelivery, profile } = useTikisStore();
-  const [title, setTitle] = useState("Documents confidentiels");
-  const [details, setDetails] = useState("À remettre contre signature.");
+  const { profile } = useTikisStore();
+  const [title, setTitle] = useState("");
+  const [details, setDetails] = useState("");
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("Plis");
   const [vehicle, setVehicle] = useState<SelectableVehicleType>("Moto");
   const [pickup, setPickup] = useState<LocationLabel | null>(null);
@@ -40,7 +40,7 @@ export default function CreateDeliveryScreen() {
   const [lengthCm, setLengthCm] = useState("");
   const [widthCm, setWidthCm] = useState("");
   const [heightCm, setHeightCm] = useState("");
-  const [passengers, setPassengers] = useState("1");
+  const [passengers, setPassengers] = useState("");
   const [offeredPriceInput, setOfferedPriceInput] = useState("");
   const [route, setRoute] = useState<{ distanceKm: number; durationMinutes: number; precise: boolean; source: "routes" | "provisional" } | null>(null);
   const [routeMessage, setRouteMessage] = useState("");
@@ -51,6 +51,7 @@ export default function CreateDeliveryScreen() {
   const [pickerTarget, setPickerTarget] = useState<"pickup" | "dropoff" | null>(null);
   const [favoritesVisible, setFavoritesVisible] = useState(false);
   const { mutateAsync: requestRoute } = trpc.geography.route.useMutation();
+  const createDeliveryMutation = trpc.deliveries.create.useMutation();
   const savePlaceMutation = trpc.geography.savePlace.useMutation();
   const favoriteMutation = trpc.geography.favorites.add.useMutation();
   const renameFavoriteMutation = trpc.geography.favorites.rename.useMutation();
@@ -125,10 +126,8 @@ export default function CreateDeliveryScreen() {
     if (priceInputError) { setError(priceInputError); return; }
     setError(""); setPublicationStage("Enregistrement des lieux…"); setLoading(true);
     try {
-      await Promise.all([savePlaceMutation.mutateAsync(toPlacePayload(pickup)), savePlaceMutation.mutateAsync(toPlacePayload(dropoff))]);
       setPublicationStage("Publication auprès des livreurs…");
-      await new Promise((resolve) => setTimeout(resolve, 180));
-      const delivery = createDemoDelivery({ title: cleanTitle, type: deliveryType, pickup, dropoff, distanceKm: route.distanceKm, routeSource: route.source, estimatedPrice: estimate, ...(parsedOfferedPrice ? { offeredPrice: parsedOfferedPrice } : {}), vehicleTypes: [vehicle], details: cleanDetails, ...(deliveryType === "Autre" && weightKg ? { weightKg: Number(weightKg) } : {}), ...(deliveryType === "Autre" && Object.keys(dimensions).length ? { dimensions } : {}), ...(deliveryType === "Personne" ? { passengers: Number(passengers) } : {}) });
+      const delivery = await createDeliveryMutation.mutateAsync({ title: cleanTitle, type: deliveryType, pickup: toPlacePayload(pickup), dropoff: toPlacePayload(dropoff), distanceKm: route.distanceKm, routeSource: route.source, estimatedPrice: estimate, ...(parsedOfferedPrice ? { offeredPrice: parsedOfferedPrice } : {}), vehicleTypes: [vehicle], details: cleanDetails, ...(deliveryType === "Autre" && weightKg ? { weightKg: Number(weightKg) } : {}), ...(deliveryType === "Autre" && Object.keys(dimensions).length ? { dimensions } : {}), ...(deliveryType === "Personne" ? { passengers: Number(passengers) } : {}) });
       router.replace(`/delivery/${delivery.id}` as any);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "La livraison n’a pas pu être publiée."); }
     finally { setLoading(false); setPublicationStage(""); }

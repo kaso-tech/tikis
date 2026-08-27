@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { StatusBadge } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
 import { formatListRouteParts } from "@/lib/geo-rules";
-import { deliveryStatusMeta, formatMoney, type Delivery } from "@/shared/tikis-domain";
+import { deliveryStatusMeta, formatMoney, formatRelativeDate, type Delivery } from "@/shared/tikis-domain";
 
 export function DeliveryCard({ delivery, onPress }: { delivery: Delivery; onPress: () => void }) {
   const status = deliveryStatusMeta[delivery.status];
@@ -22,7 +22,7 @@ export function DeliveryCard({ delivery, onPress }: { delivery: Delivery; onPres
         <View style={styles.vehicleIcon}><MaterialIcons name="local-shipping" size={19} color="#007B8B" /></View>
         <View style={styles.titleWrap}>
           <Text style={styles.title} numberOfLines={1}>{delivery.title}</Text>
-          <Text style={styles.when}>{delivery.scheduledAt}</Text>
+          <Text style={styles.when}>{formatRelativeDate(delivery.createdAt)}</Text>
         </View>
         <StatusBadge label={status.label} color={status.color} background={status.background} />
       </View>

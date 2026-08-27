@@ -13,9 +13,11 @@ import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 
 export default function ProfileScreen() {
-  const { role, profile, notifications, markNotificationsRead, updateProfile, completedDeliveriesForRole, reviews } = useTikisStore();
+  const { role, profile, notifications, markNotificationsRead, updateProfile } = useTikisStore();
   const { openLogoutConfirmation } = useTikisLogout();
   const updateMutation = trpc.profiles.update.useMutation();
+  const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
+  const reviewsQuery = trpc.reviews.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
   const [editorOpen, setEditorOpen] = useState(false);
   const [fullName, setFullName] = useState(profile?.fullName ?? "");
   const [photoBase64, setPhotoBase64] = useState<string | undefined>();
@@ -26,8 +28,8 @@ export default function ProfileScreen() {
   const name = profile?.fullName ?? (driver ? "Antoine Kaboré" : "Aïcha Traoré");
   const initials = name.split(" ").map((part) => part[0]).slice(0, 2).join("").toUpperCase();
   const photoUri = profile?.photoUrl ? `${getApiBaseUrl()}${profile.photoUrl}` : undefined;
-  const completed = completedDeliveriesForRole(role);
-  const receivedReviews = reviews.filter((review) => driver && review.driverName === name);
+  const completed = (deliveriesQuery.data ?? []).filter((delivery) => delivery.status === "completed");
+  const receivedReviews = driver ? reviewsQuery.data ?? [] : [];
 
   async function pickPhoto() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.45, base64: true });

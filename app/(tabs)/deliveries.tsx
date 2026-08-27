@@ -4,6 +4,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { DeliveryCard } from "@/components/tikis/delivery-card";
 import { tikisStyles } from "@/components/tikis/ui";
 import { useTikisStore } from "@/lib/tikis-store";
+import { trpc } from "@/lib/trpc";
 import type { DeliveryStatus } from "@/shared/tikis-domain";
 
 type FilterKey = "all" | DeliveryStatus;
@@ -16,13 +17,11 @@ const driverFilters: { key: FilterKey; label: string }[] = [
 ];
 
 export default function DeliveriesScreen() {
-  const { deliveries, role } = useTikisStore();
+  const { role, profile } = useTikisStore();
+  const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
   const [filter, setFilter] = useState<FilterKey>("all");
   const filters = role === "sender" ? senderFilters : driverFilters;
-  const data = useMemo(() => deliveries.filter((delivery) => {
-    const roleMatch = role === "sender" ? delivery.senderName === "A. Traoré" : delivery.status === "open" || delivery.driverId === "driver-antoine" || delivery.status === "pending_confirmation";
-    return roleMatch && (filter === "all" || delivery.status === filter);
-  }), [deliveries, filter, role]);
+  const data = useMemo(() => (deliveriesQuery.data ?? []).filter((delivery) => filter === "all" || delivery.status === filter), [deliveriesQuery.data, filter]);
 
   return (
     <View style={tikisStyles.screen}>
@@ -36,6 +35,7 @@ export default function DeliveriesScreen() {
           <Text style={[tikisStyles.title, styles.title]}>{role === "sender" ? "Vos courses" : "Vos livraisons"}</Text>
           <View style={styles.filters}>{filters.map((item) => <Pressable key={item.key} onPress={() => setFilter(item.key)} style={({ pressed }) => [styles.filter, filter === item.key && styles.filterActive, pressed && styles.pressed]}><Text style={[styles.filterText, filter === item.key && styles.filterTextActive]}>{item.label}</Text></Pressable>)}</View>
         </>}
+        ListEmptyComponent={<Text style={styles.empty}>{deliveriesQuery.isLoading ? "Chargement de vos livraisons…" : deliveriesQuery.error ? "Impossible de charger les livraisons. Réessayez dans un instant." : "Aucune livraison pour le moment."}</Text>}
       />
     </View>
   );
@@ -50,4 +50,5 @@ const styles = StyleSheet.create({
   filterText: { color: "#697386", fontWeight: "800", fontSize: 12 },
   filterTextActive: { color: "#FFFFFF" },
   pressed: { opacity: 0.7 },
+  empty: { color: "#697386", textAlign: "center", marginTop: 42, fontSize: 13 },
 });

@@ -166,6 +166,19 @@ export { displayLocation, locationSubtitle, locationTitle } from "../lib/geo-rul
 export const formatMoney = (amount: number) =>
   `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 }).format(amount)} FCFA`;
 
+export function formatRelativeDate(value: string, now = Date.now()) {
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return "Date indisponible";
+  const differenceMinutes = Math.max(0, Math.floor((now - timestamp) / 60_000));
+  if (differenceMinutes < 1) return "À l’instant";
+  if (differenceMinutes < 60) return `Il y a ${differenceMinutes} min`;
+  const hours = Math.floor(differenceMinutes / 60);
+  if (hours < 24) return `Il y a ${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `Il y a ${days} j`;
+  return new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" }).format(new Date(value));
+}
+
 export const deliveryStatusMeta: Record<
   DeliveryStatus,
   { label: string; color: string; background: string }

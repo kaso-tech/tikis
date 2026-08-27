@@ -7,19 +7,25 @@ import { Avatar, SurfaceCard, TikisButton } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
 import { isValidReviewText } from "@/lib/review-rules";
 import { useTikisStore } from "@/lib/tikis-store";
+import { trpc } from "@/lib/trpc";
 
 export default function ReviewDeliveryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { deliveryById, reviewForDelivery, submitReview } = useTikisStore();
-  const delivery = deliveryById(id);
-  const existing = reviewForDelivery(id);
+  const { profile } = useTikisStore();
+  const safeDeliveryId = id ?? "00000000-0000-4000-8000-000000000000";
+  const deliveryQuery = trpc.deliveries.get.useQuery({ id: safeDeliveryId }, { enabled: Boolean(id && profile?.phone) });
+  const reviewQuery = trpc.reviews.getForDelivery.useQuery({ deliveryId: safeDeliveryId }, { enabled: Boolean(id && profile?.phone) });
+  const submitReviewMutation = trpc.reviews.submit.useMutation();
+  const delivery = deliveryQuery.data;
+  const existing = reviewQuery.data;
   const [rating, setRating] = useState<1 | 2 | 3 | 4 | 5>(5);
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  if (deliveryQuery.isLoading || reviewQuery.isLoading) return <SafeAreaView style={styles.safe}><View style={styles.missing}><Text style={styles.missingTitle}>Chargement de l’évaluation…</Text></View></SafeAreaView>;
   if (!delivery) return <SafeAreaView style={styles.safe}><View style={styles.missing}><Text style={styles.missingTitle}>Livraison introuvable</Text><TikisButton label="Retour" onPress={() => router.back()} /></View></SafeAreaView>;
 
-  async function save() { if (comment && !isValidReviewText(comment)) { setError("Caractères non autorisés"); haptic.error(); return; } setSaving(true); await new Promise((resolve) => setTimeout(resolve, 350)); const result = submitReview({ deliveryId: id, rating, comment }); setSaving(false); if (!result.ok) { setError(result.message ?? "L’avis n’a pas pu être enregistré."); haptic.error(); return; } haptic.success(); router.replace(`/delivery/${id}` as any); }
+  async function save() { if (comment && !isValidReviewText(comment)) { setError("Caractères non autorisés"); haptic.error(); return; } setSaving(true); try { await submitReviewMutation.mutateAsync({ deliveryId: safeDeliveryId, rating, ...(comment.trim() ? { comment } : {}) }); haptic.success(); router.replace(`/delivery/${safeDeliveryId}` as any); } catch (cause) { setError(cause instanceof Error ? cause.message : "L’avis n’a pas pu être enregistré."); haptic.error(); } finally { setSaving(false); } }
 
   return <SafeAreaView style={styles.safe} edges={["top", "bottom"]}><ScrollView contentContainerStyle={styles.content}><View style={styles.top}><Pressable onPress={() => router.back()} style={({ pressed }) => [styles.back, pressed && styles.pressed]}><MaterialIcons name="arrow-back" size={22} color="#0B1F3A" /></Pressable><Text style={styles.topTitle}>Évaluer la course</Text><View style={styles.placeholder} /></View>{existing ? <SurfaceCard style={styles.doneCard}><MaterialIcons name="task-alt" size={28} color="#18A572" /><Text style={styles.doneTitle}>Avis déjà envoyé</Text><Text style={styles.doneText}>Vous avez attribué {existing.rating}/5 à {existing.driverName}.</Text>{existing.comment ? <Text style={styles.quote}>« {existing.comment} »</Text> : null}</SurfaceCard> : <><Text style={styles.eyebrow}>LIVRAISON TERMINÉE</Text><Text style={styles.title}>Comment s’est passée la prestation ?</Text><Text style={styles.subtitle}>Votre avis aide la communauté Tikis à choisir des livreurs de confiance.</Text><SurfaceCard style={styles.driverCard}><Avatar initials={(delivery.driverName ?? "LT").split(" ").map((part) => part[0]).join("")} color="#007B8B" size={56} /><View><Text style={styles.driverName}>{delivery.driverName ?? "Livreur Tikis"}</Text><Text style={styles.deliveryName}>{delivery.title}</Text></View></SurfaceCard><Text style={styles.label}>VOTRE NOTE</Text><View style={styles.stars}>{[1, 2, 3, 4, 5].map((star) => <Pressable key={star} accessibilityRole="button" accessibilityLabel={`${star} étoiles`} onPress={() => { setRating(star as 1 | 2 | 3 | 4 | 5); haptic.selection(); }} style={({ pressed }) => [styles.starButton, pressed && styles.pressed]}><MaterialIcons name={star <= rating ? "star" : "star-outline"} size={39} color={star <= rating ? "#F59E0B" : "#C6D1DC"} /></Pressable>)}</View><Text style={styles.ratingCaption}>{rating === 5 ? "Excellente prestation" : rating >= 4 ? "Très bonne prestation" : rating >= 3 ? "Prestation correcte" : "Prestation à améliorer"}</Text><Text style={styles.label}>VOTRE AVIS <Text style={styles.optional}>(facultatif)</Text></Text><TextInput multiline maxLength={500} value={comment} onChangeText={(value) => { setComment(value); setError(""); }} placeholder="Partagez votre expérience avec ce livreur…" placeholderTextColor="#A1ADBC" style={[styles.comment, error && styles.commentError]} textAlignVertical="top" />{error ? <Text style={styles.error}>{error}</Text> : <Text style={styles.helper}>{comment.length}/500 · Votre avis doit rester respectueux et utile.</Text>}<TikisButton label="Publier mon avis" icon="send" onPress={() => void save()} loading={saving} style={styles.save} /></>}</ScrollView></SafeAreaView>;
 }

@@ -4,14 +4,14 @@ import { FlatList, StyleSheet, Text, View } from "react-native";
 import { DeliveryCard } from "@/components/tikis/delivery-card";
 import { SectionHeading, SurfaceCard, TikisButton, tikisStyles } from "@/components/tikis/ui";
 import { useTikisStore } from "@/lib/tikis-store";
+import { trpc } from "@/lib/trpc";
 import { availableWalletBalance, formatMoney } from "@/shared/tikis-domain";
 
 export default function HomeScreen() {
-  const { role, profile, deliveries, wallet } = useTikisStore();
+  const { role, profile, wallet } = useTikisStore();
+  const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
   const firstName = (profile?.fullName ?? (role === "sender" ? "Aïcha Traoré" : "Antoine Kaboré")).split(" ")[0];
-  const visibleDeliveries = role === "sender"
-    ? deliveries.filter((delivery) => delivery.senderName === "A. Traoré")
-    : deliveries.filter((delivery) => delivery.status === "open" || delivery.status === "pending_confirmation" || (delivery.driverId === "driver-antoine" && delivery.status !== "completed"));
+  const visibleDeliveries = (deliveriesQuery.data ?? []).filter((delivery) => role === "sender" ? delivery.status !== "completed" : delivery.status !== "completed");
 
   return (
     <View style={tikisStyles.screen}>
@@ -52,7 +52,7 @@ export default function HomeScreen() {
             <SectionHeading title={role === "sender" ? "Vos livraisons" : "Opportunités pour vous"} action={role === "sender" ? "Tout voir" : "Filtrer"} />
           </>
         }
-        ListEmptyComponent={<Text style={styles.empty}>Aucune course pour le moment.</Text>}
+        ListEmptyComponent={<Text style={styles.empty}>{deliveriesQuery.isLoading ? "Chargement des livraisons…" : deliveriesQuery.error ? "Impossible de charger les livraisons." : "Aucune course pour le moment."}</Text>}
       />
     </View>
   );

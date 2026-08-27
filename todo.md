@@ -153,3 +153,9 @@
 - [x] Mettre en place les métriques de cache, erreurs et limitation de requêtes géographiques.
 - [x] Couvrir les cas métier A à J, la résilience et les contrôles d’accès par des tests.
 - [x] Valider l’intégralité de la refonte, redémarrer le serveur et enregistrer une version livrable.
+- [x] Analyser les exigences de livraison réelle et les flux de démonstration à remplacer.
+- [x] Définir le modèle persistant, les statuts et la migration non destructive des livraisons.
+- [x] Créer les accès serveur sécurisés de création, consultation et mise à jour de livraison.
+- [x] Connecter la création, les listes et les détails aux livraisons persistées de l’utilisateur.
+- [x] Migrer les transitions, candidatures et historique vers la source de données réelle.
+- [x] Tester les parcours expéditeur et livreur, valider le serveur et enregistrer la version livrable.

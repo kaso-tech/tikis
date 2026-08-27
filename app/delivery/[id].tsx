@@ -9,19 +9,26 @@ import { haptic } from "@/lib/haptics";
 import { offeredPriceError, parseOfferedPrice, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
 import { useTikisStore } from "@/lib/tikis-store";
-import { deliveryStatusMeta, formatMoney, type DriverCandidate } from "@/shared/tikis-domain";
+import { trpc } from "@/lib/trpc";
+import { deliveryStatusMeta, formatMoney, formatRelativeDate, type DriverCandidate } from "@/shared/tikis-domain";
 
 type FinancialAction = "apply" | "withdraw" | "select" | "confirm" | "complete" | null;
 
 export default function DeliveryDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
-  const {
-    role, policy, deliveryById, candidatesForDelivery, driverCandidateForDelivery,
-    applyToDelivery, counterOffer, withdrawFromDelivery, selectCandidate, confirmAssignedDelivery, completeDelivery, reviewForDelivery,
-  } = useTikisStore();
-  const delivery = deliveryById(params.id);
-  const candidates = candidatesForDelivery(params.id);
-  const ownCandidate = driverCandidateForDelivery(params.id);
+  const { role, profile, policy } = useTikisStore();
+  const utilities = trpc.useUtils();
+  const deliveryQuery = trpc.deliveries.get.useQuery({ id: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
+  const candidatesQuery = trpc.deliveries.candidates.useQuery({ deliveryId: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
+  const applyMutation = trpc.deliveries.submitApplication.useMutation();
+  const withdrawMutation = trpc.deliveries.withdraw.useMutation();
+  const selectMutation = trpc.deliveries.selectCandidate.useMutation();
+  const confirmMutation = trpc.deliveries.confirm.useMutation();
+  const completeMutation = trpc.deliveries.complete.useMutation();
+  const reviewQuery = trpc.reviews.getForDelivery.useQuery({ deliveryId: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
+  const delivery = deliveryQuery.data;
+  const candidates = candidatesQuery.data ?? [];
+  const ownCandidate = candidates.find((candidate) => candidate.driverId === profile?.phone);
   const [action, setAction] = useState<FinancialAction>(null);
   const [selectedCandidate, setSelectedCandidate] = useState<DriverCandidate | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -30,6 +37,14 @@ export default function DeliveryDetailScreen() {
   const [counterInput, setCounterInput] = useState("");
   const [counterError, setCounterError] = useState("");
   const [counterLoading, setCounterLoading] = useState(false);
+
+  async function refreshDelivery() {
+    await Promise.all([
+      utilities.deliveries.get.invalidate({ id: params.id ?? "" }),
+      utilities.deliveries.candidates.invalidate({ deliveryId: params.id ?? "" }),
+      utilities.deliveries.list.invalidate(),
+    ]);
+  }
 
   const actionConfig = useMemo(() => {
     if (!delivery) return null;
@@ -43,6 +58,10 @@ export default function DeliveryDetailScreen() {
     return null;
   }, [action, delivery, ownCandidate, policy.rate, selectedCandidate]);
 
+  if (deliveryQuery.isLoading) {
+    return <SafeAreaView style={styles.safe}><View style={styles.notFound}><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
+  }
+
   if (!delivery) {
     return <SafeAreaView style={styles.safe}><View style={styles.notFound}><Text style={styles.notFoundTitle}>Livraison introuvable</Text><TikisButton label="Retour aux courses" onPress={() => router.replace("/(tabs)/deliveries" as any)} /></View></SafeAreaView>;
   }
@@ -50,26 +69,26 @@ export default function DeliveryDetailScreen() {
   const status = deliveryStatusMeta[delivery.status];
   const deliveryId = delivery.id;
   const canRevealContact = delivery.status === "active" || delivery.status === "completed";
-  const review = reviewForDelivery(delivery.id);
+  const review = reviewQuery.data;
   const showCandidates = role === "sender" && (delivery.status === "open" || delivery.status === "pending_confirmation" || delivery.status === "active");
   const pickupPresentation = formatDeliveryDetailPlace(delivery.pickup);
   const dropoffPresentation = formatDeliveryDetailPlace(delivery.dropoff);
 
   async function confirmAction() {
     setProcessing(true);
-    await new Promise((resolve) => setTimeout(resolve, 450));
-    if (action === "apply") {
-      const result = applyToDelivery(deliveryId);
-      if (!result.ok) setMessage(result.message ?? "La candidature n’a pas pu être envoyée.");
-    }
-    if (action === "withdraw") withdrawFromDelivery(deliveryId);
-    if (action === "select" && selectedCandidate) selectCandidate(deliveryId, selectedCandidate.id);
-    if (action === "confirm") confirmAssignedDelivery(deliveryId);
-    if (action === "complete") completeDelivery(deliveryId);
-    setProcessing(false);
-    setAction(null);
-    setSelectedCandidate(null);
-    haptic.success();
+    try {
+      if (action === "apply") await applyMutation.mutateAsync({ deliveryId });
+      if (action === "withdraw") await withdrawMutation.mutateAsync({ deliveryId });
+      if (action === "select" && selectedCandidate) await selectMutation.mutateAsync({ deliveryId, candidateId: selectedCandidate.id });
+      if (action === "confirm") await confirmMutation.mutateAsync({ deliveryId });
+      if (action === "complete") await completeMutation.mutateAsync({ deliveryId });
+      await refreshDelivery();
+      setAction(null);
+      setSelectedCandidate(null);
+      haptic.success();
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Cette action n’a pas pu être enregistrée.");
+    } finally { setProcessing(false); }
   }
 
   function openCandidateAction(candidate: DriverCandidate) {
@@ -89,11 +108,13 @@ export default function DeliveryDetailScreen() {
     const inputError = offeredPriceError(counterInput);
     if (!amount || inputError) { setCounterError(inputError ?? "Saisissez un prix valide."); return; }
     setCounterLoading(true); setCounterError("");
-    await new Promise((resolve) => setTimeout(resolve, 350));
-    const result = counterOffer(deliveryId, amount);
-    setCounterLoading(false);
-    if (!result.ok) { setCounterError(result.message ?? "La contre-proposition n’a pas pu être envoyée."); return; }
-    setCounterVisible(false); setMessage("Votre contre-proposition a été envoyée à l’expéditeur."); haptic.success();
+    try {
+      await applyMutation.mutateAsync({ deliveryId, offerPrice: amount });
+      await refreshDelivery();
+      setCounterVisible(false); setMessage("Votre contre-proposition a été envoyée à l’expéditeur."); haptic.success();
+    } catch (cause) {
+      setCounterError(cause instanceof Error ? cause.message : "La contre-proposition n’a pas pu être envoyée.");
+    } finally { setCounterLoading(false); }
   }
 
   return (
@@ -102,12 +123,12 @@ export default function DeliveryDetailScreen() {
         data={showCandidates ? candidates : []}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.content}
-        renderItem={({ item }) => <CandidateRow candidate={item} delivery={delivery} onChoose={() => openCandidateAction(item)} />}
+        renderItem={({ item }) => <CandidateRow candidate={item} delivery={delivery} loading={processing && selectedCandidate?.id === item.id} onChoose={() => openCandidateAction(item)} />}
         ListHeaderComponent={<>
           <View style={styles.topBar}><Pressable onPress={() => router.back()} style={({ pressed }) => [styles.back, pressed && styles.pressed]}><MaterialIcons name="arrow-back" size={22} color="#0B1F3A" /></Pressable><Text style={styles.topTitle}>Détail de livraison</Text><Pressable onPress={() => router.push(`/report/${deliveryId}` as any)} style={({ pressed }) => [styles.report, pressed && styles.pressed]}><MaterialIcons name="flag" size={20} color="#C23B45" /></Pressable></View>
           <StatusBadge label={status.label} color={status.color} background={status.background} />
           <Text style={styles.title}>{delivery.title}</Text>
-          <Text style={styles.schedule}>{delivery.scheduledAt} · {delivery.distanceKm.toLocaleString("fr-FR")} km</Text>
+          <Text style={styles.schedule}>{formatRelativeDate(delivery.createdAt)} · {delivery.distanceKm.toLocaleString("fr-FR")} km</Text>
           {delivery.routeSource === "provisional" ? <Text style={styles.provisionalRoute}>Distance et estimation provisoires, à recalculer avec Routes API dès que le service est activé.</Text> : null}
 
           <SurfaceCard style={styles.routeCard}>
@@ -137,7 +158,7 @@ export default function DeliveryDetailScreen() {
 
           {canRevealContact && delivery.driverName ? <><SectionHeading title="Mise en relation" /><SurfaceCard style={styles.contactCard}><View style={styles.contactTop}><Avatar initials={delivery.driverName.split(" ").map((part) => part[0]).join("")} color="#007B8B" /><View style={styles.contactInfo}><Text style={styles.contactName}>{role === "sender" ? delivery.driverName : delivery.senderName}</Text><Text style={styles.contactMeta}>{role === "sender" ? "Livreur confirmé" : "Expéditeur"}</Text></View><MaterialIcons name="verified" size={21} color="#18A572" /></View><TikisButton label={role === "sender" ? "Appeler le livreur" : "Appeler l’expéditeur"} variant="secondary" icon="phone" onPress={() => void Linking.openURL(`tel:${role === "sender" ? delivery.driverPhone : delivery.senderPhone}`)} style={styles.contactButton} /></SurfaceCard></> : null}
 
-          {role === "driver" ? <DriverActions deliveryStatus={delivery.status} ownCandidateStatus={ownCandidate?.status} onApply={() => setAction("apply")} onCounterOffer={openCounterOffer} onWithdraw={() => setAction("withdraw")} onConfirm={() => setAction("confirm")} onComplete={() => setAction("complete")} /> : null}
+          {role === "driver" ? <DriverActions deliveryStatus={delivery.status} ownCandidateStatus={ownCandidate?.status} loading={processing} onApply={() => setAction("apply")} onCounterOffer={openCounterOffer} onWithdraw={() => setAction("withdraw")} onConfirm={() => setAction("confirm")} onComplete={() => setAction("complete")} /> : null}
           {showCandidates ? <SectionHeading title={delivery.status === "active" ? "Remplacer le livreur" : `Intéressés (${candidates.length})`} /> : null}
           {message ? <Text style={styles.message}>{message}</Text> : null}
         </>}
@@ -159,15 +180,15 @@ export default function DeliveryDetailScreen() {
   );
 }
 
-function CandidateRow({ candidate, delivery, onChoose }: { candidate: DriverCandidate; delivery: { status: string }; onChoose: () => void }) {
+function CandidateRow({ candidate, delivery, loading, onChoose }: { candidate: DriverCandidate; delivery: { status: string }; loading: boolean; onChoose: () => void }) {
   const unavailable = candidate.status === "selected" || candidate.status === "confirmed";
-  return <SurfaceCard style={styles.candidateCard}><View style={styles.candidateHeader}><Avatar initials={candidate.initials} color={candidate.id.includes("adama") ? "#7657A7" : "#007B8B"} /><View style={styles.candidateInfo}><Text style={styles.candidateName}>{candidate.name}</Text><Text style={styles.candidateMeta}>★ {candidate.rating.toLocaleString("fr-FR")} · {candidate.completedDeliveries} livraisons</Text></View>{candidate.isVerified ? <MaterialIcons name="verified" size={20} color="#18A572" /> : null}</View><View style={styles.candidateFooter}><View><Text style={styles.candidateVehicle}>{candidate.vehicles.join(", ")}</Text><Text style={styles.candidatePrice}>{formatMoney(candidate.offerPrice ?? candidate.commissionBlocked * 10)}</Text></View><TikisButton label={unavailable ? "En attente" : delivery.status === "active" ? "Remplacer" : "Choisir"} variant={unavailable ? "ghost" : "secondary"} onPress={onChoose} disabled={unavailable} style={styles.candidateButton} /></View></SurfaceCard>;
+  return <SurfaceCard style={styles.candidateCard}><View style={styles.candidateHeader}><Avatar initials={candidate.initials} color="#007B8B" /><View style={styles.candidateInfo}><Text style={styles.candidateName}>{candidate.name}</Text><Text style={styles.candidateMeta}>{candidate.completedDeliveries ? `★ ${candidate.rating.toLocaleString("fr-FR")} · ${candidate.completedDeliveries} livraisons` : "Profil Tikis vérifié"}</Text></View>{candidate.isVerified ? <MaterialIcons name="verified" size={20} color="#18A572" /> : null}</View><View style={styles.candidateFooter}><View><Text style={styles.candidateVehicle}>{candidate.vehicles.join(", ") || "Engin à confirmer"}</Text><Text style={styles.candidatePrice}>{formatMoney(candidate.offerPrice ?? candidate.commissionBlocked * 10)}</Text></View><TikisButton label={unavailable ? "En attente" : delivery.status === "active" ? "Remplacer" : "Choisir"} variant={unavailable ? "ghost" : "secondary"} onPress={onChoose} disabled={unavailable || loading} loading={loading} style={styles.candidateButton} /></View></SurfaceCard>;
 }
 
-function DriverActions({ deliveryStatus, ownCandidateStatus, onApply, onCounterOffer, onWithdraw, onConfirm, onComplete }: { deliveryStatus: string; ownCandidateStatus?: string; onApply: () => void; onCounterOffer: () => void; onWithdraw: () => void; onConfirm: () => void; onComplete: () => void }) {
-  if (deliveryStatus === "open") return <View style={styles.driverAction}>{ownCandidateStatus === "applied" ? <><TikisButton label="Modifier mon prix" variant="secondary" icon="price-change" onPress={onCounterOffer} /><TikisButton label="Renoncer" variant="ghost" icon="undo" onPress={onWithdraw} style={styles.secondaryDriverAction} /></> : <><TikisButton label="Se proposer" icon="add-task" onPress={onApply} /><TikisButton label="Faire une contre-proposition" variant="secondary" icon="price-change" onPress={onCounterOffer} style={styles.secondaryDriverAction} /></>}<Text style={styles.driverHint}>{ownCandidateStatus === "applied" ? "Votre proposition reste modifiable tant que vous n’êtes pas sélectionné." : "Vous pouvez candidater au prix client ou proposer un montant différent."}</Text></View>;
-  if (deliveryStatus === "pending_confirmation" && ownCandidateStatus === "selected") return <View style={styles.driverAction}><TikisButton label="Confirmer la course" icon="check-circle" onPress={onConfirm} /><Text style={styles.driverHint}>Après confirmation, vos coordonnées seront partagées avec l’expéditeur.</Text></View>;
-  if (deliveryStatus === "active" && ownCandidateStatus === "confirmed") return <View style={styles.driverAction}><TikisButton label="Marquer comme terminée" icon="task-alt" onPress={onComplete} /><Text style={styles.driverHint}>À utiliser après remise et paiement direct avec l’expéditeur.</Text></View>;
+function DriverActions({ deliveryStatus, ownCandidateStatus, loading, onApply, onCounterOffer, onWithdraw, onConfirm, onComplete }: { deliveryStatus: string; ownCandidateStatus?: string; loading: boolean; onApply: () => void; onCounterOffer: () => void; onWithdraw: () => void; onConfirm: () => void; onComplete: () => void }) {
+  if (deliveryStatus === "open") return <View style={styles.driverAction}>{ownCandidateStatus === "applied" ? <><TikisButton label="Modifier mon prix" variant="secondary" icon="price-change" onPress={onCounterOffer} disabled={loading} /><TikisButton label="Renoncer" variant="ghost" icon="undo" onPress={onWithdraw} loading={loading} disabled={loading} style={styles.secondaryDriverAction} /></> : <><TikisButton label="Se proposer" icon="add-task" onPress={onApply} loading={loading} disabled={loading} /><TikisButton label="Faire une contre-proposition" variant="secondary" icon="price-change" onPress={onCounterOffer} disabled={loading} style={styles.secondaryDriverAction} /></>}<Text style={styles.driverHint}>{ownCandidateStatus === "applied" ? "Votre proposition reste modifiable tant que vous n’êtes pas sélectionné." : "Vous pouvez candidater au prix client ou proposer un montant différent."}</Text></View>;
+  if (deliveryStatus === "pending_confirmation" && ownCandidateStatus === "selected") return <View style={styles.driverAction}><TikisButton label="Confirmer la course" icon="check-circle" onPress={onConfirm} loading={loading} disabled={loading} /><Text style={styles.driverHint}>Après confirmation, vos coordonnées seront partagées avec l’expéditeur.</Text></View>;
+  if (deliveryStatus === "active" && ownCandidateStatus === "confirmed") return <View style={styles.driverAction}><TikisButton label="Marquer comme terminée" icon="task-alt" onPress={onComplete} loading={loading} disabled={loading} /><Text style={styles.driverHint}>À utiliser après remise et paiement direct avec l’expéditeur.</Text></View>;
   return null;
 }
 

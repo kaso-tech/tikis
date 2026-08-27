@@ -9,11 +9,13 @@ import { presentSimulatedTrackingPush } from "@/lib/simulated-push-notifications
 import { SurfaceCard, TikisButton } from "@/components/tikis/ui";
 import { formatNavigationTarget } from "@/lib/geo-rules";
 import { useTikisStore } from "@/lib/tikis-store";
+import { trpc } from "@/lib/trpc";
 
 export default function TrackDeliveryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { deliveryById, addNotification } = useTikisStore();
-  const delivery = deliveryById(id);
+  const { profile, addNotification } = useTikisStore();
+  const deliveryQuery = trpc.deliveries.get.useQuery({ id: id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(id && profile?.phone) });
+  const delivery = deliveryQuery.data;
   const trackable = delivery?.status === "pending_confirmation" || delivery?.status === "active" || delivery?.status === "completed";
   const [trackingAlert, setTrackingAlert] = useState<TrackingEvent | null>(null);
   const deliveredEvents = useRef(new Set<TrackingEvent["type"]>());
@@ -25,6 +27,10 @@ export default function TrackDeliveryScreen() {
     addNotification({ title: event.title, body: event.body, tone: event.type === "arrived" ? "success" : "warning" });
     void presentSimulatedTrackingPush(event, id);
   }, [addNotification, id]);
+
+  if (deliveryQuery.isLoading) {
+    return <SafeAreaView style={styles.safe} edges={["top", "bottom"]}><View style={styles.empty}><Text style={styles.emptyTitle}>Chargement du suivi…</Text></View></SafeAreaView>;
+  }
 
   if (!delivery || !trackable) {
     return <SafeAreaView style={styles.safe} edges={["top", "bottom"]}><View style={styles.empty}><View style={styles.emptyIcon}><MaterialIcons name="location-disabled" size={30} color="#C23B45" /></View><Text style={styles.emptyTitle}>Suivi indisponible</Text><Text style={styles.emptyText}>Le suivi devient disponible lorsqu’un livreur est retenu pour cette livraison.</Text><TikisButton label="Retour à la livraison" onPress={() => router.back()} style={styles.emptyButton} /></View></SafeAreaView>;

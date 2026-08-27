@@ -6,13 +6,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { isAllowedDeliveryText } from "@/lib/tikis-engine";
 import { useTikisStore } from "@/lib/tikis-store";
+import { trpc } from "@/lib/trpc";
 
 const REASONS = ["Retard important", "Comportement inapproprié", "Problème de livraison", "Autre"];
 
 export default function ReportDeliveryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { deliveryById } = useTikisStore();
-  const delivery = deliveryById(id);
+  const { profile } = useTikisStore();
+  const deliveryQuery = trpc.deliveries.get.useQuery({ id: id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(id && profile?.phone) });
+  const delivery = deliveryQuery.data;
   const [reason, setReason] = useState(REASONS[0]);
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
