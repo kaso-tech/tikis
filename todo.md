@@ -182,3 +182,7 @@
 - [x] Vérifier le bundle Expo Go, TypeScript, lint et la réponse du serveur après correction.
 - [x] Enregistrer la correction de stabilité du bundling Expo Go.
 - [x] Rétablir le serveur de développement et vérifier sa disponibilité après le redémarrage.
+- [x] Collecter la trace précise de l’échec persistant d’enregistrement après OTP.
+- [x] Corriger le contrat client/serveur responsable de l’inscription après OTP.
+- [x] Tester les créations de profil et reconnexions avec les numéros normalisés.
+- [x] Redémarrer, vérifier et enregistrer la correction définitive du parcours OTP.

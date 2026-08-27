@@ -20,6 +20,14 @@ type DeliveryStatusListener = (event: DeliveryStatusEvent) => void;
 
 let client: SupabaseClient | null = null;
 
+/**
+ * Supabase Phone reste volontairement désactivé en développement. La simple
+ * présence des clés Realtime ne doit jamais détourner le parcours OTP simulé.
+ */
+export function isSupabasePhoneAuthEnabled() {
+  return process.env.EXPO_PUBLIC_ENABLE_SUPABASE_PHONE_AUTH === "true";
+}
+
 const supabaseSessionStorage = {
   async getItem(key: string) { if (typeof window !== "undefined") return window.sessionStorage?.getItem(key) ?? null; return (await import("expo-secure-store")).getItemAsync(key); },
   async setItem(key: string, value: string) { if (typeof window !== "undefined") window.sessionStorage?.setItem(key, value); else await (await import("expo-secure-store")).setItemAsync(key, value); },

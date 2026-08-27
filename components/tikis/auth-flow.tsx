@@ -10,7 +10,7 @@ import { COUNTRIES, createRegisteredProfile, detectCountry, findSimulatedAccount
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { setTikisSessionToken } from "@/lib/tikis-session";
-import { requestSupabasePhoneOtp, verifySupabasePhoneOtp } from "@/lib/supabase-tracking";
+import { isSupabasePhoneAuthEnabled, requestSupabasePhoneOtp, verifySupabasePhoneOtp } from "@/lib/supabase-tracking";
 import type { UserRole, VehicleType } from "@/shared/tikis-domain";
 import { SIMULATION_OTP } from "@/shared/tikis-domain";
 
@@ -88,7 +88,16 @@ export function AuthFlow() {
     }
     setPhoneError("");
     setSending(true);
-    try { await requestSupabasePhoneOtp(phone); setOtpProvider("supabase"); } catch { setOtpProvider("simulation"); }
+    if (isSupabasePhoneAuthEnabled()) {
+      try {
+        await requestSupabasePhoneOtp(phone);
+        setOtpProvider("supabase");
+      } catch {
+        setOtpProvider("simulation");
+      }
+    } else {
+      setOtpProvider("simulation");
+    }
     setSending(false);
     setStage("otp");
     setSecondsLeft(RESEND_SECONDS);
@@ -193,6 +202,7 @@ export function AuthFlow() {
   }
 
   async function finishRegistration() {
+    if (finishing) return;
     const validation = validateFullName(fullName);
     if (!selectedRole) {
       setNameError("Sélectionnez un type de compte.");
@@ -216,9 +226,10 @@ export function AuthFlow() {
       const persistedProfile = supabaseAccessToken ? await registerSupabaseProfileMutation.mutateAsync({ phone: localProfile.phone, fullName: localProfile.fullName, countryCode: localProfile.countryCode, role: localProfile.role, vehicles: localProfile.vehicles, accessToken: supabaseAccessToken }) : await registerProfileMutation.mutateAsync({ phone: localProfile.phone, fullName: localProfile.fullName, countryCode: localProfile.countryCode, role: localProfile.role, vehicles: localProfile.vehicles, otp: otp as "730512" });
       await setTikisSessionToken(persistedProfile.sessionToken);
       registerProfile(persistedProfile.profile);
-    } catch {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
       setFinishing(false);
-      setNameError("Impossible d’enregistrer votre profil de façon sécurisée. Vérifiez votre connexion puis réessayez.");
+      setNameError(message && message.length < 180 ? message : "Impossible d’enregistrer votre profil de façon sécurisée. Vérifiez votre connexion puis réessayez.");
       haptic.error();
       return;
     }
