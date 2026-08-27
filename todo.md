@@ -194,3 +194,7 @@
 - [x] Stabiliser les effets et callbacks de recherche, carte et confirmation de lieu.
 - [x] Ajouter une régression et valider le parcours de sélection sans boucle de rendu.
 - [x] Redémarrer, vérifier le serveur et enregistrer la correction du sélecteur.
+- [x] Examiner le parcours GPS existant pour la sélection de lieu.
+- [x] Ajouter le bouton de sélection de position actuelle et le géocodage inverse associé.
+- [x] Tester la permission, le refus GPS et la confirmation de lieu détecté.
+- [x] Redémarrer, vérifier et enregistrer la sélection de position actuelle.
