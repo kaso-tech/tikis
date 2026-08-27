@@ -233,3 +233,7 @@
 - [x] Ajouter un libellé personnalisé lors de l’enregistrement d’une adresse.
 - [x] Afficher les adresses récentes et une estimation de distance immédiate dans la création.
 - [x] Tester les nouveaux parcours, vérifier le serveur et enregistrer la version.
+- [x] Examiner la hauteur du panneau, le glissement de carte et la couverture de recherche actuelle.
+- [x] Agrandir le panneau de sélection et déplacer les adresses récentes sous Mes adresses.
+- [x] Maintenir la carte déplaçable et élargir la recherche d’adresses et de lieux.
+- [x] Tester les interactions, vérifier le serveur et enregistrer la version.

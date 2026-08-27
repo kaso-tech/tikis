@@ -87,6 +87,18 @@ describe("services géographiques backend Tikis", () => {
     expect(String(fetchMock.mock.calls[2]?.[0])).toContain("nominatim.openstreetmap.org/search");
   });
 
+  it("complète les suggestions rapides par les résultats directs Mapbox pendant une recherche approfondie", async () => {
+    process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ suggestions: [{ mapbox_id: "suggestion-1", name: "Alimentation proche", feature_type: "poi" }] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ features: [{ id: "forward-1", geometry: { coordinates: [-1.521, 12.371] }, properties: { mapbox_id: "forward-1", feature_type: "poi", name: "Alimentation élargie", context: { place: { name: "Ouagadougou" }, country: { name: "Burkina Faso" } } } }] })))
+      .mockResolvedValueOnce(new Response(JSON.stringify([])));
+    global.fetch = fetchMock as typeof fetch;
+    const result = await searchPlaces("Alimentation", { latitude: 12.3714, longitude: -1.5197 }, "BF", true);
+    expect(result.map((item) => item.name)).toEqual(["Alimentation proche", "Alimentation élargie"]);
+    expect(result[1]?.directLocation).toMatchObject({ latitude: 12.371, longitude: -1.521 });
+  });
+
   it("ne consulte pas le repli communautaire pendant l’autocomplétion automatique", async () => {
     process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ suggestions: [] })));

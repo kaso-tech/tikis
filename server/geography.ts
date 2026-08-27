@@ -209,6 +209,12 @@ function locationToDirectSuggestion(place: LocationLabel): PlaceSuggestion {
   };
 }
 
+function mergeSuggestions(...groups: PlaceSuggestion[][]) {
+  const unique = new Map<string, PlaceSuggestion>();
+  for (const group of groups) for (const suggestion of group) if (!unique.has(suggestion.id)) unique.set(suggestion.id, suggestion);
+  return [...unique.values()].slice(0, 12);
+}
+
 function openStreetMapLocation(item: OpenStreetMapPlace): LocationLabel | null {
   const latitude = Number(item.lat);
   const longitude = Number(item.lon);
@@ -350,10 +356,10 @@ export async function searchPlaces(query: string, bias?: { latitude: number; lon
   try {
     const payload = await mapboxJson(url, "Search") as { suggestions?: MapboxSuggestion[] };
     let suggestions = (payload.suggestions ?? []).map((item) => suggestionToPlaceSuggestion(item, sessionToken)).filter((item): item is PlaceSuggestion => Boolean(item));
-    if (!suggestions.length && includeCommunityFallback) {
+    if (includeCommunityFallback) {
       const directMapbox = await searchMapboxForward(textQuery, bias, safeCountryCode);
-      suggestions = directMapbox.map(locationToDirectSuggestion);
-      if (!suggestions.length) suggestions = (await searchOpenStreetMapPlaces(textQuery, safeCountryCode)).map(locationToDirectSuggestion);
+      suggestions = mergeSuggestions(suggestions, directMapbox.map(locationToDirectSuggestion));
+      if (suggestions.length < 12) suggestions = mergeSuggestions(suggestions, (await searchOpenStreetMapPlaces(textQuery, safeCountryCode)).map(locationToDirectSuggestion));
     }
     writeCache(searchCache, cacheKey, suggestions, SEARCH_CACHE_TTL_MS);
     recordGeographicMetric("search", "success", Date.now() - startedAt);
