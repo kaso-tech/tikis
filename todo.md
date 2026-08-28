@@ -253,3 +253,7 @@
 - [x] Appliquer le style épuré aux parcours d’authentification, livraisons et suivi.
 - [x] Appliquer le style épuré aux profils, Wallet, avis et écrans secondaires.
 - [x] Tester l’ensemble des écrans, vérifier le serveur et enregistrer la version.
+- [x] Synchroniser le projet avec la branche main des autres agents.
+- [x] Installer les dépendances si package.json ou pnpm-lock.yaml a changé.
+- [x] Relancer Expo et vérifier la compilation sans erreur.
+- [x] Livrer la dernière version synchronisée.
