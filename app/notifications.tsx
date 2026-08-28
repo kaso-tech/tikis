@@ -7,9 +7,9 @@ import { trpc } from "@/lib/trpc";
 import { formatRelativeDate } from "@/shared/tikis-domain";
 
 const tones = {
-  info: { icon: "notifications" as const, color: "#007B8B", background: "#E5F6F7" },
-  success: { icon: "check-circle" as const, color: "#18A572", background: "#DCFCE7" },
-  warning: { icon: "account-balance-wallet" as const, color: "#B45309", background: "#FEF3C7" },
+  info: { icon: "notifications" as const, color: "#007B8B", background: "#EEEDF3" },
+  success: { icon: "check-circle" as const, color: "#167A55", background: "#EEEDF3" },
+  warning: { icon: "account-balance-wallet" as const, color: "#9A6200", background: "#EEEDF3" },
 };
 
 export default function NotificationsScreen() {
@@ -25,7 +25,7 @@ export default function NotificationsScreen() {
         data={notifications}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.content}
-        ListHeaderComponent={<View style={styles.header}><View><Text style={styles.eyebrow}>Centre d’activité</Text><Text style={styles.title}>Notifications</Text></View><Pressable onPress={() => router.back()} style={({ pressed }) => [styles.close, pressed && styles.pressed]}><MaterialIcons name="close" size={22} color="#0B1F3A" /></Pressable></View>}
+        ListHeaderComponent={<View style={styles.header}><View><Text style={styles.eyebrow}>Centre d’activité</Text><Text style={styles.title}>Notifications</Text></View><Pressable onPress={() => router.back()} style={({ pressed }) => [styles.close, pressed && styles.pressed]}><MaterialIcons name="close" size={22} color="#111111" /></Pressable></View>}
         renderItem={({ item }) => {
           const tone = tones[item.tone];
           return <Pressable onPress={markRead} disabled={markReadMutation.isPending} style={({ pressed }) => [styles.item, !item.read && styles.itemUnread, pressed && styles.pressed]}><View style={[styles.icon, { backgroundColor: tone.background }]}><MaterialIcons name={tone.icon} size={20} color={tone.color} /></View><View style={styles.itemBody}><View style={styles.itemTop}><Text style={styles.itemTitle}>{item.title}</Text>{!item.read ? <View style={styles.unread} /> : null}</View><Text style={styles.itemText}>{item.body}</Text><Text style={styles.itemTime}>{formatRelativeDate(item.createdAt)}</Text></View></Pressable>;
