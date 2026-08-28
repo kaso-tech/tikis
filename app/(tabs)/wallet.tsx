@@ -57,7 +57,6 @@ export default function WalletScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         ListHeaderComponent={<>
-          <Text style={tikisStyles.eyebrow}>{isDriver ? "Vos commissions Tikis" : "Vos mouvements Tikis"}</Text>
           <Text style={[tikisStyles.title, styles.title]}>Votre Wallet</Text>
           <SurfaceCard style={styles.balanceCard}>
             <Text style={styles.balanceLabel}>Solde disponible</Text>

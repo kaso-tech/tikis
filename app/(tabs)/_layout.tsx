@@ -26,7 +26,7 @@ export default function TabLayout() {
     >
       <Tabs.Screen name="index" options={{ title: "Accueil", tabBarIcon: ({ color, size }) => <MaterialIcons name="home-filled" size={size} color={color} /> }} />
       <Tabs.Screen name="deliveries" options={{ title: "Courses", tabBarIcon: ({ color, size }) => <MaterialIcons name="local-shipping" size={size} color={color} /> }} />
-      <Tabs.Screen name="addresses" options={{ title: "Adresses", tabBarIcon: ({ color, size }) => <MaterialIcons name="bookmark" size={size} color={color} /> }} />
+      <Tabs.Screen name="addresses" options={{ href: profile.role === "sender" ? undefined : null, title: "Adresses", tabBarIcon: ({ color, size }) => <MaterialIcons name="bookmark" size={size} color={color} /> }} />
       <Tabs.Screen name="wallet" options={{ href: profile.role === "driver" ? undefined : null, title: "Wallet", tabBarIcon: ({ color, size }) => <MaterialIcons name="account-balance-wallet" size={size} color={color} /> }} />
       <Tabs.Screen name="profile" options={{ title: "Profil", tabBarIcon: ({ color, size }) => <MaterialIcons name="person" size={size} color={color} /> }} />
     </Tabs>
