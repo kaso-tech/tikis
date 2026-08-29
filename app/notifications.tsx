@@ -40,7 +40,7 @@ export default function NotificationsScreen() {
   const { profile } = useTikisStore();
   const notificationsQuery = trpc.notifications.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 12_000 });
   const markReadMutation = trpc.notifications.markRead.useMutation({ onSuccess: () => void notificationsQuery.refetch() });
-  const notifications = useMemo(() => notificationsQuery.data ?? [], [notificationsQuery.data]);
+  const notifications = notificationsQuery.data ?? [];
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   const groups = useMemo(() => {

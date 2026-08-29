@@ -28,6 +28,10 @@ function categoryIcon(category: AddressCategory): React.ComponentProps<typeof Ma
   return category === "maison" ? "home" : category === "bureau" ? "business" : category === "famille" ? "person" : "location-on";
 }
 
+function categoryLabel(category: AddressCategory): string {
+  return category === "maison" ? "Maison" : category === "bureau" ? "Bureau" : category === "famille" ? "Famille" : "Autres";
+}
+
 export default function AddressesScreen() {
   const { profile } = useTikisStore();
   const utils = trpc.useUtils();
@@ -176,7 +180,7 @@ export default function AddressesScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => !saving && setEditing(null)} />
           <View style={styles.sheet}>
             <View style={styles.sheetGrip} />
-            <Text style={styles.sheetTitle}>Renommer l’adresse</Text>
+            <Text style={styles.sheetTitle}>Renommer l'adresse</Text>
             <Text style={styles.sheetSub}>Utilisez un nom simple, par exemple « Maison » ou « Bureau ».</Text>
             {editing ? (
               <View style={styles.renameCard}>
@@ -189,7 +193,7 @@ export default function AddressesScreen() {
                 </View>
               </View>
             ) : null}
-            <Text style={styles.fieldLabel}>NOM DE L’ADRESSE</Text>
+            <Text style={styles.fieldLabel}>NOM DE L'ADRESSE</Text>
             <TextInput
               value={draft}
               onChangeText={(value) => setDraft(sanitizePlaceText(value, 80, { preserveTrailingSpace: true }))}

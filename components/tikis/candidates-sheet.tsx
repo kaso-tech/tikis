@@ -75,7 +75,7 @@ export function CandidatesSheet({ visible, candidates, deliveryStatus, loadingId
               </View>
               <Text style={styles.emptyTitle}>En attente de candidatures</Text>
               <Text style={styles.emptyText}>
-                Votre livraison a été publiée. Les livreurs compatibles apparaîtront ici dès qu’ils proposeront leur service.
+                Votre livraison a été publiée. Les livreurs compatibles apparaîtront ici dès qu'ils proposeront leur service.
               </Text>
             </View>
           )}

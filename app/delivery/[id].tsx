@@ -1,6 +1,6 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, useLocalSearchParams } from "expo-router";
-import { type ComponentProps, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
@@ -15,16 +15,6 @@ import { deliveryStatusMeta, formatMoney, formatRelativeDate, type DriverCandida
 
 type FinancialAction = "apply" | "withdraw" | "select" | "confirm" | "complete" | null;
 type SenderAction = "disable" | "reactivate" | "cancel" | null;
-
-function DetailRow({ icon, label, value }: { icon: ComponentProps<typeof MaterialIcons>["name"]; label: string; value: string }) {
-  return (
-    <View style={styles.detailsRow}>
-      <View style={styles.detailsIcon}><MaterialIcons name={icon} size={16} color="#007B8B" /></View>
-      <Text style={styles.detailsLabel}>{label}</Text>
-      <Text style={styles.detailsValue} numberOfLines={1}>{value}</Text>
-    </View>
-  );
-}
 
 export default function DeliveryDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -55,6 +45,7 @@ export default function DeliveryDetailScreen() {
   const [counterLoading, setCounterLoading] = useState(false);
   const [senderAction, setSenderAction] = useState<SenderAction>(null);
   const [senderProcessing, setSenderProcessing] = useState(false);
+  const [openingMap, setOpeningMap] = useState(false);
   const [candidatesSheetOpen, setCandidatesSheetOpen] = useState(false);
 
   async function refreshDelivery() {
@@ -268,7 +259,7 @@ export default function DeliveryDetailScreen() {
                 <Text style={styles.pricingCounterValue}>{formatMoney(ownCandidate.offerPrice)}</Text>
               </View>
             ) : null}
-            <Text style={styles.pricingNote}>Votre gain reste informatif jusqu’à la confirmation de la mission.</Text>
+            <Text style={styles.pricingNote}>Votre gain reste informatif jusqu'à la confirmation de la mission.</Text>
           </View>
         )}
 
@@ -485,10 +476,6 @@ const styles = StyleSheet.create({
   candidatesCountText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700" },
 
   detailsCard: { backgroundColor: "#FFFFFF", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 2 },
-  detailsRow: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 9, borderBottomWidth: 1, borderBottomColor: "#ECECEC" },
-  detailsIcon: { width: 26, height: 26, borderRadius: 8, backgroundColor: "#E2F3F4", alignItems: "center", justifyContent: "center" },
-  detailsLabel: { color: "#747474", fontSize: 11, flexShrink: 0 },
-  detailsValue: { color: "#111111", fontSize: 12, fontWeight: "600", flex: 1, textAlign: "right" },
   detailsLast: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: "#ECECEC", marginTop: 2 },
   detailsDescription: { color: "#666666", fontSize: 12, lineHeight: 18 },
 
