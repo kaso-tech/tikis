@@ -43,7 +43,7 @@ export function LiveMap({ deliveryId, driverName, pickup, dropoff, driverTracksL
           <View style={styles.startMarker}><MaterialIcons name="inventory-2" size={15} color="#FFFFFF" /></View>
         </Marker>
         <Marker coordinate={dropoff} anchor={{ x: 0.5, y: 0.85 }}>
-          <View style={styles.destinationMarker}><MaterialIcons name="location-on" size={26} color="#E45858" /></View>
+          <View style={styles.destinationMarker}><MaterialIcons name="location-on" size={26} color="#B4232D" /></View>
         </Marker>
         {position ? <Marker coordinate={position} anchor={{ x: 0.5, y: 0.5 }} flat rotation={position.heading}>
           <View style={styles.driverMarker}><MaterialIcons name="two-wheeler" size={22} color="#FFFFFF" /></View>
@@ -56,13 +56,13 @@ export function LiveMap({ deliveryId, driverName, pickup, dropoff, driverTracksL
 }
 
 const styles = StyleSheet.create({
-  container: { height: 360, overflow: "hidden", borderRadius: 10, backgroundColor: "#D8E8E5" },
+  container: { height: 360, overflow: "hidden", borderRadius: 10, backgroundColor: "#EEEDF3" },
   map: { ...StyleSheet.absoluteFillObject },
   startMarker: { width: 31, height: 31, borderRadius: 8, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", borderWidth: 0 },
   destinationMarker: { width: 33, height: 33, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
   driverMarker: { width: 46, height: 46, borderRadius: 12, backgroundColor: "#111111", alignItems: "center", justifyContent: "center", borderWidth: 0, shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
   liveBadge: { position: "absolute", top: 14, left: 14, flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 10, height: 30, borderRadius: 15, backgroundColor: "rgba(255,255,255,0.95)" },
-  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#18A572" }, liveDotIdle: { backgroundColor: "#C98119" }, liveText: { color: "#147A58", fontSize: 10, fontWeight: "900", letterSpacing: 0.45 }, liveTextIdle: { color: "#8A5A0E" }, liveBadgeIdle: { backgroundColor: "rgba(255,247,230,0.96)" },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#167A55" }, liveDotIdle: { backgroundColor: "#9A6200" }, liveText: { color: "#167A55", fontSize: 10, fontWeight: "600", letterSpacing: 0.45 }, liveTextIdle: { color: "#9A6200" }, liveBadgeIdle: { backgroundColor: "rgba(238,237,243,0.96)" },
   progressBubble: { position: "absolute", left: 14, right: 14, bottom: 14, padding: 12, borderRadius: 10, backgroundColor: "rgba(17,17,17,0.94)" },
-  progressMain: { color: "#FFFFFF", fontSize: 18, fontWeight: "600" }, progressSub: { color: "#D6D6D6", fontSize: 12, marginTop: 2 },
+  progressMain: { color: "#FFFFFF", fontSize: 18, fontWeight: "600" }, progressSub: { color: "#BBBBBB", fontSize: 12, marginTop: 2 },
 });

@@ -58,7 +58,7 @@ export function FloatingPlacePicker({
       <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
         <View style={styles.header}>
           <Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onClose} style={({ pressed }) => [styles.close, pressed && styles.pressed]}>
-            <MaterialIcons name="close" size={22} color="#0B1F3A" />
+            <MaterialIcons name="close" size={22} color="#111111" />
           </Pressable>
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>LIEU DE LIVRAISON</Text>
@@ -78,7 +78,7 @@ export function FloatingPlacePicker({
             />
           ) : null}
           {pendingPlace && formattedPendingPlace ? <SurfaceCard style={styles.confirmationCard}>
-            <View style={styles.confirmationHeading}><View style={styles.confirmationIcon}><MaterialIcons name="verified" size={18} color="#147A58" /></View><View style={styles.confirmationCopy}><Text style={styles.confirmationEyebrow}>LIEU SÉLECTIONNÉ</Text><Text style={styles.confirmationTitle}>{formattedPendingPlace.title}</Text></View></View>
+            <View style={styles.confirmationHeading}><View style={styles.confirmationIcon}><MaterialIcons name="verified" size={18} color="#167A55" /></View><View style={styles.confirmationCopy}><Text style={styles.confirmationEyebrow}>LIEU SÉLECTIONNÉ</Text><Text style={styles.confirmationTitle}>{formattedPendingPlace.title}</Text></View></View>
             <Text style={styles.confirmationMeta}>{formattedPendingPlace.subtitle}</Text>
             <Text style={styles.confirmationAddress} numberOfLines={2}>{formatNavigationTarget(pendingPlace)}</Text>
             <View style={styles.confirmationFacts}><Text style={styles.confirmationFact}>{pendingPlace.precision === "exact" ? "Position précise" : pendingPlace.precision === "street" ? "Niveau rue" : pendingPlace.precision === "area" ? "Niveau quartier" : "Position GPS enregistrée"}</Text>{pendingPlace.country ? <Text style={styles.confirmationFact}>{pendingPlace.country}</Text> : null}</View>
@@ -142,7 +142,7 @@ export function FavoritePlacesSheet({
       <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
         <View style={styles.header}>
           <Pressable accessibilityRole="button" accessibilityLabel="Fermer les favoris" onPress={onClose} style={({ pressed }) => [styles.close, pressed && styles.pressed]}>
-            <MaterialIcons name="close" size={22} color="#0B1F3A" />
+            <MaterialIcons name="close" size={22} color="#111111" />
           </Pressable>
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>ADRESSES ENREGISTRÉES</Text>
@@ -163,7 +163,7 @@ export function FavoritePlacesSheet({
               <View key={favorite.id} style={styles.favoriteCard}>
                 <View style={styles.favoriteTop}>
                   <View style={styles.favoriteIcon}>
-                    <MaterialIcons name="star" size={18} color="#A86600" />
+                    <MaterialIcons name="star" size={18} color="#9A6200" />
                   </View>
                   <View style={styles.favoriteCopy}>
                     <Text style={styles.favoriteTitle} numberOfLines={1}>{favorite.label}</Text>
@@ -176,13 +176,13 @@ export function FavoritePlacesSheet({
                 </View>
                 <View style={styles.manageActions}>
                   <Pressable accessibilityRole="button" onPress={() => { setActionError(""); setDraftLabel(favorite.label); setEditing(favorite); }} style={({ pressed }) => [styles.manageButton, pressed && styles.pressed]}><MaterialIcons name="edit" size={16} color="#007B8B" /><Text style={styles.manageText}>Renommer</Text></Pressable>
-                  <Pressable accessibilityRole="button" onPress={() => { setActionError(""); setRemoving(favorite); }} style={({ pressed }) => [styles.manageButton, styles.manageDelete, pressed && styles.pressed]}><MaterialIcons name="delete-outline" size={16} color="#C23B45" /><Text style={[styles.manageText, styles.deleteText]}>Supprimer</Text></Pressable>
+                  <Pressable accessibilityRole="button" onPress={() => { setActionError(""); setRemoving(favorite); }} style={({ pressed }) => [styles.manageButton, styles.manageDelete, pressed && styles.pressed]}><MaterialIcons name="delete-outline" size={16} color="#B4232D" /><Text style={[styles.manageText, styles.deleteText]}>Supprimer</Text></Pressable>
                 </View>
               </View>
             ))
           ) : (
             <View style={styles.empty}>
-              <MaterialIcons name="star-outline" size={30} color="#A1ADBC" />
+              <MaterialIcons name="star-outline" size={30} color="#9AA5B6" />
               <Text style={styles.emptyTitle}>{favorites.length ? "Aucun résultat" : "Aucun lieu favori"}</Text>
               <Text style={styles.emptyText}>{favorites.length ? "Essayez une autre recherche." : "Après avoir choisi une adresse, utilisez l’icône étoile dans la création de livraison pour l’enregistrer ici."}</Text>
             </View>
@@ -197,7 +197,7 @@ export function FavoritePlacesSheet({
         </Modal>
         <Modal visible={Boolean(removing)} transparent animationType="fade" onRequestClose={() => !deleting && setRemoving(null)}>
           <View style={styles.dialogOverlay}><View style={styles.dialog}>
-            <View style={styles.dangerIcon}><MaterialIcons name="delete-outline" size={24} color="#C23B45" /></View><Text style={styles.dialogTitle}>Supprimer ce favori ?</Text><Text style={styles.dialogText}>« {removing?.label} » sera retiré de vos favoris. Cette action est irréversible.</Text>
+            <View style={styles.dangerIcon}><MaterialIcons name="delete-outline" size={24} color="#B4232D" /></View><Text style={styles.dialogTitle}>Supprimer ce favori ?</Text><Text style={styles.dialogText}>« {removing?.label} » sera retiré de vos favoris. Cette action est irréversible.</Text>
             <View style={styles.dialogActions}><TikisButton label="Conserver" variant="secondary" onPress={() => setRemoving(null)} disabled={deleting} style={styles.dialogAction} /><TikisButton label="Supprimer" icon="delete-outline" onPress={() => void confirmRemove()} loading={deleting} style={{ ...styles.dialogAction, ...styles.dangerAction }} /></View>
           </View></View>
         </Modal>
@@ -207,55 +207,55 @@ export function FavoritePlacesSheet({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F6F8FC" },
-  header: { minHeight: 76, paddingHorizontal: 20, flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: "#FFFFFF", borderBottomWidth: 1, borderBottomColor: "#E7ECF2" },
-  close: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", backgroundColor: "#F3F6FA" },
-  closeSpacer: { width: 42 },
+  safe: { flex: 1, backgroundColor: "#EEEDF3" },
+  header: { minHeight: 62, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFFFFF", borderBottomWidth: 0 },
+  close: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
+  closeSpacer: { width: 40 },
   headerCopy: { flex: 1 },
-  eyebrow: { color: "#007B8B", fontSize: 10, fontWeight: "900", letterSpacing: 0.8 },
-  title: { color: "#0B1F3A", fontSize: 18, fontWeight: "900", marginTop: 2 },
-  content: { padding: 20, paddingBottom: 38 },
-  subtitle: { color: "#697386", fontSize: 13, lineHeight: 19, marginBottom: 18 },
-  confirmationCard: { marginTop: 4, borderColor: "#BDE3D2", backgroundColor: "#F1FBF6" },
-  confirmationHeading: { flexDirection: "row", alignItems: "center", gap: 10 },
-  confirmationIcon: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: "#DBF4E6" },
+  eyebrow: { color: "#007B8B", fontSize: 10, fontWeight: "600", letterSpacing: 0.7 },
+  title: { color: "#111111", fontSize: 17, fontWeight: "600", marginTop: 2 },
+  content: { padding: 16, paddingBottom: 30 },
+  subtitle: { color: "#666666", fontSize: 13, lineHeight: 19, marginBottom: 14 },
+  confirmationCard: { marginTop: 4, borderWidth: 0, backgroundColor: "#EEEDF3" },
+  confirmationHeading: { flexDirection: "row", alignItems: "center", gap: 9 },
+  confirmationIcon: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
   confirmationCopy: { flex: 1 },
-  confirmationEyebrow: { color: "#147A58", fontSize: 9, fontWeight: "900", letterSpacing: 0.8 },
-  confirmationTitle: { color: "#0B1F3A", fontSize: 15, fontWeight: "900", marginTop: 2 },
-  confirmationMeta: { color: "#39745F", fontSize: 12, fontWeight: "700", marginTop: 10 },
-  confirmationAddress: { color: "#697386", fontSize: 11, lineHeight: 16, marginTop: 3 },
-  confirmationFacts: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 11 },
-  confirmationFact: { color: "#147A58", fontSize: 10, fontWeight: "800", backgroundColor: "#DBF4E6", borderRadius: 8, overflow: "hidden", paddingHorizontal: 8, paddingVertical: 4 },
-  confirmationActions: { flexDirection: "row", gap: 10, marginTop: 16 },
-  confirmationAction: { flex: 1, minHeight: 45 },
-  searchBox: { height: 48, flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 13, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#DDE5ED", borderRadius: 14, marginBottom: 13 },
-  searchInput: { flex: 1, color: "#0B1F3A", fontSize: 14, fontWeight: "700", height: "100%" },
-  clearSearch: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center", backgroundColor: "#EEF2F6" },
-  actionError: { color: "#C23B45", fontSize: 12, fontWeight: "700", lineHeight: 18, marginBottom: 10 },
-  favoriteCard: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7ECF2", borderRadius: 18, padding: 14, marginBottom: 12 },
-  favoriteTop: { flexDirection: "row", alignItems: "center", gap: 11 },
-  favoriteIcon: { width: 36, height: 36, borderRadius: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#FFF4D8" },
+  confirmationEyebrow: { color: "#167A55", fontSize: 9, fontWeight: "600", letterSpacing: 0.7 },
+  confirmationTitle: { color: "#111111", fontSize: 14, fontWeight: "600", marginTop: 2 },
+  confirmationMeta: { color: "#167A55", fontSize: 12, fontWeight: "600", marginTop: 8 },
+  confirmationAddress: { color: "#666666", fontSize: 11, lineHeight: 16, marginTop: 3 },
+  confirmationFacts: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 9 },
+  confirmationFact: { color: "#167A55", fontSize: 10, fontWeight: "600", backgroundColor: "#EEEDF3", borderRadius: 6, overflow: "hidden", paddingHorizontal: 7, paddingVertical: 3 },
+  confirmationActions: { flexDirection: "row", gap: 8, marginTop: 14 },
+  confirmationAction: { flex: 1, minHeight: 42 },
+  searchBox: { height: 44, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, backgroundColor: "#FFFFFF", borderRadius: 9, marginBottom: 12 },
+  searchInput: { flex: 1, color: "#111111", fontSize: 14, fontWeight: "500", height: "100%" },
+  clearSearch: { width: 24, height: 24, borderRadius: 6, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
+  actionError: { color: "#B4232D", fontSize: 12, fontWeight: "600", lineHeight: 18, marginBottom: 8 },
+  favoriteCard: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 12, marginBottom: 10 },
+  favoriteTop: { flexDirection: "row", alignItems: "center", gap: 9 },
+  favoriteIcon: { width: 32, height: 32, borderRadius: 7, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
   favoriteCopy: { flex: 1 },
-  favoriteTitle: { color: "#0B1F3A", fontSize: 14, fontWeight: "900" },
-  favoriteMeta: { color: "#778398", fontSize: 11, lineHeight: 16, marginTop: 3 },
-  favoriteActions: { flexDirection: "row", gap: 9, marginTop: 14 },
-  favoriteAction: { flex: 1, minHeight: 43 },
-  manageActions: { flexDirection: "row", gap: 8, marginTop: 10 },
-  manageButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, flex: 1, minHeight: 36, backgroundColor: "#E6F5F6", borderRadius: 10 },
-  manageDelete: { backgroundColor: "#FFF0F1" },
-  manageText: { color: "#007B8B", fontSize: 11, fontWeight: "900" },
-  deleteText: { color: "#C23B45" },
-  empty: { alignItems: "center", paddingVertical: 54, paddingHorizontal: 28, backgroundColor: "#FFFFFF", borderRadius: 20, borderWidth: 1, borderColor: "#E7ECF2" },
-  emptyTitle: { color: "#0B1F3A", fontSize: 16, fontWeight: "900", marginTop: 12 },
-  emptyText: { color: "#778398", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 6 },
-  dialogOverlay: { flex: 1, backgroundColor: "rgba(11,31,58,0.42)", alignItems: "center", justifyContent: "center", padding: 24 },
-  dialog: { width: "100%", maxWidth: 400, backgroundColor: "#FFFFFF", borderRadius: 22, padding: 20 },
-  dialogTitle: { color: "#0B1F3A", fontSize: 18, fontWeight: "900", textAlign: "center" },
-  dialogText: { color: "#697386", fontSize: 13, lineHeight: 19, textAlign: "center", marginTop: 7 },
-  renameInput: { minHeight: 48, borderRadius: 13, borderWidth: 1, borderColor: "#DDE5ED", color: "#0B1F3A", fontSize: 14, fontWeight: "700", paddingHorizontal: 13, marginTop: 16 },
-  dialogActions: { flexDirection: "row", gap: 10, marginTop: 18 },
-  dialogAction: { flex: 1, minHeight: 45 },
-  dangerIcon: { width: 48, height: 48, borderRadius: 16, alignItems: "center", justifyContent: "center", alignSelf: "center", backgroundColor: "#FFF0F1", marginBottom: 10 },
-  dangerAction: { backgroundColor: "#C23B45" },
-  pressed: { opacity: 0.65 },
+  favoriteTitle: { color: "#111111", fontSize: 14, fontWeight: "600" },
+  favoriteMeta: { color: "#666666", fontSize: 11, lineHeight: 16, marginTop: 3 },
+  favoriteActions: { flexDirection: "row", gap: 8, marginTop: 12 },
+  favoriteAction: { flex: 1, minHeight: 40 },
+  manageActions: { flexDirection: "row", gap: 7, marginTop: 8 },
+  manageButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, flex: 1, minHeight: 34, backgroundColor: "#EEEDF3", borderRadius: 8 },
+  manageDelete: { backgroundColor: "#FFF3F3" },
+  manageText: { color: "#007B8B", fontSize: 11, fontWeight: "600" },
+  deleteText: { color: "#B4232D" },
+  empty: { alignItems: "center", paddingVertical: 38, paddingHorizontal: 24, backgroundColor: "#FFFFFF", borderRadius: 10 },
+  emptyTitle: { color: "#111111", fontSize: 15, fontWeight: "600", marginTop: 10 },
+  emptyText: { color: "#666666", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 5 },
+  dialogOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.42)", alignItems: "center", justifyContent: "center", padding: 22 },
+  dialog: { width: "100%", maxWidth: 400, backgroundColor: "#FFFFFF", borderRadius: 14, padding: 18 },
+  dialogTitle: { color: "#111111", fontSize: 17, fontWeight: "600", textAlign: "center" },
+  dialogText: { color: "#666666", fontSize: 13, lineHeight: 19, textAlign: "center", marginTop: 6 },
+  renameInput: { minHeight: 44, borderRadius: 9, borderWidth: 0, backgroundColor: "#EEEDF3", color: "#111111", fontSize: 14, fontWeight: "500", paddingHorizontal: 12, marginTop: 14 },
+  dialogActions: { flexDirection: "row", gap: 8, marginTop: 16 },
+  dialogAction: { flex: 1, minHeight: 42 },
+  dangerIcon: { width: 44, height: 44, borderRadius: 10, alignItems: "center", justifyContent: "center", alignSelf: "center", backgroundColor: "#FFF3F3", marginBottom: 10 },
+  dangerAction: { backgroundColor: "#B4232D" },
+  pressed: { opacity: 0.67 },
 });

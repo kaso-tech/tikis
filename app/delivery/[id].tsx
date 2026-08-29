@@ -1,10 +1,11 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
-import { FlatList, Linking, Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { type ComponentProps, useMemo, useState } from "react";
+import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
-import { Avatar, SectionHeading, StatusBadge, SurfaceCard, TikisButton } from "@/components/tikis/ui";
+import { SectionHeading, TikisButton } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
 import { offeredPriceError, parseOfferedPrice, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
@@ -13,7 +14,17 @@ import { trpc } from "@/lib/trpc";
 import { deliveryStatusMeta, formatMoney, formatRelativeDate, type DriverCandidate } from "@/shared/tikis-domain";
 
 type FinancialAction = "apply" | "withdraw" | "select" | "confirm" | "complete" | null;
-type SenderAction = "disable" | "reactivate" | "cancel" | "delete" | null;
+type SenderAction = "disable" | "reactivate" | "cancel" | null;
+
+function DetailRow({ icon, label, value }: { icon: ComponentProps<typeof MaterialIcons>["name"]; label: string; value: string }) {
+  return (
+    <View style={styles.detailsRow}>
+      <View style={styles.detailsIcon}><MaterialIcons name={icon} size={16} color="#007B8B" /></View>
+      <Text style={styles.detailsLabel}>{label}</Text>
+      <Text style={styles.detailsValue} numberOfLines={1}>{value}</Text>
+    </View>
+  );
+}
 
 export default function DeliveryDetailScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -44,7 +55,7 @@ export default function DeliveryDetailScreen() {
   const [counterLoading, setCounterLoading] = useState(false);
   const [senderAction, setSenderAction] = useState<SenderAction>(null);
   const [senderProcessing, setSenderProcessing] = useState(false);
-  const [openingMap, setOpeningMap] = useState(false);
+  const [candidatesSheetOpen, setCandidatesSheetOpen] = useState(false);
 
   async function refreshDelivery() {
     await Promise.all([
@@ -72,12 +83,11 @@ export default function DeliveryDetailScreen() {
     if (senderAction === "disable") return { title: "Désactiver la livraison", description: "Elle ne sera plus visible pour de nouveaux livreurs. Les candidatures en cours seront annulées et les commissions temporairement bloquées seront libérées.", confirmLabel: "Désactiver", tone: "warning" as const };
     if (senderAction === "reactivate") return { title: "Activer la livraison", description: "La livraison redeviendra visible pour les livreurs compatibles. Les anciennes candidatures restent annulées afin de leur permettre de se proposer avec les informations actuelles.", confirmLabel: "Activer", tone: "success" as const };
     if (senderAction === "cancel") return { title: "Annuler la livraison", description: "Cette action est réservée aux courses qui n’ont pas encore démarré. La livraison sera conservée dans votre historique avec son statut d’annulation.", confirmLabel: "Annuler la livraison", tone: "danger" as const };
-    if (senderAction === "delete") return { title: "Supprimer la livraison", description: "Pour préserver la traçabilité et les écritures Wallet, cette demande sera annulée puis conservée dans l’historique plutôt que supprimée définitivement.", confirmLabel: "Supprimer", tone: "danger" as const };
     return null;
   }, [senderAction]);
 
   if (deliveryQuery.isLoading) {
-    return <SafeAreaView style={styles.safe}><View style={styles.notFound}><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
+    return <SafeAreaView style={styles.safe}><View style={styles.notFound}><ActivityIndicator color="#007B8B" /><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
   }
 
   if (!delivery) {
@@ -93,8 +103,12 @@ export default function DeliveryDetailScreen() {
   const canDisable = role === "sender" && delivery.status === "open";
   const canReactivate = role === "sender" && delivery.status === "disabled";
   const canCancel = role === "sender" && (delivery.status === "open" || delivery.status === "disabled" || delivery.status === "pending_confirmation");
+  const isActive = delivery.status === "active";
+  const isCompleted = delivery.status === "completed";
   const pickupPresentation = formatDeliveryDetailPlace(delivery.pickup);
   const dropoffPresentation = formatDeliveryDetailPlace(delivery.dropoff);
+  const statusBadgeColor = isActive ? "#167A55" : isCompleted ? "#747474" : "#3B6BCD";
+  const statusBadgeText = isActive ? `EN COURS · ETA 8 min` : isCompleted ? "TERMINÉE" : status.label.toUpperCase();
 
   async function confirmAction() {
     setProcessing(true);
@@ -118,7 +132,7 @@ export default function DeliveryDetailScreen() {
     try {
       if (senderAction === "disable") await disableMutation.mutateAsync({ deliveryId });
       if (senderAction === "reactivate") await reactivateMutation.mutateAsync({ deliveryId });
-      if (senderAction === "cancel" || senderAction === "delete") await cancelMutation.mutateAsync({ deliveryId });
+      if (senderAction === "cancel") await cancelMutation.mutateAsync({ deliveryId });
       await refreshDelivery();
       setSenderAction(null);
       haptic.success();
@@ -127,14 +141,9 @@ export default function DeliveryDetailScreen() {
     } finally { setSenderProcessing(false); }
   }
 
-  function openMap() {
-    setOpeningMap(true);
-    router.push(`/delivery/${deliveryId}/map` as any);
-    setTimeout(() => setOpeningMap(false), 500);
-  }
-
   function openCandidateAction(candidate: DriverCandidate) {
     setSelectedCandidate(candidate);
+    setCandidatesSheetOpen(false);
     setAction("select");
   }
 
@@ -160,63 +169,191 @@ export default function DeliveryDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <FlatList
-        data={showCandidates ? candidates : []}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.content}
-        renderItem={({ item }) => <CandidateRow candidate={item} delivery={delivery} loading={processing && selectedCandidate?.id === item.id} onChoose={() => openCandidateAction(item)} />}
-        ListHeaderComponent={<>
-          <View style={styles.topBar}><Pressable onPress={() => router.back()} style={({ pressed }) => [styles.back, pressed && styles.pressed]}><MaterialIcons name="arrow-back" size={22} color="#0B1F3A" /></Pressable><Text style={styles.topTitle}>Livraison</Text><Pressable onPress={() => router.push(`/report/${deliveryId}` as any)} style={({ pressed }) => [styles.report, pressed && styles.pressed]}><MaterialIcons name="flag" size={20} color="#C23B45" /></Pressable></View>
-          <StatusBadge label={status.label} color={status.color} background={status.background} />
-          {role === "driver" ? <><Text style={styles.driverStatusLabel}>Statut</Text><Text style={styles.driverStatus}>{status.label}</Text></> : <Text style={styles.title}>{delivery.title}</Text>}
-          <Text style={styles.schedule}>{delivery.status === "open" ? `Créée ${formatRelativeDate(delivery.createdAt).toLocaleLowerCase("fr-FR")}` : formatRelativeDate(delivery.createdAt)} · <Text style={styles.distanceText}>{delivery.distanceKm.toLocaleString("fr-FR")} km</Text></Text>
-          {delivery.routeSource === "provisional" ? <Text style={styles.provisionalRoute}>Distance et estimation provisoires, à recalculer avec Routes API dès que le service est activé.</Text> : null}
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.topBar}>
+          <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Retour">
+            <MaterialIcons name="arrow-back" size={20} color="#111111" />
+          </Pressable>
+          <Pressable onPress={() => router.push(`/report/${deliveryId}` as any)} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Signaler">
+            <MaterialIcons name="flag" size={18} color="#B4232D" />
+          </Pressable>
+        </View>
 
-          <SurfaceCard style={styles.routeCard}>
-            <RouteLine label="Récupération" title={pickupPresentation.title} subtitle={pickupPresentation.subtitle} tone="pickup" />
-            <View style={styles.routeDivider} />
-            <RouteLine label="Destination" title={dropoffPresentation.title} subtitle={dropoffPresentation.subtitle} tone="dropoff" />
-          </SurfaceCard>
-          <TikisButton label="Voir sur la carte" icon="map" variant="secondary" onPress={openMap} loading={openingMap} loadingLabel="Ouverture de la carte…" style={styles.mapButton} />
+        <View style={styles.heroMap}>
+          <View style={styles.heroMapInner}>
+            <View style={[styles.heroMapBlock, { top: "12%", left: "8%", width: 60, height: 40 }]} />
+            <View style={[styles.heroMapBlock, { top: "60%", right: "12%", width: 50, height: 60 }]} />
+            <View style={[styles.heroMapRoad, { top: "45%", left: 0, right: 0, height: 10 }]} />
+            <View style={[styles.heroMapMarker, styles.heroMapMarkerStart]}>
+              <MaterialIcons name="inventory-2" size={12} color="#FFFFFF" />
+            </View>
+            <View style={[styles.heroMapMarker, styles.heroMapMarkerEnd]}>
+              <MaterialIcons name="location-on" size={12} color="#B4232D" />
+            </View>
+          </View>
+          <View style={styles.heroMapStatus}>
+            <View style={[styles.heroMapDot, { backgroundColor: statusBadgeColor }]} />
+            <Text style={styles.heroMapStatusText}>{statusBadgeText}</Text>
+          </View>
+        </View>
 
-          <SectionHeading title="Détails" />
-          <SurfaceCard style={styles.detailCard}>
-            <DetailRow icon="title" label="Titre" value={delivery.title} />
-            <DetailRow icon="category" label="Type" value={delivery.type} />
-            {delivery.type === "Autre" && delivery.weightKg ? <DetailRow icon="scale" label="Poids" value={`${delivery.weightKg} kg`} /> : null}
-            {delivery.type === "Autre" && delivery.dimensions ? <DetailRow icon="straighten" label="Dimensions" value={[delivery.dimensions.lengthCm, delivery.dimensions.widthCm, delivery.dimensions.heightCm].filter(Boolean).join(" × ") + " cm"} /> : null}
-            {delivery.type === "Personne" && delivery.passengers ? <DetailRow icon="group" label="Nombre" value={`${delivery.passengers} personne`} /> : null}
-            <DetailRow icon="route" label="Distance" value={`${delivery.distanceKm.toLocaleString("fr-FR")} km`} />
-            <DetailRow icon="two-wheeler" label="Engins" value={delivery.vehicleTypes.join(", ")} />
-            <View style={styles.detailLast}><Text style={styles.detailDescription}>{delivery.details}</Text></View>
-          </SurfaceCard>
+        <View style={styles.eyebrow}>{delivery.type} · {delivery.vehicleTypes[0] ?? "Moto"}</View>
+        <Text style={styles.title}>{delivery.title}</Text>
+        <View style={styles.metaRow}>
+          <Text style={styles.metaText}>{formatRelativeDate(delivery.createdAt)}</Text>
+          <View style={styles.metaDot} />
+          <Text style={styles.metaText}>{delivery.distanceKm.toLocaleString("fr-FR")} km</Text>
+          {showCandidates && candidates.length > 0 ? (
+            <>
+              <View style={styles.metaDot} />
+              <Text style={styles.metaText}>{candidates.length} candidat{candidates.length > 1 ? "s" : ""}</Text>
+            </>
+          ) : null}
+        </View>
 
-          <SectionHeading title="Tarification" />
-          <SurfaceCard style={styles.pricingCard}>
-            <View style={styles.pricingRow}><Text style={styles.pricingLabel}>{role === "driver" ? ownCandidate?.offerPrice ? "Frais client" : "Frais de la course" : "Frais de livraison"}</Text><Text style={styles.pricingValue}>{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</Text></View>
-            {role === "driver" && ownCandidate?.offerPrice ? <View style={styles.counterPrice}><Text style={styles.counterPriceLabel}>Frais proposé</Text><Text style={styles.counterPriceValue}>{formatMoney(ownCandidate.offerPrice)}</Text></View> : null}
-            <Text style={styles.pricingNote}>{role === "sender" ? "Vous réglerez directement le livreur lors de la livraison." : "Votre gain reste informatif jusqu’à la confirmation de la mission."}</Text>
-          </SurfaceCard>
+        <View style={styles.timelineCard}>
+          <Text style={styles.eyebrowSmall}>SUIVI</Text>
+          <View style={styles.timeline}>
+            <TimelineStep label="Publiée" done />
+            <TimelineLine done={isActive || isCompleted} />
+            <TimelineStep label="Retenue" done={isActive || isCompleted} />
+            <TimelineLine done={isCompleted} />
+            <TimelineStep label="Terminée" done={isCompleted} />
+          </View>
+        </View>
 
-          {role === "sender" && (delivery.status === "pending_confirmation" || delivery.status === "active") ? <TikisButton label="Suivre en direct" icon="my-location" variant="secondary" onPress={() => router.push(`/track/${deliveryId}` as any)} style={styles.trackButton} /> : null}
-          {role === "sender" ? <View style={styles.senderActions}>
-            {canEdit ? <TikisButton label="Modifier la livraison" icon="edit" variant="secondary" onPress={() => router.push({ pathname: "/create-delivery", params: { deliveryId } } as any)} disabled={senderProcessing} style={styles.senderActionButton} /> : null}
-            {canReactivate ? <TikisButton label="Activer la livraison" icon="play-circle" onPress={() => setSenderAction("reactivate")} loading={senderProcessing && senderAction === "reactivate"} disabled={senderProcessing} style={styles.senderActionButton} /> : null}
-            {canDisable ? <TikisButton label="Désactiver la livraison" icon="pause-circle" variant="secondary" onPress={() => setSenderAction("disable")} loading={senderProcessing && senderAction === "disable"} disabled={senderProcessing} style={styles.senderActionButton} /> : null}
-            {canCancel ? <TikisButton label="Annuler la livraison" icon="cancel" variant="ghost" onPress={() => setSenderAction("cancel")} loading={senderProcessing && senderAction === "cancel"} disabled={senderProcessing} style={styles.senderActionButton} /> : null}
-            {canCancel ? <TikisButton label="Supprimer" icon="delete-outline" variant="danger" onPress={() => setSenderAction("delete")} loading={senderProcessing && senderAction === "delete"} disabled={senderProcessing} style={styles.deleteActionButton} /> : null}
-          </View> : null}
+        <View style={styles.routeCard}>
+          <View style={styles.routeCol}>
+            <View style={[styles.routePin, styles.routePinFrom]} />
+            <View style={styles.routeLine} />
+            <View style={[styles.routePin, styles.routePinTo]} />
+          </View>
+          <View style={styles.routeInfoWrap}>
+            <View style={styles.routeInfo}>
+              <Text style={styles.routeLabel}>RÉCUPÉRATION</Text>
+              <Text style={styles.routeValue} numberOfLines={1}>{pickupPresentation.title}</Text>
+              <Text style={styles.routeMeta} numberOfLines={1}>{pickupPresentation.subtitle}</Text>
+            </View>
+            <View style={styles.routeInfo}>
+              <Text style={styles.routeLabel}>DESTINATION</Text>
+              <Text style={styles.routeValue} numberOfLines={1}>{dropoffPresentation.title}</Text>
+              <Text style={styles.routeMeta} numberOfLines={1}>{dropoffPresentation.subtitle}</Text>
+            </View>
+          </View>
+        </View>
 
-          {canRevealContact && delivery.driverName ? <><SectionHeading title="Mise en relation" /><SurfaceCard style={styles.contactCard}><View style={styles.contactTop}><Avatar initials={delivery.driverName.split(" ").map((part) => part[0]).join("")} color="#007B8B" /><View style={styles.contactInfo}><Text style={styles.contactName}>{role === "sender" ? delivery.driverName : delivery.senderName}</Text><Text style={styles.contactMeta}>{role === "sender" ? "Livreur confirmé" : "Expéditeur"}</Text></View><MaterialIcons name="verified" size={21} color="#18A572" /></View><TikisButton label={role === "sender" ? "Appeler le livreur" : "Appeler l’expéditeur"} variant="secondary" icon="phone" onPress={() => void Linking.openURL(`tel:${role === "sender" ? delivery.driverPhone : delivery.senderPhone}`)} style={styles.contactButton} /></SurfaceCard></> : null}
+        {role === "sender" ? (
+          <View style={styles.pricingCard}>
+            <View style={styles.pricingRow}>
+              <View>
+                <Text style={styles.pricingLabel}>Frais de livraison</Text>
+                {delivery.offeredPrice && delivery.offeredPrice !== delivery.estimatedPrice ? (
+                  <Text style={styles.pricingRef}>Estimé {formatMoney(delivery.estimatedPrice)}</Text>
+                ) : null}
+              </View>
+              <Text style={styles.pricingValue}>{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</Text>
+            </View>
+            <Text style={styles.pricingNote}>Vous réglerez directement le livreur lors de la livraison.</Text>
+          </View>
+        ) : (
+          <View style={styles.pricingCard}>
+            <View style={styles.pricingRow}>
+              <Text style={styles.pricingLabel}>{ownCandidate?.offerPrice ? "Frais client" : "Frais de la course"}</Text>
+              <Text style={styles.pricingValue}>{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</Text>
+            </View>
+            {ownCandidate?.offerPrice ? (
+              <View style={styles.pricingCounterRow}>
+                <Text style={styles.pricingCounterLabel}>Frais proposé</Text>
+                <Text style={styles.pricingCounterValue}>{formatMoney(ownCandidate.offerPrice)}</Text>
+              </View>
+            ) : null}
+            <Text style={styles.pricingNote}>Votre gain reste informatif jusqu’à la confirmation de la mission.</Text>
+          </View>
+        )}
 
-          {role === "driver" ? <DriverActions deliveryStatus={delivery.status} ownCandidateStatus={ownCandidate?.status} loading={processing} onApply={() => setAction("apply")} onCounterOffer={openCounterOffer} onWithdraw={() => setAction("withdraw")} onConfirm={() => setAction("confirm")} onComplete={() => setAction("complete")} /> : null}
-          {showCandidates ? <SectionHeading title={delivery.status === "active" ? "Remplacer le livreur" : `Livreurs qui se sont proposés (${candidates.length})`} /> : null}
-          {message ? <Text style={styles.message}>{message}</Text> : null}
-        </>}
-        ListEmptyComponent={showCandidates ? <Text style={styles.empty}>Aucun livreur n’a encore postulé à cette livraison.</Text> : null}
-        ListFooterComponent={delivery.status === "completed" && role === "sender" ? review ? <SurfaceCard style={styles.reviewDone}><MaterialIcons name="star" size={20} color="#F59E0B" /><View style={styles.reviewDoneInfo}><Text style={styles.reviewDoneTitle}>Avis envoyé · {review.rating}/5</Text><Text style={styles.reviewDoneText}>{review.comment || "Votre évaluation est enregistrée dans votre historique."}</Text></View></SurfaceCard> : <TikisButton label="Noter le livreur" variant="ghost" icon="star-outline" onPress={() => router.push(`/review/${deliveryId}` as any)} style={styles.rateButton} /> : null}
-      />
+        {canRevealContact && delivery.driverName ? (
+          <View style={styles.driverCard}>
+            <View style={styles.driverAvatar}>
+              <Text style={styles.driverAvatarText}>{(delivery.driverName ?? "?").split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}</Text>
+              <View style={styles.driverVerifiedBadge}>
+                <MaterialIcons name="check" size={10} color="#167A55" />
+              </View>
+            </View>
+            <View style={styles.driverInfo}>
+              <View style={styles.driverNameRow}>
+                <Text style={styles.driverName} numberOfLines={1}>{role === "sender" ? delivery.driverName : delivery.senderName}</Text>
+                <MaterialIcons name="verified" size={14} color="#167A55" />
+              </View>
+              <Text style={styles.driverMeta}>{role === "sender" ? "Livreur confirmé" : "Expéditeur"}</Text>
+            </View>
+            <View style={styles.driverActions}>
+              <Pressable onPress={() => void Linking.openURL(`tel:${role === "sender" ? delivery.driverPhone : delivery.senderPhone}`)} style={({ pressed }) => [styles.driverActionBtn, pressed && styles.pressed]} accessibilityLabel="Appeler">
+                <MaterialIcons name="phone" size={16} color="#111111" />
+              </Pressable>
+              <Pressable style={({ pressed }) => [styles.driverActionBtn, pressed && styles.pressed]} accessibilityLabel="Message">
+                <MaterialIcons name="chat" size={16} color="#111111" />
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
+        {showCandidates ? (
+          <Pressable onPress={() => setCandidatesSheetOpen(true)} style={({ pressed }) => [styles.candidatesTrigger, isActive && styles.candidatesTriggerActive, pressed && styles.pressed]}>
+            <View style={[styles.candidatesIcon, isActive && styles.candidatesIconActive]}>
+              <MaterialIcons name="group" size={18} color={isActive ? "#9A6200" : "#007B8B"} />
+            </View>
+            <View style={styles.candidatesBody}>
+              <Text style={styles.candidatesTitle}>{isActive ? "Changer de livreur" : "Livreurs candidats"}</Text>
+              <Text style={styles.candidatesMeta}>{isActive ? "Voir les autres candidatures reçues" : `${candidates.length} livreur${candidates.length > 1 ? "s" : ""} ont proposé leur service`}</Text>
+            </View>
+            {candidates.length > 0 ? <View style={styles.candidatesCount}><Text style={styles.candidatesCountText}>{candidates.length}</Text></View> : null}
+            <MaterialIcons name="chevron-right" size={18} color="#747474" />
+          </Pressable>
+        ) : null}
+
+        <SectionHeading title="Détails" />
+        <View style={styles.detailsCard}>
+          <DetailRow icon="title" label="Titre" value={delivery.title} />
+          <DetailRow icon="category" label="Type" value={delivery.type} />
+          {delivery.type === "Autre" && delivery.weightKg ? <DetailRow icon="scale" label="Poids" value={`${delivery.weightKg} kg`} /> : null}
+          {delivery.type === "Personne" && delivery.passengers ? <DetailRow icon="group" label="Nombre" value={`${delivery.passengers} personne`} /> : null}
+          <DetailRow icon="route" label="Distance" value={`${delivery.distanceKm.toLocaleString("fr-FR")} km`} />
+          <DetailRow icon="two-wheeler" label="Engins" value={delivery.vehicleTypes.join(", ")} />
+          {delivery.details ? <View style={styles.detailsLast}><Text style={styles.detailsDescription}>{delivery.details}</Text></View> : null}
+        </View>
+
+        {role === "sender" && (isActive || delivery.status === "pending_confirmation") ? (
+          <Pressable onPress={() => router.push(`/track/${deliveryId}` as any)} style={({ pressed }) => [styles.trackButton, pressed && styles.pressed]}>
+            <MaterialIcons name="my-location" size={16} color="#FFFFFF" />
+            <Text style={styles.trackButtonText}>Suivre en direct</Text>
+          </Pressable>
+        ) : null}
+
+        {role === "sender" ? (
+          <View style={styles.senderActions}>
+            {canEdit ? <TikisButton label="Modifier la livraison" icon="edit" variant="secondary" onPress={() => router.push({ pathname: "/create-delivery", params: { deliveryId } } as any)} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
+            {canReactivate ? <TikisButton label="Activer la livraison" icon="play-circle" onPress={() => setSenderAction("reactivate")} loading={senderProcessing && senderAction === "reactivate"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
+            {canDisable ? <TikisButton label="Désactiver la livraison" icon="pause-circle" variant="secondary" onPress={() => setSenderAction("disable")} loading={senderProcessing && senderAction === "disable"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
+            {canCancel ? (
+              <Pressable onPress={() => setSenderAction("cancel")} disabled={senderProcessing} style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed, senderProcessing && styles.cancelButtonDisabled]}>
+                <MaterialIcons name="cancel" size={16} color={senderProcessing ? "#A0A0A0" : "#B4232D"} />
+                <Text style={[styles.cancelButtonText, senderProcessing && styles.cancelButtonTextDisabled]}>Annuler la livraison</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
+        {role === "driver" ? <DriverActions deliveryStatus={delivery.status} ownCandidateStatus={ownCandidate?.status} loading={processing} onApply={() => setAction("apply")} onCounterOffer={openCounterOffer} onWithdraw={() => setAction("withdraw")} onConfirm={() => setAction("confirm")} onComplete={() => setAction("complete")} /> : null}
+
+        {message ? <Text style={styles.message}>{message}</Text> : null}
+        {isCompleted && role === "sender" ? review ? (
+          <View style={styles.reviewDone}><MaterialIcons name="star" size={20} color="#9A6200" /><View style={styles.reviewDoneInfo}><Text style={styles.reviewDoneTitle}>Avis envoyé · {review.rating}/5</Text><Text style={styles.reviewDoneText}>{review.comment || "Votre évaluation est enregistrée dans votre historique."}</Text></View></View>
+        ) : (
+          <TikisButton label="Noter le livreur" variant="ghost" icon="star-outline" onPress={() => router.push(`/review/${deliveryId}` as any)} style={styles.rateButton} />
+        ) : null}
+      </ScrollView>
+
       {actionConfig ? <FinancialConfirmationModal visible title={actionConfig.title} description={actionConfig.description} amount={actionConfig.amount} confirmLabel={actionConfig.label} irreversible={actionConfig.irreversible} loading={processing} onCancel={() => { setAction(null); setSelectedCandidate(null); }} onConfirm={() => void confirmAction()} /> : null}
       {senderActionConfig ? <DeliveryActionConfirmationModal visible title={senderActionConfig.title} description={senderActionConfig.description} confirmLabel={senderActionConfig.confirmLabel} tone={senderActionConfig.tone} loading={senderProcessing} onCancel={() => !senderProcessing && setSenderAction(null)} onConfirm={() => void confirmSenderAction()} /> : null}
       <Modal visible={counterVisible} transparent animationType="fade" onRequestClose={() => !counterLoading && setCounterVisible(false)}>
@@ -229,19 +366,37 @@ export default function DeliveryDetailScreen() {
           <View style={styles.counterActions}><TikisButton label="Annuler" variant="secondary" onPress={() => setCounterVisible(false)} disabled={counterLoading} style={styles.counterAction} /><TikisButton label="Envoyer" icon="send" onPress={() => void submitCounterOffer()} loading={counterLoading} style={styles.counterAction} /></View>
         </View></View>
       </Modal>
+      <CandidatesSheet
+        visible={candidatesSheetOpen}
+        candidates={candidates}
+        deliveryStatus={delivery.status}
+        loadingId={processing ? selectedCandidate?.id ?? null : null}
+        onClose={() => setCandidatesSheetOpen(false)}
+        onChoose={openCandidateAction}
+      />
     </SafeAreaView>
   );
 }
 
-function CandidateRow({ candidate, delivery, loading, onChoose }: { candidate: DriverCandidate; delivery: { status: string }; loading: boolean; onChoose: () => void }) {
-  const unavailable = candidate.status === "selected" || candidate.status === "confirmed";
-  return <SurfaceCard style={styles.candidateCard}><View style={styles.candidateHeader}><Avatar initials={candidate.initials} color="#007B8B" /><View style={styles.candidateInfo}><Text style={styles.candidateName}>{candidate.name}</Text><Text style={styles.candidateMeta}>{candidate.completedDeliveries ? `★ ${candidate.rating.toLocaleString("fr-FR")} · ${candidate.completedDeliveries} livraisons` : "Aucune note · Profil Tikis vérifié"}</Text></View>{candidate.isVerified ? <MaterialIcons name="verified" size={20} color="#18A572" /> : null}</View><View style={styles.candidateFooter}><View><Text style={styles.candidateVehicle}>{candidate.vehicles.join(", ") || "Engin à confirmer"}</Text><Text style={styles.candidatePrice}>{formatMoney(candidate.offerPrice ?? candidate.commissionBlocked * 10)}</Text></View><TikisButton label={unavailable ? "En attente" : delivery.status === "active" ? "Remplacer" : "Choisir"} variant={unavailable ? "ghost" : "secondary"} onPress={onChoose} disabled={unavailable || loading} loading={loading} style={styles.candidateButton} /></View></SurfaceCard>;
+function TimelineStep({ label, done }: { label: string; done: boolean }) {
+  return (
+    <View style={styles.timelineStep}>
+      <View style={[styles.timelineDot, done && styles.timelineDotDone]}>
+        {done ? <MaterialIcons name="check" size={11} color="#FFFFFF" /> : <MaterialIcons name="radio-button-unchecked" size={9} color="#747474" />}
+      </View>
+      <Text style={[styles.timelineLabel, done && styles.timelineLabelDone]}>{label}</Text>
+    </View>
+  );
+}
+
+function TimelineLine({ done }: { done: boolean }) {
+  return <View style={[styles.timelineLine, done && styles.timelineLineDone]} />;
 }
 
 function DeliveryActionConfirmationModal({ visible, title, description, confirmLabel, tone, loading, onCancel, onConfirm }: { visible: boolean; title: string; description: string; confirmLabel: string; tone: "success" | "warning" | "danger"; loading: boolean; onCancel: () => void; onConfirm: () => void }) {
-  const color = tone === "danger" ? "#C23B45" : tone === "warning" ? "#B45309" : "#007B8B";
-  const background = tone === "danger" ? "#FDEBEC" : tone === "warning" ? "#FFF4D8" : "#E5F6F7";
-  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}><View style={styles.actionOverlay}><Pressable style={styles.actionBackdrop} onPress={onCancel} /><View style={styles.actionSheet}><View style={styles.actionHandle} /><View style={[styles.actionIcon, { backgroundColor: background }]}><MaterialIcons name={tone === "danger" ? "warning-amber" : tone === "warning" ? "pause-circle" : "play-circle"} size={25} color={color} /></View><Text style={styles.actionTitle}>{title}</Text><Text style={styles.actionDescription}>{description}</Text><TikisButton label={confirmLabel} variant={tone === "danger" ? "danger" : tone === "warning" ? "secondary" : "primary"} onPress={onConfirm} loading={loading} style={styles.actionConfirm} /><TikisButton label="Conserver la livraison" variant="ghost" onPress={onCancel} disabled={loading} style={styles.actionCancel} /></View></View></Modal>;
+  const color = tone === "danger" ? "#B4232D" : tone === "warning" ? "#9A6200" : "#007B8B";
+  const background = tone === "danger" ? "#FDEBEC" : tone === "warning" ? "#FEF6E2" : "#E2F3F4";
+  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}><View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={onCancel} /><View style={styles.actionSheet}><View style={styles.actionHandle} /><View style={[styles.actionIcon, { backgroundColor: background }]}><MaterialIcons name={tone === "danger" ? "warning-amber" : tone === "warning" ? "pause-circle" : "play-circle"} size={24} color={color} /></View><Text style={styles.actionTitle}>{title}</Text><Text style={styles.actionDescription}>{description}</Text><TikisButton label={confirmLabel} variant={tone === "danger" ? "danger" : tone === "warning" ? "secondary" : "primary"} onPress={onConfirm} loading={loading} style={styles.actionConfirm} /><TikisButton label="Conserver la livraison" variant="ghost" onPress={onCancel} disabled={loading} style={styles.actionCancel} /></View></View></Modal>;
 }
 
 function DriverActions({ deliveryStatus, ownCandidateStatus, loading, onApply, onCounterOffer, onWithdraw, onConfirm, onComplete }: { deliveryStatus: string; ownCandidateStatus?: string; loading: boolean; onApply: () => void; onCounterOffer: () => void; onWithdraw: () => void; onConfirm: () => void; onComplete: () => void }) {
@@ -251,77 +406,138 @@ function DriverActions({ deliveryStatus, ownCandidateStatus, loading, onApply, o
   return null;
 }
 
-function RouteLine({ label, title, subtitle, tone }: { label: string; title: string; subtitle: string; tone: "pickup" | "dropoff" }) { return <View style={styles.routeLineRow}><View style={[styles.routePin, tone === "pickup" ? styles.pickupPin : styles.dropoffPin]}>{tone === "pickup" ? <View style={styles.pinInner} /> : <MaterialIcons name="location-on" size={15} color="#FFFFFF" />}</View><View style={styles.routeLineInfo}><Text style={styles.routeLabel}>{label}</Text><Text style={styles.routeValue}>{title}</Text><Text style={styles.routeMeta} numberOfLines={2}>{subtitle}</Text></View></View>; }
-function DetailRow({ icon, label, value }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; label: string; value: string }) { return <View style={styles.detailRow}><MaterialIcons name={icon} size={18} color="#007B8B" /><Text style={styles.detailLabel}>{label}</Text><Text style={styles.detailValue}>{value}</Text></View>; }
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: "#EEEDF3" },
+  content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32, gap: 10 },
 
-const baseStyles: any = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F6F8FC" }, content: { padding: 20, paddingBottom: 45 }, topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }, back: { width: 42, height: 42, borderRadius: 21, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7ECF2", alignItems: "center", justifyContent: "center" }, report: { width: 42, height: 42, borderRadius: 21, backgroundColor: "#FDEBEC", alignItems: "center", justifyContent: "center" }, topTitle: { color: "#0B1F3A", fontSize: 16, fontWeight: "900" }, title: { color: "#0B1F3A", fontSize: 26, lineHeight: 33, fontWeight: "900", marginTop: 12, letterSpacing: -0.4 }, schedule: { color: "#697386", fontSize: 13, marginTop: 5 }, provisionalRoute: { color: "#9A6700", fontSize: 11, fontWeight: "800", lineHeight: 16, marginTop: 7 }, routeCard: { marginTop: 21 }, routeLineRow: { flexDirection: "row", alignItems: "center" }, routePin: { width: 29, height: 29, borderRadius: 10, alignItems: "center", justifyContent: "center", marginRight: 11 }, pickupPin: { backgroundColor: "#E5F6F7" }, dropoffPin: { backgroundColor: "#0B1F3A" }, pinInner: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#007B8B" }, routeLineInfo: { flex: 1 }, routeLabel: { color: "#8A96A8", fontSize: 11, fontWeight: "900", letterSpacing: 0.5, textTransform: "uppercase" }, routeValue: { color: "#0B1F3A", fontSize: 13, fontWeight: "700", marginTop: 2 }, routeMeta: { color: "#697386", fontSize: 11, lineHeight: 16, marginTop: 2 }, routeDivider: { height: 15, width: 1, backgroundColor: "#C9D4DF", marginLeft: 14, marginVertical: 3 }, detailCard: { paddingVertical: 3 }, detailRow: { flexDirection: "row", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderColor: "#EEF2F6", gap: 9 }, detailLabel: { color: "#697386", fontSize: 13, flex: 1 }, detailValue: { color: "#0B1F3A", fontSize: 13, fontWeight: "800", textAlign: "right", flex: 1.4 }, detailLast: { paddingVertical: 12 }, detailDescription: { color: "#485569", fontSize: 13, lineHeight: 19 }, pricingCard: { backgroundColor: "#E5F6F7", borderColor: "#CDE4E7" }, pricingRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" }, pricingLabel: { color: "#35656C", fontSize: 13, fontWeight: "800" }, pricingValue: { color: "#006572", fontSize: 19, fontWeight: "900" }, estimateReference: { color: "#4D7075", fontSize: 11, fontWeight: "700", marginTop: 2 }, counterPrice: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 9, paddingTop: 9, borderTopWidth: 1, borderColor: "#C8E6E8" }, counterPriceLabel: { color: "#35656C", fontSize: 12, fontWeight: "800" }, counterPriceValue: { color: "#006572", fontSize: 15, fontWeight: "900" }, pricingNote: { color: "#4D7075", fontSize: 12, lineHeight: 18, marginTop: 5 }, trackButton: { marginTop: 12 }, contactCard: { padding: 15 }, contactTop: { flexDirection: "row", alignItems: "center", gap: 10 }, contactInfo: { flex: 1 }, contactName: { color: "#0B1F3A", fontSize: 16, fontWeight: "900" }, contactMeta: { color: "#697386", fontSize: 12, marginTop: 2 }, contactButton: { marginTop: 14 }, candidateCard: { marginBottom: 11 }, candidateHeader: { flexDirection: "row", alignItems: "center", gap: 10 }, candidateInfo: { flex: 1 }, candidateName: { color: "#0B1F3A", fontSize: 15, fontWeight: "900" }, candidateMeta: { color: "#697386", fontSize: 12, marginTop: 3 }, candidateFooter: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", paddingTop: 13, marginTop: 13, borderTopWidth: 1, borderColor: "#EEF2F6" }, candidateVehicle: { color: "#697386", fontSize: 12 }, candidatePrice: { color: "#007B8B", fontSize: 15, fontWeight: "900", marginTop: 3 }, candidateButton: { minHeight: 40, paddingHorizontal: 13, borderRadius: 12 }, driverAction: { marginTop: 24, marginBottom: 6 }, secondaryDriverAction: { marginTop: 10 }, driverHint: { color: "#697386", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 10, paddingHorizontal: 12 }, empty: { textAlign: "center", color: "#8A96A8", marginBottom: 18 }, message: { color: "#C23B45", textAlign: "center", fontSize: 13, fontWeight: "800", marginTop: 12 }, rateButton: { marginTop: 18 }, reviewDone: { marginTop: 18, flexDirection: "row", gap: 10, alignItems: "center", backgroundColor: "#FFF7E6", borderColor: "#F6D48F" }, reviewDoneInfo: { flex: 1 }, reviewDoneTitle: { color: "#8A5A0E", fontSize: 13, fontWeight: "900" }, reviewDoneText: { color: "#936C1B", fontSize: 12, lineHeight: 17, marginTop: 2 }, counterOverlay: { flex: 1, backgroundColor: "rgba(11,31,58,0.42)", alignItems: "center", justifyContent: "center", padding: 24 }, counterDialog: { width: "100%", maxWidth: 400, backgroundColor: "#FFFFFF", borderRadius: 22, padding: 20 }, counterIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: "#E6F5F6", alignSelf: "center", alignItems: "center", justifyContent: "center", marginBottom: 10 }, counterTitle: { color: "#0B1F3A", fontSize: 18, fontWeight: "900", textAlign: "center" }, counterText: { color: "#697386", fontSize: 13, lineHeight: 19, textAlign: "center", marginTop: 7 }, counterInputWrap: { minHeight: 52, flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: "#B8DDE0", borderRadius: 14, paddingHorizontal: 14, marginTop: 17 }, counterInput: { flex: 1, color: "#0B1F3A", fontSize: 16, fontWeight: "900", minHeight: 45 }, counterCurrency: { color: "#697386", fontSize: 12, fontWeight: "900", marginLeft: 8 }, counterHint: { color: "#4D7075", fontSize: 11, lineHeight: 16, textAlign: "center", marginTop: 7 }, counterError: { color: "#C23B45", fontSize: 11, fontWeight: "700", lineHeight: 16, textAlign: "center", marginTop: 7 }, counterActions: { flexDirection: "row", gap: 10, marginTop: 18 }, counterAction: { flex: 1, minHeight: 45 }, notFound: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 18 }, notFoundTitle: { color: "#0B1F3A", fontSize: 20, fontWeight: "900" }, pressed: { opacity: 0.67 },
-});
+  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4 },
+  iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
 
-Object.assign(baseStyles, {
-  distanceText: { color: "#0B1F3A", fontWeight: "900" },
-  mapButton: { marginTop: 11 },
-  senderActions: { marginTop: 12, gap: 9 },
-  senderActionButton: { minHeight: 46 },
-  deleteActionButton: { minHeight: 46, marginTop: 1 },
-  actionOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(11,31,58,0.38)" },
-  actionBackdrop: { ...StyleSheet.absoluteFillObject },
-  actionSheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, paddingTop: 10, paddingBottom: 27 },
-  actionHandle: { width: 40, height: 4, borderRadius: 3, backgroundColor: "#D8E0EA", alignSelf: "center", marginBottom: 17 },
-  actionIcon: { width: 49, height: 49, borderRadius: 16, alignItems: "center", justifyContent: "center", marginBottom: 13 },
-  actionTitle: { color: "#0B1F3A", fontSize: 21, fontWeight: "900" },
-  actionDescription: { color: "#5E6B7C", fontSize: 13, lineHeight: 20, marginTop: 7 },
-  actionConfirm: { marginTop: 21 },
-  actionCancel: { marginTop: 7 },
-  driverStatusLabel: { color: "#8A96A8", fontSize: 11, fontWeight: "900", letterSpacing: 0.5, marginTop: 12, textTransform: "uppercase" },
-  driverStatus: { color: "#0B1F3A", fontSize: 15, fontWeight: "900", marginTop: 3 },
-});
+  heroMap: { height: 200, borderRadius: 12, backgroundColor: "#EEEDF3", position: "relative", overflow: "hidden", marginTop: 8 },
+  heroMapInner: { ...StyleSheet.absoluteFillObject, backgroundColor: "#EEEDF3" },
+  heroMapBlock: { position: "absolute", backgroundColor: "#DCDEE3", borderRadius: 5 },
+  heroMapRoad: { position: "absolute", backgroundColor: "#FFFFFF", borderRadius: 99 },
+  heroMapMarker: { position: "absolute", width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  heroMapMarkerStart: { top: "30%", left: "18%", backgroundColor: "#007B8B" },
+  heroMapMarkerEnd: { top: "60%", right: "22%", backgroundColor: "#FFFFFF", borderColor: "#B4232D" },
+  heroMapStatus: { position: "absolute", top: 12, left: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 7 },
+  heroMapDot: { width: 7, height: 7, borderRadius: 4 },
+  heroMapStatusText: { color: "#111111", fontSize: 10, fontWeight: "600" },
 
-const styles: any = StyleSheet.create({
-  ...baseStyles,
-  safe: { ...baseStyles.safe, backgroundColor: "#EEEDF3" },
-  content: { ...baseStyles.content, padding: 16, paddingBottom: 28 },
-  topBar: { ...baseStyles.topBar, marginBottom: 16 },
-  back: { ...baseStyles.back, borderRadius: 8, borderWidth: 0 },
-  report: { ...baseStyles.report, borderRadius: 8 },
-  topTitle: { ...baseStyles.topTitle, color: "#111111", fontWeight: "600" },
-  title: { ...baseStyles.title, color: "#111111", fontWeight: "600", fontSize: 24, lineHeight: 30, marginTop: 10 },
-  provisionalRoute: { ...baseStyles.provisionalRoute, fontWeight: "600" },
-  routeCard: { ...baseStyles.routeCard, marginTop: 16 },
-  routePin: { ...baseStyles.routePin, borderRadius: 8 },
-  routeLabel: { ...baseStyles.routeLabel, fontWeight: "600" },
-  routeValue: { ...baseStyles.routeValue, color: "#111111", fontWeight: "600" },
-  detailRow: { ...baseStyles.detailRow, paddingVertical: 10, borderBottomWidth: 0 },
-  detailLast: { ...baseStyles.detailLast, paddingVertical: 10 },
-  detailValue: { ...baseStyles.detailValue, color: "#111111", fontWeight: "600" },
-  pricingCard: { ...baseStyles.pricingCard, backgroundColor: "#FFFFFF", borderWidth: 0 },
-  pricingLabel: { ...baseStyles.pricingLabel, color: "#555555", fontWeight: "600" },
-  pricingValue: { ...baseStyles.pricingValue, color: "#111111", fontWeight: "600" },
-  counterPrice: { ...baseStyles.counterPrice, borderTopWidth: 0 },
-  counterPriceLabel: { ...baseStyles.counterPriceLabel, color: "#555555", fontWeight: "600" },
-  counterPriceValue: { ...baseStyles.counterPriceValue, color: "#111111", fontWeight: "600" },
-  contactCard: { ...baseStyles.contactCard, padding: 13 },
-  contactName: { ...baseStyles.contactName, color: "#111111", fontWeight: "600" },
-  candidateCard: { ...baseStyles.candidateCard, marginBottom: 8 },
-  candidateName: { ...baseStyles.candidateName, color: "#111111", fontWeight: "600" },
-  candidateFooter: { ...baseStyles.candidateFooter, paddingTop: 10, marginTop: 10, borderTopWidth: 0 },
-  candidatePrice: { ...baseStyles.candidatePrice, fontWeight: "600" },
-  candidateButton: { ...baseStyles.candidateButton, borderRadius: 8 },
-  driverAction: { ...baseStyles.driverAction, marginTop: 18 },
-  reviewDone: { ...baseStyles.reviewDone, borderWidth: 0 },
-  reviewDoneTitle: { ...baseStyles.reviewDoneTitle, fontWeight: "600" },
-  counterOverlay: { ...baseStyles.counterOverlay, backgroundColor: "rgba(0,0,0,0.42)", padding: 16 },
-  counterDialog: { ...baseStyles.counterDialog, borderRadius: 12, padding: 16 },
-  counterIcon: { ...baseStyles.counterIcon, borderRadius: 9 },
-  counterTitle: { ...baseStyles.counterTitle, color: "#111111", fontWeight: "600" },
-  counterInputWrap: { ...baseStyles.counterInputWrap, borderWidth: 0, borderRadius: 9, backgroundColor: "#EEEDF3" },
-  counterInput: { ...baseStyles.counterInput, color: "#111111", fontWeight: "500" },
-  counterCurrency: { ...baseStyles.counterCurrency, fontWeight: "600" },
-  actionOverlay: { ...baseStyles.actionOverlay, backgroundColor: "rgba(0,0,0,0.42)" },
-  actionSheet: { ...baseStyles.actionSheet, borderTopLeftRadius: 14, borderTopRightRadius: 14, padding: 16, paddingBottom: 20 },
-  actionIcon: { ...baseStyles.actionIcon, borderRadius: 9 },
-  actionTitle: { ...baseStyles.actionTitle, color: "#111111", fontWeight: "600" },
-  driverStatusLabel: { ...baseStyles.driverStatusLabel, fontWeight: "600" },
-  driverStatus: { ...baseStyles.driverStatus, color: "#111111", fontWeight: "600" },
-  notFoundTitle: { ...baseStyles.notFoundTitle, color: "#111111", fontWeight: "600" },
+  eyebrow: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", marginTop: 4 },
+  eyebrowSmall: { color: "#747474", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
+  title: { color: "#111111", fontSize: 22, fontWeight: "700", lineHeight: 1.2, marginTop: 4 },
+  metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
+  metaText: { color: "#666666", fontSize: 11 },
+  metaDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: "#747474" },
+
+  timelineCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, marginTop: 4 },
+  timeline: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginTop: 10 },
+  timelineStep: { alignItems: "center", width: 70 },
+  timelineDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
+  timelineDotDone: { backgroundColor: "#007B8B" },
+  timelineLine: { flex: 1, height: 1.5, backgroundColor: "#ECECEC", marginTop: 11 },
+  timelineLineDone: { backgroundColor: "#007B8B" },
+  timelineLabel: { color: "#747474", fontSize: 9, fontWeight: "600", textAlign: "center", marginTop: 6 },
+  timelineLabelDone: { color: "#007B8B" },
+
+  routeCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "stretch", gap: 10 },
+  routeCol: { alignItems: "center", width: 14 },
+  routePin: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
+  routePinFrom: { backgroundColor: "#007B8B" },
+  routePinTo: { backgroundColor: "#B4232D" },
+  routeLine: { width: 1.5, flex: 1, backgroundColor: "#ECECEC", marginVertical: 4 },
+  routeInfoWrap: { flex: 1, minWidth: 0 },
+  routeInfo: { paddingVertical: 2 },
+  routeLabel: { color: "#747474", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
+  routeValue: { color: "#111111", fontSize: 12, fontWeight: "600", marginTop: 2 },
+  routeMeta: { color: "#666666", fontSize: 10, marginTop: 1 },
+
+  pricingCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14 },
+  pricingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  pricingLabel: { color: "#111111", fontSize: 12, fontWeight: "600" },
+  pricingValue: { color: "#111111", fontSize: 18, fontWeight: "700" },
+  pricingRef: { color: "#747474", fontSize: 10, marginTop: 1 },
+  pricingCounterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#ECECEC" },
+  pricingCounterLabel: { color: "#666666", fontSize: 11, fontWeight: "500" },
+  pricingCounterValue: { color: "#007B8B", fontSize: 13, fontWeight: "700" },
+  pricingNote: { color: "#747474", fontSize: 11, lineHeight: 16, marginTop: 8 },
+
+  driverCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
+  driverAvatar: { width: 40, height: 40, borderRadius: 10, backgroundColor: "#E2F3F4", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0 },
+  driverAvatarText: { color: "#007B8B", fontSize: 13, fontWeight: "700" },
+  driverVerifiedBadge: { position: "absolute", bottom: -2, right: -2, width: 14, height: 14, borderRadius: 7, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
+  driverInfo: { flex: 1, minWidth: 0 },
+  driverNameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  driverName: { color: "#111111", fontSize: 13, fontWeight: "600", flexShrink: 1 },
+  driverMeta: { color: "#666666", fontSize: 11, marginTop: 2 },
+  driverActions: { flexDirection: "row", gap: 6 },
+  driverActionBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
+
+  candidatesTrigger: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
+  candidatesTriggerActive: { borderWidth: 1, borderColor: "#007B8B", borderStyle: "dashed" },
+  candidatesIcon: { width: 36, height: 36, borderRadius: 9, backgroundColor: "#E2F3F4", alignItems: "center", justifyContent: "center" },
+  candidatesIconActive: { backgroundColor: "#FEF6E2" },
+  candidatesBody: { flex: 1, minWidth: 0 },
+  candidatesTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },
+  candidatesMeta: { color: "#666666", fontSize: 11, marginTop: 2 },
+  candidatesCount: { backgroundColor: "#111111", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 99 },
+  candidatesCountText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700" },
+
+  detailsCard: { backgroundColor: "#FFFFFF", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 2 },
+  detailsRow: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 9, borderBottomWidth: 1, borderBottomColor: "#ECECEC" },
+  detailsIcon: { width: 26, height: 26, borderRadius: 8, backgroundColor: "#E2F3F4", alignItems: "center", justifyContent: "center" },
+  detailsLabel: { color: "#747474", fontSize: 11, flexShrink: 0 },
+  detailsValue: { color: "#111111", fontSize: 12, fontWeight: "600", flex: 1, textAlign: "right" },
+  detailsLast: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: "#ECECEC", marginTop: 2 },
+  detailsDescription: { color: "#666666", fontSize: 12, lineHeight: 18 },
+
+  trackButton: { backgroundColor: "#007B8B", borderRadius: 10, paddingVertical: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  trackButtonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "600" },
+
+  senderActions: { gap: 8, marginTop: 4 },
+  senderActionBtn: { minHeight: 46 },
+  cancelButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 46, borderRadius: 9, borderWidth: 1, borderColor: "#B4232D", backgroundColor: "#FFFFFF" },
+  cancelButtonDisabled: { borderColor: "#D5D5DC" },
+  cancelButtonText: { color: "#B4232D", fontSize: 13, fontWeight: "600" },
+  cancelButtonTextDisabled: { color: "#A0A0A0" },
+
+  driverAction: { marginTop: 16 },
+  secondaryDriverAction: { marginTop: 8 },
+  driverHint: { color: "#666666", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 10, paddingHorizontal: 12 },
+
+  actionOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.42)" },
+  actionSheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 14, borderTopRightRadius: 14, padding: 16, paddingTop: 8, paddingBottom: 20 },
+  actionHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", alignSelf: "center", marginBottom: 14 },
+  actionIcon: { width: 44, height: 44, borderRadius: 9, alignItems: "center", justifyContent: "center", marginBottom: 12, alignSelf: "center" },
+  actionTitle: { color: "#111111", fontSize: 17, fontWeight: "600", textAlign: "center" },
+  actionDescription: { color: "#666666", fontSize: 13, lineHeight: 19, marginTop: 6, textAlign: "center" },
+  actionConfirm: { marginTop: 18 },
+  actionCancel: { marginTop: 6 },
+
+  counterOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.42)", alignItems: "center", justifyContent: "center", padding: 16 },
+  counterDialog: { width: "100%", maxWidth: 400, backgroundColor: "#FFFFFF", borderRadius: 12, padding: 16 },
+  counterIcon: { width: 44, height: 44, borderRadius: 9, backgroundColor: "#E2F3F4", alignSelf: "center", alignItems: "center", justifyContent: "center", marginBottom: 10 },
+  counterTitle: { color: "#111111", fontSize: 16, fontWeight: "600", textAlign: "center" },
+  counterText: { color: "#666666", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 6 },
+  counterInputWrap: { flexDirection: "row", alignItems: "center", minHeight: 48, backgroundColor: "#EEEDF3", borderRadius: 9, paddingHorizontal: 14, marginTop: 14 },
+  counterInput: { flex: 1, color: "#111111", fontSize: 15, fontWeight: "500", minHeight: 42 },
+  counterCurrency: { color: "#666666", fontSize: 11, fontWeight: "600", marginLeft: 8 },
+  counterHint: { color: "#666666", fontSize: 11, lineHeight: 16, textAlign: "center", marginTop: 6 },
+  counterError: { color: "#B4232D", fontSize: 11, fontWeight: "600", lineHeight: 16, textAlign: "center", marginTop: 6 },
+  counterActions: { flexDirection: "row", gap: 8, marginTop: 16 },
+  counterAction: { flex: 1, minHeight: 42 },
+
+  message: { color: "#B4232D", textAlign: "center", fontSize: 13, fontWeight: "600", marginTop: 8 },
+
+  reviewDone: { flexDirection: "row", gap: 10, alignItems: "center", backgroundColor: "#FEF6E2", borderRadius: 10, padding: 12, marginTop: 14 },
+  reviewDoneInfo: { flex: 1 },
+  reviewDoneTitle: { color: "#9A6200", fontSize: 13, fontWeight: "600" },
+  reviewDoneText: { color: "#9A6200", fontSize: 12, lineHeight: 17, marginTop: 2 },
+  rateButton: { marginTop: 14 },
+
+  notFound: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 12 },
+  notFoundTitle: { color: "#111111", fontSize: 16, fontWeight: "600" },
+
+  pressed: { opacity: 0.7 },
 });

@@ -38,7 +38,7 @@ export function FinancialConfirmationModal({
             <Text style={styles.amount}>{formatMoney(amount)}</Text>
           </View>
           <View style={styles.note}>
-            <MaterialIcons name={irreversible ? "lock" : "info-outline"} size={17} color={irreversible ? "#B45309" : "#006572"} />
+            <MaterialIcons name={irreversible ? "lock" : "info-outline"} size={17} color={irreversible ? "#9A6200" : "#007B8B"} />
             <Text style={[styles.noteText, irreversible ? styles.warningText : null]}>
               {irreversible ? "Cette étape rend la commission Tikis définitivement acquise après confirmation du livreur." : "Aucun débit définitif ne sera appliqué tant que la prochaine étape n’est pas confirmée."}
             </Text>
@@ -54,22 +54,22 @@ export function FinancialConfirmationModal({
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(11, 31, 58, 0.36)" },
+  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0, 0, 0, 0.42)" },
   backdrop: { ...StyleSheet.absoluteFillObject },
-  sheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 22, paddingBottom: 30, paddingTop: 10 },
-  handle: { width: 40, height: 4, borderRadius: 4, backgroundColor: "#D8E0EA", alignSelf: "center", marginBottom: 18 },
-  iconWrap: { width: 48, height: 48, alignItems: "center", justifyContent: "center", borderRadius: 16, backgroundColor: "#E5F6F7", marginBottom: 14 },
-  title: { color: "#0B1F3A", fontSize: 22, fontWeight: "900", letterSpacing: -0.3 },
-  description: { color: "#5E6B7C", fontSize: 14, lineHeight: 21, marginTop: 7 },
-  amountRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#F6F8FC", borderRadius: 15, padding: 14, marginTop: 18 },
-  amountLabel: { color: "#697386", fontSize: 13, fontWeight: "700" },
-  amount: { color: "#0B1F3A", fontSize: 17, fontWeight: "900" },
-  note: { flexDirection: "row", gap: 9, marginTop: 15, paddingHorizontal: 3 },
-  noteText: { flex: 1, color: "#35656C", fontSize: 12, lineHeight: 18 },
-  warningText: { color: "#8A5A09" },
-  confirm: { marginTop: 21 },
-  cancel: { alignItems: "center", paddingVertical: 16 },
-  cancelText: { color: "#697386", fontWeight: "800", fontSize: 15 },
-  pressed: { opacity: 0.65 },
+  sheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 14, borderTopRightRadius: 14, paddingHorizontal: 18, paddingBottom: 24, paddingTop: 10 },
+  handle: { width: 38, height: 4, borderRadius: 2, backgroundColor: "#CFCFCF", alignSelf: "center", marginBottom: 14 },
+  iconWrap: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 10, backgroundColor: "#EEEDF3", marginBottom: 12 },
+  title: { color: "#111111", fontSize: 20, fontWeight: "600", letterSpacing: -0.25 },
+  description: { color: "#666666", fontSize: 13, lineHeight: 20, marginTop: 6 },
+  amountRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#EEEDF3", borderRadius: 9, padding: 12, marginTop: 14 },
+  amountLabel: { color: "#666666", fontSize: 13, fontWeight: "500" },
+  amount: { color: "#111111", fontSize: 16, fontWeight: "600" },
+  note: { flexDirection: "row", gap: 8, marginTop: 12, paddingHorizontal: 3 },
+  noteText: { flex: 1, color: "#666666", fontSize: 12, lineHeight: 18 },
+  warningText: { color: "#9A6200" },
+  confirm: { marginTop: 18 },
+  cancel: { alignItems: "center", paddingVertical: 12 },
+  cancelText: { color: "#666666", fontWeight: "600", fontSize: 14 },
+  pressed: { opacity: 0.67 },
 });
 
