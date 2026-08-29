@@ -1,1 +1,1 @@
-export { DeliveryRouteMap } from "./delivery-route-map.native";
+export { DeliveryRouteMap } from "./delivery-route-map.web";

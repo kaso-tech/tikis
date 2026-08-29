@@ -6,11 +6,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
 import { useTikisNavigation } from "@/lib/tikis-navigation";
 import { trpc } from "@/lib/trpc";
-import { formatNavigationTarget } from "@/lib/geo-rules";
+import { formatNavigationTarget, formatListRouteParts } from "@/lib/geo-rules";
 import { availableWalletBalance, formatMoney, type Delivery, type DeliveryStatus } from "@/shared/tikis-domain";
 
-const SHEET_PEEK = 280;
-const SHEET_EXPANDED = 620;
+const SHEET_PEEK = 340;
+const SHEET_EXPANDED = 640;
 
 const TYPE_ICON: Record<Delivery["type"], React.ComponentProps<typeof MaterialIcons>["name"]> = {
   Plis: "inventory-2",
@@ -18,16 +18,48 @@ const TYPE_ICON: Record<Delivery["type"], React.ComponentProps<typeof MaterialIc
   Autre: "local-shipping",
 };
 
-function isLiveStatus(status: DeliveryStatus): boolean {
-  return status === "pending_confirmation" || status === "active";
+const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: string }> = {
+  open: { label: "PUBLIÉE", color: "#3B6BCD", bg: "#EAF1FF" },
+  pending_confirmation: { label: "EN ATTENTE", color: "#9A6200", bg: "#FEF6E2" },
+  active: { label: "EN ROUTE", color: "#167A55", bg: "#E2F3F4" },
+  completed: { label: "TERMINÉE", color: "#747474", bg: "#ECECEC" },
+  disabled: { label: "DÉSACTIVÉE", color: "#747474", bg: "#ECECEC" },
+  cancelled: { label: "ANNULÉE", color: "#B4232D", bg: "#FBE8EA" },
+};
+
+type FilterKey = "all" | "active" | "open" | "pending" | "completed";
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: "all", label: "Toutes" },
+  { key: "active", label: "En cours" },
+  { key: "open", label: "Publiées" },
+  { key: "pending", label: "À confirmer" },
+  { key: "completed", label: "Terminées" },
+];
+
+function matchesFilter(status: DeliveryStatus, filter: FilterKey): boolean {
+  if (filter === "all") return status !== "cancelled" && status !== "disabled";
+  if (filter === "active") return status === "active";
+  if (filter === "open") return status === "open";
+  if (filter === "pending") return status === "pending_confirmation";
+  if (filter === "completed") return status === "completed";
+  return true;
 }
 
-function statusChipProps(status: DeliveryStatus): { label: string; color: string; bg: string } {
-  if (status === "active") return { label: "EN ROUTE", color: "#167A55", bg: "#E2F3F4" };
-  if (status === "pending_confirmation") return { label: "EN ATTENTE", color: "#9A6200", bg: "#FEF6E2" };
-  if (status === "open") return { label: "PUBLIÉE", color: "#3B6BCD", bg: "#EAF1FF" };
-  if (status === "completed") return { label: "TERMINÉE", color: "#747474", bg: "#ECECEC" };
-  return { label: "—", color: "#747474", bg: "#ECECEC" };
+function projectOntoCanvas(
+  origin: { latitude: number; longitude: number },
+  target: { latitude: number; longitude: number },
+  bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number },
+  canvas: { width: number; height: number },
+  padding: number,
+) {
+  const latRange = bounds.maxLat - bounds.minLat || 0.0001;
+  const lngRange = bounds.maxLng - bounds.minLng || 0.0001;
+  const innerWidth = canvas.width - padding * 2;
+  const innerHeight = canvas.height - padding * 2;
+  const xFor = (lng: number) => padding + ((lng - bounds.minLng) / lngRange) * innerWidth;
+  const yFor = (lat: number) => padding + (1 - (lat - bounds.minLat) / latRange) * innerHeight;
+  return { x: xFor(target.longitude), y: yFor(target.latitude), originX: xFor(origin.longitude), originY: yFor(origin.latitude) };
 }
 
 export function HomeScreen() {
@@ -41,41 +73,42 @@ export function HomeScreen() {
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 12_000 });
   const driverWallet = walletQuery.data?.wallet;
 
+  const [filter, setFilter] = useState<FilterKey>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [driverOnline, setDriverOnline] = useState(true);
+  const [applyingId, setApplyingId] = useState<string | null>(null);
   const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
   const sheetValue = useRef(SHEET_PEEK);
 
-  const focusedList = useMemo(() => {
+  const filteredList = useMemo(() => {
     if (role === "driver") {
-      return [...deliveries].sort((left, right) => left.distanceKm - right.distanceKm || (right.offeredPrice ?? right.estimatedPrice) - (left.offeredPrice ?? left.estimatedPrice));
+      return [...deliveries]
+        .filter((d) => matchesFilter(d.status, filter))
+        .sort((a, b) => a.distanceKm - b.distanceKm);
     }
-    return deliveries.filter((d) => d.status !== "completed");
-  }, [deliveries, role]);
+    return deliveries.filter((d) => matchesFilter(d.status, filter));
+  }, [deliveries, filter, role]);
 
-  const urgent = useMemo(() => {
-    if (focusedList.length === 0) return null;
-    if (role === "driver") {
-      return focusedList.find((d) => d.status === "open" || d.status === "pending_confirmation") ?? focusedList[0];
+  const selected = useMemo(() => {
+    if (selectedId) {
+      const found = filteredList.find((d) => d.id === selectedId);
+      if (found) return found;
     }
-    return focusedList.find((d) => d.status === "active" || d.status === "pending_confirmation") ?? focusedList[0];
-  }, [focusedList, role]);
+    return filteredList[0] ?? null;
+  }, [filteredList, selectedId]);
 
   useEffect(() => {
-    if (!selectedId && urgent) setSelectedId(urgent.id);
-  }, [urgent, selectedId]);
+    if (!selectedId && selected) setSelectedId(selected.id);
+  }, [selected, selectedId]);
 
   useEffect(() => {
-    if (selectedId && focusedList.every((d) => d.id !== selectedId) && urgent) {
-      setSelectedId(urgent.id);
-    } else if (!selectedId && urgent) {
-      setSelectedId(urgent.id);
+    if (selectedId && filteredList.every((d) => d.id !== selectedId)) {
+      setSelectedId(filteredList[0]?.id ?? null);
     }
-  }, [focusedList, selectedId, urgent]);
+  }, [filteredList, selectedId]);
 
-  const liveCount = deliveries.filter((delivery) => isLiveStatus(delivery.status)).length;
-  const otherDeliveries = focusedList.filter((d) => d.id !== urgent?.id).slice(0, 4);
+  const otherDeliveries = useMemo(() => filteredList.filter((d) => d.id !== selected?.id).slice(0, 5), [filteredList, selected?.id]);
 
   useEffect(() => {
     const listener = sheetHeight.addListener(({ value }) => { sheetValue.current = value; });
@@ -101,16 +134,34 @@ export function HomeScreen() {
     },
   })).current;
 
+  const utilities = trpc.useUtils();
+  const applyMutation = trpc.deliveries.submitApplication.useMutation();
+
+  async function handleApply(deliveryId: string) {
+    setApplyingId(deliveryId);
+    try {
+      await applyMutation.mutateAsync({ deliveryId });
+      await Promise.all([
+        utilities.deliveries.list.invalidate(),
+        utilities.wallet.snapshot.invalidate(),
+        utilities.notifications.list.invalidate(),
+      ]);
+    } catch {
+    } finally {
+      setApplyingId(null);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <MapBackground selected={selectedId ? deliveries.find((d) => d.id === selectedId) ?? urgent : urgent} />
+      <MapBackground selected={selected} />
 
       <View style={styles.searchRow} pointerEvents="box-none">
         {role === "sender" ? (
           <>
             <View style={styles.searchPill}>
               <MaterialIcons name="search" size={16} color="#747474" />
-              <Text style={styles.searchPillText}>Où allez-vous ?</Text>
+              <Text style={styles.searchPillText}>Rechercher une livraison…</Text>
             </View>
             <Pressable onPress={() => openDrawer()} style={({ pressed }) => [styles.searchBtn, pressed && styles.pressed]} accessibilityLabel="Menu">
               <MaterialIcons name="menu" size={20} color="#111111" />
@@ -120,7 +171,7 @@ export function HomeScreen() {
           <>
             <Pressable onPress={() => setDriverOnline((prev) => !prev)} style={({ pressed }) => [styles.onlinePill, !driverOnline && styles.onlinePillOffline, pressed && styles.pressed]}>
               <View style={[styles.onlineDot, !driverOnline && styles.onlineDotOffline]} />
-              <Text style={styles.onlinePillText}>{driverOnline ? "EN SERVICE" : "HORS SERVICE"}</Text>
+              <Text style={[styles.onlinePillText, !driverOnline && styles.onlinePillTextOffline]}>{driverOnline ? "EN SERVICE" : "HORS SERVICE"}</Text>
             </Pressable>
             <Pressable onPress={() => openDrawer()} style={({ pressed }) => [styles.searchBtn, pressed && styles.pressed]} accessibilityLabel="Menu">
               <MaterialIcons name="menu" size={20} color="#111111" />
@@ -129,55 +180,47 @@ export function HomeScreen() {
         )}
       </View>
 
-      {role === "sender" ? (
-        <View style={styles.livePill} pointerEvents="none">
-          <View style={[styles.liveDot, liveCount === 0 && styles.liveDotIdle]} />
-          <Text style={[styles.livePillText, liveCount === 0 && styles.livePillTextIdle]}>
-            {liveCount === 0 ? "Aucune livraison active" : `${liveCount} livraison${liveCount > 1 ? "s" : ""} actives`}
-          </Text>
-        </View>
-      ) : (
-        <View style={[styles.livePill, walletQuery.isLoading ? styles.livePillLoading : null]} pointerEvents="none">
-          {walletQuery.isLoading ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <MaterialIcons name="account-balance-wallet" size={13} color="#FFFFFF" />
-              <Text style={styles.walletPillText}>
-                {driverWallet ? formatMoney(availableWalletBalance(driverWallet)) : "Wallet indisponible"}
-              </Text>
-            </>
-          )}
-        </View>
-      )}
-
       <Pressable
         onPress={() => {
-          if (role === "sender") {
-            router.push("/create-delivery" as any);
-          } else if (urgent) {
-            router.push(`/delivery/${urgent.id}` as any);
-          } else {
-            router.push("/(tabs)/deliveries" as any);
-          }
+          if (role === "sender") router.push("/create-delivery" as any);
         }}
-        style={({ pressed }) => [styles.fab, role === "driver" && styles.fabWhite, pressed && styles.pressed]}
-        accessibilityLabel={role === "sender" ? "Créer une livraison" : "Accepter la prochaine course"}
+        style={({ pressed }) => [styles.fab, pressed && styles.pressed]}
+        accessibilityLabel={role === "sender" ? "Créer une livraison" : "Recherche rapide"}
       >
-        <MaterialIcons name="add" size={26} color={role === "sender" ? "#FFFFFF" : "#007B8B"} />
+        <MaterialIcons name={role === "sender" ? "add" : "search"} size={26} color="#FFFFFF" />
       </Pressable>
 
       <Animated.View style={[styles.sheet, { height: sheetHeight }]}>
         <View {...panResponder.panHandlers} style={styles.sheetHeader}>
           <View style={styles.sheetGrip} />
           <View style={styles.sheetTitleRow}>
-            <Text style={styles.sheetTitle}>Bonjour {firstName} 👋</Text>
-            <Pressable
-              onPress={() => role === "sender" ? router.push("/(tabs)/profile" as any) : router.push("/(tabs)/wallet" as any)}
-              style={({ pressed }) => [pressed && styles.pressed]}
-            >
-              <Text style={styles.sheetLink}>{role === "sender" ? "Profil" : "Wallet"}</Text>
-            </Pressable>
+            <View>
+              <Text style={styles.sheetTitle}>Bonjour {firstName} 👋</Text>
+              <Text style={styles.sheetSubtitle}>
+                {role === "sender"
+                  ? `${filteredList.length} livraison${filteredList.length > 1 ? "s" : ""} affichée${filteredList.length > 1 ? "s" : ""}`
+                  : `${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité`}
+              </Text>
+            </View>
+            {role === "driver" ? (
+              <View style={styles.walletBadge}>
+                {walletQuery.isLoading ? (
+                  <ActivityIndicator size="small" color="#007B8B" />
+                ) : (
+                  <>
+                    <MaterialIcons name="account-balance-wallet" size={14} color="#007B8B" />
+                    <Text style={styles.walletBadgeText}>{driverWallet ? formatMoney(availableWalletBalance(driverWallet)) : "—"}</Text>
+                  </>
+                )}
+              </View>
+            ) : null}
+          </View>
+          <View style={styles.filterRow}>
+            {FILTERS.map((item) => (
+              <Pressable key={item.key} onPress={() => setFilter(item.key)} style={({ pressed }) => [styles.chip, filter === item.key && styles.chipActive, pressed && styles.pressed]}>
+                <Text style={[styles.chipText, filter === item.key && styles.chipTextActive]}>{item.label}</Text>
+              </Pressable>
+            ))}
           </View>
         </View>
 
@@ -192,46 +235,50 @@ export function HomeScreen() {
               <ActivityIndicator color="#007B8B" />
               <Text style={styles.loadingText}>Chargement de vos livraisons…</Text>
             </View>
-          ) : !urgent ? (
+          ) : !selected ? (
             <View style={styles.empty}>
               <View style={styles.emptyIcon}>
                 <MaterialIcons name={role === "sender" ? "add" : "local-shipping"} size={26} color="#747474" />
               </View>
               <Text style={styles.emptyTitle}>{role === "sender" ? "Aucune livraison en cours" : "Aucune opportunité disponible"}</Text>
               <Text style={styles.emptyText}>
-                {role === "sender" ? "Publiez votre première course et comparez les livreurs disponibles." : "Revenez dans quelques minutes, de nouvelles courses arrivent régulièrement."}
+                {role === "sender"
+                  ? "Publiez votre première course et comparez les livreurs disponibles."
+                  : "Revenez dans quelques minutes, de nouvelles courses arrivent régulièrement."}
               </Text>
             </View>
           ) : (
-            <UrgentCard delivery={urgent} role={role} />
+            <UrgentCard
+              delivery={selected}
+              role={role}
+              applying={applyingId === selected.id}
+              onAction={() => {
+                if (role === "sender") router.push(`/track/${selected.id}` as any);
+                else router.push(`/delivery/${selected.id}` as any);
+              }}
+              onDetails={() => router.push(`/delivery/${selected.id}` as any)}
+              onApply={() => handleApply(selected.id)}
+            />
           )}
 
-          <View style={styles.shortcuts}>
-            {role === "sender" ? (
-              <>
-                <Shortcut icon="add" label="Nouvelle" onPress={() => router.push("/create-delivery" as any)} />
-                <Shortcut icon="my-location" label="Suivi" onPress={() => router.push("/(tabs)/live" as any)} />
-                <Shortcut icon="bookmark" label="Adresses" onPress={() => router.push("/(tabs)/addresses" as any)} />
-              </>
-            ) : (
-              <>
-                <Shortcut icon="map" label="Carte" onPress={() => router.push("/(tabs)/live" as any)} />
-                <Shortcut icon="local-shipping" label="Courses" onPress={() => router.push("/(tabs)/deliveries" as any)} />
-                <Shortcut icon="account-balance-wallet" label="Wallet" onPress={() => router.push("/(tabs)/wallet" as any)} />
-              </>
-            )}
-          </View>
-
           {otherDeliveries.length > 0 ? (
-            <View style={styles.miniList}>
+            <View style={styles.listSection}>
+              <Text style={styles.listSectionTitle}>
+                {role === "sender" ? "Autres livraisons" : "Autres opportunités"}
+              </Text>
               {otherDeliveries.map((delivery) => (
-                <MiniItem
+                <DeliveryRow
                   key={delivery.id}
                   delivery={delivery}
+                  role={role}
+                  selected={delivery.id === selectedId}
+                  applying={applyingId === delivery.id}
                   onPress={() => {
                     setSelectedId(delivery.id);
                     if (!expanded) animateSheet(true);
                   }}
+                  onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
+                  onApply={() => handleApply(delivery.id)}
                 />
               ))}
             </View>
@@ -244,6 +291,30 @@ export function HomeScreen() {
 
 function MapBackground({ selected }: { selected: Delivery | null | undefined }) {
   const hasDriver = selected ? selected.status !== "open" : false;
+  const pickup = selected?.pickup;
+  const dropoff = selected?.dropoff;
+  const routeLine = useMemo(() => {
+    if (!pickup || !dropoff) return null;
+    const minLat = Math.min(pickup.latitude, dropoff.latitude);
+    const maxLat = Math.max(pickup.latitude, dropoff.latitude);
+    const minLng = Math.min(pickup.longitude, dropoff.longitude);
+    const maxLng = Math.max(pickup.longitude, dropoff.longitude);
+    const latPad = (maxLat - minLat || 0.005) * 0.4;
+    const lngPad = (maxLng - minLng || 0.005) * 0.4;
+    const projection = projectOntoCanvas(
+      pickup,
+      dropoff,
+      { minLat: minLat - latPad, maxLat: maxLat + latPad, minLng: minLng - lngPad, maxLng: maxLng + lngPad },
+      { width: 320, height: 640 },
+      60,
+    );
+    const dx = projection.x - projection.originX;
+    const dy = projection.y - projection.originY;
+    const length = Math.max(1, Math.hypot(dx, dy));
+    const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+    return { left: projection.originX, top: projection.originY, length, angle };
+  }, [pickup, dropoff]);
+
   return (
     <View style={styles.mapBg}>
       <View style={[styles.mapBlock, { top: "10%", left: "8%", width: 90, height: 60 }]} />
@@ -253,6 +324,21 @@ function MapBackground({ selected }: { selected: Delivery | null | undefined }) 
       <View style={[styles.mapRoad, styles.mapRoad1]} />
       <View style={[styles.mapRoad, styles.mapRoad2]} />
       <View style={[styles.mapRoad, styles.mapRoad3]} />
+
+      {routeLine ? (
+        <View
+          style={[
+            styles.routeLine,
+            {
+              left: routeLine.left,
+              top: routeLine.top,
+              width: routeLine.length,
+              transform: [{ translateY: -1.5 }, { rotate: `${routeLine.angle}deg` }],
+              transformOrigin: "0% 50%",
+            },
+          ]}
+        />
+      ) : null}
 
       <View style={[styles.marker, styles.markerStart]}>
         <MaterialIcons name="inventory-2" size={14} color="#FFFFFF" />
@@ -269,59 +355,174 @@ function MapBackground({ selected }: { selected: Delivery | null | undefined }) 
   );
 }
 
-function UrgentCard({ delivery, role }: { delivery: Delivery; role: "sender" | "driver" }) {
-  const cta = role === "sender" ? "Suivre" : "Accepter";
-  const ctaAction = () => {
-    if (role === "sender") {
-      router.push(`/track/${delivery.id}` as any);
-    } else {
-      router.push(`/delivery/${delivery.id}` as any);
-    }
-  };
+function UrgentCard({
+  delivery,
+  role,
+  applying,
+  onAction,
+  onDetails,
+  onApply,
+}: {
+  delivery: Delivery;
+  role: "sender" | "driver";
+  applying: boolean;
+  onAction: () => void;
+  onDetails: () => void;
+  onApply: () => void;
+}) {
+  const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
+  const price = formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice);
+  const isSender = role === "sender";
+  const mayApply = role === "driver" && delivery.status === "open" && !["applied", "selected", "confirmed"].includes(delivery.ownCandidateStatus ?? "");
+
   return (
-    <View style={[styles.urgentCard, role === "driver" && styles.urgentCardDriver]}>
-      <View style={[styles.urgentThumb, role === "driver" && styles.urgentThumbDriver]}>
-        <MaterialIcons name={TYPE_ICON[delivery.type] ?? "local-shipping"} size={18} color={role === "driver" ? "#007B8B" : "#FFFFFF"} />
+    <View style={[styles.urgentCard, isSender ? styles.urgentCardSender : styles.urgentCardDriver]}>
+      <View style={styles.urgentHead}>
+        <View style={[styles.urgentThumb, isSender ? styles.urgentThumbSender : styles.urgentThumbDriver]}>
+          <MaterialIcons name={TYPE_ICON[delivery.type] ?? "local-shipping"} size={18} color={isSender ? "#FFFFFF" : "#007B8B"} />
+        </View>
+        <View style={styles.urgentMeta}>
+          <Text style={styles.urgentTitle} numberOfLines={1}>{delivery.title}</Text>
+          <Text style={styles.urgentSub} numberOfLines={1}>
+            {isSender
+              ? `${route.pickup} → ${route.dropoff} · ${delivery.distanceKm.toFixed(1)} km`
+              : `${route.pickup} → ${route.dropoff} · ${delivery.vehicleTypes[0] ?? "Moto"}`}
+          </Text>
+        </View>
+        <View style={[styles.urgentChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}>
+          <Text style={[styles.urgentChipText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text>
+        </View>
       </View>
-      <View style={styles.urgentBody}>
-        <Text style={styles.urgentTitle} numberOfLines={1}>{delivery.title}</Text>
-        <Text style={styles.urgentMeta} numberOfLines={1}>
-          {role === "sender"
-            ? `${delivery.driverName ?? "Livreur en attente"} · ${delivery.distanceKm.toFixed(1)} km · ETA 8 min`
-            : `${delivery.distanceKm.toFixed(1)} km · ${formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)} · ${delivery.vehicleTypes[0] ?? "Moto"}`}
-        </Text>
+      <View style={styles.urgentPricing}>
+        <View>
+          <Text style={styles.urgentPrice}>{price}</Text>
+          <Text style={styles.urgentPriceExtra}>{isSender ? "est. client" : "rémunération nette"}</Text>
+        </View>
+        <View style={styles.urgentSideStat}>
+          <Text style={styles.urgentSideStatLabel}>{isSender ? "Livreur" : "Vous êtes à"}</Text>
+          <Text style={styles.urgentSideStatValue}>
+            {isSender
+              ? delivery.driverName ?? "En attente"
+              : `${delivery.distanceKm.toFixed(1)} km`}
+          </Text>
+        </View>
       </View>
-      <Pressable onPress={ctaAction} style={({ pressed }) => [styles.urgentCta, role === "driver" && styles.urgentCtaDriver, pressed && styles.pressed]}>
-        <Text style={[styles.urgentCtaText, role === "driver" && styles.urgentCtaTextDriver]}>{cta}</Text>
-      </Pressable>
+      <View style={styles.urgentActions}>
+        {isSender ? (
+          <Pressable onPress={onAction} style={({ pressed }) => [styles.urgentBtnWhite, pressed && styles.pressed]}>
+            <MaterialIcons name="my-location" size={15} color="#111111" />
+            <Text style={styles.urgentBtnWhiteText}>Suivre la course</Text>
+          </Pressable>
+        ) : (
+          <>
+            <Pressable onPress={onDetails} style={({ pressed }) => [styles.urgentBtnLight, pressed && styles.pressed]}>
+              <MaterialIcons name="description" size={15} color="#FFFFFF" />
+              <Text style={styles.urgentBtnLightText}>Détails</Text>
+            </Pressable>
+            {mayApply ? (
+              <Pressable
+                onPress={onApply}
+                disabled={applying}
+                style={({ pressed }) => [styles.urgentBtnWhite, appliedStyle(applying, pressed)]}
+              >
+                {applying ? (
+                  <ActivityIndicator size="small" color="#007B8B" />
+                ) : (
+                  <MaterialIcons name="add-circle" size={15} color="#007B8B" />
+                )}
+                <Text style={styles.urgentBtnWhiteText}>{applying ? "Candidature…" : "Postuler"}</Text>
+              </Pressable>
+            ) : (
+              <Pressable onPress={onDetails} style={({ pressed }) => [styles.urgentBtnWhite, pressed && styles.pressed]}>
+                <MaterialIcons name="arrow-forward" size={15} color="#007B8B" />
+                <Text style={styles.urgentBtnWhiteText}>Voir la course</Text>
+              </Pressable>
+            )}
+          </>
+        )}
+      </View>
     </View>
   );
 }
 
-function Shortcut({ icon, label, onPress }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; label: string; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.shortcut, pressed && styles.pressed]}>
-      <MaterialIcons name={icon} size={16} color="#007B8B" />
-      <Text style={styles.shortcutText}>{label}</Text>
-    </Pressable>
-  );
+function appliedStyle(applying: boolean, pressed: boolean) {
+  if (applying) return { opacity: 0.6 };
+  if (pressed) return styles.pressed;
+  return null;
 }
 
-function MiniItem({ delivery, onPress }: { delivery: Delivery; onPress: () => void }) {
-  const chip = statusChipProps(delivery.status);
+function DeliveryRow({
+  delivery,
+  role,
+  selected,
+  applying,
+  onPress,
+  onDetails,
+  onApply,
+}: {
+  delivery: Delivery;
+  role: "sender" | "driver";
+  selected: boolean;
+  applying: boolean;
+  onPress: () => void;
+  onDetails: () => void;
+  onApply: () => void;
+}) {
+  const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
+  const price = formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice);
+  const isSender = role === "sender";
+  const mayApply = role === "driver" && delivery.status === "open" && !["applied", "selected", "confirmed"].includes(delivery.ownCandidateStatus ?? "");
+
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.miniItem, pressed && styles.pressed]}>
-      <View style={styles.miniThumb}>
-        <MaterialIcons name={TYPE_ICON[delivery.type] ?? "local-shipping"} size={14} color="#666666" />
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, selected && styles.rowSelected, pressed && styles.pressed]}>
+      <View style={styles.rowTop}>
+        <View style={[styles.rowThumb, isSender ? null : styles.rowThumbDriver]}>
+          <MaterialIcons name={TYPE_ICON[delivery.type] ?? "local-shipping"} size={15} color={isSender ? "#111111" : "#FFFFFF"} />
+        </View>
+        <View style={styles.rowMain}>
+          <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
+          <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff}</Text>
+        </View>
+        <Text style={styles.rowPrice}>{price}</Text>
       </View>
-      <View style={styles.miniBody}>
-        <Text style={styles.miniTitle} numberOfLines={1}>{delivery.title}</Text>
-        <Text style={styles.miniMeta} numberOfLines={1}>
-          {delivery.distanceKm.toFixed(1)} km · {formatNavigationTarget(delivery.pickup)}
-        </Text>
-      </View>
-      <View style={[styles.miniChip, { backgroundColor: chip.bg }]}>
-        <Text style={[styles.miniChipText, { color: chip.color }]}>{chip.label}</Text>
+      <View style={styles.rowBottom}>
+        <View style={styles.rowStat}>
+          <MaterialIcons name="route" size={12} color="#666666" />
+          <Text style={styles.rowStatText}>{delivery.distanceKm.toFixed(1)} km</Text>
+        </View>
+        {isSender ? (
+          <View style={styles.rowStat}>
+            <MaterialIcons name="group" size={12} color="#666666" />
+            <Text style={styles.rowStatText}>{delivery.candidateCount ?? 0} candidat{(delivery.candidateCount ?? 0) > 1 ? "s" : ""}</Text>
+          </View>
+        ) : (
+          <View style={styles.rowStat}>
+            <MaterialIcons name="my-location" size={12} color="#007B8B" />
+            <Text style={[styles.rowStatText, { color: "#007B8B", fontWeight: "700" }]}>Vous êtes à {delivery.distanceKm.toFixed(1)} km</Text>
+          </View>
+        )}
+        <View style={styles.rowActions}>
+          <Pressable onPress={onDetails} style={({ pressed }) => [styles.rowBtnOutline, pressed && styles.pressed]}>
+            <Text style={styles.rowBtnOutlineText}>Détails</Text>
+          </Pressable>
+          {isSender ? (
+            <Pressable onPress={onDetails} style={({ pressed }) => [styles.rowBtnFilled, pressed && styles.pressed]}>
+              <Text style={styles.rowBtnFilledText}>Suivre</Text>
+            </Pressable>
+          ) : mayApply ? (
+            <Pressable
+              onPress={onApply}
+              disabled={applying}
+              style={({ pressed }) => [styles.rowBtnFilled, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
+            >
+              {applying ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.rowBtnFilledText}>Postuler</Text>}
+            </Pressable>
+          ) : (
+            <Pressable onPress={onDetails} style={({ pressed }) => [styles.rowBtnFilled, pressed && styles.pressed]}>
+              <Text style={styles.rowBtnFilledText}>Voir</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
     </Pressable>
   );
@@ -336,6 +537,7 @@ const styles = StyleSheet.create({
   mapRoad1: { top: "30%", left: "-10%", right: "-10%", height: 18, transform: [{ rotate: "-12deg" }] },
   mapRoad2: { top: "56%", left: "-20%", width: "80%", height: 14, transform: [{ rotate: "6deg" }] },
   mapRoad3: { top: "78%", left: "20%", right: "-10%", height: 12, transform: [{ rotate: "-4deg" }] },
+  routeLine: { position: "absolute", height: 3, backgroundColor: "#007B8B", borderRadius: 2, boxShadow: "0 0 0 5px rgba(0,123,139,0.10)" } as any,
   marker: { position: "absolute", width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   markerStart: { top: "32%", left: "16%", backgroundColor: "#007B8B" },
   markerDriver: { top: "50%", left: "42%", backgroundColor: "#111111" },
@@ -351,56 +553,73 @@ const styles = StyleSheet.create({
   onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FFFFFF" },
   onlineDotOffline: { backgroundColor: "#747474" },
   onlinePillText: { color: "#FFFFFF", fontSize: 12, fontWeight: "600" },
+  onlinePillTextOffline: { color: "#111111" },
 
-  livePill: { position: "absolute", top: 60, left: 14, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: "#FFFFFF", borderRadius: 7, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
-  livePillLoading: { backgroundColor: "#111111" },
-  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#167A55" },
-  liveDotIdle: { backgroundColor: "#747474" },
-  livePillText: { color: "#167A55", fontSize: 10, fontWeight: "600" },
-  livePillTextIdle: { color: "#747474" },
-  walletPillText: { color: "#FFFFFF", fontSize: 10, fontWeight: "600" },
-
-  fab: { position: "absolute", right: 14, bottom: 310, width: 50, height: 50, borderRadius: 14, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", shadowColor: "#007B8B", shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6, zIndex: 10 },
-  fabWhite: { backgroundColor: "#FFFFFF" },
+  fab: { position: "absolute", right: 14, bottom: 360, width: 50, height: 50, borderRadius: 14, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", shadowColor: "#007B8B", shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6, zIndex: 10 },
 
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: -4 }, elevation: 8, overflow: "hidden" },
-  sheetHeader: { paddingTop: 12, paddingBottom: 6 },
-  sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", marginBottom: 12 },
-  sheetTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16 },
+  sheetHeader: { paddingTop: 10, paddingBottom: 8 },
+  sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", marginBottom: 10 },
+  sheetTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, marginBottom: 10 },
   sheetTitle: { color: "#111111", fontSize: 15, fontWeight: "700" },
-  sheetLink: { color: "#007B8B", fontSize: 12, fontWeight: "600" },
+  sheetSubtitle: { color: "#666666", fontSize: 11, marginTop: 2, fontWeight: "500" },
+  walletBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, paddingVertical: 5, backgroundColor: "#E6F4F5", borderRadius: 7 },
+  walletBadgeText: { color: "#007B8B", fontSize: 11, fontWeight: "700" },
+  filterRow: { flexDirection: "row", gap: 6, paddingHorizontal: 14, flexWrap: "wrap" },
+  chip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
+  chipActive: { backgroundColor: "#007B8B", borderColor: "#007B8B" },
+  chipText: { color: "#666666", fontSize: 11, fontWeight: "600" },
+  chipTextActive: { color: "#FFFFFF" },
 
   scrollArea: { flex: 1, marginTop: 4 },
-  scrollContent: { paddingHorizontal: 14, paddingTop: 4, paddingBottom: 90, gap: 10 },
+  scrollContent: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 90, gap: 10 },
 
-  urgentCard: { backgroundColor: "#111111", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "center", gap: 10 },
+  urgentCard: { borderRadius: 12, padding: 12, gap: 10 },
+  urgentCardSender: { backgroundColor: "#111111" },
   urgentCardDriver: { backgroundColor: "#007B8B" },
-  urgentThumb: { width: 40, height: 40, borderRadius: 9, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  urgentHead: { flexDirection: "row", alignItems: "center", gap: 10 },
+  urgentThumb: { width: 36, height: 36, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+  urgentThumbSender: { backgroundColor: "#007B8B" },
   urgentThumbDriver: { backgroundColor: "#FFFFFF" },
-  urgentBody: { flex: 1, minWidth: 0 },
-  urgentTitle: { color: "#FFFFFF", fontSize: 13, fontWeight: "600" },
-  urgentMeta: { color: "rgba(255,255,255,0.6)", fontSize: 10, marginTop: 2 },
-  urgentCta: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 7, backgroundColor: "#007B8B" },
-  urgentCtaDriver: { backgroundColor: "#FFFFFF" },
-  urgentCtaText: { color: "#FFFFFF", fontSize: 11, fontWeight: "600" },
-  urgentCtaTextDriver: { color: "#007B8B" },
+  urgentMeta: { flex: 1, minWidth: 0 },
+  urgentTitle: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
+  urgentSub: { color: "rgba(255,255,255,0.65)", fontSize: 11, marginTop: 2 },
+  urgentChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
+  urgentChipText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.4 },
+  urgentPricing: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
+  urgentPrice: { color: "#FFFFFF", fontSize: 20, fontWeight: "700", letterSpacing: -0.3 },
+  urgentPriceExtra: { color: "rgba(255,255,255,0.6)", fontSize: 10, marginTop: 1 },
+  urgentSideStat: { alignItems: "flex-end" },
+  urgentSideStatLabel: { color: "rgba(255,255,255,0.65)", fontSize: 10 },
+  urgentSideStatValue: { color: "#FFFFFF", fontSize: 14, fontWeight: "700", marginTop: 1 },
+  urgentActions: { flexDirection: "row", gap: 7 },
+  urgentBtnWhite: { flex: 1, height: 38, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
+  urgentBtnWhiteText: { color: "#007B8B", fontSize: 12, fontWeight: "700" },
+  urgentBtnLight: { flex: 1, height: 38, borderRadius: 9, backgroundColor: "rgba(255,255,255,0.14)", alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6, borderWidth: 1, borderColor: "rgba(255,255,255,0.22)" },
+  urgentBtnLightText: { color: "#FFFFFF", fontSize: 12, fontWeight: "600" },
 
-  shortcuts: { flexDirection: "row", gap: 8, marginTop: 4 },
-  shortcut: { flex: 1, backgroundColor: "#EEEDF3", borderRadius: 9, paddingVertical: 11, paddingHorizontal: 6, alignItems: "center", gap: 5 },
-  shortcutText: { color: "#111111", fontSize: 11, fontWeight: "600" },
-
-  miniList: { backgroundColor: "#FFFFFF", borderRadius: 12, paddingHorizontal: 4, paddingVertical: 2, marginTop: 4 },
-  miniItem: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 8, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#ECECEC" },
-  miniThumb: { width: 28, height: 28, borderRadius: 7, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
-  miniBody: { flex: 1, minWidth: 0 },
-  miniTitle: { color: "#111111", fontSize: 12, fontWeight: "500" },
-  miniMeta: { color: "#666666", fontSize: 10, marginTop: 2 },
-  miniChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
-  miniChipText: { fontSize: 9, fontWeight: "600" },
+  listSection: { marginTop: 6 },
+  listSectionTitle: { fontSize: 10.5, fontWeight: "600", color: "#747474", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 8, paddingHorizontal: 4 },
+  row: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 11, marginBottom: 7, borderWidth: 1, borderColor: "#E3E3E3" },
+  rowSelected: { borderColor: "#007B8B", backgroundColor: "#F5FBFB" },
+  rowTop: { flexDirection: "row", alignItems: "center", gap: 9 },
+  rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
+  rowThumbDriver: { backgroundColor: "#007B8B" },
+  rowMain: { flex: 1, minWidth: 0 },
+  rowTitle: { color: "#111111", fontSize: 12.5, fontWeight: "600" },
+  rowSub: { color: "#666666", fontSize: 10.5, marginTop: 1 },
+  rowPrice: { color: "#111111", fontSize: 14, fontWeight: "700" },
+  rowBottom: { flexDirection: "row", alignItems: "center", marginTop: 8, gap: 10 },
+  rowStat: { flexDirection: "row", alignItems: "center", gap: 4 },
+  rowStatText: { color: "#666666", fontSize: 10.5, fontWeight: "500" },
+  rowActions: { marginLeft: "auto", flexDirection: "row", gap: 6 },
+  rowBtnOutline: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
+  rowBtnOutlineText: { color: "#111111", fontSize: 10.5, fontWeight: "600" },
+  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#007B8B", minWidth: 60, alignItems: "center" },
+  rowBtnFilledText: { color: "#FFFFFF", fontSize: 10.5, fontWeight: "700" },
 
   loadingState: { alignItems: "center", paddingVertical: 32, gap: 8 },
   loadingText: { color: "#666666", fontSize: 12 },
-
   empty: { alignItems: "center", paddingHorizontal: 24, paddingVertical: 24 },
   emptyIcon: { width: 60, height: 60, borderRadius: 14, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center", marginBottom: 12 },
   emptyTitle: { color: "#111111", fontSize: 14, fontWeight: "600", marginBottom: 4 },
