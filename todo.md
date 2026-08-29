@@ -280,8 +280,20 @@
 - [x] Récupérer la dernière référence Git, vérifier les dépendances et relancer Expo.
 - [x] Valider la compilation, les tests et les services avant la livraison.
 - [x] Rétablir le statut draft requis dans les cartes d’accueil et reconstruire Metro après le rebase.
+- [x] Synchroniser puis auditer Wallet, accueil Livreur, carte et suivi GPS.
+- [x] Ajouter un historique détaillé des transactions récentes au Wallet.
+- [x] Simplifier l’accueil Livreur et retirer les contrôles ainsi que l’onglet demandés.
+- [x] Réorganiser les cartes de livraison et leurs actions selon l’état réel.
+- [x] Ajuster l’itinéraire, le cadrage de carte visible et la réactivité GPS.
+- [x] Tester les parcours Livreur, relancer Expo et livrer la version vérifiée.
 - [x] Récupérer la dernière référence Git, vérifier les dépendances et relancer Expo.
 - [x] Valider la compilation, les tests et les services avant la livraison.
 - [x] Vérifier l’accès GitHub authentifié et rétablir une branche synchronisée.
 - [x] Corriger les contrats de statut et Wallet incompatibles après la synchronisation.
 - [x] Relancer Expo, tester et livrer la version corrigée.
+- [x] Synchroniser le projet puis auditer Wallet, accueil Livreur, carte et GPS.
+- [x] Ajouter un historique détaillé des transactions récentes du Wallet.
+- [x] Simplifier l’accueil Livreur, retirer les contrôles demandés et l’onglet Adresses du footer.
+- [x] Réorganiser les cartes de livraison, les actions contextuelles et le retour rapide en haut.
+- [x] Ajuster la carte, l’itinéraire routier, le cadrage visible et la fréquence GPS.
+- [x] Tester les parcours Livreur, relancer Expo et livrer la version vérifiée.

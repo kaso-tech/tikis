@@ -48,7 +48,9 @@ export default function WalletScreen() {
     if (walletQuery.error || amount === null || !Number.isFinite(amount)) return "Indisponible";
     return formatMoney(amount);
   };
-  const completed = journal.filter((entry) => entry.operation === "credit" || entry.operation === "debit" || entry.operation === "refund");
+  const recentJournal = [...journal]
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .slice(0, 20);
   const todaysCount = journal.filter((entry) => {
     const d = new Date(entry.createdAt);
     const now = new Date();
@@ -175,15 +177,15 @@ export default function WalletScreen() {
         )}
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>{isDriver ? "Journal financier" : "Activité financière"}</Text>
-          <Text style={styles.sectionAction}>Voir tout</Text>
+          <Text style={styles.sectionTitle}>{isDriver ? "Transactions récentes" : "Activité financière"}</Text>
+          <Text style={styles.sectionAction}>{recentJournal.length} mouvement{recentJournal.length > 1 ? "s" : ""}</Text>
         </View>
 
         {walletQuery.isLoading ? (
           <View style={styles.listCard}><Text style={styles.emptyText}>Chargement sécurisé de vos opérations…</Text></View>
         ) : walletQuery.error ? (
           <View style={styles.listCard}><Text style={styles.emptyText}>Le journal financier est momentanément indisponible.</Text></View>
-        ) : completed.length === 0 ? (
+        ) : recentJournal.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}><MaterialIcons name="savings" size={26} color="#747474" /></View>
             <Text style={styles.emptyTitle}>Aucun mouvement enregistré</Text>
@@ -191,9 +193,9 @@ export default function WalletScreen() {
           </View>
         ) : (
           <View style={styles.listCard}>
-            {completed.slice(0, 6).map((entry, idx) => {
+            {recentJournal.map((entry, idx) => {
               const meta = operationMeta[entry.operation];
-              const isLast = idx === Math.min(completed.length, 6) - 1;
+              const isLast = idx === recentJournal.length - 1;
               const isCredit = entry.operation === "credit" || entry.operation === "refund" || entry.operation === "unblock" || entry.operation === "compensation";
               const isPending = entry.operation === "block" || entry.operation === "deposit_request" || entry.operation === "withdrawal_request";
               const amountColor = isCredit ? styles.amountCredit : isPending ? styles.amountPending : styles.amountDebit;
@@ -208,7 +210,7 @@ export default function WalletScreen() {
                       <Text style={styles.txLabel} numberOfLines={1}>{meta.label}</Text>
                       <Text style={styles.txTime}>{formatRelativeDate(entry.createdAt)}</Text>
                     </View>
-                    <Text style={styles.txReason} numberOfLines={1}>{entry.reason}</Text>
+                    <Text style={styles.txReason} numberOfLines={2}>{entry.reason} · Solde après opération : {formatMoney(entry.balanceAfter)}</Text>
                   </View>
                   <Text style={[styles.txAmount, amountColor]}>{amountPrefix}{formatMoney(entry.amount)}</Text>
                 </View>

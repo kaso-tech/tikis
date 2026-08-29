@@ -87,7 +87,9 @@ export function HomeScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [driverOnline, setDriverOnline] = useState(true);
-  const [applyingId, setApplyingId] = useState<string | null>(null);
+  const [actioningId, setActioningId] = useState<string | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
   const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
   const sheetValue = useRef(SHEET_PEEK);
   const driverLocation = useDriverLocation({ enabled: role === "driver" });
@@ -168,19 +170,21 @@ export function HomeScreen() {
 
   const utilities = trpc.useUtils();
   const applyMutation = trpc.deliveries.submitApplication.useMutation();
+  const withdrawMutation = trpc.deliveries.withdraw.useMutation();
+  const confirmMutation = trpc.deliveries.confirm.useMutation();
 
-  async function handleApply(deliveryId: string) {
-    setApplyingId(deliveryId);
+  async function handleDriverAction(delivery: Delivery) {
+    setActioningId(delivery.id);
     try {
-      await applyMutation.mutateAsync({ deliveryId });
-      await Promise.all([
-        utilities.deliveries.list.invalidate(),
-        utilities.wallet.snapshot.invalidate(),
-        utilities.notifications.list.invalidate(),
-      ]);
-    } catch {
+      if (delivery.ownCandidateStatus === "applied") await withdrawMutation.mutateAsync({ deliveryId: delivery.id });
+      else if (delivery.ownCandidateStatus === "selected") await confirmMutation.mutateAsync({ deliveryId: delivery.id });
+      else if (delivery.ownCandidateStatus === "confirmed" || delivery.status === "active") {
+        router.push(`/track/${delivery.id}` as any);
+        return;
+      } else await applyMutation.mutateAsync({ deliveryId: delivery.id });
+      await Promise.all([utilities.deliveries.list.invalidate(), utilities.wallet.snapshot.invalidate(), utilities.notifications.list.invalidate()]);
     } finally {
-      setApplyingId(null);
+      setActioningId(null);
     }
   }
 
@@ -190,9 +194,9 @@ export function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <MapBackground selected={selected} />
+      <MapBackground selected={selected} sheetOverlayHeight={sheetValue.current} />
 
-      <Pressable
+      {!isDriver ? <Pressable
         onPress={() => {
           if (!isDriver) router.push("/create-delivery" as any);
         }}
@@ -200,7 +204,7 @@ export function HomeScreen() {
         accessibilityLabel={!isDriver ? "Créer une livraison" : ""}
       >
         {!isDriver && <MaterialIcons name="add" size={26} color="#FFFFFF" />}
-      </Pressable>
+      </Pressable> : null}
 
       <Animated.View style={[styles.sheet, { height: sheetHeight }]}>
         <View {...panResponder.panHandlers} style={styles.sheetHeader}>
@@ -230,9 +234,12 @@ export function HomeScreen() {
         </View>
 
         <ScrollView
+          ref={scrollRef}
           style={styles.scrollArea}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={(event) => setShowScrollTop(event.nativeEvent.contentOffset.y > 180)}
         >
           {isDriver && driverWallet ? <WalletCard walletBalance={availableWalletBalance(driverWallet)} totalBalance={driverWallet.total} pendingBalance={0} blockedBalance={driverWallet.blocked} /> : null}
 
@@ -284,18 +291,22 @@ export function HomeScreen() {
               </Text>
             </View>
           ) : isDriver ? (
-            <DeliveryRow
-              key={selected.id}
-              delivery={selected}
-              role={role}
-              selected
-              driverDistance={driverLocation.distanceTo(selected.pickup)}
-              driverLocationStatus={driverLocation.status}
-              applying={applyingId === selected.id}
-              onPress={() => {}}
-              onDetails={() => router.push(`/delivery/${selected.id}` as any)}
-              onApply={() => handleApply(selected.id)}
-            />
+            <View style={styles.listSection}>
+              {filteredList.map((delivery) => (
+                <DeliveryRow
+                  key={delivery.id}
+                  delivery={delivery}
+                  role={role}
+                  selected={delivery.id === selected.id}
+                  driverDistance={driverLocation.distanceTo(delivery.pickup)}
+                  driverLocationStatus={driverLocation.status}
+                  applying={actioningId === delivery.id}
+                  onPress={() => setSelectedId(delivery.id)}
+                  onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
+                  onApply={() => void handleDriverAction(delivery)}
+                />
+              ))}
+            </View>
           ) : (
             <UrgentCard
               delivery={selected}
@@ -304,7 +315,7 @@ export function HomeScreen() {
             />
           )}
 
-          {otherDeliveries.length > 0 ? (
+          {!isDriver && otherDeliveries.length > 0 ? (
             <View style={styles.listSection}>
               {otherDeliveries.map((delivery) => (
                 <DeliveryRow
@@ -314,16 +325,21 @@ export function HomeScreen() {
                   selected={false}
                   driverDistance={isDriver ? driverLocation.distanceTo(delivery.pickup) : null}
                   driverLocationStatus={isDriver ? driverLocation.status : null}
-                  applying={applyingId === delivery.id}
+                  applying={actioningId === delivery.id}
                   onPress={() => setSelectedId(delivery.id)}
                   onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
-                  onApply={() => handleApply(delivery.id)}
+                  onApply={() => {}}
                 />
               ))}
             </View>
           ) : null}
         </ScrollView>
       </Animated.View>
+      {isDriver && showScrollTop ? (
+        <Pressable onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })} style={({ pressed }) => [styles.scrollTopButton, pressed && styles.pressed]} accessibilityLabel="Revenir en haut">
+          <MaterialIcons name="keyboard-arrow-up" size={20} color="#111111" />
+        </Pressable>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -358,8 +374,10 @@ function WalletCard({ walletBalance, totalBalance, pendingBalance, blockedBalanc
   );
 }
 
-function MapBackground({ selected }: { selected: Delivery | null | undefined }) {
+function MapBackground({ selected, sheetOverlayHeight }: { selected: Delivery | null | undefined; sheetOverlayHeight: number }) {
   const mapRef = useRef<MapView>(null);
+  const routeMutation = trpc.geography.route.useMutation();
+  const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
   const hasDriver = selected ? selected.status !== "open" : false;
   const region = useMemo(() => {
     if (!selected) return { latitude: 5.3599, longitude: -4.0083, latitudeDelta: 0.12, longitudeDelta: 0.12 };
@@ -369,10 +387,22 @@ function MapBackground({ selected }: { selected: Delivery | null | undefined }) 
   useEffect(() => {
     if (!selected) return;
     const timer = setTimeout(() => {
-      mapRef.current?.animateToRegion(region, 600);
+      mapRef.current?.fitToCoordinates([selected.pickup, selected.dropoff], {
+        edgePadding: { top: 84, left: 24, right: 24, bottom: Math.max(170, sheetOverlayHeight + 24) },
+        animated: true,
+      });
     }, 220);
     return () => clearTimeout(timer);
-  }, [region, selected]);
+  }, [region, selected, sheetOverlayHeight]);
+
+  useEffect(() => {
+    let active = true;
+    if (!selected) { setRouteCoordinates([]); return; }
+    void routeMutation.mutateAsync({ origin: selected.pickup, destination: selected.dropoff })
+      .then((route) => { if (active) setRouteCoordinates(route.coordinates); })
+      .catch(() => { if (active) setRouteCoordinates([]); });
+    return () => { active = false; };
+  }, [selected?.id]);
 
   return (
     <View style={styles.mapBg}>
@@ -391,7 +421,7 @@ function MapBackground({ selected }: { selected: Delivery | null | undefined }) 
         {selected ? (
           <>
             <Polyline
-              coordinates={[
+              coordinates={routeCoordinates.length > 1 ? routeCoordinates : [
                 { latitude: selected.pickup.latitude, longitude: selected.pickup.longitude },
                 { latitude: selected.dropoff.latitude, longitude: selected.dropoff.longitude },
               ]}
@@ -492,8 +522,18 @@ function DeliveryRow({
 }) {
   const isSender = role === "sender";
   const isDriver = role === "driver";
-  const mayApply = isDriver && delivery.status === "open" && !["applied", "selected", "confirmed"].includes(delivery.ownCandidateStatus ?? "");
+  const driverAction = delivery.ownCandidateStatus === "applied"
+    ? "Renoncer"
+    : delivery.ownCandidateStatus === "selected"
+      ? "Confirmer"
+      : delivery.ownCandidateStatus === "confirmed" || delivery.status === "active"
+        ? "Démarrer"
+        : "Postuler";
   const vehicleLabel = (delivery.vehicleTypes ?? []).join(" · ") || "Moto";
+  const volumeM3 = delivery.dimensions?.lengthCm && delivery.dimensions?.widthCm && delivery.dimensions?.heightCm
+    ? (delivery.dimensions.lengthCm * delivery.dimensions.widthCm * delivery.dimensions.heightCm / 1_000_000).toFixed(2)
+    : null;
+  const deliveryDetails = [delivery.type, vehicleLabel, delivery.passengers ? `${delivery.passengers} pers.` : null, delivery.weightKg ? `${delivery.weightKg} kg` : null, volumeM3 ? `${volumeM3} m³` : null].filter(Boolean).join(" · ");
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const dateInfo = formatDeliveryCreationDate(delivery.createdAt);
   const dateColor = dateInfo.tone === "primary" ? "#007B8B" : "#747474";
@@ -517,12 +557,13 @@ function DeliveryRow({
           <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
           <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff} · {vehicleLabel}</Text>
         </View>
-        <Text style={styles.rowPrice}>{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</Text>
+        {isDriver ? <Text style={styles.rowDriverDistance}>{driverDistText} de vous</Text> : null}
       </View>
       <View style={styles.rowDateRow}>
         <View style={[styles.datePill, { backgroundColor: dateBg }]}>
           <MaterialIcons name={dateInfo.icon} size={11} color={dateColor} />
           <Text style={[styles.datePillText, { color: dateColor }]}>{dateInfo.primary}</Text>
+          <Text style={styles.rowPrice}>{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</Text>
         </View>
       </View>
       <View style={styles.rowBottom}>
@@ -533,7 +574,7 @@ function DeliveryRow({
         {isDriver ? (
           <View style={styles.rowStat}>
             <MaterialIcons name="my-location" size={12} color="#007B8B" />
-            <Text style={[styles.rowStatText, { color: "#007B8B", fontWeight: "700" }]}>Vous êtes à {driverDistText}</Text>
+            <Text style={[styles.rowStatText, { color: "#007B8B", fontWeight: "600" }]} numberOfLines={1}>{deliveryDetails}</Text>
           </View>
         ) : (
           <View style={styles.rowStat}>
@@ -545,13 +586,13 @@ function DeliveryRow({
           <Pressable onPress={onDetails} style={({ pressed }) => [styles.rowBtnOutline, pressed && styles.pressed]}>
             <Text style={styles.rowBtnOutlineText}>Détails</Text>
           </Pressable>
-          {isDriver && mayApply ? (
+          {isDriver ? (
             <Pressable
               onPress={onApply}
               disabled={applying}
               style={({ pressed }) => [styles.rowBtnFilled, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
             >
-              {applying ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.rowBtnFilledText}>Postuler</Text>}
+              {applying ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.rowBtnFilledText}>{driverAction}</Text>}
             </Pressable>
           ) : (
             <Pressable onPress={onDetails} style={({ pressed }) => [styles.rowBtnFilled, pressed && styles.pressed]}>
@@ -644,8 +685,9 @@ const styles = StyleSheet.create({
   rowTitle: { color: "#111111", fontSize: 12.5, fontWeight: "600" },
   rowSub: { color: "#666666", fontSize: 10.5, marginTop: 1 },
   rowPrice: { color: "#111111", fontSize: 14, fontWeight: "700" },
+  rowDriverDistance: { color: "#007B8B", fontSize: 10.5, fontWeight: "600" },
   rowDateRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
-  datePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  datePill: { flex: 1, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   datePillText: { fontSize: 10.5, fontWeight: "700" },
   rowBottom: { flexDirection: "row", alignItems: "center", marginTop: 8, gap: 10 },
   rowStat: { flexDirection: "row", alignItems: "center", gap: 4 },
@@ -664,4 +706,5 @@ const styles = StyleSheet.create({
   emptyText: { color: "#666666", fontSize: 12, textAlign: "center", lineHeight: 18 },
 
   pressed: { opacity: 0.7 },
+  scrollTopButton: { position: "absolute", right: 16, bottom: 24, width: 38, height: 38, borderRadius: 10, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE", alignItems: "center", justifyContent: "center" },
 });

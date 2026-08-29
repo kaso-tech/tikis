@@ -23,7 +23,7 @@ export function formatDistance(km: number): { value: string; unit: "m" | "km" } 
 }
 
 export function useDriverLocation(options: { enabled?: boolean; minDisplacementMeters?: number } = {}) {
-  const { enabled = true, minDisplacementMeters = 10 } = options;
+  const { enabled = true, minDisplacementMeters = 0 } = options;
   const [state, setState] = useState<State>({ location: null, status: "idle", error: null });
   const lastLocation = useRef<DriverLocation | null>(null);
   const subscriptionRef = useRef<Location.LocationSubscription | null>(null);
