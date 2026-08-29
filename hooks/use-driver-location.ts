@@ -13,24 +13,32 @@ type State = {
   error: string | null;
 };
 
-function formatDistance(km: number): { value: string; unit: "m" | "km" } {
+export function formatDistance(km: number): { value: string; unit: "m" | "km" } {
   if (!Number.isFinite(km) || km <= 0) return { value: "—", unit: "km" };
-  if (km < 1) {
-    return { value: `${Math.max(50, Math.round(km * 1000))}`, unit: "m" };
-  }
+  if (km < 0.05) return { value: "< 50", unit: "m" };
+  if (km < 1) return { value: `${Math.round(km * 1000)}`, unit: "m" };
   if (km < 10) return { value: km.toFixed(1).replace(".", ","), unit: "km" };
+  if (km < 100) return { value: km.toFixed(1).replace(".", ","), unit: "km" };
   return { value: Math.round(km).toString(), unit: "km" };
 }
 
-export function useDriverLocation(options: { enabled?: boolean; intervalMs?: number } = {}) {
-  const { enabled = true, intervalMs = 30_000 } = options;
+export function useDriverLocation(options: { enabled?: boolean; minDisplacementMeters?: number } = {}) {
+  const { enabled = true, minDisplacementMeters = 10 } = options;
   const [state, setState] = useState<State>({ location: null, status: "idle", error: null });
-  const isRequesting = useRef(false);
+  const lastLocation = useRef<DriverLocation | null>(null);
+  const subscriptionRef = useRef<Location.LocationSubscription | null>(null);
 
-  const request = useCallback(async () => {
-    if (isRequesting.current) return state.location;
-    isRequesting.current = true;
-    setState((current) => ({ ...current, status: "loading", error: null }));
+  const applyPosition = useCallback((position: { coords: Location.LocationObjectCoords }) => {
+    const next: DriverLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+    if (lastLocation.current) {
+      const movedMeters = geodesicDistanceKm(lastLocation.current, next) * 1000;
+      if (movedMeters < minDisplacementMeters) return;
+    }
+    lastLocation.current = next;
+    setState({ location: next, status: "ready", error: null });
+  }, [minDisplacementMeters]);
+
+  const requestOnce = useCallback(async () => {
     try {
       const servicesEnabled = await Location.hasServicesEnabledAsync();
       if (!servicesEnabled) {
@@ -44,23 +52,36 @@ export function useDriverLocation(options: { enabled?: boolean; intervalMs?: num
         return null;
       }
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      const next: DriverLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude };
-      setState({ location: next, status: "ready", error: null });
-      return next;
+      applyPosition(position);
+      return position;
     } catch (cause) {
       setState({ location: null, status: "unavailable", error: cause instanceof Error ? cause.message : "GPS indisponible" });
       return null;
-    } finally {
-      isRequesting.current = false;
     }
-  }, [state.location]);
+  }, [applyPosition]);
+
+  const startWatching = useCallback(async () => {
+    const permission = await Location.getForegroundPermissionsAsync();
+    if (!permission.granted) return;
+    subscriptionRef.current?.remove();
+    subscriptionRef.current = await Location.watchPositionAsync(
+      { accuracy: Location.Accuracy.Balanced, distanceInterval: minDisplacementMeters },
+      applyPosition,
+    );
+  }, [applyPosition, minDisplacementMeters]);
 
   useEffect(() => {
     if (!enabled) return;
-    void request();
-    const id = setInterval(() => { void request(); }, intervalMs);
-    return () => clearInterval(id);
-  }, [enabled, intervalMs, request]);
+    setState((current) => ({ ...current, status: "loading", error: null }));
+    void (async () => {
+      await requestOnce();
+      await startWatching();
+    })();
+    return () => {
+      subscriptionRef.current?.remove();
+      subscriptionRef.current = null;
+    };
+  }, [enabled, requestOnce, startWatching]);
 
   function distanceTo(pickup: { latitude: number; longitude: number } | null | undefined) {
     if (!state.location || !pickup) return null;
@@ -68,5 +89,5 @@ export function useDriverLocation(options: { enabled?: boolean; intervalMs?: num
     return { ...formatDistance(km), km };
   }
 
-  return { ...state, request, distanceTo };
+  return { ...state, request: requestOnce, distanceTo };
 }

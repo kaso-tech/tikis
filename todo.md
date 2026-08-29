@@ -280,3 +280,8 @@
 - [x] Récupérer la dernière référence Git, vérifier les dépendances et relancer Expo.
 - [x] Valider la compilation, les tests et les services avant la livraison.
 - [x] Rétablir le statut draft requis dans les cartes d’accueil et reconstruire Metro après le rebase.
+- [x] Récupérer la dernière référence Git, vérifier les dépendances et relancer Expo.
+- [x] Valider la compilation, les tests et les services avant la livraison.
+- [x] Vérifier l’accès GitHub authentifié et rétablir une branche synchronisée.
+- [x] Corriger les contrats de statut et Wallet incompatibles après la synchronisation.
+- [x] Relancer Expo, tester et livrer la version corrigée.
