@@ -85,6 +85,8 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
   );
 }
 
+export { MapPreviewLeaflet as MapPreview };
+
 const styles = StyleSheet.create({
   frame: {
     borderRadius: 9,

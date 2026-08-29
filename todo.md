@@ -269,3 +269,5 @@
 - [x] Valider TypeScript, lint, tests et services, puis préparer la version synchronisée.
 - [x] Récupérer le commit collaboratif 3e8b707, vérifier les dépendances et la compilation, relancer Expo et livrer la version à jour.
 - [x] Récupérer la dernière version Git, corriger le doublon TypeScript, relancer Expo et valider 86 tests, Metro et l’API.
+- [x] Localiser et corriger l’accès non sécurisé à displayName dans la page Courses.
+- [x] Ajouter une protection de régression, relancer Expo et valider la correction.
