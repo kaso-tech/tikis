@@ -9,11 +9,12 @@ import { useTikisNavigation } from "@/lib/tikis-navigation";
 import { trpc } from "@/lib/trpc";
 import { formatListRouteParts } from "@/lib/geo-rules";
 import { useDriverLocation } from "@/hooks/use-driver-location";
+import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format";
 import { availableWalletBalance, formatMoney, type Delivery, type DeliveryStatus } from "@/shared/tikis-domain";
 
 const { height: SCREEN_H } = Dimensions.get("window");
-const SHEET_MIN = 110;
-const SHEET_PEEK = 340;
+const SHEET_MIN = 130;
+const SHEET_PEEK = 420;
 const SHEET_EXPANDED = Math.min(SCREEN_H * 0.78, 720);
 
 const TYPE_ICON: Record<Delivery["type"], React.ComponentProps<typeof MaterialIcons>["name"]> = {
@@ -57,17 +58,17 @@ function driverSortPriority(d: Delivery): number {
   return 3;
 }
 
-function openNavigation(pickup: { latitude: number; longitude: number }, dropoff: { latitude: number; longitude: number }) {
-  const url = `https://www.google.com/maps/dir/?api=1&origin=${pickup.latitude},${pickup.longitude}&destination=${dropoff.latitude},${dropoff.longitude}&travelmode=driving`;
-  void Linking.openURL(url);
-}
-
 function fitRegionFor(pickup: { latitude: number; longitude: number }, dropoff: { latitude: number; longitude: number }): Region {
   const midLat = (pickup.latitude + dropoff.latitude) / 2;
   const midLng = (pickup.longitude + dropoff.longitude) / 2;
   const latDelta = Math.max(0.025, Math.abs(pickup.latitude - dropoff.latitude) * 2.2);
   const lngDelta = Math.max(0.025, Math.abs(pickup.longitude - dropoff.longitude) * 2.2);
   return { latitude: midLat, longitude: midLng, latitudeDelta: latDelta, longitudeDelta: lngDelta };
+}
+
+function openNavigation(pickup: { latitude: number; longitude: number }, dropoff: { latitude: number; longitude: number }) {
+  const url = `https://www.google.com/maps/dir/?api=1&origin=${pickup.latitude},${pickup.longitude}&destination=${dropoff.latitude},${dropoff.longitude}&travelmode=driving`;
+  void Linking.openURL(url);
 }
 
 export function HomeScreen() {
@@ -84,7 +85,6 @@ export function HomeScreen() {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
   const [driverOnline, setDriverOnline] = useState(true);
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
@@ -97,21 +97,11 @@ export function HomeScreen() {
       if (!matchesFilter(d.status, filter)) return false;
       if (q.length === 0) return true;
       const route = formatListRouteParts(d.pickup, d.dropoff);
-      const haystack = [
-        d.title,
-        d.type,
-        route.pickup,
-        route.dropoff,
-        (d.vehicleTypes ?? []).join(" "),
-      ]
-        .join(" ")
-        .toLowerCase();
+      const haystack = [d.title, d.type, route.pickup, route.dropoff, (d.vehicleTypes ?? []).join(" ")].join(" ").toLowerCase();
       return haystack.includes(q);
     };
     if (role === "driver") {
-      return [...deliveries]
-        .filter(matches)
-        .sort((a, b) => driverSortPriority(a) - driverSortPriority(b) || a.distanceKm - b.distanceKm);
+      return [...deliveries].filter(matches).sort((a, b) => driverSortPriority(a) - driverSortPriority(b) || a.distanceKm - b.distanceKm);
     }
     return deliveries.filter(matches);
   }, [deliveries, filter, role, searchQuery]);
@@ -150,9 +140,8 @@ export function HomeScreen() {
     return () => sheetHeight.removeListener(listener);
   }, [sheetHeight]);
 
-  const animateSheet = (toExpanded: boolean) => {
-    setExpanded(toExpanded);
-    Animated.spring(sheetHeight, { toValue: toExpanded ? SHEET_EXPANDED : SHEET_PEEK, useNativeDriver: false, friction: 9, tension: 60 }).start();
+  const animateSheetTo = (toValue: number) => {
+    Animated.spring(sheetHeight, { toValue, useNativeDriver: false, friction: 9, tension: 60 }).start();
   };
 
   const panResponder = useRef(PanResponder.create({
@@ -176,11 +165,6 @@ export function HomeScreen() {
     },
   })).current;
 
-  const animateSheetTo = (toValue: number) => {
-    setExpanded(toValue === SHEET_EXPANDED);
-    Animated.spring(sheetHeight, { toValue, useNativeDriver: false, friction: 9, tension: 60 }).start();
-  };
-
   const utilities = trpc.useUtils();
   const applyMutation = trpc.deliveries.submitApplication.useMutation();
 
@@ -199,106 +183,48 @@ export function HomeScreen() {
     }
   }
 
+  const isDriver = role === "driver";
+  const firstNameDisplay = isDriver ? firstName : "à vous";
+  const countLabel = isDriver ? `${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité` : `${filteredList.length} livraison${filteredList.length > 1 ? "s" : ""} affichée${filteredList.length > 1 ? "s" : ""}`;
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
       <MapBackground selected={selected} />
 
-      <View style={styles.searchRow} pointerEvents="box-none">
-        {role === "sender" ? (
-          <>
-            <View style={styles.searchPill}>
-              <MaterialIcons name="search" size={16} color="#747474" />
-              <TextInput
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Rechercher une livraison…"
-                placeholderTextColor="#747474"
-                style={styles.searchInput}
-                returnKeyType="search"
-                clearButtonMode="while-editing"
-              />
-              {searchQuery.length > 0 ? (
-                <Pressable onPress={() => setSearchQuery("")} hitSlop={8} accessibilityLabel="Effacer la recherche">
-                  <MaterialIcons name="close" size={16} color="#747474" />
-                </Pressable>
-              ) : null}
-            </View>
-            <Pressable onPress={() => openDrawer()} style={({ pressed }) => [styles.searchBtn, pressed && styles.pressed]} accessibilityLabel="Menu">
-              <MaterialIcons name="menu" size={20} color="#111111" />
-            </Pressable>
-          </>
-        ) : (
-          <>
-            <View style={[styles.searchPill, !driverOnline && styles.searchPillOffline]}>
-              <Pressable onPress={() => setDriverOnline((prev) => !prev)} style={styles.onlineToggle} accessibilityLabel="Basculer en service">
-                <View style={[styles.onlineDot, !driverOnline && styles.onlineDotOffline]} />
-                <Text style={[styles.onlinePillText, !driverOnline && styles.onlinePillTextOffline]}>{driverOnline ? "EN SERVICE" : "HORS SERVICE"}</Text>
-              </Pressable>
-              <View style={styles.searchDivider} />
-              <MaterialIcons name="search" size={16} color="#747474" />
-              <TextInput
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                placeholder="Rechercher une opportunité…"
-                placeholderTextColor="#747474"
-                style={styles.searchInput}
-                returnKeyType="search"
-                clearButtonMode="while-editing"
-              />
-              {searchQuery.length > 0 ? (
-                <Pressable onPress={() => setSearchQuery("")} hitSlop={8} accessibilityLabel="Effacer la recherche">
-                  <MaterialIcons name="close" size={16} color="#747474" />
-                </Pressable>
-              ) : null}
-            </View>
-            <Pressable onPress={() => openDrawer()} style={({ pressed }) => [styles.searchBtn, pressed && styles.pressed]} accessibilityLabel="Menu">
-              <MaterialIcons name="menu" size={20} color="#111111" />
-            </Pressable>
-          </>
-        )}
-      </View>
-
       <Pressable
         onPress={() => {
-          if (role === "sender") router.push("/create-delivery" as any);
+          if (!isDriver) router.push("/create-delivery" as any);
         }}
         style={({ pressed }) => [styles.fab, pressed && styles.pressed]}
-        accessibilityLabel={role === "sender" ? "Créer une livraison" : "Recherche rapide"}
+        accessibilityLabel={!isDriver ? "Créer une livraison" : ""}
       >
-        <MaterialIcons name={role === "sender" ? "add" : "search"} size={26} color="#FFFFFF" />
+        {!isDriver && <MaterialIcons name="add" size={26} color="#FFFFFF" />}
       </Pressable>
 
       <Animated.View style={[styles.sheet, { height: sheetHeight }]}>
         <View {...panResponder.panHandlers} style={styles.sheetHeader}>
           <View style={styles.sheetGrip} />
-          <View style={styles.sheetTitleRow}>
-            <View>
-              <Text style={styles.sheetTitle}>Bonjour {firstName} 👋</Text>
-              <Text style={styles.sheetSubtitle}>
-                {role === "sender"
-                  ? `${filteredList.length} livraison${filteredList.length > 1 ? "s" : ""} affichée${filteredList.length > 1 ? "s" : ""}`
-                  : `${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité`}
-              </Text>
+          <View style={styles.sheetTop}>
+            <View style={styles.greetingBlock}>
+              <Text style={styles.sheetTitle}>Bonjour {firstNameDisplay} 👋</Text>
+              <Text style={styles.sheetSubtitle}>{countLabel}</Text>
             </View>
-            {role === "driver" ? (
-              <View style={styles.walletBadge}>
-                {walletQuery.isLoading ? (
-                  <ActivityIndicator size="small" color="#007B8B" />
-                ) : (
-                  <>
-                    <MaterialIcons name="account-balance-wallet" size={14} color="#007B8B" />
-                    <Text style={styles.walletBadgeText}>{driverWallet ? formatMoney(availableWalletBalance(driverWallet)) : "—"}</Text>
-                  </>
-                )}
-              </View>
-            ) : null}
-          </View>
-          <View style={styles.filterRow}>
-            {FILTERS.map((item) => (
-              <Pressable key={item.key} onPress={() => setFilter(item.key)} style={({ pressed }) => [styles.chip, filter === item.key && styles.chipActive, pressed && styles.pressed]}>
-                <Text style={[styles.chipText, filter === item.key && styles.chipTextActive]}>{item.label}</Text>
+            {isDriver ? (
+              <Pressable
+                onPress={() => setDriverOnline((prev) => !prev)}
+                style={({ pressed }) => [styles.servicePill, !driverOnline && styles.servicePillOffline, pressed && styles.pressed]}
+                accessibilityLabel={driverOnline ? "Passer hors service" : "Passer en service"}
+              >
+                <View style={[styles.onlineDot, !driverOnline && styles.onlineDotOffline]} />
+                <Text style={[styles.serviceText, !driverOnline && styles.serviceTextOffline]}>
+                  {driverOnline ? "EN SERVICE" : "HORS SERVICE"}
+                </Text>
               </Pressable>
-            ))}
+            ) : (
+              <Pressable onPress={() => openDrawer()} style={({ pressed }) => [styles.servicePill, styles.servicePillNeutral, pressed && styles.pressed]} accessibilityLabel="Ouvrir le menu">
+                <MaterialIcons name="menu" size={16} color="#111111" />
+              </Pressable>
+            )}
           </View>
         </View>
 
@@ -306,8 +232,39 @@ export function HomeScreen() {
           style={styles.scrollArea}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          scrollEnabled
         >
+          {isDriver && driverWallet ? <WalletCard walletBalance={availableWalletBalance(driverWallet)} totalBalance={driverWallet.balance} pendingBalance={driverWallet.pendingBalance} blockedBalance={driverWallet.blockedBalance} /> : null}
+
+          {isDriver ? (
+            <View style={styles.searchRow}>
+              <View style={styles.searchPill}>
+                <MaterialIcons name="search" size={16} color="#747474" />
+                <TextInput
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  placeholder="Rechercher une opportunité…"
+                  placeholderTextColor="#747474"
+                  style={styles.searchInput}
+                  returnKeyType="search"
+                  clearButtonMode="while-editing"
+                />
+                {searchQuery.length > 0 ? (
+                  <Pressable onPress={() => setSearchQuery("")} hitSlop={8} accessibilityLabel="Effacer la recherche">
+                    <MaterialIcons name="close" size={16} color="#747474" />
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+
+          <View style={styles.filterRow}>
+            {FILTERS.map((item) => (
+              <Pressable key={item.key} onPress={() => setFilter(item.key)} style={({ pressed }) => [styles.chip, filter === item.key && styles.chipActive, pressed && styles.pressed]}>
+                <Text style={[styles.chipText, filter === item.key && styles.chipTextActive]}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+
           {deliveriesQuery.isLoading ? (
             <View style={styles.loadingState}>
               <ActivityIndicator color="#007B8B" />
@@ -316,49 +273,48 @@ export function HomeScreen() {
           ) : !selected ? (
             <View style={styles.empty}>
               <View style={styles.emptyIcon}>
-                <MaterialIcons name={role === "sender" ? "add" : "local-shipping"} size={26} color="#747474" />
+                <MaterialIcons name={isDriver ? "local-shipping" : "add"} size={26} color="#747474" />
               </View>
-              <Text style={styles.emptyTitle}>{role === "sender" ? "Aucune livraison en cours" : "Aucune opportunité disponible"}</Text>
+              <Text style={styles.emptyTitle}>{isDriver ? "Aucune opportunité disponible" : "Aucune livraison en cours"}</Text>
               <Text style={styles.emptyText}>
-                {role === "sender"
-                  ? "Publiez votre première course et comparez les livreurs disponibles."
-                  : "Revenez dans quelques minutes, de nouvelles courses arrivent régulièrement."}
+                {isDriver
+                  ? "Revenez dans quelques minutes, de nouvelles courses arrivent régulièrement."
+                  : "Publiez votre première course et comparez les livreurs disponibles."}
               </Text>
             </View>
+          ) : isDriver ? (
+            <DeliveryRow
+              key={selected.id}
+              delivery={selected}
+              role={role}
+              selected
+              driverDistance={driverLocation.distanceTo(selected.pickup)}
+              driverLocationStatus={driverLocation.status}
+              applying={applyingId === selected.id}
+              onPress={() => {}}
+              onDetails={() => router.push(`/delivery/${selected.id}` as any)}
+              onApply={() => handleApply(selected.id)}
+            />
           ) : (
             <UrgentCard
               delivery={selected}
               role={role}
-              driverDistance={role === "driver" ? driverLocation.distanceTo(selected.pickup) : null}
-              driverLocationStatus={role === "driver" ? driverLocation.status : null}
-              applying={applyingId === selected.id}
-              onAction={() => {
-                if (role === "sender") router.push(`/track/${selected.id}` as any);
-                else router.push(`/delivery/${selected.id}` as any);
-              }}
-              onDetails={() => router.push(`/delivery/${selected.id}` as any)}
-              onApply={() => handleApply(selected.id)}
+              onAction={() => router.push(`/track/${selected.id}` as any)}
             />
           )}
 
           {otherDeliveries.length > 0 ? (
             <View style={styles.listSection}>
-              <Text style={styles.listSectionTitle}>
-                {role === "sender" ? "Autres livraisons" : "Autres opportunités"}
-              </Text>
               {otherDeliveries.map((delivery) => (
                 <DeliveryRow
                   key={delivery.id}
                   delivery={delivery}
                   role={role}
-                  selected={delivery.id === selectedId}
-                  driverDistance={role === "driver" ? driverLocation.distanceTo(delivery.pickup) : null}
-                  driverLocationStatus={role === "driver" ? driverLocation.status : null}
+                  selected={false}
+                  driverDistance={isDriver ? driverLocation.distanceTo(delivery.pickup) : null}
+                  driverLocationStatus={isDriver ? driverLocation.status : null}
                   applying={applyingId === delivery.id}
-                  onPress={() => {
-                    setSelectedId(delivery.id);
-                    if (!expanded) animateSheet(true);
-                  }}
+                  onPress={() => setSelectedId(delivery.id)}
                   onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
                   onApply={() => handleApply(delivery.id)}
                 />
@@ -368,6 +324,36 @@ export function HomeScreen() {
         </ScrollView>
       </Animated.View>
     </SafeAreaView>
+  );
+}
+
+function WalletCard({ walletBalance, totalBalance, pendingBalance, blockedBalance }: { walletBalance: number; totalBalance: number; pendingBalance: number; blockedBalance: number }) {
+  return (
+    <View style={styles.walletCard}>
+      <Text style={styles.walletEyebrow}>SOLDE DISPONIBLE</Text>
+      <View style={styles.walletRow}>
+        <Text style={styles.walletAmount}>{formatMoney(walletBalance)}</Text>
+        <View style={styles.walletTrend}>
+          <MaterialIcons name="trending-up" size={11} color="#48B889" />
+          <Text style={styles.walletTrendText}>+12%</Text>
+        </View>
+      </View>
+      <View style={styles.walletDivider} />
+      <View style={styles.walletStats}>
+        <View style={styles.walletStat}>
+          <Text style={styles.walletStatLabel}>Solde total</Text>
+          <Text style={styles.walletStatValue}>{formatMoney(totalBalance)}</Text>
+        </View>
+        <View style={styles.walletStat}>
+          <Text style={styles.walletStatLabel}>Bloquée</Text>
+          <Text style={styles.walletStatValue}>{formatMoney(blockedBalance)}</Text>
+        </View>
+        <View style={styles.walletStat}>
+          <Text style={styles.walletStatLabel}>En attente</Text>
+          <Text style={styles.walletStatValue}>{formatMoney(pendingBalance)}</Text>
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -439,30 +425,13 @@ function MapBackground({ selected }: { selected: Delivery | null | undefined }) 
 function UrgentCard({
   delivery,
   role,
-  driverDistance,
-  driverLocationStatus,
-  applying,
   onAction,
-  onDetails,
-  onApply,
 }: {
   delivery: Delivery;
   role: "sender" | "driver";
-  driverDistance: { value: string; unit: "m" | "km"; km: number } | null;
-  driverLocationStatus: "idle" | "loading" | "ready" | "denied" | "unavailable" | null;
-  applying: boolean;
   onAction: () => void;
-  onDetails: () => void;
-  onApply: () => void;
 }) {
-  const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
-  const price = formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice);
   const isSender = role === "sender";
-  const isDriver = role === "driver";
-  const isOwnActive = isDriver && (delivery.status === "pending_confirmation" || delivery.status === "active" || delivery.ownCandidateStatus === "selected" || delivery.ownCandidateStatus === "confirmed");
-  const mayApply = isDriver && delivery.status === "open" && !["applied", "selected", "confirmed"].includes(delivery.ownCandidateStatus ?? "");
-  const vehicleLabel = (delivery.vehicleTypes ?? []).join(" · ") || "Moto";
-
   return (
     <View style={[styles.urgentCard, isSender ? styles.urgentCardSender : styles.urgentCardDriver]}>
       <View style={styles.urgentHead}>
@@ -473,8 +442,8 @@ function UrgentCard({
           <Text style={styles.urgentTitle} numberOfLines={1}>{delivery.title}</Text>
           <Text style={styles.urgentSub} numberOfLines={1}>
             {isSender
-              ? `${route.pickup} → ${route.dropoff} · ${vehicleLabel}`
-              : `${route.pickup} → ${route.dropoff} · ${vehicleLabel}`}
+              ? `${delivery.driverName ?? "Livreur en attente"} · ${formatDistanceKm(delivery.distanceKm).value} ${formatDistanceKm(delivery.distanceKm).unit}`
+              : `${(delivery.vehicleTypes ?? []).join(" · ") || "Moto"}`}
           </Text>
         </View>
         <View style={[styles.urgentChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}>
@@ -483,22 +452,8 @@ function UrgentCard({
       </View>
       <View style={styles.urgentPricing}>
         <View>
-          <Text style={styles.urgentPrice}>{price}</Text>
+          <Text style={styles.urgentPrice}>{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</Text>
           <Text style={styles.urgentPriceExtra}>{isSender ? "est. client" : "rémunération nette"}</Text>
-        </View>
-        <View style={styles.urgentSideStat}>
-          <Text style={styles.urgentSideStatLabel}>{isSender ? "Livreur" : "Vous êtes à"}</Text>
-          <Text style={styles.urgentSideStatValue}>
-            {isSender
-              ? delivery.driverName ?? "En attente"
-              : driverDistance
-                ? `${driverDistance.value} ${driverDistance.unit}`
-                : driverLocationStatus === "loading" || driverLocationStatus === "idle"
-                  ? "…"
-                  : driverLocationStatus === "denied"
-                    ? "GPS off"
-                    : "—"}
-          </Text>
         </View>
       </View>
       <View style={styles.urgentActions}>
@@ -507,44 +462,7 @@ function UrgentCard({
             <MaterialIcons name="my-location" size={15} color="#111111" />
             <Text style={styles.urgentBtnWhiteText}>Suivre la course</Text>
           </Pressable>
-        ) : isOwnActive ? (
-          <>
-            <Pressable onPress={onDetails} style={({ pressed }) => [styles.urgentBtnLight, pressed && styles.pressed]}>
-              <MaterialIcons name="description" size={15} color="#FFFFFF" />
-              <Text style={styles.urgentBtnLightText}>Détails</Text>
-            </Pressable>
-            <Pressable onPress={() => openNavigation(delivery.pickup, delivery.dropoff)} style={({ pressed }) => [styles.urgentBtnWhite, pressed && styles.pressed]}>
-              <MaterialIcons name="navigation" size={15} color="#007B8B" />
-              <Text style={styles.urgentBtnWhiteText}>Démarrer</Text>
-            </Pressable>
-          </>
-        ) : (
-          <>
-            <Pressable onPress={onDetails} style={({ pressed }) => [styles.urgentBtnLight, pressed && styles.pressed]}>
-              <MaterialIcons name="description" size={15} color="#FFFFFF" />
-              <Text style={styles.urgentBtnLightText}>Détails</Text>
-            </Pressable>
-            {mayApply ? (
-              <Pressable
-                onPress={onApply}
-                disabled={applying}
-                style={({ pressed }) => [styles.urgentBtnWhite, applying ? { opacity: 0.6 } : pressed ? styles.pressed : null]}
-              >
-                {applying ? (
-                  <ActivityIndicator size="small" color="#007B8B" />
-                ) : (
-                  <MaterialIcons name="add-circle" size={15} color="#007B8B" />
-                )}
-                <Text style={styles.urgentBtnWhiteText}>{applying ? "Candidature…" : "Postuler"}</Text>
-              </Pressable>
-            ) : (
-              <Pressable onPress={onDetails} style={({ pressed }) => [styles.urgentBtnWhite, pressed && styles.pressed]}>
-                <MaterialIcons name="arrow-forward" size={15} color="#007B8B" />
-                <Text style={styles.urgentBtnWhiteText}>Voir la course</Text>
-              </Pressable>
-            )}
-          </>
-        )}
+        ) : null}
       </View>
     </View>
   );
@@ -571,14 +489,16 @@ function DeliveryRow({
   onDetails: () => void;
   onApply: () => void;
 }) {
-  const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
-  const price = formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice);
   const isSender = role === "sender";
   const isDriver = role === "driver";
-  const isOwnActive = isDriver && (delivery.status === "pending_confirmation" || delivery.status === "active" || delivery.ownCandidateStatus === "selected" || delivery.ownCandidateStatus === "confirmed");
   const mayApply = isDriver && delivery.status === "open" && !["applied", "selected", "confirmed"].includes(delivery.ownCandidateStatus ?? "");
   const vehicleLabel = (delivery.vehicleTypes ?? []).join(" · ") || "Moto";
-  const driverDistanceText = driverDistance
+  const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
+  const dateInfo = formatDeliveryCreationDate(delivery.createdAt);
+  const dateColor = dateInfo.tone === "primary" ? "#007B8B" : "#747474";
+  const dateBg = dateInfo.tone === "primary" ? "#E6F4F5" : "#F0F0F2";
+  const totalDistance = formatDistanceKm(delivery.distanceKm);
+  const driverDistText = driverDistance
     ? `${driverDistance.value} ${driverDistance.unit}`
     : driverLocationStatus === "loading" || driverLocationStatus === "idle"
       ? "…"
@@ -596,41 +516,35 @@ function DeliveryRow({
           <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
           <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff} · {vehicleLabel}</Text>
         </View>
-        <Text style={styles.rowPrice}>{price}</Text>
+        <Text style={styles.rowPrice}>{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</Text>
+      </View>
+      <View style={styles.rowDateRow}>
+        <View style={[styles.datePill, { backgroundColor: dateBg }]}>
+          <MaterialIcons name={dateInfo.icon} size={11} color={dateColor} />
+          <Text style={[styles.datePillText, { color: dateColor }]}>{dateInfo.primary}</Text>
+        </View>
       </View>
       <View style={styles.rowBottom}>
         <View style={styles.rowStat}>
           <MaterialIcons name="route" size={12} color="#666666" />
-          <Text style={styles.rowStatText}>{delivery.distanceKm.toFixed(1)} km</Text>
+          <Text style={styles.rowStatText}>{totalDistance.value} {totalDistance.unit}</Text>
         </View>
-        {isSender ? (
+        {isDriver ? (
           <View style={styles.rowStat}>
-            <MaterialIcons name="group" size={12} color="#666666" />
-            <Text style={styles.rowStatText}>{delivery.candidateCount ?? 0} candidat{(delivery.candidateCount ?? 0) > 1 ? "s" : ""}</Text>
+            <MaterialIcons name="my-location" size={12} color="#007B8B" />
+            <Text style={[styles.rowStatText, { color: "#007B8B", fontWeight: "700" }]}>Vous êtes à {driverDistText}</Text>
           </View>
         ) : (
           <View style={styles.rowStat}>
-            <MaterialIcons name="my-location" size={12} color="#007B8B" />
-            <Text style={[styles.rowStatText, { color: "#007B8B", fontWeight: "700" }]}>Vous êtes à {driverDistanceText}</Text>
+            <MaterialIcons name="group" size={12} color="#666666" />
+            <Text style={styles.rowStatText}>{delivery.candidateCount ?? 0} candidat{(delivery.candidateCount ?? 0) > 1 ? "s" : ""}</Text>
           </View>
         )}
         <View style={styles.rowActions}>
           <Pressable onPress={onDetails} style={({ pressed }) => [styles.rowBtnOutline, pressed && styles.pressed]}>
             <Text style={styles.rowBtnOutlineText}>Détails</Text>
           </Pressable>
-          {isSender ? (
-            <Pressable onPress={onDetails} style={({ pressed }) => [styles.rowBtnFilled, pressed && styles.pressed]}>
-              <Text style={styles.rowBtnFilledText}>Suivre</Text>
-            </Pressable>
-          ) : isOwnActive ? (
-            <Pressable
-              onPress={() => openNavigation(delivery.pickup, delivery.dropoff)}
-              style={({ pressed }) => [styles.rowBtnFilled, pressed && styles.pressed]}
-            >
-              <MaterialIcons name="navigation" size={12} color="#FFFFFF" />
-              <Text style={styles.rowBtnFilledText}>Démarrer</Text>
-            </Pressable>
-          ) : mayApply ? (
+          {isDriver && mayApply ? (
             <Pressable
               onPress={onApply}
               disabled={applying}
@@ -640,7 +554,7 @@ function DeliveryRow({
             </Pressable>
           ) : (
             <Pressable onPress={onDetails} style={({ pressed }) => [styles.rowBtnFilled, pressed && styles.pressed]}>
-              <Text style={styles.rowBtnFilledText}>Voir</Text>
+              <Text style={styles.rowBtnFilledText}>{isSender ? "Suivre" : "Voir"}</Text>
             </Pressable>
           )}
         </View>
@@ -657,38 +571,48 @@ const styles = StyleSheet.create({
   nativeMarkerDriver: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#111111", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
   nativeMarkerEnd: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#B4232D" },
 
-  searchRow: { position: "absolute", top: 8, left: 14, right: 14, flexDirection: "row", alignItems: "center", gap: 8, zIndex: 10 },
-  searchPill: { flex: 1, height: 40, borderRadius: 12, backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  searchPillOffline: { backgroundColor: "#F3F2F6" },
-  searchDivider: { width: 1, height: 22, backgroundColor: "#D7D5DE" },
-  searchInput: { flex: 1, color: "#111111", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
-  searchPillText: { color: "#666666", fontSize: 13 },
-  searchBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  onlineToggle: { flexDirection: "row", alignItems: "center", gap: 6 },
-
-  onlinePillText: { color: "#FFFFFF", fontSize: 12, fontWeight: "600" },
-  onlinePillTextOffline: { color: "#111111" },
-  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FFFFFF" },
-  onlineDotOffline: { backgroundColor: "#747474" },
-
-  fab: { position: "absolute", right: 14, bottom: 360, width: 50, height: 50, borderRadius: 14, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", shadowColor: "#007B8B", shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6, zIndex: 10 },
+  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", shadowColor: "#007B8B", shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6, zIndex: 10 },
 
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: -4 }, elevation: 8, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
   sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", marginBottom: 10 },
-  sheetTitleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, marginBottom: 10 },
-  sheetTitle: { color: "#111111", fontSize: 15, fontWeight: "700" },
-  sheetSubtitle: { color: "#666666", fontSize: 11, marginTop: 2, fontWeight: "500" },
-  walletBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 9, paddingVertical: 5, backgroundColor: "#E6F4F5", borderRadius: 7 },
-  walletBadgeText: { color: "#007B8B", fontSize: 11, fontWeight: "700" },
-  filterRow: { flexDirection: "row", gap: 6, paddingHorizontal: 14, flexWrap: "wrap" },
+  sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
+  greetingBlock: { flex: 1, minWidth: 0 },
+  sheetTitle: { color: "#111111", fontSize: 14, fontWeight: "700", lineHeight: 18 },
+  sheetSubtitle: { color: "#666666", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
+
+  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#007B8B", flexDirection: "row", alignItems: "center", gap: 6, shadowColor: "#007B8B", shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE", shadowOpacity: 0, elevation: 0 },
+  servicePillNeutral: { backgroundColor: "#EEEDF3", shadowOpacity: 0, elevation: 0 },
+  serviceText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
+  serviceTextOffline: { color: "#111111" },
+  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FFFFFF" },
+  onlineDotOffline: { backgroundColor: "#747474" },
+
+  searchRow: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6 },
+  searchPill: { height: 40, backgroundColor: "#EEEDF3", borderRadius: 11, flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
+  searchInput: { flex: 1, color: "#111111", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
+
+  walletCard: { marginHorizontal: 14, marginTop: 6, marginBottom: 8, backgroundColor: "#111111", borderRadius: 12, padding: 14 },
+  walletEyebrow: { color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
+  walletRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginTop: 4, marginBottom: 10 },
+  walletAmount: { color: "#FFFFFF", fontSize: 26, fontWeight: "700", letterSpacing: -0.4 },
+  walletTrend: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(72,184,137,0.16)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
+  walletTrendText: { color: "#48B889", fontSize: 11, fontWeight: "700" },
+  walletDivider: { height: 1, backgroundColor: "rgba(255,255,255,0.10)", marginBottom: 10 },
+  walletStats: { flexDirection: "row", gap: 12 },
+  walletStat: { flex: 1 },
+  walletStatLabel: { color: "rgba(255,255,255,0.55)", fontSize: 10 },
+  walletStatValue: { color: "#FFFFFF", fontSize: 13, fontWeight: "700", marginTop: 2 },
+
+  filterRow: { flexDirection: "row", gap: 6, paddingHorizontal: 14, paddingBottom: 10, flexWrap: "wrap" },
   chip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
   chipActive: { backgroundColor: "#007B8B", borderColor: "#007B8B" },
   chipText: { color: "#666666", fontSize: 11, fontWeight: "600" },
   chipTextActive: { color: "#FFFFFF" },
 
-  scrollArea: { flex: 1, marginTop: 4 },
-  scrollContent: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 90, gap: 10 },
+  scrollArea: { flex: 1, marginTop: 2 },
+  scrollContent: { paddingHorizontal: 14, paddingTop: 6, paddingBottom: 90, gap: 8 },
 
   urgentCard: { borderRadius: 12, padding: 12, gap: 10 },
   urgentCardSender: { backgroundColor: "#111111" },
@@ -705,18 +629,12 @@ const styles = StyleSheet.create({
   urgentPricing: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
   urgentPrice: { color: "#FFFFFF", fontSize: 20, fontWeight: "700", letterSpacing: -0.3 },
   urgentPriceExtra: { color: "rgba(255,255,255,0.6)", fontSize: 10, marginTop: 1 },
-  urgentSideStat: { alignItems: "flex-end" },
-  urgentSideStatLabel: { color: "rgba(255,255,255,0.65)", fontSize: 10 },
-  urgentSideStatValue: { color: "#FFFFFF", fontSize: 14, fontWeight: "700", marginTop: 1 },
   urgentActions: { flexDirection: "row", gap: 7 },
   urgentBtnWhite: { flex: 1, height: 38, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
   urgentBtnWhiteText: { color: "#007B8B", fontSize: 12, fontWeight: "700" },
-  urgentBtnLight: { flex: 1, height: 38, borderRadius: 9, backgroundColor: "rgba(255,255,255,0.14)", alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6, borderWidth: 1, borderColor: "rgba(255,255,255,0.22)" },
-  urgentBtnLightText: { color: "#FFFFFF", fontSize: 12, fontWeight: "600" },
 
-  listSection: { marginTop: 6 },
-  listSectionTitle: { fontSize: 10.5, fontWeight: "600", color: "#747474", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 8, paddingHorizontal: 4 },
-  row: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 11, marginBottom: 7, borderWidth: 1, borderColor: "#E3E3E3" },
+  listSection: { marginTop: 4, gap: 8 },
+  row: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 11, borderWidth: 1, borderColor: "#E3E3E3" },
   rowSelected: { borderColor: "#007B8B", backgroundColor: "#F5FBFB" },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 9 },
   rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
@@ -725,6 +643,9 @@ const styles = StyleSheet.create({
   rowTitle: { color: "#111111", fontSize: 12.5, fontWeight: "600" },
   rowSub: { color: "#666666", fontSize: 10.5, marginTop: 1 },
   rowPrice: { color: "#111111", fontSize: 14, fontWeight: "700" },
+  rowDateRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
+  datePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  datePillText: { fontSize: 10.5, fontWeight: "700" },
   rowBottom: { flexDirection: "row", alignItems: "center", marginTop: 8, gap: 10 },
   rowStat: { flexDirection: "row", alignItems: "center", gap: 4 },
   rowStatText: { color: "#666666", fontSize: 10.5, fontWeight: "500" },

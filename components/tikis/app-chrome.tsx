@@ -35,11 +35,23 @@ function unreadLabel(count: number) { return count > 9 ? "9+" : String(count); }
 export function TikisHeader() {
   const { openDrawer } = useTikisNavigation();
   const insets = useSafeAreaInsets();
-  const { role, notifications } = useTikisStore();
+  const { notifications } = useTikisStore();
   const unread = notifications.filter((item) => !item.read).length;
-  const roleLabel = role === "sender" ? "Espace expéditeur" : "Espace livreur";
 
-  return <View style={[styles.header, { height: 58 + Math.max(insets.top, 8), paddingTop: Math.max(insets.top, 8) }]}><Pressable accessibilityRole="button" accessibilityLabel="Ouvrir le menu" onPress={() => { haptic.light(); openDrawer(); }} style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}><MaterialIcons name="menu" size={24} color="#111111" /></Pressable><View style={styles.brand}><View style={styles.brandMark}><MaterialIcons name="local-shipping" size={16} color="#FFFFFF" /></View><View><Text style={styles.brandName}>tIKIS</Text><Text style={styles.brandContext}>{roleLabel}</Text></View></View><Pressable accessibilityRole="button" accessibilityLabel="Ouvrir les notifications" onPress={() => { haptic.light(); router.push("/notifications" as any); }} style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}><MaterialIcons name="notifications-none" size={23} color="#111111" />{unread > 0 ? <View style={styles.headerBadge}><Text style={styles.headerBadgeText}>{unreadLabel(unread)}</Text></View> : null}</Pressable></View>;
+  return (
+    <View style={[styles.header, { height: 58 + Math.max(insets.top, 8), paddingTop: Math.max(insets.top, 8) }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir le menu" onPress={() => { haptic.light(); openDrawer(); }} style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}>
+        <MaterialIcons name="menu" size={24} color="#111111" />
+      </Pressable>
+      <View style={styles.brand}>
+        <Text style={styles.brandName}>Tikis</Text>
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir les notifications" onPress={() => { haptic.light(); router.push("/notifications" as any); }} style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}>
+        <MaterialIcons name="notifications-none" size={23} color="#111111" />
+        {unread > 0 ? <View style={styles.headerBadge}><Text style={styles.headerBadgeText}>{unreadLabel(unread)}</Text></View> : null}
+      </Pressable>
+    </View>
+  );
 }
 
 export function TikisDrawer() {
@@ -66,10 +78,8 @@ function DrawerRow({ item, active, onPress }: { item: DrawerItem; active: boolea
 const styles = StyleSheet.create({
   header: { backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingBottom: 6, flexDirection: "row", alignItems: "center" },
   headerIcon: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
-  brand: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 11 },
-  brandMark: { width: 30, height: 30, borderRadius: 7, alignItems: "center", justifyContent: "center", backgroundColor: "#007B8B" },
-  brandName: { color: "#111111", fontSize: 17, fontWeight: "600", letterSpacing: -0.25 },
-  brandContext: { color: "#707070", fontSize: 10, fontWeight: "500", marginTop: -1 },
+  brand: { flex: 1, flexDirection: "row", alignItems: "center", paddingLeft: 11 },
+  brandName: { color: "#111111", fontSize: 19, fontWeight: "700", letterSpacing: -0.4 },
   headerBadge: { position: "absolute", right: 3, top: 3, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: "#B4232D", alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
   headerBadgeText: { color: "#FFFFFF", fontWeight: "600", fontSize: 9 },
   drawerModal: { flex: 1, flexDirection: "row" },
