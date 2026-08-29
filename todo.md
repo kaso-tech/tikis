@@ -260,3 +260,6 @@
 - [x] Effectuer un pull Git sur main et vérifier les changements des autres agents.
 - [x] Installer les dépendances si package.json ou pnpm-lock.yaml a changé.
 - [x] Relancer Expo, valider la compilation et livrer la dernière version.
+- [x] Récupérer explicitement les derniers commits de origin/main.
+- [x] Comparer package.json, installer les dépendances modifiées et relancer Expo.
+- [x] Vérifier compilation, tests, services et livrer la version réellement à jour.
