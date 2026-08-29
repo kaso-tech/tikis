@@ -84,14 +84,6 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.topBar}>
-          <Pressable onPress={() => router.push("/(drawer)" as any)} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Ouvrir le menu">
-            <MaterialIcons name="menu" size={20} color="#111111" />
-          </Pressable>
-          <Text style={styles.topTitle}>Profil</Text>
-          <View style={styles.iconBtnSpacer} />
-        </View>
-
         <View style={styles.hero}>
           <Pressable onPress={openEditor} style={({ pressed }) => [styles.avatarWrap, pressed && styles.pressed]}>
             {photoUri ? (
@@ -322,11 +314,6 @@ function MenuRow({ icon, iconBg, label, sub, badge, onPress, last }: { icon: Rea
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#EEEDF3" },
   content: { padding: 16, paddingBottom: 40, gap: 12 },
-
-  topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 },
-  iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
-  iconBtnSpacer: { width: 36 },
-  topTitle: { color: "#111111", fontSize: 15, fontWeight: "600" },
 
   hero: { alignItems: "center", paddingVertical: 16, gap: 8 },
   avatarWrap: { position: "relative", padding: 4 },

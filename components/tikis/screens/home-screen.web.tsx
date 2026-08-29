@@ -243,6 +243,7 @@ export function HomeScreen() {
 }
 
 function MapBackground({ selected }: { selected: Delivery | null | undefined }) {
+  const hasDriver = selected ? selected.status !== "open" : false;
   return (
     <View style={styles.mapBg}>
       <View style={[styles.mapBlock, { top: "10%", left: "8%", width: 90, height: 60 }]} />
@@ -256,9 +257,11 @@ function MapBackground({ selected }: { selected: Delivery | null | undefined }) 
       <View style={[styles.marker, styles.markerStart]}>
         <MaterialIcons name="inventory-2" size={14} color="#FFFFFF" />
       </View>
-      <View style={[styles.marker, styles.markerDriver]}>
-        <MaterialIcons name="two-wheeler" size={18} color="#FFFFFF" />
-      </View>
+      {hasDriver ? (
+        <View style={[styles.marker, styles.markerDriver]}>
+          <MaterialIcons name="two-wheeler" size={18} color="#FFFFFF" />
+        </View>
+      ) : null}
       <View style={[styles.marker, styles.markerEnd]}>
         <MaterialIcons name="location-on" size={16} color="#B4232D" />
       </View>

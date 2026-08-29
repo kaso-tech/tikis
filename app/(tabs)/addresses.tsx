@@ -89,17 +89,6 @@ export default function AddressesScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.topBar}>
-        <Pressable onPress={() => router.push("/(drawer)" as any)} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Ouvrir le menu">
-          <MaterialIcons name="menu" size={20} color="#111111" />
-        </Pressable>
-        <View style={styles.topTitleWrap}>
-          <Text style={styles.topTitle}>Adresses</Text>
-          <View style={styles.topCount}><Text style={styles.topCountText}>{decorated.length}</Text></View>
-        </View>
-        <View style={styles.iconBtnSpacer} />
-      </View>
-
       <View style={styles.header}>
         <Text style={styles.eyebrow}>GESTION</Text>
         <Text style={styles.pageTitle}>Mes adresses</Text>
@@ -235,13 +224,7 @@ function FilterChip({ label, count, active, onPress }: { label: string; count: n
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#EEEDF3" },
 
-  topBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4, gap: 8 },
-  iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
-  iconBtnSpacer: { width: 36 },
-  topTitleWrap: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  topTitle: { color: "#111111", fontSize: 15, fontWeight: "600" },
-  topCount: { backgroundColor: "#FFFFFF", paddingHorizontal: 9, paddingVertical: 4, borderRadius: 99, minWidth: 28, alignItems: "center" },
-  topCountText: { color: "#747474", fontSize: 11, fontWeight: "600" },
+  pressed: { opacity: 0.7 },
 
   header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12 },
   eyebrow: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },

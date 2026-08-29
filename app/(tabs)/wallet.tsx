@@ -77,16 +77,6 @@ export default function WalletScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.topBar}>
-        <Pressable onPress={() => null} style={styles.iconBtn} accessibilityLabel="Ouvrir le menu">
-          <MaterialIcons name="menu" size={20} color="#111111" />
-        </Pressable>
-        <Text style={styles.topTitle}>Wallet</Text>
-        <Pressable style={styles.iconBtn} accessibilityLabel="Plus d'options">
-          <MaterialIcons name="more-horiz" size={20} color="#111111" />
-        </Pressable>
-      </View>
-
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={[styles.balanceCard, isDriver ? styles.balanceCardDriver : styles.balanceCardSender]}>
           <Text style={[styles.balanceEyebrow, isDriver && styles.balanceEyebrowLight]}>
@@ -281,9 +271,6 @@ function QuickStat({ icon, value, label, tone }: { icon: React.ComponentProps<ty
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#EEEDF3" },
 
-  topBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4, gap: 8 },
-  iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
-  topTitle: { flex: 1, color: "#111111", fontSize: 15, fontWeight: "600", textAlign: "center" },
   pressed: { opacity: 0.7 },
 
   scroll: { padding: 8, paddingBottom: 24, gap: 12 },

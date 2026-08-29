@@ -84,7 +84,7 @@ export function DeliveryCard({ delivery, onPress, onMap }: { delivery: Delivery;
         {role === "sender" ? <View style={styles.candidateCount}><MaterialIcons name="group" size={14} color="#555555" /><Text style={styles.candidateCountText}>{delivery.candidateCount ?? 0}</Text><MaterialIcons name="chevron-right" size={17} color="#888888" /></View> : null}
       </View>
     </Pressable>
-    <View style={styles.actions}><TikisButton label="Carte" icon="map" variant="secondary" onPress={openMap} loading={openingMap} loadingLabel="Carte…" style={styles.mapButton} />{mayApply ? <TikisButton label="Postuler" icon="add-task" onPress={confirmApplication} loading={isApplying} loadingLabel="Candidature…" style={styles.applyButton} /> : null}{role === "driver" && delivery.ownCandidateStatus === "applied" ? <View style={styles.appliedState}><MaterialIcons name="check-circle" size={17} color="#167A55" /><Text style={styles.appliedStateText}>Candidature envoyée</Text></View> : null}</View>
+    <View style={styles.actions}><TikisButton label="Carte" icon="map" variant="secondary" onPress={openMap} loading={openingMap} loadingLabel="Carte…" style={styles.mapButton} />{mayApply ? <TikisButton label="Postuler" icon="add-circle" onPress={confirmApplication} loading={isApplying} loadingLabel="Candidature…" style={styles.applyButton} /> : null}{role === "driver" && delivery.ownCandidateStatus === "applied" ? <View style={styles.appliedState}><MaterialIcons name="check-circle" size={17} color="#167A55" /><Text style={styles.appliedStateText}>Candidature envoyée</Text></View> : null}</View>
   </View>;
 }
 
