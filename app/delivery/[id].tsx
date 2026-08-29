@@ -4,6 +4,7 @@ import { type ComponentProps, useMemo, useState } from "react";
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
+import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { SectionHeading, TikisButton } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
@@ -181,17 +182,14 @@ export default function DeliveryDetailScreen() {
         </View>
 
         <View style={styles.heroMap}>
-          <View style={styles.heroMapInner}>
-            <View style={[styles.heroMapBlock, { top: "12%", left: "8%", width: 60, height: 40 }]} />
-            <View style={[styles.heroMapBlock, { top: "60%", right: "12%", width: 50, height: 60 }]} />
-            <View style={[styles.heroMapRoad, { top: "45%", left: 0, right: 0, height: 10 }]} />
-            <View style={[styles.heroMapMarker, styles.heroMapMarkerStart]}>
-              <MaterialIcons name="inventory-2" size={12} color="#FFFFFF" />
-            </View>
-            <View style={[styles.heroMapMarker, styles.heroMapMarkerEnd]}>
-              <MaterialIcons name="location-on" size={12} color="#B4232D" />
-            </View>
-          </View>
+          <DeliveryRouteMap
+            pickup={delivery.pickup}
+            dropoff={delivery.dropoff}
+            coordinates={[
+              { latitude: delivery.pickup.latitude, longitude: delivery.pickup.longitude },
+              { latitude: delivery.dropoff.latitude, longitude: delivery.dropoff.longitude },
+            ]}
+          />
           <View style={styles.heroMapStatus}>
             <View style={[styles.heroMapDot, { backgroundColor: statusBadgeColor }]} />
             <Text style={styles.heroMapStatusText}>{statusBadgeText}</Text>

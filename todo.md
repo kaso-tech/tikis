@@ -274,3 +274,6 @@
 - [x] Synchroniser le projet puis auditer les erreurs des écrans Mes adresses et Wallet.
 - [x] Corriger Mes adresses et restaurer un solde Wallet visible avec repli explicite.
 - [x] Ajouter des protections de régression, relancer Expo et valider les écrans corrigés.
+- [x] Récupérer la dernière version Git partagée et comparer l’état local.
+- [x] Vérifier les dépendances modifiées, relancer Expo et valider la dernière version.
+- [x] Corriger la métadonnée de statut draft manquante dans les écrans d’accueil synchronisés.
