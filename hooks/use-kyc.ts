@@ -39,7 +39,7 @@ export function useKyc() {
     try {
       const camera = await ImagePicker.requestCameraPermissionsAsync();
       const media =
-        camera.granted ? await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: kind === "selfie" ? [1, 1] : [16, 10], quality: 0.55, base64: true, cameraFacing: kind === "selfie" ? 1 : 0 }) : null;
+        camera.granted ? await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: kind === "selfie" ? [1, 1] : [16, 10], quality: 0.55, base64: true }) : null;
       const result = media && !media.canceled
         ? media
         : await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: kind === "selfie" ? [1, 1] : [16, 10], quality: 0.55, base64: true });

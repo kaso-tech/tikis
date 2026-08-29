@@ -1,7 +1,1 @@
-import { Platform } from "react-native";
-import { LiveScreen as LiveScreenWeb } from "./live.web";
-import { LiveScreen as LiveScreenNative } from "./live.native";
-
-export default function LiveScreen() {
-  return Platform.OS === "web" ? <LiveScreenWeb /> : <LiveScreenNative />;
-}
+export { LiveScreen as default } from "@/components/tikis/screens/live-screen";

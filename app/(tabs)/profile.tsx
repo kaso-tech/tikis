@@ -31,10 +31,10 @@ export default function ProfileScreen() {
   const initials = name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
   const photoUri = profile?.photoUrl ? `${getApiBaseUrl()}${profile.photoUrl}` : undefined;
   const completed = (deliveriesQuery.data ?? []).filter((delivery) => delivery.status === "completed");
-  const receivedReviews = driver ? reviewsQuery.data ?? [] : [];
+  const receivedReviews = useMemo(() => driver ? reviewsQuery.data ?? [] : [], [driver, reviewsQuery.data]);
   const unread = notifications.filter((item) => !item.read).length;
   const driverWallet = walletQuery.data?.wallet;
-  const availableBalance = driverWallet ? driverWallet.available : 0;
+  const availableBalance = driverWallet ? availableWalletBalance(driverWallet) : 0;
 
   const driverRating = useMemo(() => {
     if (!driver || receivedReviews.length === 0) return null;

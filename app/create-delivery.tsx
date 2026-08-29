@@ -224,7 +224,7 @@ export default function CreateDeliveryScreen() {
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.section}>
             <Text style={styles.eyebrow}>ITINÉRAIRE</Text>
-            <Text style={styles.sectionTitle}>D'où à où ?</Text>
+            <Text style={styles.sectionTitle}>D’où à où ?</Text>
             <View style={styles.routeCard}>
               <RouteInput tone="pickup" label="RÉCUPÉRATION" value={pickup} invalid={Boolean(pickupIssue)} onPress={() => setPickerTarget("pickup")} />
               {route ? (
@@ -234,7 +234,7 @@ export default function CreateDeliveryScreen() {
                 </View>
               ) : (
                 <View style={styles.routeConnector}>
-                  <View style={styles.routeConnectorLine} style={styles.routeConnectorLineDashed} />
+                  <View style={[styles.routeConnectorLine, styles.routeConnectorLineDashed]} />
                 </View>
               )}
               <RouteInput tone="dropoff" label="DESTINATION" value={dropoff} invalid={Boolean(dropoffIssue)} onPress={() => setPickerTarget("dropoff")} />
@@ -266,7 +266,7 @@ export default function CreateDeliveryScreen() {
 
           <View style={styles.section}>
             <Text style={styles.eyebrow}>TYPE</Text>
-            <Text style={styles.sectionTitle}>Qu'envoyez-vous ?</Text>
+            <Text style={styles.sectionTitle}>Qu’envoyez-vous ?</Text>
             <View style={styles.typeGrid}>
               {DELIVERY_TYPES.map((item) => {
                 const active = deliveryType === item.value;
