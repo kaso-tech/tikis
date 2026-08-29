@@ -297,3 +297,9 @@
 - [x] Réorganiser les cartes de livraison, les actions contextuelles et le retour rapide en haut.
 - [x] Ajuster la carte, l’itinéraire routier, le cadrage visible et la fréquence GPS.
 - [x] Tester les parcours Livreur, relancer Expo et livrer la version vérifiée.
+- [x] Synchroniser le projet puis auditer les cartes Livreur, la carte et le suivi interne.
+- [x] Réorganiser les cartes avec date en bas, prix à droite et détails noirs ordonnés.
+- [x] Corriger les marqueurs de carte et ouvrir la navigation externe livreur → collecte → destination.
+- [x] Retirer le suivi interne devenu redondant et nettoyer ses dépendances.
+- [x] Tester les retouches, relancer Expo et livrer la version vérifiée.
+- [x] Aligner la variante web de l’accueil sur les contrats Wallet et DeliveryStatus après le rebase.

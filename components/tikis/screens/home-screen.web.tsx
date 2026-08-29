@@ -309,7 +309,7 @@ export function HomeScreen() {
               driverDistance={null}
               driverLocationStatus={null}
               applying={false}
-              onAction={() => router.push(`/track/${selected.id}` as any)}
+              onAction={() => router.push(`/delivery/${selected.id}/map` as any)}
               onDetails={() => router.push(`/delivery/${selected.id}` as any)}
               onApply={() => {}}
             />

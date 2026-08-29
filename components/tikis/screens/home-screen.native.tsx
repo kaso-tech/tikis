@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Dimensions, Linking, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, Dimensions, Linking, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import MapView, { Marker, Polyline, type Region } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -67,8 +67,8 @@ function fitRegionFor(pickup: { latitude: number; longitude: number }, dropoff: 
   return { latitude: midLat, longitude: midLng, latitudeDelta: latDelta, longitudeDelta: lngDelta };
 }
 
-function openNavigation(pickup: { latitude: number; longitude: number }, dropoff: { latitude: number; longitude: number }) {
-  const url = `https://www.google.com/maps/dir/?api=1&origin=${pickup.latitude},${pickup.longitude}&destination=${dropoff.latitude},${dropoff.longitude}&travelmode=driving`;
+function openNavigation(origin: { latitude: number; longitude: number }, pickup: { latitude: number; longitude: number }, dropoff: { latitude: number; longitude: number }) {
+  const url = `https://www.google.com/maps/dir/?api=1&origin=${origin.latitude},${origin.longitude}&destination=${dropoff.latitude},${dropoff.longitude}&waypoints=${pickup.latitude},${pickup.longitude}&travelmode=driving`;
   void Linking.openURL(url);
 }
 
@@ -179,10 +179,18 @@ export function HomeScreen() {
       if (delivery.ownCandidateStatus === "applied") await withdrawMutation.mutateAsync({ deliveryId: delivery.id });
       else if (delivery.ownCandidateStatus === "selected") await confirmMutation.mutateAsync({ deliveryId: delivery.id });
       else if (delivery.ownCandidateStatus === "confirmed" || delivery.status === "active") {
-        router.push(`/track/${delivery.id}` as any);
+        let origin = driverLocation.location;
+        if (!origin) {
+          const position = await driverLocation.request();
+          origin = position ? { latitude: position.coords.latitude, longitude: position.coords.longitude } : null;
+        }
+        if (!origin) throw new Error("La position actuelle est requise pour démarrer la navigation.");
+        openNavigation(origin, delivery.pickup, delivery.dropoff);
         return;
       } else await applyMutation.mutateAsync({ deliveryId: delivery.id });
       await Promise.all([utilities.deliveries.list.invalidate(), utilities.wallet.snapshot.invalidate(), utilities.notifications.list.invalidate()]);
+    } catch (cause) {
+      Alert.alert("Action indisponible", cause instanceof Error ? cause.message : "Réessayez dans un instant.");
     } finally {
       setActioningId(null);
     }
@@ -194,7 +202,7 @@ export function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <MapBackground selected={selected} sheetOverlayHeight={sheetValue.current} />
+      <MapBackground selected={selected} sheetOverlayHeight={sheetValue.current} driverPosition={driverLocation.location} />
 
       {!isDriver ? <Pressable
         onPress={() => {
@@ -311,7 +319,7 @@ export function HomeScreen() {
             <UrgentCard
               delivery={selected}
               role={role}
-              onAction={() => router.push(`/track/${selected.id}` as any)}
+              onAction={() => router.push(`/delivery/${selected.id}/map` as any)}
             />
           )}
 
@@ -374,7 +382,7 @@ function WalletCard({ walletBalance, totalBalance, pendingBalance, blockedBalanc
   );
 }
 
-function MapBackground({ selected, sheetOverlayHeight }: { selected: Delivery | null | undefined; sheetOverlayHeight: number }) {
+function MapBackground({ selected, sheetOverlayHeight, driverPosition }: { selected: Delivery | null | undefined; sheetOverlayHeight: number; driverPosition: { latitude: number; longitude: number } | null }) {
   const mapRef = useRef<MapView>(null);
   const routeMutation = trpc.geography.route.useMutation();
   const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
@@ -420,22 +428,14 @@ function MapBackground({ selected, sheetOverlayHeight }: { selected: Delivery | 
       >
         {selected ? (
           <>
-            <Polyline
-              coordinates={routeCoordinates.length > 1 ? routeCoordinates : [
-                { latitude: selected.pickup.latitude, longitude: selected.pickup.longitude },
-                { latitude: selected.dropoff.latitude, longitude: selected.dropoff.longitude },
-              ]}
-              strokeColor="#007B8B"
-              strokeWidth={4}
-              lineCap="round"
-            />
+            {routeCoordinates.length > 1 ? <Polyline coordinates={routeCoordinates} strokeColor="#007B8B" strokeWidth={4} lineCap="round" /> : null}
             <Marker coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={{ x: 0.5, y: 0.5 }}>
               <View style={styles.nativeMarkerStart}>
                 <MaterialIcons name="inventory-2" size={15} color="#FFFFFF" />
               </View>
             </Marker>
             {hasDriver ? (
-              <Marker coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={{ x: 0.5, y: 0.5 }}>
+              <Marker coordinate={driverPosition ?? { latitude: selected.pickup.latitude + 0.00022, longitude: selected.pickup.longitude + 0.00022 }} anchor={{ x: 0.5, y: 0.5 }}>
                 <View style={styles.nativeMarkerDriver}>
                   <MaterialIcons name="two-wheeler" size={16} color="#FFFFFF" />
                 </View>
@@ -530,15 +530,15 @@ function DeliveryRow({
         ? "Démarrer"
         : "Postuler";
   const vehicleLabel = (delivery.vehicleTypes ?? []).join(" · ") || "Moto";
-  const volumeM3 = delivery.dimensions?.lengthCm && delivery.dimensions?.widthCm && delivery.dimensions?.heightCm
-    ? (delivery.dimensions.lengthCm * delivery.dimensions.widthCm * delivery.dimensions.heightCm / 1_000_000).toFixed(2)
+  const dimensions = delivery.dimensions?.lengthCm && delivery.dimensions?.widthCm && delivery.dimensions?.heightCm
+    ? `${delivery.dimensions.lengthCm}×${delivery.dimensions.widthCm}×${delivery.dimensions.heightCm} cm`
     : null;
-  const deliveryDetails = [delivery.type, vehicleLabel, delivery.passengers ? `${delivery.passengers} pers.` : null, delivery.weightKg ? `${delivery.weightKg} kg` : null, volumeM3 ? `${volumeM3} m³` : null].filter(Boolean).join(" · ");
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const dateInfo = formatDeliveryCreationDate(delivery.createdAt);
   const dateColor = dateInfo.tone === "primary" ? "#007B8B" : "#747474";
   const dateBg = dateInfo.tone === "primary" ? "#E6F4F5" : "#F0F0F2";
   const totalDistance = formatDistanceKm(delivery.distanceKm);
+  const deliveryDetails = [delivery.type, delivery.passengers ? `${delivery.passengers} pers.` : null, `${totalDistance.value} ${totalDistance.unit}`, dimensions, vehicleLabel].filter(Boolean).join(" · ");
   const driverDistText = driverDistance
     ? `${driverDistance.value} ${driverDistance.unit}`
     : driverLocationStatus === "loading" || driverLocationStatus === "idle"
@@ -557,31 +557,17 @@ function DeliveryRow({
           <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
           <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff} · {vehicleLabel}</Text>
         </View>
-        {isDriver ? <Text style={styles.rowDriverDistance}>{driverDistText} de vous</Text> : null}
+        {isDriver ? <View style={styles.rowDriverDistance}><MaterialIcons name="my-location" size={12} color="#007B8B" /><Text style={styles.rowDriverDistanceText}>{driverDistText} de vous</Text></View> : null}
       </View>
       <View style={styles.rowDateRow}>
-        <View style={[styles.datePill, { backgroundColor: dateBg }]}>
-          <MaterialIcons name={dateInfo.icon} size={11} color={dateColor} />
-          <Text style={[styles.datePillText, { color: dateColor }]}>{dateInfo.primary}</Text>
-          <Text style={styles.rowPrice}>{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</Text>
-        </View>
+        <Text style={styles.rowDetails} numberOfLines={1}>{deliveryDetails}</Text>
+        <Text style={styles.rowPrice}>{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</Text>
       </View>
       <View style={styles.rowBottom}>
-        <View style={styles.rowStat}>
-          <MaterialIcons name="route" size={12} color="#666666" />
-          <Text style={styles.rowStatText}>{totalDistance.value} {totalDistance.unit}</Text>
+        <View style={[styles.datePill, { backgroundColor: dateBg }]}> 
+          <MaterialIcons name={dateInfo.icon} size={11} color={dateColor} />
+          <Text style={[styles.datePillText, { color: dateColor }]}>{dateInfo.primary}</Text>
         </View>
-        {isDriver ? (
-          <View style={styles.rowStat}>
-            <MaterialIcons name="my-location" size={12} color="#007B8B" />
-            <Text style={[styles.rowStatText, { color: "#007B8B", fontWeight: "600" }]} numberOfLines={1}>{deliveryDetails}</Text>
-          </View>
-        ) : (
-          <View style={styles.rowStat}>
-            <MaterialIcons name="group" size={12} color="#666666" />
-            <Text style={styles.rowStatText}>{delivery.candidateCount ?? 0} candidat{(delivery.candidateCount ?? 0) > 1 ? "s" : ""}</Text>
-          </View>
-        )}
         <View style={styles.rowActions}>
           <Pressable onPress={onDetails} style={({ pressed }) => [styles.rowBtnOutline, pressed && styles.pressed]}>
             <Text style={styles.rowBtnOutlineText}>Détails</Text>
@@ -684,10 +670,12 @@ const styles = StyleSheet.create({
   rowMain: { flex: 1, minWidth: 0 },
   rowTitle: { color: "#111111", fontSize: 12.5, fontWeight: "600" },
   rowSub: { color: "#666666", fontSize: 10.5, marginTop: 1 },
-  rowPrice: { color: "#111111", fontSize: 14, fontWeight: "700" },
-  rowDriverDistance: { color: "#007B8B", fontSize: 10.5, fontWeight: "600" },
+  rowPrice: { color: "#111111", fontSize: 14, fontWeight: "700", textAlign: "right" },
+  rowDetails: { flex: 1, color: "#111111", fontSize: 11.5, lineHeight: 16, paddingRight: 8 },
+  rowDriverDistance: { flexDirection: "row", alignItems: "center", gap: 3, marginLeft: 8 },
+  rowDriverDistanceText: { color: "#007B8B", fontSize: 10.5, fontWeight: "600" },
   rowDateRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
-  datePill: { flex: 1, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  datePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   datePillText: { fontSize: 10.5, fontWeight: "700" },
   rowBottom: { flexDirection: "row", alignItems: "center", marginTop: 8, gap: 10 },
   rowStat: { flexDirection: "row", alignItems: "center", gap: 4 },

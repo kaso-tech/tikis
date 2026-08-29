@@ -322,7 +322,7 @@ export default function DeliveryDetailScreen() {
         </View>
 
         {role === "sender" && (isActive || delivery.status === "pending_confirmation") ? (
-          <Pressable onPress={() => router.push(`/track/${deliveryId}` as any)} style={({ pressed }) => [styles.trackButton, pressed && styles.pressed]}>
+          <Pressable onPress={() => router.push(`/delivery/${deliveryId}/map` as any)} style={({ pressed }) => [styles.trackButton, pressed && styles.pressed]}>
             <MaterialIcons name="my-location" size={16} color="#FFFFFF" />
             <Text style={styles.trackButtonText}>Suivre en direct</Text>
           </Pressable>

@@ -54,7 +54,7 @@ export async function presentSimulatedTrackingPush(event: TrackingEvent, deliver
       content: {
         title: event.title,
         body: event.body,
-        data: { deliveryId, event: event.type, url: `/track/${deliveryId}` },
+        data: { deliveryId, event: event.type, url: `/delivery/${deliveryId}/map` },
         sound: false,
         color: "#007B8B",
       },
@@ -73,7 +73,7 @@ export async function presentDeliveryStatusPush(event: { deliveryId: string; sta
     const granted = await configureSimulatedPushNotifications();
     if (!granted) return false;
     await Notifications.scheduleNotificationAsync({
-      content: { title: event.title, body: event.body, data: { deliveryId: event.deliveryId, status: event.status, url: `/track/${event.deliveryId}` }, sound: false, color: "#007B8B" },
+      content: { title: event.title, body: event.body, data: { deliveryId: event.deliveryId, status: event.status, url: `/delivery/${event.deliveryId}/map` }, sound: false, color: "#007B8B" },
       trigger: null,
     });
     return true;
