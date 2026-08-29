@@ -271,3 +271,6 @@
 - [x] Récupérer la dernière version Git, corriger le doublon TypeScript, relancer Expo et valider 86 tests, Metro et l’API.
 - [x] Localiser et corriger l’accès non sécurisé à displayName dans la page Courses.
 - [x] Ajouter une protection de régression, relancer Expo et valider la correction.
+- [x] Synchroniser le projet puis auditer les erreurs des écrans Mes adresses et Wallet.
+- [x] Corriger Mes adresses et restaurer un solde Wallet visible avec repli explicite.
+- [x] Ajouter des protections de régression, relancer Expo et valider les écrans corrigés.

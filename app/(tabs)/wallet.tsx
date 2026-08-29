@@ -1,5 +1,5 @@
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useState } from "react";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
@@ -32,7 +32,7 @@ const TONE_COLOR: Record<Tone, string> = {
 export default function WalletScreen() {
   const { role, profile } = useTikisStore();
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 12_000 });
-  const wallet = walletQuery.data?.wallet ?? { total: 0, blocked: 0 };
+  const wallet = walletQuery.data?.wallet;
   const journal = walletQuery.data?.journal ?? [];
   const initiateMutation = trpc.wallet.initiateLigdiSimulation.useMutation();
   const settleMutation = trpc.wallet.settleLigdiSimulation.useMutation({ onSuccess: () => void walletQuery.refetch() });
@@ -42,7 +42,12 @@ export default function WalletScreen() {
   const [payment, setPayment] = useState<{ id: string; type: "deposit" | "withdrawal"; amount: number; providerReference: string } | null>(null);
   const requestLoading = initiateMutation.isPending || settleMutation.isPending;
   const isDriver = role === "driver";
-  const available = availableWalletBalance(wallet);
+  const available = wallet ? availableWalletBalance(wallet) : null;
+  const displayWalletAmount = (amount: number | null) => {
+    if (walletQuery.isLoading) return "Chargement…";
+    if (walletQuery.error || amount === null || !Number.isFinite(amount)) return "Indisponible";
+    return formatMoney(amount);
+  };
   const completed = journal.filter((entry) => entry.operation === "credit" || entry.operation === "debit" || entry.operation === "refund");
   const todaysCount = journal.filter((entry) => {
     const d = new Date(entry.createdAt);
@@ -54,6 +59,14 @@ export default function WalletScreen() {
       const d = new Date(entry.createdAt);
       const now = new Date();
       return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate() && entry.operation === "credit";
+    })
+    .reduce((sum, entry) => sum + entry.amount, 0);
+  const completedDriverCourses = journal.filter((entry) => entry.operation === "credit").length;
+  const currentMonthSpending = journal
+    .filter((entry) => {
+      const date = new Date(entry.createdAt);
+      const now = new Date();
+      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && entry.operation === "debit";
     })
     .reduce((sum, entry) => sum + entry.amount, 0);
 
@@ -83,11 +96,11 @@ export default function WalletScreen() {
             {isDriver ? "SOLDE DISPONIBLE" : "VOTRE WALLET EXPÉDITEUR"}
           </Text>
           <View style={styles.balanceValueRow}>
-            <Text style={styles.balanceValue}>{formatMoney(available)}</Text>
+            <Text style={styles.balanceValue}>{displayWalletAmount(available)}</Text>
             {isDriver ? (
               <View style={styles.trendPill}>
-                <MaterialIcons name="trending-up" size={11} color="#48B889" />
-                <Text style={styles.trendText}>+12%</Text>
+                <MaterialIcons name="verified" size={11} color="#48B889" />
+                <Text style={styles.trendText}>Disponible</Text>
               </View>
             ) : (
               <View style={styles.trendPillLight}>
@@ -102,11 +115,11 @@ export default function WalletScreen() {
               <>
                 <View style={styles.balanceCol}>
                   <Text style={[styles.balanceLabel, isDriver && styles.balanceLabelLight]}>Solde total</Text>
-                  <Text style={styles.balanceSub}>{formatMoney(wallet.total)}</Text>
+                  <Text style={styles.balanceSub}>{displayWalletAmount(wallet?.total ?? null)}</Text>
                 </View>
                 <View style={styles.balanceCol}>
                   <Text style={[styles.balanceLabel, isDriver && styles.balanceLabelLight]}>Bloquée</Text>
-                  <Text style={styles.balanceSub}>{formatMoney(wallet.blocked)}</Text>
+                  <Text style={styles.balanceSub}>{displayWalletAmount(wallet?.blocked ?? null)}</Text>
                 </View>
                 <View style={styles.balanceCol}>
                   <Text style={[styles.balanceLabel, isDriver && styles.balanceLabelLight]}>En attente</Text>
@@ -121,7 +134,7 @@ export default function WalletScreen() {
                 </View>
                 <View style={styles.balanceCol}>
                   <Text style={[styles.balanceLabel, isDriver && styles.balanceLabelLight]}>Ce mois</Text>
-                  <Text style={styles.balanceSub}>8 450 F</Text>
+                  <Text style={styles.balanceSub}>{displayWalletAmount(currentMonthSpending)}</Text>
                 </View>
               </>
             )}
@@ -149,7 +162,7 @@ export default function WalletScreen() {
           <View style={styles.quickStats}>
             <QuickStat icon="local-shipping" value={String(todaysCount)} label="Aujourd'hui" tone="primary" />
             <QuickStat icon="savings" value={formatMoney(todaysEarnings)} label="Gains" tone="success" />
-            <QuickStat icon="two-wheeler" value="47" label="Courses" tone="amber" />
+            <QuickStat icon="two-wheeler" value={String(completedDriverCourses)} label="Courses" tone="amber" />
           </View>
         ) : (
           <View style={styles.senderInfo}>
