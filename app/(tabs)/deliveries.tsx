@@ -18,6 +18,29 @@ const driverFilters: { key: FilterKey; label: string }[] = [
   { key: "all", label: "Demandes" }, { key: "pending_confirmation", label: "Attribuées" }, { key: "active", label: "En cours" }, { key: "completed", label: "Terminées" },
 ];
 
+function FilterSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.filterSection}>
+      <Text style={styles.filterSectionTitle}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+function FilterPill({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.optionPill, selected && styles.optionPillActive, pressed && styles.pressed]}
+    >
+      <Text style={[styles.optionPillText, selected && styles.optionPillTextActive]}>{label}</Text>
+      {selected ? <MaterialIcons name="check" size={14} color="#FFFFFF" /> : null}
+    </Pressable>
+  );
+}
+
 export default function DeliveriesScreen() {
   const { role, profile } = useTikisStore();
   const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
@@ -75,9 +98,6 @@ export default function DeliveriesScreen() {
     </View>
   );
 }
-
-function FilterSection({ title, children }: { title: string; children: React.ReactNode }) { return <View style={styles.filterSection}><Text style={styles.filterSectionTitle}>{title}</Text>{children}</View>; }
-function FilterPill({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) { return <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: selected }} onPress={onPress} style={({ pressed }) => [styles.optionPill, selected && styles.optionPillActive, pressed && styles.pressed]}><Text style={[styles.optionPillText, selected && styles.optionPillTextActive]}>{label}</Text>{selected ? <MaterialIcons name="check" size={14} color="#FFFFFF" /> : null}</Pressable>; }
 
 const styles = StyleSheet.create({
   list: { padding: 16, paddingBottom: 98 },
