@@ -257,7 +257,7 @@ function MapBackground({ selected }: { selected: Delivery | null | undefined }) 
         <MaterialIcons name="inventory-2" size={14} color="#FFFFFF" />
       </View>
       <View style={[styles.marker, styles.markerDriver]}>
-        <MaterialIcons name="delivery-dining" size={16} color="#FFFFFF" />
+        <MaterialIcons name="two-wheeler" size={18} color="#FFFFFF" />
       </View>
       <View style={[styles.marker, styles.markerEnd]}>
         <MaterialIcons name="location-on" size={16} color="#B4232D" />

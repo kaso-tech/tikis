@@ -29,6 +29,7 @@ export default function TabLayout() {
       <Tabs.Screen name="live" options={{ href: profile.role === "sender" ? undefined : null, title: "Suivi", tabBarIcon: ({ color, size }) => <MaterialIcons name="my-location" size={size} color={color} /> }} />
       <Tabs.Screen name="wallet" options={{ headerShown: false, href: profile.role === "driver" ? undefined : null, title: "Wallet", tabBarIcon: ({ color, size }) => <MaterialIcons name="account-balance-wallet" size={size} color={color} /> }} />
       <Tabs.Screen name="profile" options={{ headerShown: false, title: "Profil", tabBarIcon: ({ color, size }) => <MaterialIcons name="person" size={size} color={color} /> }} />
+      <Tabs.Screen name="addresses" options={{ headerShown: false, title: "Adresses", tabBarIcon: ({ color, size }) => <MaterialIcons name="location-on" size={size} color={color} /> }} />
     </Tabs>
   );
 }
