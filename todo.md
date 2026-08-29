@@ -257,3 +257,6 @@
 - [x] Installer les dépendances si package.json ou pnpm-lock.yaml a changé.
 - [x] Relancer Expo et vérifier la compilation sans erreur.
 - [x] Livrer la dernière version synchronisée.
+- [x] Effectuer un pull Git sur main et vérifier les changements des autres agents.
+- [x] Installer les dépendances si package.json ou pnpm-lock.yaml a changé.
+- [x] Relancer Expo, valider la compilation et livrer la dernière version.
