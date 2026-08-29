@@ -293,6 +293,4 @@ const styles = StyleSheet.create({
   helper: { color: "#747474", fontSize: 10, marginTop: 4 },
   modalActions: { flexDirection: "row", gap: 8, marginTop: 18 },
   modalAction: { flex: 1, minHeight: 42 },
-
-  pressed: { opacity: 0.7 },
 });

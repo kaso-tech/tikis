@@ -268,3 +268,4 @@
 - [x] Purger les caches Expo, relancer Metro et isoler les écrans de carte natifs du bundle web.
 - [x] Valider TypeScript, lint, tests et services, puis préparer la version synchronisée.
 - [x] Récupérer le commit collaboratif 3e8b707, vérifier les dépendances et la compilation, relancer Expo et livrer la version à jour.
+- [x] Récupérer la dernière version Git, corriger le doublon TypeScript, relancer Expo et valider 86 tests, Metro et l’API.
