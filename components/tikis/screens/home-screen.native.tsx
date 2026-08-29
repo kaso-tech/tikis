@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Dimensions, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Animated, Dimensions, Linking, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import MapView, { Marker, Polyline, type Region } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -8,9 +8,11 @@ import { useTikisStore } from "@/lib/tikis-store";
 import { useTikisNavigation } from "@/lib/tikis-navigation";
 import { trpc } from "@/lib/trpc";
 import { formatListRouteParts } from "@/lib/geo-rules";
+import { useDriverLocation } from "@/hooks/use-driver-location";
 import { availableWalletBalance, formatMoney, type Delivery, type DeliveryStatus } from "@/shared/tikis-domain";
 
 const { height: SCREEN_H } = Dimensions.get("window");
+const SHEET_MIN = 110;
 const SHEET_PEEK = 340;
 const SHEET_EXPANDED = Math.min(SCREEN_H * 0.78, 720);
 
@@ -49,6 +51,18 @@ function matchesFilter(status: DeliveryStatus, filter: FilterKey): boolean {
   return true;
 }
 
+function driverSortPriority(d: Delivery): number {
+  if (d.ownCandidateStatus === "confirmed" || d.status === "active") return 0;
+  if (d.ownCandidateStatus === "selected" || d.status === "pending_confirmation") return 1;
+  if (d.status === "open") return 2;
+  return 3;
+}
+
+function openNavigation(pickup: { latitude: number; longitude: number }, dropoff: { latitude: number; longitude: number }) {
+  const url = `https://www.google.com/maps/dir/?api=1&origin=${pickup.latitude},${pickup.longitude}&destination=${dropoff.latitude},${dropoff.longitude}&travelmode=driving`;
+  void Linking.openURL(url);
+}
+
 function fitRegionFor(pickup: { latitude: number; longitude: number }, dropoff: { latitude: number; longitude: number }): Region {
   const midLat = (pickup.latitude + dropoff.latitude) / 2;
   const midLng = (pickup.longitude + dropoff.longitude) / 2;
@@ -69,29 +83,51 @@ export function HomeScreen() {
   const driverWallet = walletQuery.data?.wallet;
 
   const [filter, setFilter] = useState<FilterKey>("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [driverOnline, setDriverOnline] = useState(true);
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
   const sheetValue = useRef(SHEET_PEEK);
+  const driverLocation = useDriverLocation({ enabled: role === "driver" });
 
   const filteredList = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const matches = (d: Delivery) => {
+      if (!matchesFilter(d.status, filter)) return false;
+      if (q.length === 0) return true;
+      const route = formatListRouteParts(d.pickup, d.dropoff);
+      const haystack = [
+        d.title,
+        d.type,
+        route.pickup,
+        route.dropoff,
+        (d.vehicleTypes ?? []).join(" "),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    };
     if (role === "driver") {
       return [...deliveries]
-        .filter((d) => matchesFilter(d.status, filter))
-        .sort((a, b) => a.distanceKm - b.distanceKm);
+        .filter(matches)
+        .sort((a, b) => driverSortPriority(a) - driverSortPriority(b) || a.distanceKm - b.distanceKm);
     }
-    return deliveries.filter((d) => matchesFilter(d.status, filter));
-  }, [deliveries, filter, role]);
+    return deliveries.filter(matches);
+  }, [deliveries, filter, role, searchQuery]);
 
   const selected = useMemo(() => {
     if (selectedId) {
       const found = filteredList.find((d) => d.id === selectedId);
       if (found) return found;
     }
+    if (role === "driver") {
+      const own = filteredList.find((d) => d.ownCandidateStatus === "selected" || d.ownCandidateStatus === "confirmed" || d.status === "active");
+      if (own) return own;
+    }
     return filteredList[0] ?? null;
-  }, [filteredList, selectedId]);
+  }, [filteredList, selectedId, role]);
 
   useEffect(() => {
     if (!selectedId && selected) setSelectedId(selected.id);
@@ -99,9 +135,14 @@ export function HomeScreen() {
 
   useEffect(() => {
     if (selectedId && filteredList.every((d) => d.id !== selectedId)) {
-      setSelectedId(filteredList[0]?.id ?? null);
+      if (role === "driver") {
+        const own = filteredList.find((d) => d.ownCandidateStatus === "selected" || d.ownCandidateStatus === "confirmed" || d.status === "active");
+        setSelectedId(own?.id ?? filteredList[0]?.id ?? null);
+      } else {
+        setSelectedId(filteredList[0]?.id ?? null);
+      }
     }
-  }, [filteredList, selectedId]);
+  }, [filteredList, selectedId, role]);
 
   const otherDeliveries = useMemo(() => filteredList.filter((d) => d.id !== selected?.id).slice(0, 5), [filteredList, selected?.id]);
 
@@ -119,15 +160,27 @@ export function HomeScreen() {
     onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 6,
     onPanResponderMove: (_, gesture) => {
       const current = sheetValue.current;
-      const next = Math.max(SHEET_PEEK, Math.min(SHEET_EXPANDED, current - gesture.dy));
+      const next = Math.max(SHEET_MIN, Math.min(SHEET_EXPANDED, current - gesture.dy));
       sheetHeight.setValue(next);
     },
     onPanResponderRelease: (_, gesture) => {
       const current = sheetValue.current;
-      const shouldExpand = gesture.dy < -20 || current > (SHEET_PEEK + SHEET_EXPANDED) / 2;
-      animateSheet(shouldExpand);
+      const range = SHEET_EXPANDED - SHEET_MIN;
+      const ratio = (current - SHEET_MIN) / range;
+      let target: number;
+      if (gesture.dy < -30) target = SHEET_EXPANDED;
+      else if (gesture.dy > 30) target = ratio < 0.25 ? SHEET_MIN : SHEET_PEEK;
+      else if (ratio > 0.66) target = SHEET_EXPANDED;
+      else if (ratio < 0.25) target = SHEET_MIN;
+      else target = SHEET_PEEK;
+      animateSheetTo(target);
     },
   })).current;
+
+  const animateSheetTo = (toValue: number) => {
+    setExpanded(toValue === SHEET_EXPANDED);
+    Animated.spring(sheetHeight, { toValue, useNativeDriver: false, friction: 9, tension: 60 }).start();
+  };
 
   const utilities = trpc.useUtils();
   const applyMutation = trpc.deliveries.submitApplication.useMutation();
@@ -156,7 +209,20 @@ export function HomeScreen() {
           <>
             <View style={styles.searchPill}>
               <MaterialIcons name="search" size={16} color="#747474" />
-              <Text style={styles.searchPillText}>Rechercher une livraison…</Text>
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Rechercher une livraison…"
+                placeholderTextColor="#747474"
+                style={styles.searchInput}
+                returnKeyType="search"
+                clearButtonMode="while-editing"
+              />
+              {searchQuery.length > 0 ? (
+                <Pressable onPress={() => setSearchQuery("")} hitSlop={8} accessibilityLabel="Effacer la recherche">
+                  <MaterialIcons name="close" size={16} color="#747474" />
+                </Pressable>
+              ) : null}
             </View>
             <Pressable onPress={() => openDrawer()} style={({ pressed }) => [styles.searchBtn, pressed && styles.pressed]} accessibilityLabel="Menu">
               <MaterialIcons name="menu" size={20} color="#111111" />
@@ -164,10 +230,28 @@ export function HomeScreen() {
           </>
         ) : (
           <>
-            <Pressable onPress={() => setDriverOnline((prev) => !prev)} style={({ pressed }) => [styles.onlinePill, !driverOnline && styles.onlinePillOffline, pressed && styles.pressed]}>
-              <View style={[styles.onlineDot, !driverOnline && styles.onlineDotOffline]} />
-              <Text style={[styles.onlinePillText, !driverOnline && styles.onlinePillTextOffline]}>{driverOnline ? "EN SERVICE" : "HORS SERVICE"}</Text>
-            </Pressable>
+            <View style={[styles.searchPill, !driverOnline && styles.searchPillOffline]}>
+              <Pressable onPress={() => setDriverOnline((prev) => !prev)} style={styles.onlineToggle} accessibilityLabel="Basculer en service">
+                <View style={[styles.onlineDot, !driverOnline && styles.onlineDotOffline]} />
+                <Text style={[styles.onlinePillText, !driverOnline && styles.onlinePillTextOffline]}>{driverOnline ? "EN SERVICE" : "HORS SERVICE"}</Text>
+              </Pressable>
+              <View style={styles.searchDivider} />
+              <MaterialIcons name="search" size={16} color="#747474" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Rechercher une opportunité…"
+                placeholderTextColor="#747474"
+                style={styles.searchInput}
+                returnKeyType="search"
+                clearButtonMode="while-editing"
+              />
+              {searchQuery.length > 0 ? (
+                <Pressable onPress={() => setSearchQuery("")} hitSlop={8} accessibilityLabel="Effacer la recherche">
+                  <MaterialIcons name="close" size={16} color="#747474" />
+                </Pressable>
+              ) : null}
+            </View>
             <Pressable onPress={() => openDrawer()} style={({ pressed }) => [styles.searchBtn, pressed && styles.pressed]} accessibilityLabel="Menu">
               <MaterialIcons name="menu" size={20} color="#111111" />
             </Pressable>
@@ -223,7 +307,7 @@ export function HomeScreen() {
           style={styles.scrollArea}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          scrollEnabled={expanded}
+          scrollEnabled
         >
           {deliveriesQuery.isLoading ? (
             <View style={styles.loadingState}>
@@ -246,6 +330,8 @@ export function HomeScreen() {
             <UrgentCard
               delivery={selected}
               role={role}
+              driverDistance={role === "driver" ? driverLocation.distanceTo(selected.pickup) : null}
+              driverLocationStatus={role === "driver" ? driverLocation.status : null}
               applying={applyingId === selected.id}
               onAction={() => {
                 if (role === "sender") router.push(`/track/${selected.id}` as any);
@@ -267,6 +353,8 @@ export function HomeScreen() {
                   delivery={delivery}
                   role={role}
                   selected={delivery.id === selectedId}
+                  driverDistance={role === "driver" ? driverLocation.distanceTo(delivery.pickup) : null}
+                  driverLocationStatus={role === "driver" ? driverLocation.status : null}
                   applying={applyingId === delivery.id}
                   onPress={() => {
                     setSelectedId(delivery.id);
@@ -352,6 +440,8 @@ function MapBackground({ selected }: { selected: Delivery | null | undefined }) 
 function UrgentCard({
   delivery,
   role,
+  driverDistance,
+  driverLocationStatus,
   applying,
   onAction,
   onDetails,
@@ -359,6 +449,8 @@ function UrgentCard({
 }: {
   delivery: Delivery;
   role: "sender" | "driver";
+  driverDistance: { value: string; unit: "m" | "km"; km: number } | null;
+  driverLocationStatus: "idle" | "loading" | "ready" | "denied" | "unavailable" | null;
   applying: boolean;
   onAction: () => void;
   onDetails: () => void;
@@ -367,7 +459,10 @@ function UrgentCard({
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const price = formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice);
   const isSender = role === "sender";
-  const mayApply = role === "driver" && delivery.status === "open" && !["applied", "selected", "confirmed"].includes(delivery.ownCandidateStatus ?? "");
+  const isDriver = role === "driver";
+  const isOwnActive = isDriver && (delivery.status === "pending_confirmation" || delivery.status === "active" || delivery.ownCandidateStatus === "selected" || delivery.ownCandidateStatus === "confirmed");
+  const mayApply = isDriver && delivery.status === "open" && !["applied", "selected", "confirmed"].includes(delivery.ownCandidateStatus ?? "");
+  const vehicleLabel = (delivery.vehicleTypes ?? []).join(" · ") || "Moto";
 
   return (
     <View style={[styles.urgentCard, isSender ? styles.urgentCardSender : styles.urgentCardDriver]}>
@@ -379,8 +474,8 @@ function UrgentCard({
           <Text style={styles.urgentTitle} numberOfLines={1}>{delivery.title}</Text>
           <Text style={styles.urgentSub} numberOfLines={1}>
             {isSender
-              ? `${route.pickup} → ${route.dropoff} · ${delivery.distanceKm.toFixed(1)} km`
-              : `${route.pickup} → ${route.dropoff} · ${delivery.vehicleTypes[0] ?? "Moto"}`}
+              ? `${route.pickup} → ${route.dropoff} · ${vehicleLabel}`
+              : `${route.pickup} → ${route.dropoff} · ${vehicleLabel}`}
           </Text>
         </View>
         <View style={[styles.urgentChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}>
@@ -397,7 +492,13 @@ function UrgentCard({
           <Text style={styles.urgentSideStatValue}>
             {isSender
               ? delivery.driverName ?? "En attente"
-              : `${delivery.distanceKm.toFixed(1)} km`}
+              : driverDistance
+                ? `${driverDistance.value} ${driverDistance.unit}`
+                : driverLocationStatus === "loading" || driverLocationStatus === "idle"
+                  ? "…"
+                  : driverLocationStatus === "denied"
+                    ? "GPS off"
+                    : "—"}
           </Text>
         </View>
       </View>
@@ -407,6 +508,17 @@ function UrgentCard({
             <MaterialIcons name="my-location" size={15} color="#111111" />
             <Text style={styles.urgentBtnWhiteText}>Suivre la course</Text>
           </Pressable>
+        ) : isOwnActive ? (
+          <>
+            <Pressable onPress={onDetails} style={({ pressed }) => [styles.urgentBtnLight, pressed && styles.pressed]}>
+              <MaterialIcons name="description" size={15} color="#FFFFFF" />
+              <Text style={styles.urgentBtnLightText}>Détails</Text>
+            </Pressable>
+            <Pressable onPress={() => openNavigation(delivery.pickup, delivery.dropoff)} style={({ pressed }) => [styles.urgentBtnWhite, pressed && styles.pressed]}>
+              <MaterialIcons name="navigation" size={15} color="#007B8B" />
+              <Text style={styles.urgentBtnWhiteText}>Démarrer</Text>
+            </Pressable>
+          </>
         ) : (
           <>
             <Pressable onPress={onDetails} style={({ pressed }) => [styles.urgentBtnLight, pressed && styles.pressed]}>
@@ -443,6 +555,8 @@ function DeliveryRow({
   delivery,
   role,
   selected,
+  driverDistance,
+  driverLocationStatus,
   applying,
   onPress,
   onDetails,
@@ -451,6 +565,8 @@ function DeliveryRow({
   delivery: Delivery;
   role: "sender" | "driver";
   selected: boolean;
+  driverDistance: { value: string; unit: "m" | "km"; km: number } | null;
+  driverLocationStatus: "idle" | "loading" | "ready" | "denied" | "unavailable" | null;
   applying: boolean;
   onPress: () => void;
   onDetails: () => void;
@@ -459,7 +575,17 @@ function DeliveryRow({
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const price = formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice);
   const isSender = role === "sender";
-  const mayApply = role === "driver" && delivery.status === "open" && !["applied", "selected", "confirmed"].includes(delivery.ownCandidateStatus ?? "");
+  const isDriver = role === "driver";
+  const isOwnActive = isDriver && (delivery.status === "pending_confirmation" || delivery.status === "active" || delivery.ownCandidateStatus === "selected" || delivery.ownCandidateStatus === "confirmed");
+  const mayApply = isDriver && delivery.status === "open" && !["applied", "selected", "confirmed"].includes(delivery.ownCandidateStatus ?? "");
+  const vehicleLabel = (delivery.vehicleTypes ?? []).join(" · ") || "Moto";
+  const driverDistanceText = driverDistance
+    ? `${driverDistance.value} ${driverDistance.unit}`
+    : driverLocationStatus === "loading" || driverLocationStatus === "idle"
+      ? "…"
+      : driverLocationStatus === "denied"
+        ? "GPS off"
+        : "—";
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, selected && styles.rowSelected, pressed && styles.pressed]}>
@@ -469,7 +595,7 @@ function DeliveryRow({
         </View>
         <View style={styles.rowMain}>
           <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
-          <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff}</Text>
+          <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff} · {vehicleLabel}</Text>
         </View>
         <Text style={styles.rowPrice}>{price}</Text>
       </View>
@@ -486,7 +612,7 @@ function DeliveryRow({
         ) : (
           <View style={styles.rowStat}>
             <MaterialIcons name="my-location" size={12} color="#007B8B" />
-            <Text style={[styles.rowStatText, { color: "#007B8B", fontWeight: "700" }]}>Vous êtes à {delivery.distanceKm.toFixed(1)} km</Text>
+            <Text style={[styles.rowStatText, { color: "#007B8B", fontWeight: "700" }]}>Vous êtes à {driverDistanceText}</Text>
           </View>
         )}
         <View style={styles.rowActions}>
@@ -496,6 +622,14 @@ function DeliveryRow({
           {isSender ? (
             <Pressable onPress={onDetails} style={({ pressed }) => [styles.rowBtnFilled, pressed && styles.pressed]}>
               <Text style={styles.rowBtnFilledText}>Suivre</Text>
+            </Pressable>
+          ) : isOwnActive ? (
+            <Pressable
+              onPress={() => openNavigation(delivery.pickup, delivery.dropoff)}
+              style={({ pressed }) => [styles.rowBtnFilled, pressed && styles.pressed]}
+            >
+              <MaterialIcons name="navigation" size={12} color="#FFFFFF" />
+              <Text style={styles.rowBtnFilledText}>Démarrer</Text>
             </Pressable>
           ) : mayApply ? (
             <Pressable
@@ -526,15 +660,17 @@ const styles = StyleSheet.create({
 
   searchRow: { position: "absolute", top: 8, left: 14, right: 14, flexDirection: "row", alignItems: "center", gap: 8, zIndex: 10 },
   searchPill: { flex: 1, height: 40, borderRadius: 12, backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  searchPillOffline: { backgroundColor: "#F3F2F6" },
+  searchDivider: { width: 1, height: 22, backgroundColor: "#D7D5DE" },
+  searchInput: { flex: 1, color: "#111111", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
   searchPillText: { color: "#666666", fontSize: 13 },
   searchBtn: { width: 40, height: 40, borderRadius: 12, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  onlineToggle: { flexDirection: "row", alignItems: "center", gap: 6 },
 
-  onlinePill: { flex: 1, height: 40, borderRadius: 12, backgroundColor: "#007B8B", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  onlinePillOffline: { backgroundColor: "#FFFFFF" },
-  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FFFFFF" },
-  onlineDotOffline: { backgroundColor: "#747474" },
   onlinePillText: { color: "#FFFFFF", fontSize: 12, fontWeight: "600" },
   onlinePillTextOffline: { color: "#111111" },
+  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FFFFFF" },
+  onlineDotOffline: { backgroundColor: "#747474" },
 
   fab: { position: "absolute", right: 14, bottom: 360, width: 50, height: 50, borderRadius: 14, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", shadowColor: "#007B8B", shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6, zIndex: 10 },
 
@@ -596,7 +732,7 @@ const styles = StyleSheet.create({
   rowActions: { marginLeft: "auto", flexDirection: "row", gap: 6 },
   rowBtnOutline: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
   rowBtnOutlineText: { color: "#111111", fontSize: 10.5, fontWeight: "600" },
-  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#007B8B", minWidth: 60, alignItems: "center" },
+  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#007B8B", minWidth: 64, alignItems: "center", flexDirection: "row", gap: 4, justifyContent: "center" },
   rowBtnFilledText: { color: "#FFFFFF", fontSize: 10.5, fontWeight: "700" },
 
   loadingState: { alignItems: "center", paddingVertical: 32, gap: 8 },

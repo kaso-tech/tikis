@@ -277,3 +277,6 @@
 - [x] Récupérer la dernière version Git partagée et comparer l’état local.
 - [x] Vérifier les dépendances modifiées, relancer Expo et valider la dernière version.
 - [x] Corriger la métadonnée de statut draft manquante dans les écrans d’accueil synchronisés.
+- [x] Récupérer la dernière référence Git, vérifier les dépendances et relancer Expo.
+- [x] Valider la compilation, les tests et les services avant la livraison.
+- [x] Rétablir le statut draft requis dans les cartes d’accueil et reconstruire Metro après le rebase.
