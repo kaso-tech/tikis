@@ -331,4 +331,4 @@
 - [x] Synchroniser le projet et auditer l’indicateur de distance ainsi que les capteurs d’orientation utilisables.
 - [x] Transformer l’icône de proximité native en boussole qui suit instantanément l’orientation du téléphone vers la collecte.
 - [x] Prévoir un repli web accessible et valider la boussole avec les cartes existantes.
-- [ ] Tester, relancer Expo, pousser vers GitHub et livrer la boussole dynamique.
+- [x] Tester, relancer Expo, pousser vers GitHub et livrer la boussole dynamique.
