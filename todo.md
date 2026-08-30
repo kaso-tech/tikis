@@ -367,3 +367,5 @@
 - [x] Propager les mouvements de commission dans le cache Wallet immédiatement après candidature, annulation ou confirmation.
 - [x] Exclure les dépôts des gains et des indicateurs d’activité de livraison.
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer la correction comptable.
+- [x] Sécuriser l’état local, récupérer la dernière branche main et vérifier les dépendances modifiées.
+- [x] Relancer Expo, valider la compilation et les services, puis livrer la version synchronisée.
