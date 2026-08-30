@@ -212,43 +212,6 @@ export default function ProfileScreen() {
           )}
         </Section>
 
-        <Section title="Préférences">
-          {!driver ? (
-            <MenuRow
-              icon="notifications-none"
-              iconBg="primary"
-              label="Notifications"
-              sub={unread ? `${unread} nouvelle${unread > 1 ? "s" : ""}` : "À jour"}
-              badge={unread > 0 ? { label: String(unread), tone: "danger" } : undefined}
-              onPress={markNotificationsRead}
-            />
-          ) : null}
-          {driver ? (
-            <MenuRow
-              icon="account-balance-wallet"
-              iconBg="dark"
-              label="Mon wallet"
-              sub={availableBalance > 0 ? `${new Intl.NumberFormat("fr-FR").format(availableBalance)} F CFA disponibles` : "Wallet momentanément indisponible"}
-              onPress={() => router.push("/(tabs)/wallet" as any)}
-            />
-          ) : null}
-          <MenuRow
-            icon="shield"
-            iconBg="dark"
-            label={driver ? "Compte vérifié" : "Sécurité du compte"}
-            sub={driver ? "Profil livreur confirmé" : "Numéro vérifié par OTP"}
-            onPress={() => Alert.alert(driver ? "Compte vérifié" : "Sécurité Tikis", driver ? "Votre profil livreur a été validé par nos équipes." : "Votre numéro est vérifié par OTP et vos informations personnelles sont validées côté serveur.")}
-            last
-          />
-        </Section>
-
-        <Section title="Légal & support">
-          <MenuRow icon="help-outline" iconBg="primary" label="FAQ" sub="Réponses aux questions courantes" onPress={() => router.push("/faq" as any)} />
-          <MenuRow icon="support-agent" iconBg="primary" label="Contactez-nous" sub="Support direct Tikis" onPress={() => router.push("/contact" as any)} />
-          <MenuRow icon="description" iconBg="primary" label="Conditions d'utilisation" onPress={() => router.push("/legal/terms" as any)} />
-          <MenuRow icon="privacy-tip" iconBg="primary" label="Politique de confidentialité" onPress={() => router.push("/legal/privacy" as any)} last />
-        </Section>
-
         <Pressable onPress={openLogoutConfirmation} style={({ pressed }) => [styles.logout, pressed && styles.pressed]}>
           <MaterialIcons name="logout" size={16} color="#B4232D" />
           <Text style={styles.logoutText}>Se déconnecter</Text>
