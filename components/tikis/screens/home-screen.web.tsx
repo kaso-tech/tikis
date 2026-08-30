@@ -9,7 +9,9 @@ import { formatListRouteParts } from "@/lib/geo-rules";
 import { useDriverLocation } from "@/hooks/use-driver-location";
 import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
-import { availableWalletBalance, formatMoney, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
+import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
+import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
+import { availableWalletBalance, commissionFor, formatMoney, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
 
 const SHEET_MIN = 130;
 const SHEET_PEEK = 420;
@@ -33,6 +35,9 @@ const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: st
 };
 
 type FilterKey = "all" | "active" | "open" | "pending" | "completed";
+type PendingHomeAction =
+  | { kind: "cancel"; delivery: Delivery }
+  | { kind: "select"; delivery: Delivery; candidate: DriverCandidate };
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "Toutes" },
@@ -81,7 +86,7 @@ export function HomeScreen() {
   const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 10_000 });
   const deliveries = useMemo(() => deliveriesQuery.data ?? [], [deliveriesQuery.data]);
 
-  const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 12_000 });
+  const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 12_000, refetchOnMount: "always", refetchOnWindowFocus: true });
   const driverWallet = walletQuery.data?.wallet;
 
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -90,6 +95,8 @@ export function HomeScreen() {
   const [driverOnline, setDriverOnline] = useState(true);
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [candidateDelivery, setCandidateDelivery] = useState<Delivery | null>(null);
+  const [applicationDelivery, setApplicationDelivery] = useState<Delivery | null>(null);
+  const [pendingAction, setPendingAction] = useState<PendingHomeAction | null>(null);
   const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
   const sheetValue = useRef(SHEET_PEEK);
   const dragStartHeight = useRef(SHEET_PEEK);
@@ -176,16 +183,37 @@ export function HomeScreen() {
     { enabled: Boolean(candidateDelivery?.id) },
   );
 
-  async function handleApply(deliveryId: string) {
-    setApplyingId(deliveryId);
+  const applicationCommission = (delivery: Delivery) => {
+    const rate = walletQuery.data?.commissionRate;
+    if (!Number.isFinite(rate) || !rate || rate <= 0 || rate >= 1) return null;
+    return commissionFor(delivery.offeredPrice ?? delivery.estimatedPrice, { rate, currency: "FCFA" });
+  };
+
+  function requestApply(delivery: Delivery) {
+    const commission = applicationCommission(delivery);
+    if (!driverWallet || commission === null) {
+      Alert.alert("Wallet indisponible", "Votre solde doit être chargé avant de pouvoir candidater. Réessayez dans un instant.");
+      return;
+    }
+    if (availableWalletBalance(driverWallet) < commission) {
+      Alert.alert("Solde insuffisant", `Votre solde disponible doit couvrir la commission de ${formatMoney(commission)} pour candidater.`);
+      return;
+    }
+    setApplicationDelivery(delivery);
+  }
+
+  async function handleApply(delivery: Delivery) {
+    setApplyingId(delivery.id);
     try {
-      await applyMutation.mutateAsync({ deliveryId });
+      await applyMutation.mutateAsync({ deliveryId: delivery.id });
       await Promise.all([
         utilities.deliveries.list.invalidate(),
         utilities.wallet.snapshot.invalidate(),
         utilities.notifications.list.invalidate(),
       ]);
-    } catch {
+      setApplicationDelivery(null);
+    } catch (cause) {
+      Alert.alert("Candidature indisponible", cause instanceof Error ? cause.message : "Réessayez dans un instant.");
     } finally {
       setApplyingId(null);
     }
@@ -196,6 +224,7 @@ export function HomeScreen() {
     try {
       await cancelMutation.mutateAsync({ deliveryId: delivery.id });
       await Promise.all([utilities.deliveries.list.invalidate(), utilities.notifications.list.invalidate()]);
+      setPendingAction(null);
     } catch (cause) {
       Alert.alert("Annulation indisponible", cause instanceof Error ? cause.message : "Réessayez dans un instant.");
     } finally {
@@ -205,10 +234,7 @@ export function HomeScreen() {
 
   function handleSenderAction(delivery: Delivery) {
     if (delivery.status === "open" && delivery.candidateCount === 0) {
-      Alert.alert("Annuler cette livraison ?", "La livraison sera retirée et ne recevra plus de candidatures.", [
-        { text: "Conserver", style: "cancel" },
-        { text: "Annuler la livraison", style: "destructive", onPress: () => void cancelSenderDelivery(delivery) },
-      ]);
+      setPendingAction({ kind: "cancel", delivery });
       return;
     }
     if (delivery.status === "open" && (delivery.candidateCount ?? 0) > 0) {
@@ -227,12 +253,18 @@ export function HomeScreen() {
     try {
       await selectCandidateMutation.mutateAsync({ deliveryId: candidateDelivery.id, candidateId: candidate.id });
       setCandidateDelivery(null);
-      await Promise.all([utilities.deliveries.list.invalidate(), utilities.notifications.list.invalidate()]);
+      await Promise.all([utilities.deliveries.list.invalidate(), utilities.wallet.snapshot.invalidate(), utilities.notifications.list.invalidate()]);
+      setPendingAction(null);
     } catch (cause) {
       Alert.alert("Sélection indisponible", cause instanceof Error ? cause.message : "Réessayez dans un instant.");
     } finally {
       setApplyingId(null);
     }
+  }
+
+  function requestCandidateSelection(candidate: DriverCandidate) {
+    if (!candidateDelivery) return;
+    setPendingAction({ kind: "select", delivery: candidateDelivery, candidate });
   }
 
   const isDriver = role === "driver";
@@ -341,7 +373,7 @@ export function HomeScreen() {
               applying={applyingId === selected.id}
               onPress={() => {}}
               onDetails={() => router.push(`/delivery/${selected.id}` as any)}
-              onApply={() => handleApply(selected.id)}
+              onApply={() => requestApply(selected)}
             />
           ) : (
             <UrgentCard
@@ -365,7 +397,7 @@ export function HomeScreen() {
                   applying={applyingId === delivery.id}
                   onPress={() => setSelectedId(delivery.id)}
                   onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
-                  onApply={() => isDriver ? void handleApply(delivery.id) : handleSenderAction(delivery)}
+                  onApply={() => isDriver ? requestApply(delivery) : handleSenderAction(delivery)}
                 />
               ))}
             </View>
@@ -378,8 +410,26 @@ export function HomeScreen() {
         deliveryStatus={candidateDelivery?.status ?? "open"}
         loadingId={applyingId}
         onClose={() => setCandidateDelivery(null)}
-        onChoose={(candidate) => void chooseCandidate(candidate)}
+        onChoose={requestCandidateSelection}
       />
+      {applicationDelivery ? (
+        <FinancialConfirmationModal
+          visible
+          title="Envoyer votre candidature"
+          description="La commission Tikis sera temporairement réservée sur votre Wallet. Elle ne sera prélevée qu’après votre sélection et votre confirmation."
+          amount={applicationCommission(applicationDelivery) ?? 0}
+          confirmLabel="Confirmer ma candidature"
+          loading={applyingId === applicationDelivery.id}
+          onCancel={() => !applyingId && setApplicationDelivery(null)}
+          onConfirm={() => void handleApply(applicationDelivery)}
+        />
+      ) : null}
+      {pendingAction?.kind === "cancel" ? (
+        <ActionConfirmationModal visible title="Annuler cette livraison ?" description="La livraison sera retirée et ne recevra plus de candidatures." confirmLabel="Annuler la livraison" icon="cancel" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void cancelSenderDelivery(pendingAction.delivery)} />
+      ) : null}
+      {pendingAction?.kind === "select" ? (
+        <ActionConfirmationModal visible title="Choisir ce livreur ?" description={`${pendingAction.candidate.name} recevra votre demande de confirmation. Aucun montant ne sera débité du Wallet expéditeur.`} confirmLabel="Choisir" icon="person" tone="primary" loading={applyingId === pendingAction.candidate.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void chooseCandidate(pendingAction.candidate)} />
+      ) : null}
     </SafeAreaView>
   );
 }

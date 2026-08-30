@@ -95,6 +95,15 @@ describe("livraisons persistées Tikis", () => {
     expect(dbMock.applyForTikisDelivery).toHaveBeenCalledWith(expect.objectContaining({ deliveryId, driverPhone: driver.phone }));
   });
 
+  it("sélectionne un livreur sans consulter le Wallet de l’expéditeur", async () => {
+    dbMock.getTikisProfileByPhone.mockResolvedValue(sender);
+    dbMock.selectTikisDeliveryCandidateWithWallet.mockResolvedValue(undefined);
+    const caller = appRouter.createCaller(contextFor(sender.phone));
+    await expect(caller.deliveries.selectCandidate({ deliveryId, candidateId: "3d487499-19e9-4f5e-a9c8-8777af588997" })).resolves.toBeUndefined();
+    expect(dbMock.selectTikisDeliveryCandidateWithWallet).toHaveBeenCalledWith(deliveryId, "3d487499-19e9-4f5e-a9c8-8777af588997", sender.phone);
+    expect(dbMock.getTikisWalletSnapshot).not.toHaveBeenCalled();
+  });
+
   it("réserve la modification d’une livraison à son expéditeur connecté", async () => {
     dbMock.getTikisProfileByPhone.mockResolvedValue(sender);
     dbMock.updateTikisDeliveryFromSender.mockResolvedValue(undefined);

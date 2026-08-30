@@ -355,3 +355,7 @@
 - [x] Synchroniser le projet et recenser les icônes de fiche, footer et menu latéral encore hors charte.
 - [x] Appliquer le brun doré aux icônes actives et aux repères de navigation concernés.
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer la correction chromatique des icônes.
+- [x] Synchroniser le projet et auditer les flux Wallet, candidatures et sélection depuis l’accueil.
+- [x] Corriger la mise à jour du Wallet et la sélection expéditeur sans contrôle de solde indu.
+- [x] Ajouter les confirmations et contrôles de solde requis aux actions de l’accueil.
+- [ ] Tester, relancer Expo, pousser vers GitHub et livrer les corrections financières.

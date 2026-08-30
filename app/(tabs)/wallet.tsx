@@ -31,11 +31,12 @@ const TONE_COLOR: Record<Tone, string> = {
 
 export default function WalletScreen() {
   const { role, profile } = useTikisStore();
-  const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 12_000 });
+  const utilities = trpc.useUtils();
+  const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 12_000, refetchOnMount: "always", refetchOnWindowFocus: true });
   const wallet = walletQuery.data?.wallet;
   const journal = walletQuery.data?.journal ?? [];
   const initiateMutation = trpc.wallet.initiateLigdiSimulation.useMutation();
-  const settleMutation = trpc.wallet.settleLigdiSimulation.useMutation({ onSuccess: () => void walletQuery.refetch() });
+  const settleMutation = trpc.wallet.settleLigdiSimulation.useMutation();
   const [requestType, setRequestType] = useState<"deposit" | "withdrawal" | null>(null);
   const [amountInput, setAmountInput] = useState("");
   const [requestError, setRequestError] = useState("");
@@ -86,6 +87,12 @@ export default function WalletScreen() {
     if (!payment) return;
     try {
       await settleMutation.mutateAsync({ paymentId: payment.id, outcome });
+      await Promise.all([
+        utilities.wallet.snapshot.invalidate(),
+        utilities.deliveries.list.invalidate(),
+        utilities.notifications.list.invalidate(),
+      ]);
+      await walletQuery.refetch();
       setPayment(null); setRequestType(null); setAmountInput("");
     } catch (cause) { setRequestError(cause instanceof Error ? cause.message : "La confirmation Ligdi Cash a échoué."); }
   }

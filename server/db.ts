@@ -758,10 +758,7 @@ export async function selectTikisDeliveryCandidateWithWallet(deliveryId: string,
     const chosen = (await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.id, candidateId), eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.status, "applied"))).limit(1).for("update"))[0];
     if (!chosen) throw new Error("Cette candidature n’est plus sélectionnable.");
     const priorDriverPhone = delivery.driverPhone;
-    const targetCommission = delivery.accruedCommission ?? chosen.commissionBlocked;
-    const difference = targetCommission - chosen.commissionBlocked;
-    if (difference > 0) await applyWalletMovement(tx, { profilePhone: chosen.driverPhone, deliveryId, operation: "block", amount: difference, availableDelta: -difference, heldDelta: difference, reason: "Ajustement de commission avant sélection", idempotencyKey: `${chosen.id}:selection-block:${targetCommission}` });
-    if (difference < 0) await applyWalletMovement(tx, { profilePhone: chosen.driverPhone, deliveryId, operation: "unblock", amount: -difference, availableDelta: -difference, heldDelta: difference, reason: "Ajustement de commission avant sélection", idempotencyKey: `${chosen.id}:selection-unblock:${targetCommission}` });
+    const targetCommission = chosen.commissionBlocked;
     const appliedCandidates = await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.status, "applied"))).for("update");
     for (const candidate of appliedCandidates) if (candidate.id !== chosen.id) {
       await releaseCandidateCommission(tx, candidate, "Commission débloquée après sélection d’un autre livreur", `release:${chosen.id}`);
@@ -772,11 +769,10 @@ export async function selectTikisDeliveryCandidateWithWallet(deliveryId: string,
       await tx.update(tikisDeliveryCandidates).set({ status: "replaced", updatedAt: new Date() }).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, priorDriverPhone), eq(tikisDeliveryCandidates.status, "confirmed")));
       await appendDeliveryEvent(tx, { deliveryId, eventType: "driver_replaced", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: priorDriverPhone, title: "Vous avez été remplacé", body: "Votre commission Tikis a été intégralement compensée.", tone: "warning", idempotencyKey: `${deliveryId}:replaced:${priorDriverPhone}:${chosen.id}` });
     }
-    await applyWalletMovement(tx, { profilePhone: chosen.driverPhone, deliveryId, operation: "debit", amount: targetCommission, availableDelta: 0, heldDelta: -targetCommission, reason: "Commission Tikis définitivement prélevée après sélection", idempotencyKey: `${deliveryId}:commission-debit:${chosen.id}` });
     await tx.update(tikisDeliveryCandidates).set({ status: "selected", commissionBlocked: targetCommission, updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, chosen.id));
     await tx.update(tikisDeliveries).set({ status: "pending_confirmation", driverPhone: chosen.driverPhone, ...(priorDriverPhone ? { previousDriverPhone: priorDriverPhone } : {}), ...(chosen.offerPrice ? { offeredPrice: chosen.offerPrice } : {}), accruedCommission: targetCommission, selectedAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
-    await appendDeliveryEvent(tx, { deliveryId, eventType: priorDriverPhone ? "driver_replaced" : "driver_selected", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: senderPhone, title: priorDriverPhone ? "Livreur remplacé" : "Livreur sélectionné", body: "La mise en relation est confirmée et la commission Tikis devient acquise.", tone: "success", idempotencyKey: `${deliveryId}:sender-selected:${chosen.id}` });
-    await appendDeliveryEvent(tx, { deliveryId, eventType: priorDriverPhone ? "driver_replaced" : "driver_selected", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: chosen.driverPhone, title: priorDriverPhone ? "Vous êtes le nouveau livreur" : "Vous avez été sélectionné", body: "Votre commission Tikis a été prélevée ; confirmez votre disponibilité.", tone: "success", idempotencyKey: `${deliveryId}:driver-selected:${chosen.id}` });
+    await appendDeliveryEvent(tx, { deliveryId, eventType: priorDriverPhone ? "driver_replaced" : "driver_selected", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: senderPhone, title: priorDriverPhone ? "Livreur remplacé" : "Livreur sélectionné", body: "Aucun montant n’est demandé au Wallet de l’expéditeur. Le livreur doit confirmer sa disponibilité.", tone: "success", idempotencyKey: `${deliveryId}:sender-selected:${chosen.id}` });
+    await appendDeliveryEvent(tx, { deliveryId, eventType: priorDriverPhone ? "driver_replaced" : "driver_selected", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: chosen.driverPhone, title: priorDriverPhone ? "Vous êtes le nouveau livreur" : "Vous avez été sélectionné", body: "Votre commission reste réservée et sera prélevée lorsque vous confirmerez votre disponibilité.", tone: "success", idempotencyKey: `${deliveryId}:driver-selected:${chosen.id}` });
   });
   return getTikisDeliveryById(deliveryId);
 }
@@ -787,8 +783,24 @@ export async function confirmTikisDeliveryWithEvents(deliveryId: string, driverP
   await db.transaction(async (tx) => {
     const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.driverPhone, driverPhone), eq(tikisDeliveries.status, "pending_confirmation"))).limit(1).for("update"))[0];
     if (!delivery) throw new Error("Cette livraison ne peut pas être confirmée.");
-    const result = await tx.update(tikisDeliveryCandidates).set({ status: "confirmed", updatedAt: new Date() }).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, driverPhone), eq(tikisDeliveryCandidates.status, "selected")));
-    if (result[0].affectedRows !== 1) throw new Error("Votre candidature ne peut pas être confirmée.");
+    const candidate = (await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, driverPhone), eq(tikisDeliveryCandidates.status, "selected"))).limit(1).for("update"))[0];
+    if (!candidate) throw new Error("Votre candidature ne peut pas être confirmée.");
+    const commission = delivery.accruedCommission ?? candidate.commissionBlocked;
+    if (commission > 0) {
+      const wallet = await ensureTikisWallet(tx, driverPhone);
+      const usesReservation = wallet.heldBalance >= commission;
+      await applyWalletMovement(tx, {
+        profilePhone: driverPhone,
+        deliveryId,
+        operation: "debit",
+        amount: commission,
+        availableDelta: usesReservation ? 0 : -commission,
+        heldDelta: usesReservation ? -commission : 0,
+        reason: "Commission Tikis prélevée après confirmation de disponibilité",
+        idempotencyKey: `${deliveryId}:${usesReservation ? "commission-debit" : "commission-direct-debit"}:${candidate.id}`,
+      });
+    }
+    await tx.update(tikisDeliveryCandidates).set({ status: "confirmed", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, candidate.id));
     await tx.update(tikisDeliveries).set({ status: "active", confirmedAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_active", status: "active", actorPhone: driverPhone, recipientPhone: driverPhone, title: "Livraison activée", body: "Votre disponibilité est confirmée. Le suivi de la livraison est actif.", tone: "success", idempotencyKey: `${deliveryId}:active-driver` });
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_active", status: "active", actorPhone: driverPhone, recipientPhone: delivery.senderPhone, title: "Livreur en route", body: "Le livreur a confirmé sa disponibilité ; le suivi est maintenant actif.", tone: "success", idempotencyKey: `${deliveryId}:active-sender` });
