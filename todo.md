@@ -369,3 +369,8 @@
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer la correction comptable.
 - [x] Sécuriser l’état local, récupérer la dernière branche main et vérifier les dépendances modifiées.
 - [x] Relancer Expo, valider la compilation et les services, puis livrer la version synchronisée.
+- [x] Synchroniser le projet et établir une matrice des parcours postulation, contre-proposition, renonciation, confirmation et annulation.
+- [x] Tracer les composants réellement rendus sur l’accueil et les snapshots Wallet retournés par chaque action.
+- [x] Corriger les mouvements de commission et rendre le popup de candidature impossible à contourner.
+- [x] Ajouter des régressions couvrant chaque parcours financier signalé.
+- [ ] Relancer Expo, vérifier les services, pousser vers GitHub et livrer la correction auditée.

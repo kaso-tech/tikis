@@ -12,6 +12,7 @@ import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
 import { availableWalletBalance, commissionFor, formatMoney, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
+import { resolveDriverHomeAction } from "@/shared/delivery-home-action";
 
 const SHEET_MIN = 130;
 const SHEET_PEEK = 420;
@@ -36,6 +37,8 @@ const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: st
 
 type FilterKey = "all" | "active" | "open" | "pending" | "completed";
 type PendingHomeAction =
+  | { kind: "withdraw"; delivery: Delivery }
+  | { kind: "confirm"; delivery: Delivery }
   | { kind: "cancel"; delivery: Delivery }
   | { kind: "select"; delivery: Delivery; candidate: DriverCandidate };
 
@@ -176,6 +179,8 @@ export function HomeScreen() {
 
   const utilities = trpc.useUtils();
   const applyMutation = trpc.deliveries.submitApplication.useMutation();
+  const withdrawMutation = trpc.deliveries.withdraw.useMutation();
+  const confirmMutation = trpc.deliveries.confirm.useMutation();
   const cancelMutation = trpc.deliveries.cancel.useMutation();
   const selectCandidateMutation = trpc.deliveries.selectCandidate.useMutation();
   const candidatesQuery = trpc.deliveries.candidates.useQuery(
@@ -202,10 +207,29 @@ export function HomeScreen() {
     setApplicationDelivery(delivery);
   }
 
+  function requestDriverAction(delivery: Delivery) {
+    const action = resolveDriverHomeAction(delivery);
+    if (action === "withdraw") {
+      setPendingAction({ kind: "withdraw", delivery });
+      return;
+    }
+    if (action === "confirm") {
+      setPendingAction({ kind: "confirm", delivery });
+      return;
+    }
+    if (action === "start") {
+      Alert.alert("Navigation mobile", "Démarrez la navigation externe depuis votre téléphone.");
+      return;
+    }
+    if (action === "apply") requestApply(delivery);
+  }
+
   async function handleApply(delivery: Delivery) {
     setApplyingId(delivery.id);
     try {
-      const result = await applyMutation.mutateAsync({ deliveryId: delivery.id });
+      const confirmedCommission = applicationCommission(delivery);
+      if (confirmedCommission === null) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
+      const result = await applyMutation.mutateAsync({ deliveryId: delivery.id, confirmedCommission });
       utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
       await Promise.all([
         utilities.deliveries.list.invalidate(),
@@ -215,6 +239,26 @@ export function HomeScreen() {
       setApplicationDelivery(null);
     } catch (cause) {
       Alert.alert("Candidature indisponible", cause instanceof Error ? cause.message : "Réessayez dans un instant.");
+    } finally {
+      setApplyingId(null);
+    }
+  }
+
+  async function executeDriverAction(action: Extract<PendingHomeAction, { kind: "withdraw" | "confirm" }>) {
+    setApplyingId(action.delivery.id);
+    try {
+      const result = action.kind === "withdraw"
+        ? await withdrawMutation.mutateAsync({ deliveryId: action.delivery.id })
+        : await confirmMutation.mutateAsync({ deliveryId: action.delivery.id });
+      utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
+      await Promise.all([
+        utilities.deliveries.list.invalidate(),
+        utilities.wallet.snapshot.invalidate(),
+        utilities.notifications.list.invalidate(),
+      ]);
+      setPendingAction(null);
+    } catch (cause) {
+      Alert.alert("Action indisponible", cause instanceof Error ? cause.message : "Réessayez dans un instant.");
     } finally {
       setApplyingId(null);
     }
@@ -374,7 +418,7 @@ export function HomeScreen() {
               applying={applyingId === selected.id}
               onPress={() => {}}
               onDetails={() => router.push(`/delivery/${selected.id}` as any)}
-              onApply={() => requestApply(selected)}
+              onApply={() => requestDriverAction(selected)}
             />
           ) : (
             <UrgentCard
@@ -398,7 +442,7 @@ export function HomeScreen() {
                   applying={applyingId === delivery.id}
                   onPress={() => setSelectedId(delivery.id)}
                   onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
-                  onApply={() => isDriver ? requestApply(delivery) : handleSenderAction(delivery)}
+                  onApply={() => isDriver ? requestDriverAction(delivery) : handleSenderAction(delivery)}
                 />
               ))}
             </View>
@@ -427,6 +471,12 @@ export function HomeScreen() {
       ) : null}
       {pendingAction?.kind === "cancel" ? (
         <ActionConfirmationModal visible title="Annuler cette livraison ?" description="La livraison sera retirée et ne recevra plus de candidatures." confirmLabel="Annuler la livraison" icon="cancel" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void cancelSenderDelivery(pendingAction.delivery)} />
+      ) : null}
+      {pendingAction?.kind === "withdraw" ? (
+        <ActionConfirmationModal visible title="Renoncer à cette candidature ?" description="Votre candidature sera retirée et la commission réservée redeviendra immédiatement disponible." confirmLabel="Renoncer" icon="undo" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
+      ) : null}
+      {pendingAction?.kind === "confirm" ? (
+        <ActionConfirmationModal visible title="Confirmer cette mission ?" description="La commission réservée sera prélevée et la livraison passera en cours." confirmLabel="Confirmer" icon="check-circle" tone="success" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
       ) : null}
       {pendingAction?.kind === "select" ? (
         <ActionConfirmationModal visible title="Choisir ce livreur ?" description={`${pendingAction.candidate.name} recevra votre demande de confirmation. Aucun montant ne sera débité du Wallet expéditeur.`} confirmLabel="Choisir" icon="person" tone="primary" loading={applyingId === pendingAction.candidate.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void chooseCandidate(pendingAction.candidate)} />

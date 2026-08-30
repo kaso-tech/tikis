@@ -115,7 +115,8 @@ export default function DeliveryDetailScreen() {
     setProcessing(true);
     try {
       if (action === "apply") {
-        const result = await applyMutation.mutateAsync({ deliveryId });
+        if (!actionConfig?.amount) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
+        const result = await applyMutation.mutateAsync({ deliveryId, confirmedCommission: actionConfig.amount });
         utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
       }
       if (action === "withdraw") {
@@ -170,7 +171,9 @@ export default function DeliveryDetailScreen() {
     if (!amount || inputError) { setCounterError(inputError ?? "Saisissez un prix valide."); return; }
     setCounterLoading(true); setCounterError("");
     try {
-      const result = await applyMutation.mutateAsync({ deliveryId, offerPrice: amount });
+      const commissionRate = walletQuery.data?.commissionRate;
+      if (!commissionRate) throw new Error("La commission doit être chargée avant d’envoyer la contre-proposition.");
+      const result = await applyMutation.mutateAsync({ deliveryId, offerPrice: amount, confirmedCommission: Math.round(amount * commissionRate) });
       utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
       await refreshDelivery();
       setCounterVisible(false); setMessage("Votre contre-proposition a été envoyée à l’expéditeur."); haptic.success();

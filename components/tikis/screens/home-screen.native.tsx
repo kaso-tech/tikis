@@ -16,6 +16,7 @@ import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
 import { availableWalletBalance, commissionFor, formatMoney, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
+import { resolveDriverHomeAction } from "@/shared/delivery-home-action";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 const SHEET_MIN = 130;
@@ -203,7 +204,8 @@ export function HomeScreen() {
   };
 
   function requestDriverAction(delivery: Delivery) {
-    if (!delivery.ownCandidateStatus && delivery.status === "open") {
+    const action = resolveDriverHomeAction(delivery);
+    if (action === "apply") {
       const commission = applicationCommission(delivery);
       if (!driverWallet || commission === null) {
         Alert.alert("Wallet indisponible", "Votre solde doit être chargé avant de pouvoir candidater. Réessayez dans un instant.");
@@ -216,15 +218,15 @@ export function HomeScreen() {
       setApplicationDelivery(delivery);
       return;
     }
-    if (delivery.ownCandidateStatus === "applied") {
+    if (action === "withdraw") {
       setPendingAction({ kind: "withdraw", delivery });
       return;
     }
-    if (delivery.ownCandidateStatus === "selected") {
+    if (action === "confirm") {
       setPendingAction({ kind: "confirm", delivery });
       return;
     }
-    void executeDriverAction(delivery);
+    if (action === "start") void executeDriverAction(delivery);
   }
 
   async function executeDriverAction(delivery: Delivery) {
@@ -248,7 +250,9 @@ export function HomeScreen() {
         openNavigation(origin, delivery.pickup, delivery.dropoff);
         return;
       } else {
-        const result = await applyMutation.mutateAsync({ deliveryId: delivery.id });
+        const confirmedCommission = applicationCommission(delivery);
+        if (confirmedCommission === null) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
+        const result = await applyMutation.mutateAsync({ deliveryId: delivery.id, confirmedCommission });
         utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
         setApplicationDelivery(null);
       }

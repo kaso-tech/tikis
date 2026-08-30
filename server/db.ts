@@ -4,6 +4,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisDelivery, TikisDeliveryCandidate, TikisPlace, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryReviews, tikisFavoritePlaces, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisWalletLedger, tikisWallets, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppNotification, LocationLabel, SelectableVehicleType, WalletOperation, WalletSnapshot } from "../shared/tikis-domain";
+import { candidateMovementVersion } from "../shared/wallet-commission";
 import { DELIVERY_EXPIRATION_MS } from "../shared/delivery-expiration";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -537,7 +538,7 @@ export async function markTikisDeliveryEventsRead(profilePhone: string) {
   return { success: true } as const;
 }
 
-export async function applyForTikisDelivery(input: { id: string; deliveryId: string; driverPhone: string; offerPrice?: number }) {
+export async function applyForTikisDelivery(input: { id: string; deliveryId: string; driverPhone: string; confirmedCommission: number; offerPrice?: number }) {
   const db = await getDb();
   if (!db) throw new Error("Les candidatures sont temporairement indisponibles.");
   const wallet = await db.transaction(async (tx) => {
@@ -551,13 +552,14 @@ export async function applyForTikisDelivery(input: { id: string; deliveryId: str
     if (!Number.isFinite(rate) || rate <= 0 || rate >= 1) throw new Error("Le taux de commission configuré est invalide.");
     const price = input.offerPrice ?? delivery.offeredPrice ?? delivery.estimatedPrice;
     const commission = Math.round(price * rate);
+    if (input.confirmedCommission !== commission) throw new Error("La commission a changé. Vérifiez le montant puis confirmez à nouveau votre candidature.");
     const candidates = await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, input.deliveryId), eq(tikisDeliveryCandidates.driverPhone, input.driverPhone))).limit(1).for("update");
     const existing = candidates[0];
     if (existing && (existing.status === "selected" || existing.status === "confirmed")) throw new Error("Cette candidature ne peut plus être modifiée.");
     const candidateId = existing?.id ?? input.id;
     const previousCommission = existing?.status === "applied" ? existing.commissionBlocked : 0;
     const delta = commission - previousCommission;
-    const movementVersion = existing?.status === "applied" ? `adjust:${previousCommission}` : "initial";
+    const movementVersion = candidateMovementVersion(existing);
     if (delta > 0) await applyWalletMovement(tx, { profilePhone: input.driverPhone, deliveryId: input.deliveryId, operation: "block", amount: delta, availableDelta: -delta, heldDelta: delta, reason: "Commission temporairement bloquée pour candidature", idempotencyKey: `${candidateId}:block:${movementVersion}:${commission}` });
     if (delta < 0) await applyWalletMovement(tx, { profilePhone: input.driverPhone, deliveryId: input.deliveryId, operation: "unblock", amount: -delta, availableDelta: -delta, heldDelta: delta, reason: "Ajustement de la commission bloquée", idempotencyKey: `${candidateId}:unblock:${movementVersion}:${commission}` });
     if (existing) await tx.update(tikisDeliveryCandidates).set({ status: "applied", offerPrice: input.offerPrice ?? null, commissionBlocked: commission, updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, existing.id));
@@ -625,7 +627,7 @@ async function releaseAppliedCandidatesForSenderAction(
   } as const;
   const message = messages[action];
   for (const candidate of candidates) {
-    await releaseCandidateCommission(tx, candidate, message.reason, `${action}:release`);
+    await releaseCandidateCommission(tx, candidate, message.reason, `${action}:release:${candidate.updatedAt.getTime()}`);
     await tx.update(tikisDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, candidate.id));
     await appendDeliveryEvent(tx, {
       deliveryId: delivery.id,
@@ -750,7 +752,7 @@ export async function withdrawTikisDeliveryCandidateWithWallet(deliveryId: strin
     if (!candidate) throw new Error("Cette candidature ne peut plus être retirée.");
     const delivery = (await tx.select().from(tikisDeliveries).where(eq(tikisDeliveries.id, deliveryId)).limit(1))[0];
     if (!delivery) throw new Error("Livraison introuvable.");
-    await releaseCandidateCommission(tx, candidate, "Commission débloquée après retrait de candidature", "withdraw");
+    await releaseCandidateCommission(tx, candidate, "Commission débloquée après retrait de candidature", `withdraw:${candidate.updatedAt.getTime()}`);
     await tx.update(tikisDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, candidate.id));
     await appendDeliveryEvent(tx, { deliveryId, eventType: "candidate_withdrawn", status: "open", actorPhone: driverPhone, recipientPhone: driverPhone, title: "Candidature retirée", body: "Votre commission bloquée a été immédiatement libérée.", tone: "success", idempotencyKey: `${candidate.id}:withdraw-driver` });
     await appendDeliveryEvent(tx, { deliveryId, eventType: "candidate_withdrawn", status: "open", actorPhone: driverPhone, recipientPhone: delivery.senderPhone, title: "Candidature retirée", body: "Un livreur a retiré sa candidature.", tone: "info", idempotencyKey: `${candidate.id}:withdraw-sender` });
@@ -771,7 +773,7 @@ export async function selectTikisDeliveryCandidateWithWallet(deliveryId: string,
     const targetCommission = chosen.commissionBlocked;
     const appliedCandidates = await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.status, "applied"))).for("update");
     for (const candidate of appliedCandidates) if (candidate.id !== chosen.id) {
-      await releaseCandidateCommission(tx, candidate, "Commission débloquée après sélection d’un autre livreur", `release:${chosen.id}`);
+      await releaseCandidateCommission(tx, candidate, "Commission débloquée après sélection d’un autre livreur", `release:${chosen.id}:${candidate.updatedAt.getTime()}`);
       await appendDeliveryEvent(tx, { deliveryId, eventType: "candidate_not_selected", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: candidate.driverPhone, title: "Livreur non retenu", body: "Un autre livreur a été sélectionné ; votre commission bloquée a été libérée.", tone: "info", idempotencyKey: `${candidate.id}:not-selected:${chosen.id}` });
     }
     if (priorDriverPhone && delivery.accruedCommission) {

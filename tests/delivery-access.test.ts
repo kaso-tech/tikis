@@ -91,8 +91,16 @@ describe("livraisons persistées Tikis", () => {
     dbMock.getTikisProfileByPhone.mockResolvedValue(driver);
     dbMock.applyForTikisDelivery.mockRejectedValue(new Error("Vous ne pouvez pas candidater à votre propre livraison."));
     const caller = appRouter.createCaller(contextFor(driver.phone));
-    await expect(caller.deliveries.submitApplication({ deliveryId })).rejects.toThrow("propre livraison");
-    expect(dbMock.applyForTikisDelivery).toHaveBeenCalledWith(expect.objectContaining({ deliveryId, driverPhone: driver.phone }));
+    await expect(caller.deliveries.submitApplication({ deliveryId, confirmedCommission: 250 })).rejects.toThrow("propre livraison");
+    expect(dbMock.applyForTikisDelivery).toHaveBeenCalledWith(expect.objectContaining({ deliveryId, driverPhone: driver.phone, confirmedCommission: 250 }));
+  });
+
+  it("refuse une candidature sans montant de commission explicitement confirmé", async () => {
+    dbMock.getTikisProfileByPhone.mockResolvedValue(driver);
+    dbMock.applyForTikisDelivery.mockClear();
+    const caller = appRouter.createCaller(contextFor(driver.phone));
+    await expect(caller.deliveries.submitApplication({ deliveryId } as never)).rejects.toThrow();
+    expect(dbMock.applyForTikisDelivery).not.toHaveBeenCalled();
   });
 
   it("sélectionne un livreur sans consulter le Wallet de l’expéditeur", async () => {
