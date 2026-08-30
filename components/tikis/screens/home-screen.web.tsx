@@ -96,6 +96,7 @@ export function HomeScreen() {
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
   const sheetValue = useRef(SHEET_PEEK);
+  const dragStartHeight = useRef(SHEET_PEEK);
   const driverLocation = useDriverLocation({ enabled: role === "driver" });
 
   const filteredList = useMemo(() => {
@@ -148,26 +149,24 @@ export function HomeScreen() {
   }, [sheetHeight]);
 
   const animateSheetTo = (toValue: number) => {
-    Animated.spring(sheetHeight, { toValue, useNativeDriver: false, friction: 9, tension: 60 }).start();
+    Animated.timing(sheetHeight, { toValue, duration: 220, useNativeDriver: false }).start();
   };
 
   const panResponder = useRef(PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 6,
+    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 5 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+    onPanResponderGrant: () => { dragStartHeight.current = sheetValue.current; },
     onPanResponderMove: (_, gesture) => {
-      const current = sheetValue.current;
-      const next = Math.max(SHEET_MIN, Math.min(SHEET_EXPANDED, current - gesture.dy));
+      const next = Math.max(SHEET_MIN, Math.min(SHEET_EXPANDED, dragStartHeight.current - gesture.dy));
       sheetHeight.setValue(next);
     },
     onPanResponderRelease: (_, gesture) => {
       const current = sheetValue.current;
-      const range = SHEET_EXPANDED - SHEET_MIN;
-      const ratio = (current - SHEET_MIN) / range;
-      let target: number;
-      if (gesture.dy < -30) target = SHEET_EXPANDED;
-      else if (gesture.dy > 30) target = ratio < 0.25 ? SHEET_MIN : SHEET_PEEK;
-      else if (ratio > 0.66) target = SHEET_EXPANDED;
-      else if (ratio < 0.25) target = SHEET_MIN;
-      else target = SHEET_PEEK;
+      const targets = [SHEET_MIN, SHEET_PEEK, SHEET_EXPANDED];
+      const target = gesture.vy <= -0.65
+        ? SHEET_EXPANDED
+        : gesture.vy >= 0.65
+          ? SHEET_MIN
+          : targets.reduce((closest, snap) => Math.abs(snap - current) < Math.abs(closest - current) ? snap : closest, SHEET_PEEK);
       animateSheetTo(target);
     },
   })).current;
@@ -531,7 +530,10 @@ function DeliveryRow({
           <MaterialIcons name={TYPE_ICON[delivery.type] ?? "local-shipping"} size={15} color={isSender ? "#111111" : "#FFFFFF"} />
         </View>
         <View style={styles.rowMain}>
-          <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
+          <View style={styles.rowTitleLine}>
+            <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
+            {isDriver ? <View style={styles.rowDriverDistance}><MaterialIcons name="navigation" size={12} color="#007B8B" /><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text></View> : null}
+          </View>
           <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff} · {vehicleLabel}</Text>
         </View>
         <Text style={styles.rowPrice}>{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</Text>
@@ -547,17 +549,12 @@ function DeliveryRow({
           <MaterialIcons name="route" size={12} color="#666666" />
           <Text style={styles.rowStatText}>{totalDistance.value} {totalDistance.unit}</Text>
         </View>
-        {isDriver ? (
-          <View style={styles.rowStat}>
-            <MaterialIcons name="my-location" size={12} color="#007B8B" />
-            <Text style={[styles.rowStatText, { color: "#007B8B", fontWeight: "700" }]}>Vous êtes à {driverDistText}</Text>
-          </View>
-        ) : (
+        {!isDriver ? (
           <View style={styles.rowStat}>
             <MaterialIcons name="group" size={12} color="#666666" />
             <Text style={styles.rowStatText}>{delivery.candidateCount ?? 0} candidat{(delivery.candidateCount ?? 0) > 1 ? "s" : ""}</Text>
           </View>
-        )}
+        ) : null}
         <View style={styles.rowActions}>
           <Pressable onPress={onDetails} style={({ pressed }) => [styles.rowBtnOutline, pressed && styles.pressed]}>
             <Text style={styles.rowBtnOutlineText}>Détails</Text>
@@ -665,7 +662,10 @@ const styles = StyleSheet.create({
   rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
   rowThumbDriver: { backgroundColor: "#007B8B" },
   rowMain: { flex: 1, minWidth: 0 },
+  rowTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
   rowTitle: { color: "#111111", fontSize: 12.5, fontWeight: "600" },
+  rowDriverDistance: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 3, paddingTop: 1 },
+  rowDriverDistanceText: { color: "#007B8B", fontSize: 10.5, fontWeight: "600" },
   rowSub: { color: "#666666", fontSize: 10.5, marginTop: 1 },
   rowPrice: { color: "#111111", fontSize: 14, fontWeight: "700" },
   rowDateRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },

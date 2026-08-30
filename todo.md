@@ -303,3 +303,8 @@
 - [x] Retirer le suivi interne devenu redondant et nettoyer ses dépendances.
 - [x] Tester les retouches, relancer Expo et livrer la version vérifiée.
 - [x] Aligner la variante web de l’accueil sur les contrats Wallet et DeliveryStatus après le rebase.
+- [x] Synchroniser le projet et examiner l’indicateur de proximité ainsi que les gestes de feuille.
+- [x] Afficher « À — km » avec une icône de navigation sur la ligne du titre de livraison.
+- [x] Stabiliser les ancrages haut, intermédiaire et bas de la feuille cartographique.
+- [x] Tester les retouches, relancer Expo et livrer la version vérifiée.
+- [x] Corriger la syntaxe résiduelle de la variante web révélée par la compilation.
