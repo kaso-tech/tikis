@@ -115,48 +115,18 @@ export function TikisDrawer() {
             <MaterialIcons name="chevron-right" size={18} color={isDark ? "#C8BCAA" : "#9B9B9B"} />
           </Pressable>
 
-          <View style={[styles.themeCard, isDark && styles.themeCardDark]}>
-            <View style={styles.themeHeader}>
-              <View style={[styles.themeIcon, isDark && styles.themeIconDark]}>
-                <MaterialIcons name={isDark ? "dark-mode" : "light-mode"} size={16} color={isDark ? "#D7A447" : "#9A6201"} />
-              </View>
-              <View style={styles.themeText}>
-                <Text style={[styles.themeTitle, isDark && styles.themeTitleDark]}>Apparence</Text>
-                <Text style={[styles.themeSub, isDark && styles.themeSubDark]}>{isDark ? "Mode sombre activé" : "Mode clair activé"}</Text>
-              </View>
+          <View style={[styles.themeRow, isDark && styles.themeRowDark]}>
+            <View style={styles.themeText}>
+              <Text style={[styles.themeTitle, isDark && styles.themeTitleDark]}>Apparence</Text>
+              <Text style={[styles.themeSub, isDark && styles.themeSubDark]}>{isDark ? "Mode sombre activé" : "Mode clair activé"}</Text>
             </View>
-            <View style={[styles.themeOptions, isDark && styles.themeOptionsDark]}>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Mode clair"
-                accessibilityState={{ selected: !isDark }}
-                onPress={() => toggleDarkMode(false)}
-                style={({ pressed }) => [styles.themeOption, !isDark && styles.themeOptionActive, pressed && styles.pressed]}
-              >
-                <MaterialIcons name="light-mode" size={16} color={!isDark ? "#FFFFFF" : (isDark ? "#C8BCAA" : "#666666")} />
-                <Text style={[styles.themeOptionLabel, !isDark && styles.themeOptionLabelActive, isDark && !isDark === false && styles.themeOptionLabelDark]}>Clair</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Mode sombre"
-                accessibilityState={{ selected: isDark }}
-                onPress={() => toggleDarkMode(true)}
-                style={({ pressed }) => [styles.themeOption, isDark && styles.themeOptionActive, pressed && styles.pressed]}
-              >
-                <MaterialIcons name="dark-mode" size={16} color={isDark ? "#FFFFFF" : "#666666"} />
-                <Text style={[styles.themeOptionLabel, isDark && styles.themeOptionLabelActive]}>Sombre</Text>
-              </Pressable>
-            </View>
-            <View style={styles.themeFooter}>
-              <Switch
-                accessibilityLabel="Activer le mode sombre"
-                value={isDark}
-                onValueChange={toggleDarkMode}
-                trackColor={{ false: "#D7CCBA", true: "#D7A447" }}
-                thumbColor={isDark ? "#FBF7F0" : "#FFFFFF"}
-              />
-              <Text style={[styles.themeHint, isDark && styles.themeHintDark]}>L'apparence s'applique à toute l'app</Text>
-            </View>
+            <Switch
+              accessibilityLabel="Activer le mode sombre"
+              value={isDark}
+              onValueChange={toggleDarkMode}
+              trackColor={{ false: "#D7CCBA", true: "#D7A447" }}
+              thumbColor={isDark ? "#FBF7F0" : "#FFFFFF"}
+            />
           </View>
 
           <Text style={[styles.menuLabel, isDark && styles.menuLabelDark]}>ASSISTANCE</Text>
@@ -233,26 +203,13 @@ const styles = StyleSheet.create({
   roleDotDark: { backgroundColor: "#D7A447" },
   roleLabel: { color: "#666666", fontSize: 11, fontWeight: "500" },
   roleLabelDark: { color: "#C8BCAA" },
-  themeCard: { marginTop: 14, padding: 12, borderRadius: 10, backgroundColor: "#F6F3EE", gap: 10 },
-  themeCardDark: { backgroundColor: "#231A10" },
-  themeHeader: { flexDirection: "row", alignItems: "center", gap: 10 },
-  themeIcon: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF" },
-  themeIconDark: { backgroundColor: "#171108" },
+  themeRow: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, backgroundColor: "#F6F3EE", flexDirection: "row", alignItems: "center", gap: 10 },
+  themeRowDark: { backgroundColor: "#231A10" },
   themeText: { flex: 1 },
   themeTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },
   themeTitleDark: { color: "#FBF7F0" },
   themeSub: { color: "#666666", fontSize: 11, marginTop: 2 },
   themeSubDark: { color: "#C8BCAA" },
-  themeOptions: { flexDirection: "row", backgroundColor: "#FFFFFF", borderRadius: 8, padding: 3, gap: 3 },
-  themeOptionsDark: { backgroundColor: "#171108" },
-  themeOption: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 7, borderRadius: 6 },
-  themeOptionActive: { backgroundColor: "#111111" },
-  themeOptionLabel: { color: "#666666", fontSize: 12, fontWeight: "600" },
-  themeOptionLabelActive: { color: "#FFFFFF" },
-  themeOptionLabelDark: { color: "#C8BCAA" },
-  themeFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  themeHint: { color: "#747474", fontSize: 10, flex: 1, textAlign: "right" },
-  themeHintDark: { color: "#8A7A5F" },
   menuLabel: { color: "#747474", fontSize: 10, fontWeight: "600", letterSpacing: 0.9, marginTop: 16, marginBottom: 6 },
   menuLabelDark: { color: "#C8BCAA" },
   menu: { gap: 2 },
