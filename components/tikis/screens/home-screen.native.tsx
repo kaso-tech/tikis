@@ -631,7 +631,7 @@ function DeliveryRow({
         <View style={styles.rowMain}>
           <View style={styles.rowTitleLine}>
             <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
-            {isDriver ? <View accessible accessibilityLabel={`Direction du point de collecte, à ${driverDistText}`} style={styles.rowDriverDistance}><MaterialIcons accessible={false} name="explore" size={15} color="#007B8B" style={{ transform: [{ rotate: `${compassRotation}deg` }] }} /><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text></View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text></View> : null}
+            {isDriver ? <View accessible accessibilityLabel={`Direction du point de collecte, à ${driverDistText}`} style={styles.rowDriverDistance}><MaterialIcons accessible={false} name="navigation" size={17} color="#007B8B" style={{ transform: [{ rotate: `${compassRotation}deg` }] }} /><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text></View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text></View> : null}
           </View>
           <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff} · {vehicleLabel}</Text>
         </View>

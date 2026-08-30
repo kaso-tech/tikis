@@ -332,3 +332,6 @@
 - [x] Transformer l’icône de proximité native en boussole qui suit instantanément l’orientation du téléphone vers la collecte.
 - [x] Prévoir un repli web accessible et valider la boussole avec les cartes existantes.
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer la boussole dynamique.
+- [x] Synchroniser le projet et vérifier l’indicateur de direction dynamique actuel.
+- [x] Remplacer l’icône de boussole par une flèche triangulaire dont la pointe indexe la collecte.
+- [ ] Tester, relancer Expo, pousser vers GitHub et livrer le correctif visuel de direction.
