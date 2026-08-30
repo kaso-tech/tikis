@@ -126,7 +126,7 @@ export function coordinateCacheKey(latitude: string | number, longitude: string 
   const safeLatitude = Number(latitude);
   const safeLongitude = Number(longitude);
   if (!Number.isFinite(safeLatitude) || !Number.isFinite(safeLongitude)) throw new Error("Coordonnées de lieu invalides.");
-  return `${safeLatitude.toFixed(5)}:${safeLongitude.toFixed(5)}`;
+  return `${safeLatitude.toFixed(7)}:${safeLongitude.toFixed(7)}`;
 }
 
 export function tikisPlaceToLocation(place: TikisPlace): LocationLabel {
@@ -159,11 +159,12 @@ export async function getTikisPlaceByCoordinate(latitude: string | number, longi
 export async function saveTikisPlace(input: Omit<InsertTikisPlace, "coordinateKey" | "resolvedAt">) {
   const db = await getDb();
   if (!db) throw new Error("La base de lieux est temporairement indisponible.");
-  if (input.googlePlaceId) {
+  const isExactMapSelection = input.source === "reverse";
+  if (!isExactMapSelection && input.googlePlaceId) {
     const cached = await getTikisPlaceByGoogleId(input.googlePlaceId);
     if (cached) return cached;
   }
-  if (input.mapboxPlaceId) {
+  if (!isExactMapSelection && input.mapboxPlaceId) {
     const cached = await getTikisPlaceByMapboxId(input.mapboxPlaceId);
     if (cached) return cached;
   }
@@ -175,7 +176,11 @@ export async function saveTikisPlace(input: Omit<InsertTikisPlace, "coordinateKe
     const updated = await db.select().from(tikisPlaces).where(eq(tikisPlaces.id, cachedByCoordinate.id)).limit(1);
     if (updated[0]) return updated[0];
   }
-  const inserted = await db.insert(tikisPlaces).values({ ...input, coordinateKey: coordinateCacheKey(input.latitude, input.longitude) });
+  const inserted = await db.insert(tikisPlaces).values({
+    ...input,
+    ...(isExactMapSelection ? { googlePlaceId: null, mapboxPlaceId: null } : {}),
+    coordinateKey: coordinateCacheKey(input.latitude, input.longitude),
+  });
   const result = await db.select().from(tikisPlaces).where(eq(tikisPlaces.id, Number(inserted[0].insertId))).limit(1);
   if (!result[0]) throw new Error("Le lieu n’a pas pu être enregistré.");
   return result[0];

@@ -324,3 +324,7 @@
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer la version vérifiée.
 - [x] Mettre en œuvre une expiration périodique serveur à 24 h des livraisons disponibles.
 - [x] Ajouter la migration, le callback serveur sécurisé et les régressions de l’expiration à 24 h.
+- [x] Synchroniser le projet puis auditer la transformation des coordonnées entre sélection, persistance et carte.
+- [x] Corriger la restitution exacte des points de collecte et destination après publication, avec régression automatisée.
+- [x] Retirer l’onglet Adresses du compte livreur et franciser avec une icône adaptée celui de l’expéditeur.
+- [ ] Tester, relancer Expo, pousser vers GitHub et livrer la correction des coordonnées et onglets.

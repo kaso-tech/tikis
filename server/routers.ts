@@ -110,7 +110,7 @@ async function generateUniqueReferralCode(fullName: string) {
 const photoMimeSchema = z.enum(["image/jpeg", "image/png", "image/webp"]);
 const base64ImageSchema = z.string().min(32).max(1_600_000).regex(/^[A-Za-z0-9+/=]+$/, "Données d’image invalides.");
 const coordinateSchema = z.number().finite();
-const placeSchema = z.object({ name: z.string().max(140), district: z.string().max(120), city: z.string().max(120), latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180), googlePlaceId: z.string().max(255).optional(), mapboxId: z.string().max(255).optional(), mapboxSessionToken: z.string().uuid().optional(), formattedAddress: z.string().max(255).optional(), street: z.string().max(160).optional(), province: z.string().max(120).optional(), country: z.string().max(120).optional() });
+const placeSchema = z.object({ name: z.string().max(140), district: z.string().max(120), city: z.string().max(120), latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180), googlePlaceId: z.string().max(255).optional(), mapboxId: z.string().max(255).optional(), mapboxSessionToken: z.string().uuid().optional(), formattedAddress: z.string().max(255).optional(), street: z.string().max(160).optional(), province: z.string().max(120).optional(), country: z.string().max(120).optional(), source: z.enum(["search", "retrieve", "reverse", "forward", "favorite", "manual", "legacy"]).optional() });
 const favoriteLabelSchema = z.string().trim().min(1).max(80).regex(/^[\p{L}\p{N}]+(?:[ .,'’()\-][\p{L}\p{N}]+)*$/u, "Libellé de favori invalide.");
 const deliveryTextSchema = z.string().trim().min(3).max(450);
 const deliveryVehicleSchema = z.enum(["Vélo", "Moto", "Tricycle", "Voiture"]);
@@ -155,7 +155,7 @@ async function saveDeliveryPlace(place: z.infer<typeof placeSchema>) {
     province: place.province,
     country: place.country,
     provider: place.mapboxId ? "mapbox" : "manual",
-    source: place.mapboxId ? "retrieve" : "manual",
+    source: place.source ?? (place.mapboxId ? "retrieve" : "manual"),
     featureType: "unknown",
     precision: "unknown",
   });

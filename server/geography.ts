@@ -149,6 +149,10 @@ function mapboxPrecision(value: NonNullable<LocationLabel["featureType"]>): NonN
   return "unknown";
 }
 
+export function pinReverseLocationToCoordinate(place: LocationLabel, latitude: number, longitude: number): LocationLabel {
+  return { ...place, latitude, longitude, source: "reverse", precision: "exact" };
+}
+
 function coordinatePair(feature: MapboxFeature) {
   const properties = feature.properties;
   const propertyCoordinates = properties?.coordinates as Record<string, unknown> | undefined;
@@ -398,7 +402,8 @@ export async function reverseGeocodeLocation(latitude: number, longitude: number
   url.searchParams.set("types", "address,street,neighborhood,locality,place");
   try {
     const payload = await mapboxJson(url, "Search") as { features?: MapboxFeature[] };
-    mapboxPlace = (payload.features ?? []).sort((left, right) => featurePrecision(left) - featurePrecision(right)).map((feature) => featureToLocation(feature, "reverse")).find((item): item is LocationLabel => Boolean(item)) ?? null;
+    const resolved = (payload.features ?? []).sort((left, right) => featurePrecision(left) - featurePrecision(right)).map((feature) => featureToLocation(feature, "reverse")).find((item): item is LocationLabel => Boolean(item)) ?? null;
+    mapboxPlace = resolved ? pinReverseLocationToCoordinate(resolved, latitude, longitude) : null;
     if (mapboxPlace) mapboxPlace = ensureCountry(mapboxPlace, countryCode);
   } catch (cause) {
     mapboxErrorCause = cause;
@@ -407,7 +412,7 @@ export async function reverseGeocodeLocation(latitude: number, longitude: number
   if (needsCommunityFallback) {
     const communityPlace = await reverseOpenStreetMapLocation(latitude, longitude, countryCode);
     if (communityPlace && (communityPlace.precision === "exact" || communityPlace.precision === "street" || !mapboxPlace)) {
-      const resolved = await rememberResolvedPlace(communityPlace);
+      const resolved = await rememberResolvedPlace(pinReverseLocationToCoordinate(communityPlace, latitude, longitude));
       recordGeographicMetric("reverse", "success", Date.now() - startedAt);
       return resolved;
     }

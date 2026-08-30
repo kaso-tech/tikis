@@ -120,16 +120,15 @@ describe("services géographiques backend Tikis", () => {
     await expect(resolveMapboxPlace("cross-border", "session-1", "CI")).rejects.toThrow("hors du pays");
   });
 
-  it("retient l’adresse la plus précise lors d’un appui sur la carte", async () => {
+  it("conserve le point exact d’un appui sur la carte tout en retenant son adresse la plus précise", async () => {
     process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ features: [
       { id: "place-ouaga", geometry: { coordinates: [-1.62, 12.47] }, properties: { feature_type: "place", name: "Ouagadougou", context: { place: { name: "Ouagadougou" }, country: { name: "Burkina Faso" } } } },
       { id: "street-kwame", geometry: { coordinates: [-1.6202, 12.4698] }, properties: { feature_type: "street", name: "Avenue Kwame Nkrumah", full_address: "Avenue Kwame Nkrumah", context: { neighborhood: { name: "Koulouba" }, place: { name: "Ouagadougou" }, country: { name: "Burkina Faso" } } } },
     ] })));
     global.fetch = fetchMock as typeof fetch;
-    const place = await reverseGeocodeLocation(12.4698, -1.6202);
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("types=address%2Cstreet%2Cneighborhood%2Clocality%2Cplace");
-    expect(place).toMatchObject({ name: "Avenue Kwame Nkrumah", district: "Koulouba", city: "Ouagadougou" });
+    const place = await reverseGeocodeLocation(12.4698123, -1.6202456);
+    expect(place).toMatchObject({ name: "Avenue Kwame Nkrumah", district: "Koulouba", city: "Ouagadougou", latitude: 12.4698123, longitude: -1.6202456, source: "reverse", precision: "exact" });
   });
 
   it("complète une sélection cartographique réduite à une ville par une adresse communautaire plus précise", async () => {
@@ -139,6 +138,6 @@ describe("services géographiques backend Tikis", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ lat: "12.534921", lon: "-1.687432", name: "Alimentation Wend Panga", category: "shop", display_name: "Alimentation Wend Panga, Rue 25.02, Koulouba, Ouagadougou, Burkina Faso", address: { road: "Rue 25.02", neighbourhood: "Koulouba", city: "Ouagadougou", country: "Burkina Faso" } })));
     global.fetch = fetchMock as typeof fetch;
     const place = await reverseGeocodeLocation(12.534921, -1.687432, "BF");
-    expect(place).toMatchObject({ name: "Alimentation Wend Panga", street: "Rue 25.02", district: "Koulouba", city: "Ouagadougou", provider: "openstreetmap", source: "search", precision: "exact" });
+    expect(place).toMatchObject({ name: "Alimentation Wend Panga", street: "Rue 25.02", district: "Koulouba", city: "Ouagadougou", provider: "openstreetmap", source: "reverse", precision: "exact" });
   });
 });

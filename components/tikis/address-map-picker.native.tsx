@@ -29,7 +29,7 @@ export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, 
     try {
       setMessage("Identification de l’adresse…");
       const result = await reverse.mutateAsync(coordinate);
-      setPlace(result ?? null);
+      setPlace(result ? { ...result, latitude: coordinate.latitude, longitude: coordinate.longitude, source: "reverse", precision: "exact" } : null);
       setMessage(result ? "" : "Adresse introuvable. Ajustez légèrement le marqueur.");
     } catch (cause) { setMessage(cause instanceof Error ? cause.message : "Le géocodage inverse est momentanément indisponible."); }
   }, [reverse]);
