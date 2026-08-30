@@ -320,7 +320,7 @@
 - [x] Synchroniser le projet et auditer navigation, cartes, statuts et expiration.
 - [x] Supprimer l’onglet et la page Courses pour les deux rôles, ainsi que les dépendances associées.
 - [x] Adapter les cartes et actions expéditeur, les badges et le format relatif des dates.
-- [ ] Améliorer la boussole de proximité, retirer le marqueur moto expéditeur et expirer les livraisons à 24 h.
-- [ ] Tester, relancer Expo, pousser vers GitHub et livrer la version vérifiée.
-- [ ] Mettre en œuvre une expiration périodique serveur à 24 h des livraisons disponibles.
+- [x] Améliorer la boussole de proximité, retirer le marqueur moto expéditeur et expirer les livraisons à 24 h.
+- [x] Tester, relancer Expo, pousser vers GitHub et livrer la version vérifiée.
+- [x] Mettre en œuvre une expiration périodique serveur à 24 h des livraisons disponibles.
 - [x] Ajouter la migration, le callback serveur sécurisé et les régressions de l’expiration à 24 h.
