@@ -344,4 +344,4 @@
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer les améliorations de session et d’interface.
 - [x] Synchroniser le projet et auditer les usages de la couleur principale actuelle.
 - [x] Remplacer l’accent bleu par #9A6201 dans les écrans, cartes, actions et états associés.
-- [ ] Tester, relancer Expo, pousser vers GitHub et livrer le nouveau thème principal.
+- [x] Tester, relancer Expo, pousser vers GitHub et livrer le nouveau thème principal.
