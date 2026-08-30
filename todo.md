@@ -327,4 +327,4 @@
 - [x] Synchroniser le projet puis auditer la transformation des coordonnées entre sélection, persistance et carte.
 - [x] Corriger la restitution exacte des points de collecte et destination après publication, avec régression automatisée.
 - [x] Retirer l’onglet Adresses du compte livreur et franciser avec une icône adaptée celui de l’expéditeur.
-- [ ] Tester, relancer Expo, pousser vers GitHub et livrer la correction des coordonnées et onglets.
+- [x] Tester, relancer Expo, pousser vers GitHub et livrer la correction des coordonnées et onglets.
