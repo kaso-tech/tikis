@@ -20,7 +20,7 @@ type SenderAction = "disable" | "reactivate" | "cancel" | null;
 function DetailRow({ icon, label, value }: { icon: ComponentProps<typeof MaterialIcons>["name"]; label: string; value: string }) {
   return (
     <View style={styles.detailsRow}>
-      <View style={styles.detailsIcon}><MaterialIcons name={icon} size={16} color="#007B8B" /></View>
+      <View style={styles.detailsIcon}><MaterialIcons name={icon} size={16} color="#9A6201" /></View>
       <Text style={styles.detailsLabel}>{label}</Text>
       <Text style={styles.detailsValue} numberOfLines={1}>{value}</Text>
     </View>
@@ -88,7 +88,7 @@ export default function DeliveryDetailScreen() {
   }, [senderAction]);
 
   if (deliveryQuery.isLoading) {
-    return <SafeAreaView style={styles.safe}><View style={styles.notFound}><ActivityIndicator color="#007B8B" /><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
+    return <SafeAreaView style={styles.safe}><View style={styles.notFound}><ActivityIndicator color="#9A6201" /><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
   }
 
   if (!delivery) {
@@ -108,7 +108,7 @@ export default function DeliveryDetailScreen() {
   const isCompleted = delivery.status === "completed";
   const pickupPresentation = formatDeliveryDetailPlace(delivery.pickup);
   const dropoffPresentation = formatDeliveryDetailPlace(delivery.dropoff);
-  const statusBadgeColor = isActive ? "#167A55" : isCompleted ? "#747474" : "#3B6BCD";
+  const statusBadgeColor = status.color;
   const statusBadgeText = isActive ? `EN COURS · ETA 8 min` : isCompleted ? "TERMINÉE" : status.label.toUpperCase();
 
   async function confirmAction() {
@@ -299,7 +299,7 @@ export default function DeliveryDetailScreen() {
         {showCandidates ? (
           <Pressable onPress={() => setCandidatesSheetOpen(true)} style={({ pressed }) => [styles.candidatesTrigger, isActive && styles.candidatesTriggerActive, pressed && styles.pressed]}>
             <View style={[styles.candidatesIcon, isActive && styles.candidatesIconActive]}>
-              <MaterialIcons name="group" size={18} color={isActive ? "#9A6200" : "#007B8B"} />
+              <MaterialIcons name="group" size={18} color="#9A6201" />
             </View>
             <View style={styles.candidatesBody}>
               <Text style={styles.candidatesTitle}>{isActive ? "Changer de livreur" : "Livreurs candidats"}</Text>
@@ -356,7 +356,7 @@ export default function DeliveryDetailScreen() {
       {senderActionConfig ? <DeliveryActionConfirmationModal visible title={senderActionConfig.title} description={senderActionConfig.description} confirmLabel={senderActionConfig.confirmLabel} tone={senderActionConfig.tone} loading={senderProcessing} onCancel={() => !senderProcessing && setSenderAction(null)} onConfirm={() => void confirmSenderAction()} /> : null}
       <Modal visible={counterVisible} transparent animationType="fade" onRequestClose={() => !counterLoading && setCounterVisible(false)}>
         <View style={styles.counterOverlay}><View style={styles.counterDialog}>
-          <View style={styles.counterIcon}><MaterialIcons name="price-change" size={24} color="#007B8B" /></View>
+          <View style={styles.counterIcon}><MaterialIcons name="price-change" size={24} color="#9A6201" /></View>
           <Text style={styles.counterTitle}>{ownCandidate ? "Modifier votre contre-proposition" : "Faire une contre-proposition"}</Text>
           <Text style={styles.counterText}>Proposez le montant que vous souhaitez percevoir. La commission Tikis sera ajustée sur ce prix si l’expéditeur vous retient.</Text>
           <View style={styles.counterInputWrap}><TextInput value={counterInput} onChangeText={(value) => setCounterInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} autoFocus style={styles.counterInput} placeholder="Ex. 6 500" placeholderTextColor="#9AA5B6" /><Text style={styles.counterCurrency}>FCFA</Text></View>
@@ -392,8 +392,8 @@ function TimelineLine({ done }: { done: boolean }) {
 }
 
 function DeliveryActionConfirmationModal({ visible, title, description, confirmLabel, tone, loading, onCancel, onConfirm }: { visible: boolean; title: string; description: string; confirmLabel: string; tone: "success" | "warning" | "danger"; loading: boolean; onCancel: () => void; onConfirm: () => void }) {
-  const color = tone === "danger" ? "#B4232D" : tone === "warning" ? "#9A6200" : "#007B8B";
-  const background = tone === "danger" ? "#FDEBEC" : tone === "warning" ? "#FEF6E2" : "#E2F3F4";
+  const color = tone === "danger" ? "#B4232D" : tone === "warning" ? "#9A6200" : "#176C52";
+  const background = tone === "danger" ? "#FDEBEC" : tone === "warning" ? "#FEF6E2" : "#DDEFE7";
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}><View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={onCancel} /><View style={styles.actionSheet}><View style={styles.actionHandle} /><View style={[styles.actionIcon, { backgroundColor: background }]}><MaterialIcons name={tone === "danger" ? "warning-amber" : tone === "warning" ? "pause-circle" : "play-circle"} size={24} color={color} /></View><Text style={styles.actionTitle}>{title}</Text><Text style={styles.actionDescription}>{description}</Text><TikisButton label={confirmLabel} variant={tone === "danger" ? "danger" : tone === "warning" ? "secondary" : "primary"} onPress={onConfirm} loading={loading} style={styles.actionConfirm} /><TikisButton label="Conserver la livraison" variant="ghost" onPress={onCancel} disabled={loading} style={styles.actionCancel} /></View></View></Modal>;
 }
 
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
   heroMapBlock: { position: "absolute", backgroundColor: "#DCDEE3", borderRadius: 5 },
   heroMapRoad: { position: "absolute", backgroundColor: "#FFFFFF", borderRadius: 99 },
   heroMapMarker: { position: "absolute", width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  heroMapMarkerStart: { top: "30%", left: "18%", backgroundColor: "#007B8B" },
+  heroMapMarkerStart: { top: "30%", left: "18%", backgroundColor: "#9A6201" },
   heroMapMarkerEnd: { top: "60%", right: "22%", backgroundColor: "#FFFFFF", borderColor: "#B4232D" },
   heroMapStatus: { position: "absolute", top: 12, left: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 7 },
   heroMapDot: { width: 7, height: 7, borderRadius: 4 },

@@ -17,8 +17,8 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: true,
         header: () => <TikisHeader />,
-        tabBarActiveTintColor: "#007B8B",
-        tabBarInactiveTintColor: "#767676",
+        tabBarActiveTintColor: "#9A6201",
+        tabBarInactiveTintColor: "#8A7A66",
         tabBarLabelStyle: { fontSize: 10, fontWeight: "600", marginTop: 1 },
         tabBarStyle: { height: 54 + bottomPadding, paddingTop: 5, paddingBottom: bottomPadding, borderTopWidth: 0, backgroundColor: "#FFFFFF" },
       }}

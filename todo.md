@@ -352,3 +352,6 @@
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer la nouvelle identité visuelle.
 - [x] Sécuriser l’état local, récupérer la dernière branche main et vérifier les dépendances modifiées.
 - [x] Relancer Expo, valider la compilation et les services, puis livrer la version synchronisée.
+- [x] Synchroniser le projet et recenser les icônes de fiche, footer et menu latéral encore hors charte.
+- [x] Appliquer le brun doré aux icônes actives et aux repères de navigation concernés.
+- [ ] Tester, relancer Expo, pousser vers GitHub et livrer la correction chromatique des icônes.
