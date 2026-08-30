@@ -362,4 +362,4 @@
 - [x] Synchroniser le projet et tracer le bouton de candidature réellement exécuté sur l’accueil.
 - [x] Bloquer la candidature tant que le solde livreur et sa confirmation explicite ne sont pas validés.
 - [x] Tracer la réponse de règlement Wallet et appliquer immédiatement son solde au cache de l’interface.
-- [ ] Tester, relancer Expo, pousser vers GitHub et livrer le correctif de candidature.
+- [x] Tester, relancer Expo, pousser vers GitHub et livrer le correctif de candidature.
