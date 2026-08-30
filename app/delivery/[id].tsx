@@ -114,10 +114,19 @@ export default function DeliveryDetailScreen() {
   async function confirmAction() {
     setProcessing(true);
     try {
-      if (action === "apply") await applyMutation.mutateAsync({ deliveryId });
-      if (action === "withdraw") await withdrawMutation.mutateAsync({ deliveryId });
+      if (action === "apply") {
+        const result = await applyMutation.mutateAsync({ deliveryId });
+        utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
+      }
+      if (action === "withdraw") {
+        const result = await withdrawMutation.mutateAsync({ deliveryId });
+        utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
+      }
       if (action === "select" && selectedCandidate) await selectMutation.mutateAsync({ deliveryId, candidateId: selectedCandidate.id });
-      if (action === "confirm") await confirmMutation.mutateAsync({ deliveryId });
+      if (action === "confirm") {
+        const result = await confirmMutation.mutateAsync({ deliveryId });
+        utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
+      }
       if (action === "complete") await completeMutation.mutateAsync({ deliveryId });
       await refreshDelivery();
       setAction(null);
@@ -161,7 +170,8 @@ export default function DeliveryDetailScreen() {
     if (!amount || inputError) { setCounterError(inputError ?? "Saisissez un prix valide."); return; }
     setCounterLoading(true); setCounterError("");
     try {
-      await applyMutation.mutateAsync({ deliveryId, offerPrice: amount });
+      const result = await applyMutation.mutateAsync({ deliveryId, offerPrice: amount });
+      utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
       await refreshDelivery();
       setCounterVisible(false); setMessage("Votre contre-proposition a été envoyée à l’expéditeur."); haptic.success();
     } catch (cause) {

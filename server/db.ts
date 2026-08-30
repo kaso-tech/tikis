@@ -540,7 +540,7 @@ export async function markTikisDeliveryEventsRead(profilePhone: string) {
 export async function applyForTikisDelivery(input: { id: string; deliveryId: string; driverPhone: string; offerPrice?: number }) {
   const db = await getDb();
   if (!db) throw new Error("Les candidatures sont temporairement indisponibles.");
-  await db.transaction(async (tx) => {
+  const wallet = await db.transaction(async (tx) => {
     const deliveries = await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, input.deliveryId), eq(tikisDeliveries.status, "open"))).limit(1).for("update");
     const delivery = deliveries[0];
     if (!delivery) throw new Error("Cette livraison n’accepte plus de candidatures.");
@@ -564,8 +564,9 @@ export async function applyForTikisDelivery(input: { id: string; deliveryId: str
     else await tx.insert(tikisDeliveryCandidates).values({ id: candidateId, deliveryId: input.deliveryId, driverPhone: input.driverPhone, offerPrice: input.offerPrice ?? null, commissionBlocked: commission, status: "applied" });
     await appendDeliveryEvent(tx, { deliveryId: input.deliveryId, eventType: "candidate_applied", status: "open", actorPhone: input.driverPhone, recipientPhone: delivery.senderPhone, title: "Nouvelle candidature", body: "Un livreur compatible s’est proposé pour votre livraison.", tone: "info", idempotencyKey: `${candidateId}:sender-applied` });
     await appendDeliveryEvent(tx, { deliveryId: input.deliveryId, eventType: "candidate_applied", status: "open", actorPhone: input.driverPhone, recipientPhone: input.driverPhone, title: "Candidature envoyée", body: `La commission de ${commission} FCFA est temporairement bloquée.`, tone: "warning", idempotencyKey: `${candidateId}:driver-applied` });
+    return walletSnapshotFromRecord(await ensureTikisWallet(tx, input.driverPhone));
   });
-  return { success: true } as const;
+  return { success: true, wallet } as const;
 }
 
 async function releaseCandidateCommission(tx: any, candidate: { id: string; deliveryId: string; driverPhone: string; commissionBlocked: number }, reason: string, suffix: string) {
@@ -721,19 +722,18 @@ export async function cancelTikisDeliveryFromSender(deliveryId: string, senderPh
     const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.senderPhone, senderPhone))).limit(1).for("update"))[0];
     if (!delivery || !["open", "disabled", "pending_confirmation"].includes(delivery.status)) throw new Error("Cette livraison ne peut plus être annulée.");
     await releaseAppliedCandidatesForSenderAction(tx, delivery, "cancelled");
-    if (delivery.status === "pending_confirmation" && delivery.driverPhone && delivery.accruedCommission && delivery.accruedCommission > 0) {
-      await applyWalletMovement(tx, {
-        profilePhone: delivery.driverPhone,
-        deliveryId,
-        operation: "compensation",
-        amount: delivery.accruedCommission,
-        availableDelta: delivery.accruedCommission,
-        heldDelta: 0,
-        reason: "Commission intégralement compensée après annulation de la livraison",
-        idempotencyKey: `${deliveryId}:cancelled:compensation:${delivery.driverPhone}`,
-      });
-      await tx.update(tikisDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, delivery.driverPhone), eq(tikisDeliveryCandidates.status, "selected")));
-      await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_cancelled", status: "cancelled", actorPhone: senderPhone, recipientPhone: delivery.driverPhone, title: "Livraison annulée", body: "L’expéditeur a annulé la livraison avant votre départ. Votre commission Tikis est intégralement compensée.", tone: "warning", idempotencyKey: `${deliveryId}:cancelled:selected-driver` });
+    if (delivery.status === "pending_confirmation" && delivery.driverPhone) {
+      const selectedCandidate = (await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, delivery.driverPhone), eq(tikisDeliveryCandidates.status, "selected"))).limit(1).for("update"))[0];
+      if (selectedCandidate) {
+        const legacyDebit = (await tx.select().from(tikisWalletLedger).where(eq(tikisWalletLedger.idempotencyKey, `${deliveryId}:commission-debit:${selectedCandidate.id}`)).limit(1))[0];
+        if (legacyDebit) {
+          await applyWalletMovement(tx, { profilePhone: delivery.driverPhone, deliveryId, operation: "compensation", amount: selectedCandidate.commissionBlocked, availableDelta: selectedCandidate.commissionBlocked, heldDelta: 0, reason: "Commission compensée après annulation de la livraison", idempotencyKey: `${deliveryId}:cancelled:compensation:${delivery.driverPhone}` });
+        } else {
+          await releaseCandidateCommission(tx, selectedCandidate, "Commission libérée après annulation de la livraison", "cancelled-release");
+        }
+        await tx.update(tikisDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, selectedCandidate.id));
+        await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_cancelled", status: "cancelled", actorPhone: senderPhone, recipientPhone: delivery.driverPhone, title: "Livraison annulée", body: "L’expéditeur a annulé la livraison avant votre départ. Votre commission Tikis a été libérée.", tone: "warning", idempotencyKey: `${deliveryId}:cancelled:selected-driver` });
+      }
     }
     await tx.update(tikisDeliveries).set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_cancelled", status: "cancelled", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Livraison annulée", body: "Votre livraison est conservée dans l’historique avec son statut d’annulation.", tone: "warning", idempotencyKey: `${deliveryId}:cancelled:sender` });
@@ -744,7 +744,7 @@ export async function cancelTikisDeliveryFromSender(deliveryId: string, senderPh
 export async function withdrawTikisDeliveryCandidateWithWallet(deliveryId: string, driverPhone: string) {
   const db = await getDb();
   if (!db) throw new Error("Les candidatures sont temporairement indisponibles.");
-  await db.transaction(async (tx) => {
+  const wallet = await db.transaction(async (tx) => {
     const candidates = await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, driverPhone), eq(tikisDeliveryCandidates.status, "applied"))).limit(1).for("update");
     const candidate = candidates[0];
     if (!candidate) throw new Error("Cette candidature ne peut plus être retirée.");
@@ -754,8 +754,9 @@ export async function withdrawTikisDeliveryCandidateWithWallet(deliveryId: strin
     await tx.update(tikisDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, candidate.id));
     await appendDeliveryEvent(tx, { deliveryId, eventType: "candidate_withdrawn", status: "open", actorPhone: driverPhone, recipientPhone: driverPhone, title: "Candidature retirée", body: "Votre commission bloquée a été immédiatement libérée.", tone: "success", idempotencyKey: `${candidate.id}:withdraw-driver` });
     await appendDeliveryEvent(tx, { deliveryId, eventType: "candidate_withdrawn", status: "open", actorPhone: driverPhone, recipientPhone: delivery.senderPhone, title: "Candidature retirée", body: "Un livreur a retiré sa candidature.", tone: "info", idempotencyKey: `${candidate.id}:withdraw-sender` });
+    return walletSnapshotFromRecord(await ensureTikisWallet(tx, driverPhone));
   });
-  return { success: true } as const;
+  return { success: true, wallet } as const;
 }
 
 export async function selectTikisDeliveryCandidateWithWallet(deliveryId: string, candidateId: string, senderPhone: string) {
@@ -789,7 +790,7 @@ export async function selectTikisDeliveryCandidateWithWallet(deliveryId: string,
 export async function confirmTikisDeliveryWithEvents(deliveryId: string, driverPhone: string) {
   const db = await getDb();
   if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
-  await db.transaction(async (tx) => {
+  const wallet = await db.transaction(async (tx) => {
     const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.driverPhone, driverPhone), eq(tikisDeliveries.status, "pending_confirmation"))).limit(1).for("update"))[0];
     if (!delivery) throw new Error("Cette livraison ne peut pas être confirmée.");
     const candidate = (await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, driverPhone), eq(tikisDeliveryCandidates.status, "selected"))).limit(1).for("update"))[0];
@@ -813,8 +814,9 @@ export async function confirmTikisDeliveryWithEvents(deliveryId: string, driverP
     await tx.update(tikisDeliveries).set({ status: "active", confirmedAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_active", status: "active", actorPhone: driverPhone, recipientPhone: driverPhone, title: "Livraison activée", body: "Votre disponibilité est confirmée. Le suivi de la livraison est actif.", tone: "success", idempotencyKey: `${deliveryId}:active-driver` });
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_active", status: "active", actorPhone: driverPhone, recipientPhone: delivery.senderPhone, title: "Livreur en route", body: "Le livreur a confirmé sa disponibilité ; le suivi est maintenant actif.", tone: "success", idempotencyKey: `${deliveryId}:active-sender` });
+    return walletSnapshotFromRecord(await ensureTikisWallet(tx, driverPhone));
   });
-  return getTikisDeliveryById(deliveryId);
+  return { delivery: await getTikisDeliveryById(deliveryId), wallet };
 }
 
 export async function completeTikisDeliveryWithEvents(deliveryId: string, profilePhone: string) {

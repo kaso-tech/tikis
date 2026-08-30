@@ -205,7 +205,8 @@ export function HomeScreen() {
   async function handleApply(delivery: Delivery) {
     setApplyingId(delivery.id);
     try {
-      await applyMutation.mutateAsync({ deliveryId: delivery.id });
+      const result = await applyMutation.mutateAsync({ deliveryId: delivery.id });
+      utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
       await Promise.all([
         utilities.deliveries.list.invalidate(),
         utilities.wallet.snapshot.invalidate(),

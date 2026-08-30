@@ -27,7 +27,8 @@ export function DeliveryCard({ delivery, onPress, onMap }: { delivery: Delivery;
 
   async function apply() {
     try {
-      await application.mutateAsync({ deliveryId: delivery.id });
+      const result = await application.mutateAsync({ deliveryId: delivery.id });
+      utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
       await Promise.all([utilities.deliveries.list.invalidate(), utilities.deliveries.candidates.invalidate({ deliveryId: delivery.id }), utilities.wallet.snapshot.invalidate(), utilities.notifications.list.invalidate()]);
       setConfirmationVisible(false);
       haptic.success();

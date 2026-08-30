@@ -230,8 +230,14 @@ export function HomeScreen() {
   async function executeDriverAction(delivery: Delivery) {
     setActioningId(delivery.id);
     try {
-      if (delivery.ownCandidateStatus === "applied") await withdrawMutation.mutateAsync({ deliveryId: delivery.id });
-      else if (delivery.ownCandidateStatus === "selected") await confirmMutation.mutateAsync({ deliveryId: delivery.id });
+      if (delivery.ownCandidateStatus === "applied") {
+        const result = await withdrawMutation.mutateAsync({ deliveryId: delivery.id });
+        utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
+      }
+      else if (delivery.ownCandidateStatus === "selected") {
+        const result = await confirmMutation.mutateAsync({ deliveryId: delivery.id });
+        utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
+      }
       else if (delivery.ownCandidateStatus === "confirmed" || delivery.status === "active") {
         let origin = driverLocation.location;
         if (!origin) {
@@ -242,7 +248,8 @@ export function HomeScreen() {
         openNavigation(origin, delivery.pickup, delivery.dropoff);
         return;
       } else {
-        await applyMutation.mutateAsync({ deliveryId: delivery.id });
+        const result = await applyMutation.mutateAsync({ deliveryId: delivery.id });
+        utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
         setApplicationDelivery(null);
       }
       await Promise.all([utilities.deliveries.list.invalidate(), utilities.wallet.snapshot.invalidate(), utilities.notifications.list.invalidate()]);

@@ -6,6 +6,7 @@ import { TikisButton } from "@/components/tikis/ui";
 import { offeredPriceError, parseOfferedPrice, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
+import { deliveryMetricsForDay } from "@/lib/wallet-metrics";
 import { availableWalletBalance, formatMoney, formatRelativeDate, type WalletOperation } from "@/shared/tikis-domain";
 
 type Tone = "primary" | "success" | "warning" | "error" | "neutral";
@@ -52,19 +53,10 @@ export default function WalletScreen() {
   const recentJournal = [...journal]
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .slice(0, 20);
-  const todaysCount = journal.filter((entry) => {
-    const d = new Date(entry.createdAt);
-    const now = new Date();
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-  }).length;
-  const todaysEarnings = journal
-    .filter((entry) => {
-      const d = new Date(entry.createdAt);
-      const now = new Date();
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate() && entry.operation === "credit";
-    })
-    .reduce((sum, entry) => sum + entry.amount, 0);
-  const completedDriverCourses = journal.filter((entry) => entry.operation === "credit").length;
+  const deliveryMetrics = deliveryMetricsForDay(journal);
+  const todaysCount = deliveryMetrics.activityCount;
+  const todaysEarnings = deliveryMetrics.earnings;
+  const completedDriverCourses = deliveryMetrics.completedCourses;
   const currentMonthSpending = journal
     .filter((entry) => {
       const date = new Date(entry.createdAt);

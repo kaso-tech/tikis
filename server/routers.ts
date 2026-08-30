@@ -407,9 +407,9 @@ export const appRouter = router({
     confirm: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("Seul le livreur sélectionné peut confirmer.");
-      const delivery = await db.confirmTikisDeliveryWithEvents(input.deliveryId, profile.phone);
-      if (delivery) { await syncDeliveryParticipants(delivery); void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livraison activée", body: "Le livreur a confirmé sa disponibilité.", occurredAt: new Date().toISOString() }); }
-      return delivery;
+      const result = await db.confirmTikisDeliveryWithEvents(input.deliveryId, profile.phone);
+      if (result.delivery) { await syncDeliveryParticipants(result.delivery); void publishDeliveryStatusBroadcast({ deliveryId: result.delivery.id, status: result.delivery.status, title: "Livraison activée", body: "Le livreur a confirmé sa disponibilité.", occurredAt: new Date().toISOString() }); }
+      return result;
     }),
     complete: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
