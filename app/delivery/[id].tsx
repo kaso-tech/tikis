@@ -209,7 +209,7 @@ export default function DeliveryDetailScreen() {
           </View>
         </View>
 
-        <View style={styles.eyebrow}>{delivery.type} · {delivery.vehicleTypes[0] ?? "Moto"}</View>
+        <Text style={styles.eyebrow}>{delivery.type} · {delivery.vehicleTypes[0] ?? "Moto"}</Text>
         <Text style={styles.title}>{delivery.title}</Text>
         <View style={styles.metaRow}>
           <Text style={styles.metaText}>{formatRelativeDate(delivery.createdAt)}</Text>
