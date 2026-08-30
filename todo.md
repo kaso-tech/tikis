@@ -376,4 +376,4 @@
 - [x] Relancer Expo, vérifier les services, pousser vers GitHub et livrer la correction auditée.
 - [x] Synchroniser le projet et isoler le fragment de texte rendu hors composant dans la fiche livraison.
 - [x] Corriger la structure du rendu et ajouter une régression ciblée.
-- [ ] Tester, relancer Expo, pousser vers GitHub et livrer le correctif de rendu.
+- [x] Tester, relancer Expo, pousser vers GitHub et livrer le correctif de rendu.
