@@ -366,4 +366,4 @@
 - [x] Synchroniser le projet et auditer les écritures de commission ainsi que les indicateurs de gain Wallet.
 - [x] Propager les mouvements de commission dans le cache Wallet immédiatement après candidature, annulation ou confirmation.
 - [x] Exclure les dépôts des gains et des indicateurs d’activité de livraison.
-- [ ] Tester, relancer Expo, pousser vers GitHub et livrer la correction comptable.
+- [x] Tester, relancer Expo, pousser vers GitHub et livrer la correction comptable.
