@@ -337,4 +337,4 @@
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer le correctif visuel de direction.
 - [x] Synchroniser le projet et examiner l’indicateur de navigation actuel.
 - [x] Ajouter au toucher une infobulle compacte contenant le nom du point de collecte.
-- [ ] Tester, relancer Expo, pousser vers GitHub et livrer l’infobulle de collecte.
+- [x] Tester, relancer Expo, pousser vers GitHub et livrer l’infobulle de collecte.
