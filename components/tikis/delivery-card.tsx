@@ -2,29 +2,34 @@ import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useState } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { StatusBadge, TikisButton } from "@/components/tikis/ui";
+import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { MapPreview } from "@/components/tikis/map-preview";
 import { haptic } from "@/lib/haptics";
 import { useDriverPickupDistance } from "@/hooks/use-driver-pickup-distance";
 import { formatListRouteParts, formatNavigationTarget } from "@/lib/geo-rules";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
-import { deliveryStatusMeta, formatMoney, formatRelativeDate, type Delivery } from "@/shared/tikis-domain";
+import { availableWalletBalance, commissionFor, deliveryStatusMeta, formatMoney, formatRelativeDate, type Delivery } from "@/shared/tikis-domain";
 
 export function DeliveryCard({ delivery, onPress, onMap }: { delivery: Delivery; onPress: () => void; onMap: () => void }) {
   const { role } = useTikisStore();
   const utilities = trpc.useUtils();
   const application = trpc.deliveries.submitApplication.useMutation();
+  const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver", refetchOnMount: "always", refetchOnWindowFocus: true });
   const status = deliveryStatusMeta[delivery.status];
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const isApplying = application.isPending;
   const [openingMap, setOpeningMap] = useState(false);
+  const [confirmationVisible, setConfirmationVisible] = useState(false);
   const mayApply = role === "driver" && delivery.status === "open" && !["applied", "selected", "confirmed"].includes(delivery.ownCandidateStatus ?? "");
   const driverDistance = useDriverPickupDistance(role === "driver" ? delivery.pickup : null);
+  const commission = commissionFor(delivery.offeredPrice ?? delivery.estimatedPrice, { rate: walletQuery.data?.commissionRate ?? 0, currency: "FCFA" });
 
   async function apply() {
     try {
       await application.mutateAsync({ deliveryId: delivery.id });
       await Promise.all([utilities.deliveries.list.invalidate(), utilities.deliveries.candidates.invalidate({ deliveryId: delivery.id }), utilities.wallet.snapshot.invalidate(), utilities.notifications.list.invalidate()]);
+      setConfirmationVisible(false);
       haptic.success();
     } catch {
       Alert.alert("Candidature indisponible", "Votre candidature n’a pas pu être enregistrée. Vérifiez votre solde Wallet puis réessayez.");
@@ -33,7 +38,16 @@ export function DeliveryCard({ delivery, onPress, onMap }: { delivery: Delivery;
 
   function confirmApplication() {
     if (!mayApply || isApplying) return;
-    Alert.alert("Postuler à cette livraison", "La commission Tikis sera temporairement bloquée dans votre Wallet. Elle sera libérée si vous n’êtes pas retenu.", [{ text: "Plus tard", style: "cancel" }, { text: "Postuler", onPress: () => void apply() }]);
+    const wallet = walletQuery.data?.wallet;
+    if (!wallet || !Number.isFinite(walletQuery.data?.commissionRate) || !walletQuery.data?.commissionRate) {
+      Alert.alert("Wallet indisponible", "Votre solde doit être chargé avant de pouvoir candidater. Réessayez dans un instant.");
+      return;
+    }
+    if (availableWalletBalance(wallet) < commission) {
+      Alert.alert("Solde insuffisant", `Votre solde disponible doit couvrir la commission de ${formatMoney(commission)} pour candidater.`);
+      return;
+    }
+    setConfirmationVisible(true);
   }
 
   function openMap() {
@@ -85,6 +99,7 @@ export function DeliveryCard({ delivery, onPress, onMap }: { delivery: Delivery;
       </View>
     </Pressable>
     <View style={styles.actions}><TikisButton label="Carte" icon="map" variant="secondary" onPress={openMap} loading={openingMap} loadingLabel="Carte…" style={styles.mapButton} />{mayApply ? <TikisButton label="Postuler" icon="add-circle" onPress={confirmApplication} loading={isApplying} loadingLabel="Candidature…" style={styles.applyButton} /> : null}{role === "driver" && delivery.ownCandidateStatus === "applied" ? <View style={styles.appliedState}><MaterialIcons name="check-circle" size={17} color="#167A55" /><Text style={styles.appliedStateText}>Candidature envoyée</Text></View> : null}</View>
+    <FinancialConfirmationModal visible={confirmationVisible} title="Envoyer votre candidature" description="La commission Tikis sera temporairement réservée sur votre Wallet. Elle ne sera prélevée qu’après votre sélection et votre confirmation." amount={commission} confirmLabel="Confirmer ma candidature" loading={isApplying} onCancel={() => !isApplying && setConfirmationVisible(false)} onConfirm={() => void apply()} />
   </View>;
 }
 

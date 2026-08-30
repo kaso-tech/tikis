@@ -86,7 +86,8 @@ export default function WalletScreen() {
   async function settlePayment(outcome: "succeeded" | "failed") {
     if (!payment) return;
     try {
-      await settleMutation.mutateAsync({ paymentId: payment.id, outcome });
+      const settled = await settleMutation.mutateAsync({ paymentId: payment.id, outcome });
+      utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: settled.wallet } : current);
       await Promise.all([
         utilities.wallet.snapshot.invalidate(),
         utilities.deliveries.list.invalidate(),

@@ -359,3 +359,7 @@
 - [x] Corriger la mise à jour du Wallet et la sélection expéditeur sans contrôle de solde indu.
 - [x] Ajouter les confirmations et contrôles de solde requis aux actions de l’accueil.
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer les corrections financières.
+- [x] Synchroniser le projet et tracer le bouton de candidature réellement exécuté sur l’accueil.
+- [x] Bloquer la candidature tant que le solde livreur et sa confirmation explicite ne sont pas validés.
+- [x] Tracer la réponse de règlement Wallet et appliquer immédiatement son solde au cache de l’interface.
+- [ ] Tester, relancer Expo, pousser vers GitHub et livrer le correctif de candidature.

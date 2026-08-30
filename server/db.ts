@@ -464,9 +464,14 @@ export async function requestTikisWalletOperation(profilePhone: string, type: "d
 }
 
 type SimulatedPaymentView = { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; createdAt: string; settledAt?: string };
+type SimulatedPaymentSettlement = { payment: SimulatedPaymentView; wallet: WalletSnapshot };
 
 function simulatedPaymentToView(payment: { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; createdAt: Date; settledAt: Date | null }): SimulatedPaymentView {
   return { id: payment.id, type: payment.type, amount: payment.amount, status: payment.status, providerReference: payment.providerReference, createdAt: payment.createdAt.toISOString(), ...(payment.settledAt ? { settledAt: payment.settledAt.toISOString() } : {}) };
+}
+
+function walletSnapshotFromRecord(wallet: { availableBalance: number; heldBalance: number }): WalletSnapshot {
+  return { total: wallet.availableBalance + wallet.heldBalance, blocked: wallet.heldBalance };
 }
 
 export async function initiateSimulatedLigdiPayment(input: { profilePhone: string; type: "deposit" | "withdrawal"; amount: number; idempotencyKey: string }) {
@@ -498,7 +503,10 @@ export async function settleSimulatedLigdiPayment(input: { profilePhone: string;
   return db.transaction(async (tx) => {
     const payment = (await tx.select().from(tikisPaymentTransactions).where(and(eq(tikisPaymentTransactions.id, input.paymentId), eq(tikisPaymentTransactions.profilePhone, input.profilePhone))).limit(1).for("update"))[0];
     if (!payment) throw new Error("Transaction Ligdi Cash introuvable.");
-    if (payment.status !== "pending") return simulatedPaymentToView(payment);
+    if (payment.status !== "pending") {
+      const wallet = await ensureTikisWallet(tx, payment.profilePhone);
+      return { payment: simulatedPaymentToView(payment), wallet: walletSnapshotFromRecord(wallet) } satisfies SimulatedPaymentSettlement;
+    }
     if (input.outcome === "failed") {
       await tx.update(tikisPaymentTransactions).set({ status: "failed", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
     } else if (payment.type === "deposit") {
@@ -510,7 +518,8 @@ export async function settleSimulatedLigdiPayment(input: { profilePhone: string;
     }
     const settled = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, payment.id)).limit(1))[0];
     if (!settled) throw new Error("La transaction n’a pas pu être finalisée.");
-    return simulatedPaymentToView(settled);
+    const wallet = await ensureTikisWallet(tx, payment.profilePhone);
+    return { payment: simulatedPaymentToView(settled), wallet: walletSnapshotFromRecord(wallet) } satisfies SimulatedPaymentSettlement;
   });
 }
 
