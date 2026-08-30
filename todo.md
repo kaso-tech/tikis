@@ -350,3 +350,5 @@
 - [x] Harmoniser les couleurs des statuts de livraison avec la charte brun doré.
 - [x] Régénérer puis intégrer une icône Tikis sur fond blanc avec le symbole brun doré #9A6201.
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer la nouvelle identité visuelle.
+- [x] Sécuriser l’état local, récupérer la dernière branche main et vérifier les dépendances modifiées.
+- [x] Relancer Expo, valider la compilation et les services, puis livrer la version synchronisée.
