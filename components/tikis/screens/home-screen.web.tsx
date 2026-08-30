@@ -22,14 +22,14 @@ const TYPE_ICON: Record<Delivery["type"], React.ComponentProps<typeof MaterialIc
 };
 
 const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: string }> = {
-  draft: { label: "BROUILLON", color: "#747474", bg: "#ECECEC" },
-  open: { label: "PUBLIÉE", color: "#9A6200", bg: "#FEF6E2" },
-  pending_confirmation: { label: "ATTRIBUÉE", color: "#167A55", bg: "#E2F3F4" },
-  active: { label: "EN TRANSIT", color: "#3B6BCD", bg: "#EAF1FF" },
-  completed: { label: "TERMINÉE", color: "#747474", bg: "#ECECEC" },
-  disabled: { label: "DÉSACTIVÉE", color: "#B4232D", bg: "#FBE8EA" },
-  cancelled: { label: "ANNULÉE", color: "#B4232D", bg: "#FBE8EA" },
-  expired: { label: "EXPIRÉE", color: "#747474", bg: "#ECECEC" },
+  draft: { label: "BROUILLON", color: "#7A6E61", bg: "#EEE8E0" },
+  open: { label: "PUBLIÉE", color: "#9A6201", bg: "#F8E8CE" },
+  pending_confirmation: { label: "ATTRIBUÉE", color: "#7A5600", bg: "#F4E9D2" },
+  active: { label: "EN TRANSIT", color: "#176C52", bg: "#DDEFE7" },
+  completed: { label: "TERMINÉE", color: "#4F6A5A", bg: "#E6EFE9" },
+  disabled: { label: "DÉSACTIVÉE", color: "#A43740", bg: "#F7E6E7" },
+  cancelled: { label: "ANNULÉE", color: "#A43740", bg: "#F7E6E7" },
+  expired: { label: "EXPIRÉE", color: "#6B6257", bg: "#EEE8E0" },
 };
 
 type FilterKey = "all" | "active" | "open" | "pending" | "completed";

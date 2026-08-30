@@ -32,7 +32,7 @@ const env = {
   appSlug: "tikis-mobile",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
   // Leave empty to use the default icon from assets/images/icon.png
-  logoUrl: "/manus-storage/tikis-icon_e87e20ef.png",
+  logoUrl: "https://files.manuscdn.com/user_upload_by_module/session_file/310519663570163538/XYrGkePKhtJtWMnH.png",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
@@ -61,7 +61,7 @@ const config: ExpoConfig = {
   },
   android: {
     adaptiveIcon: {
-      backgroundColor: "#0B1F3A",
+      backgroundColor: "#171108",
       foregroundImage: "./assets/images/android-icon-foreground.png",
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
@@ -136,9 +136,9 @@ const config: ExpoConfig = {
         image: "./assets/images/splash-icon.png",
         imageWidth: 200,
         resizeMode: "contain",
-        backgroundColor: "#ffffff",
+        backgroundColor: "#EEEDF3",
         dark: {
-          backgroundColor: "#000000",
+          backgroundColor: "#171108",
         },
       },
     ],

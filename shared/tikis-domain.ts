@@ -193,12 +193,12 @@ export const deliveryStatusMeta: Record<
   DeliveryStatus,
   { label: string; color: string; background: string }
 > = {
-  draft: { label: "Brouillon", color: "#697386", background: "#EEF1F5" },
-  open: { label: "Active", color: "#B45309", background: "#FEF3C7" },
-  pending_confirmation: { label: "À confirmer", color: "#3B6BCD", background: "#EAF1FF" },
-  active: { label: "Attribuée", color: "#11875D", background: "#DCFCE7" },
-  completed: { label: "Terminée", color: "#677489", background: "#EEF1F5" },
-  disabled: { label: "Désactivée", color: "#C23B45", background: "#FEE2E2" },
-  cancelled: { label: "Annulée", color: "#C23B45", background: "#FEE2E2" },
-  expired: { label: "Expirée", color: "#747474", background: "#ECECEC" },
+  draft: { label: "Brouillon", color: "#7A6E61", background: "#EEE8E0" },
+  open: { label: "Active", color: "#9A6201", background: "#F8E8CE" },
+  pending_confirmation: { label: "À confirmer", color: "#7A5600", background: "#F4E9D2" },
+  active: { label: "Attribuée", color: "#176C52", background: "#DDEFE7" },
+  completed: { label: "Terminée", color: "#4F6A5A", background: "#E6EFE9" },
+  disabled: { label: "Désactivée", color: "#A43740", background: "#F7E6E7" },
+  cancelled: { label: "Annulée", color: "#A43740", background: "#F7E6E7" },
+  expired: { label: "Expirée", color: "#6B6257", background: "#EEE8E0" },
 };

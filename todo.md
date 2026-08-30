@@ -345,3 +345,8 @@
 - [x] Synchroniser le projet et auditer les usages de la couleur principale actuelle.
 - [x] Remplacer l’accent bleu par #9A6201 dans les écrans, cartes, actions et états associés.
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer le nouveau thème principal.
+- [x] Synchroniser le projet et auditer le thème sombre, les statuts de livraison et l’icône actuels.
+- [x] Définir puis appliquer un mode sombre basé sur des nuances brunes accessibles.
+- [x] Harmoniser les couleurs des statuts de livraison avec la charte brun doré.
+- [x] Régénérer puis intégrer une icône Tikis sur fond blanc avec le symbole brun doré #9A6201.
+- [ ] Tester, relancer Expo, pousser vers GitHub et livrer la nouvelle identité visuelle.

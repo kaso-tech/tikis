@@ -2,7 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
@@ -12,9 +12,11 @@ import { getApiBaseUrl } from "@/constants/oauth";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { availableWalletBalance } from "@/shared/tikis-domain";
+import { useThemeContext } from "@/lib/theme-provider";
 
 export default function ProfileScreen() {
   const { role, profile, notifications, markNotificationsRead, updateProfile } = useTikisStore();
+  const { colorScheme, setColorScheme } = useThemeContext();
   const { openLogoutConfirmation } = useTikisLogout();
   const updateMutation = trpc.profiles.update.useMutation();
   const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
@@ -124,6 +126,23 @@ export default function ProfileScreen() {
               <StatCard icon="check-circle" color="dark" value="OK" label="Actif" />
             </>
           )}
+        </View>
+
+        <View style={[styles.appearanceCard, colorScheme === "dark" && styles.appearanceCardDark]}>
+          <View style={styles.appearanceIcon}>
+            <MaterialIcons name={colorScheme === "dark" ? "dark-mode" : "light-mode"} size={18} color="#9A6201" />
+          </View>
+          <View style={styles.appearanceCopy}>
+            <Text style={[styles.appearanceTitle, colorScheme === "dark" && styles.appearanceTitleDark]}>Mode sombre</Text>
+            <Text style={[styles.appearanceSub, colorScheme === "dark" && styles.appearanceSubDark]}>Nuances brunes adaptées à vos yeux.</Text>
+          </View>
+          <Switch
+            accessibilityLabel="Activer le mode sombre"
+            value={colorScheme === "dark"}
+            onValueChange={(enabled) => setColorScheme(enabled ? "dark" : "light")}
+            trackColor={{ false: "#D7CCBA", true: "#9A6201" }}
+            thumbColor="#FBF7F0"
+          />
         </View>
 
         {driver ? (
@@ -273,7 +292,7 @@ function StatCard({ icon, color, value, label }: { icon: React.ComponentProps<ty
   return (
     <View style={styles.stat}>
       <View style={[styles.statIcon, color === "amber" ? styles.statIconAmber : color === "dark" ? styles.statIconDark : null]}>
-        <MaterialIcons name={icon} size={16} color={color === "primary" ? "#007B8B" : color === "amber" ? "#9A6200" : "#FFFFFF"} />
+        <MaterialIcons name={icon} size={16} color={color === "primary" ? "#9A6201" : color === "amber" ? "#9A6200" : "#FFFFFF"} />
       </View>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
@@ -294,7 +313,7 @@ function MenuRow({ icon, iconBg, label, sub, badge, onPress, last }: { icon: Rea
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.menuRow, last && styles.menuRowLast, pressed && styles.pressed]}>
       <View style={[styles.menuIcon, iconBg === "amber" ? styles.menuIconAmber : iconBg === "dark" ? styles.menuIconDark : null]}>
-        <MaterialIcons name={icon} size={16} color={iconBg === "primary" ? "#007B8B" : iconBg === "amber" ? "#9A6200" : "#FFFFFF"} />
+        <MaterialIcons name={icon} size={16} color={iconBg === "primary" ? "#9A6201" : iconBg === "amber" ? "#9A6200" : "#FFFFFF"} />
       </View>
       <View style={styles.menuBody}>
         <Text style={styles.menuLabel}>{label}</Text>
@@ -331,6 +350,14 @@ const styles = StyleSheet.create({
   rolePillTextDriver: { color: "#9A6200" },
 
   stats: { flexDirection: "row", gap: 8 },
+  appearanceCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
+  appearanceCardDark: { backgroundColor: "#231A10" },
+  appearanceIcon: { width: 34, height: 34, borderRadius: 9, backgroundColor: "#F8F0E5", alignItems: "center", justifyContent: "center" },
+  appearanceCopy: { flex: 1, minWidth: 0 },
+  appearanceTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },
+  appearanceTitleDark: { color: "#FBF7F0" },
+  appearanceSub: { color: "#666666", fontSize: 10, marginTop: 2 },
+  appearanceSubDark: { color: "#C8BCAA" },
   stat: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 12, paddingVertical: 12, paddingHorizontal: 8, alignItems: "center", gap: 4 },
   statIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#F8F0E5", alignItems: "center", justifyContent: "center" },
   statIconAmber: { backgroundColor: "#FEF6E2" },

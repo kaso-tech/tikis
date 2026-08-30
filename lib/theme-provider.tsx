@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { Appearance, View, useColorScheme as useSystemColorScheme } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { colorScheme as nativewindColorScheme, vars } from "nativewind";
 
 import { SchemeColors, type ColorScheme } from "@/constants/theme";
@@ -10,6 +11,7 @@ type ThemeContextValue = {
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
+const THEME_PREFERENCE_KEY = "tikis.theme-preference";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const systemScheme = useSystemColorScheme() ?? "light";
@@ -32,6 +34,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const setColorScheme = useCallback((scheme: ColorScheme) => {
     setColorSchemeState(scheme);
     applyScheme(scheme);
+    void AsyncStorage.setItem(THEME_PREFERENCE_KEY, scheme);
+  }, [applyScheme]);
+
+  useEffect(() => {
+    let mounted = true;
+    void AsyncStorage.getItem(THEME_PREFERENCE_KEY).then((storedScheme) => {
+      if (!mounted || (storedScheme !== "light" && storedScheme !== "dark")) return;
+      setColorSchemeState(storedScheme);
+      applyScheme(storedScheme);
+    });
+    return () => {
+      mounted = false;
+    };
   }, [applyScheme]);
 
   useEffect(() => {
@@ -61,8 +76,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }),
     [colorScheme, setColorScheme],
   );
-  console.log(value, themeVariables)
-
   return (
     <ThemeContext.Provider value={value}>
       <View style={[{ flex: 1 }, themeVariables]}>{children}</View>
