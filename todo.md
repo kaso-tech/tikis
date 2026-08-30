@@ -334,4 +334,4 @@
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer la boussole dynamique.
 - [x] Synchroniser le projet et vérifier l’indicateur de direction dynamique actuel.
 - [x] Remplacer l’icône de boussole par une flèche triangulaire dont la pointe indexe la collecte.
-- [ ] Tester, relancer Expo, pousser vers GitHub et livrer le correctif visuel de direction.
+- [x] Tester, relancer Expo, pousser vers GitHub et livrer le correctif visuel de direction.
