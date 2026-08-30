@@ -373,4 +373,4 @@
 - [x] Tracer les composants réellement rendus sur l’accueil et les snapshots Wallet retournés par chaque action.
 - [x] Corriger les mouvements de commission et rendre le popup de candidature impossible à contourner.
 - [x] Ajouter des régressions couvrant chaque parcours financier signalé.
-- [ ] Relancer Expo, vérifier les services, pousser vers GitHub et livrer la correction auditée.
+- [x] Relancer Expo, vérifier les services, pousser vers GitHub et livrer la correction auditée.
