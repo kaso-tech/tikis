@@ -72,7 +72,7 @@ export const tikisDeliveries = mysqlTable("tikis_deliveries", {
   title: varchar("title", { length: 120 }).notNull(),
   details: varchar("details", { length: 450 }).notNull(),
   deliveryType: mysqlEnum("deliveryType", ["Plis", "Personne", "Autre"]).notNull(),
-  status: mysqlEnum("status", ["draft", "open", "pending_confirmation", "active", "completed", "disabled", "cancelled"]).notNull().default("open"),
+  status: mysqlEnum("status", ["draft", "open", "pending_confirmation", "active", "completed", "disabled", "cancelled", "expired"]).notNull().default("open"),
   distanceKm: decimal("distanceKm", { precision: 10, scale: 2 }).notNull(),
   routeSource: mysqlEnum("routeSource", ["routes", "provisional"]).notNull().default("provisional"),
   estimatedPrice: int("estimatedPrice").notNull(),

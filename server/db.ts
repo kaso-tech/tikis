@@ -1,9 +1,10 @@
 import { randomUUID } from "crypto";
-import { and, count, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisDelivery, TikisDeliveryCandidate, TikisPlace, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryReviews, tikisFavoritePlaces, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisWalletLedger, tikisWallets, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppNotification, LocationLabel, SelectableVehicleType, WalletOperation, WalletSnapshot } from "../shared/tikis-domain";
+import { DELIVERY_EXPIRATION_MS } from "../shared/delivery-expiration";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -305,6 +306,59 @@ export async function listTikisDeliveriesForProfile(profilePhone: string, role: 
   return deliveryJoins(rows);
 }
 
+export async function expireOpenTikisDeliveries(now = new Date()) {
+  const db = await getDb();
+  if (!db) return { expiredCount: 0 } as const;
+  const cutoff = new Date(now.getTime() - DELIVERY_EXPIRATION_MS);
+  return db.transaction(async (tx) => {
+    const stale = await tx.select().from(tikisDeliveries)
+      .where(and(eq(tikisDeliveries.status, "open"), lt(tikisDeliveries.createdAt, cutoff)))
+      .for("update");
+    for (const delivery of stale) {
+      const candidates = await tx.select().from(tikisDeliveryCandidates)
+        .where(and(eq(tikisDeliveryCandidates.deliveryId, delivery.id), eq(tikisDeliveryCandidates.status, "applied")))
+        .for("update");
+      for (const candidate of candidates) {
+        if (candidate.commissionBlocked > 0) {
+          await applyWalletMovement(tx, {
+            profilePhone: candidate.driverPhone,
+            deliveryId: delivery.id,
+            operation: "unblock",
+            amount: candidate.commissionBlocked,
+            availableDelta: candidate.commissionBlocked,
+            heldDelta: -candidate.commissionBlocked,
+            reason: "Commission libérée : livraison expirée après 24 h",
+            idempotencyKey: `delivery-expired:${delivery.id}:${candidate.id}`,
+          });
+        }
+        await tx.update(tikisDeliveryCandidates).set({ status: "withdrawn" }).where(eq(tikisDeliveryCandidates.id, candidate.id));
+        await appendDeliveryEvent(tx, {
+          deliveryId: delivery.id,
+          eventType: "delivery_expired",
+          status: "expired",
+          recipientPhone: candidate.driverPhone,
+          title: "Livraison expirée",
+          body: "Cette livraison n’est plus disponible après 24 heures.",
+          tone: "warning",
+          idempotencyKey: `delivery-expired-candidate:${delivery.id}:${candidate.id}`,
+        });
+      }
+      await tx.update(tikisDeliveries).set({ status: "expired", cancelledAt: now }).where(eq(tikisDeliveries.id, delivery.id));
+      await appendDeliveryEvent(tx, {
+        deliveryId: delivery.id,
+        eventType: "delivery_expired",
+        status: "expired",
+        recipientPhone: delivery.senderPhone,
+        title: "Livraison expirée",
+        body: "Votre livraison a expiré après 24 heures sans attribution.",
+        tone: "warning",
+        idempotencyKey: `delivery-expired-sender:${delivery.id}`,
+      });
+    }
+    return { expiredCount: stale.length } as const;
+  });
+}
+
 type WalletMovement = {
   profilePhone: string;
   deliveryId?: string;
@@ -319,7 +373,7 @@ type WalletMovement = {
 type DeliveryEventInput = {
   deliveryId: string;
   eventType: string;
-  status?: "draft" | "open" | "pending_confirmation" | "active" | "completed" | "disabled" | "cancelled";
+  status?: "draft" | "open" | "pending_confirmation" | "active" | "completed" | "disabled" | "cancelled" | "expired";
   actorPhone?: string;
   recipientPhone: string;
   title: string;

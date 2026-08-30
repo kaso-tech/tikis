@@ -7,6 +7,8 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { sdk } from "./sdk";
+import { expireOpenTikisDeliveries } from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -60,6 +62,19 @@ async function startServer() {
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
+  });
+
+  app.post("/api/scheduled/expire-deliveries", async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
+      const result = await expireOpenTikisDeliveries();
+      return res.json({ ok: true, ...result, taskUid: user.taskUid });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur inconnue";
+      console.error("[scheduled:expire-deliveries]", error);
+      return res.status(500).json({ error: message, timestamp: new Date().toISOString() });
+    }
   });
 
   app.use(

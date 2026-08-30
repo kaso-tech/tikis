@@ -1,15 +1,15 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
-import { useTikisNavigation } from "@/lib/tikis-navigation";
 import { trpc } from "@/lib/trpc";
 import { formatListRouteParts } from "@/lib/geo-rules";
 import { useDriverLocation } from "@/hooks/use-driver-location";
 import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format";
-import { availableWalletBalance, formatMoney, type Delivery, type DeliveryStatus } from "@/shared/tikis-domain";
+import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
+import { availableWalletBalance, formatMoney, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
 
 const SHEET_MIN = 130;
 const SHEET_PEEK = 420;
@@ -23,12 +23,13 @@ const TYPE_ICON: Record<Delivery["type"], React.ComponentProps<typeof MaterialIc
 
 const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: string }> = {
   draft: { label: "BROUILLON", color: "#747474", bg: "#ECECEC" },
-  open: { label: "PUBLIÉE", color: "#3B6BCD", bg: "#EAF1FF" },
-  pending_confirmation: { label: "EN ATTENTE", color: "#9A6200", bg: "#FEF6E2" },
-  active: { label: "EN ROUTE", color: "#167A55", bg: "#E2F3F4" },
+  open: { label: "PUBLIÉE", color: "#9A6200", bg: "#FEF6E2" },
+  pending_confirmation: { label: "ATTRIBUÉE", color: "#167A55", bg: "#E2F3F4" },
+  active: { label: "EN TRANSIT", color: "#3B6BCD", bg: "#EAF1FF" },
   completed: { label: "TERMINÉE", color: "#747474", bg: "#ECECEC" },
-  disabled: { label: "DÉSACTIVÉE", color: "#747474", bg: "#ECECEC" },
+  disabled: { label: "DÉSACTIVÉE", color: "#B4232D", bg: "#FBE8EA" },
   cancelled: { label: "ANNULÉE", color: "#B4232D", bg: "#FBE8EA" },
+  expired: { label: "EXPIRÉE", color: "#747474", bg: "#ECECEC" },
 };
 
 type FilterKey = "all" | "active" | "open" | "pending" | "completed";
@@ -42,7 +43,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 function matchesFilter(status: DeliveryStatus, filter: FilterKey): boolean {
-  if (filter === "all") return status !== "cancelled" && status !== "disabled";
+  if (filter === "all") return status !== "cancelled" && status !== "disabled" && status !== "expired";
   if (filter === "active") return status === "active";
   if (filter === "open") return status === "open";
   if (filter === "pending") return status === "pending_confirmation";
@@ -75,7 +76,6 @@ function projectOntoCanvas(
 
 export function HomeScreen() {
   const { role, profile } = useTikisStore();
-  const { openDrawer } = useTikisNavigation();
   const firstName = profile?.fullName.split(" ")[0] ?? "à vous";
 
   const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 10_000 });
@@ -89,6 +89,7 @@ export function HomeScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [driverOnline, setDriverOnline] = useState(true);
   const [applyingId, setApplyingId] = useState<string | null>(null);
+  const [candidateDelivery, setCandidateDelivery] = useState<Delivery | null>(null);
   const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
   const sheetValue = useRef(SHEET_PEEK);
   const dragStartHeight = useRef(SHEET_PEEK);
@@ -106,7 +107,7 @@ export function HomeScreen() {
     if (role === "driver") {
       return [...deliveries].filter(matches).sort((a, b) => driverSortPriority(a) - driverSortPriority(b) || a.distanceKm - b.distanceKm);
     }
-    return deliveries.filter(matches);
+    return deliveries.filter((delivery) => matches(delivery) && delivery.status !== "completed" && delivery.status !== "expired");
   }, [deliveries, filter, role, searchQuery]);
 
   const selected = useMemo(() => {
@@ -168,6 +169,12 @@ export function HomeScreen() {
 
   const utilities = trpc.useUtils();
   const applyMutation = trpc.deliveries.submitApplication.useMutation();
+  const cancelMutation = trpc.deliveries.cancel.useMutation();
+  const selectCandidateMutation = trpc.deliveries.selectCandidate.useMutation();
+  const candidatesQuery = trpc.deliveries.candidates.useQuery(
+    { deliveryId: candidateDelivery?.id ?? "00000000-0000-0000-0000-000000000000" },
+    { enabled: Boolean(candidateDelivery?.id) },
+  );
 
   async function handleApply(deliveryId: string) {
     setApplyingId(deliveryId);
@@ -184,13 +191,57 @@ export function HomeScreen() {
     }
   }
 
+  async function cancelSenderDelivery(delivery: Delivery) {
+    setApplyingId(delivery.id);
+    try {
+      await cancelMutation.mutateAsync({ deliveryId: delivery.id });
+      await Promise.all([utilities.deliveries.list.invalidate(), utilities.notifications.list.invalidate()]);
+    } catch (cause) {
+      Alert.alert("Annulation indisponible", cause instanceof Error ? cause.message : "Réessayez dans un instant.");
+    } finally {
+      setApplyingId(null);
+    }
+  }
+
+  function handleSenderAction(delivery: Delivery) {
+    if (delivery.status === "open" && delivery.candidateCount === 0) {
+      Alert.alert("Annuler cette livraison ?", "La livraison sera retirée et ne recevra plus de candidatures.", [
+        { text: "Conserver", style: "cancel" },
+        { text: "Annuler la livraison", style: "destructive", onPress: () => void cancelSenderDelivery(delivery) },
+      ]);
+      return;
+    }
+    if (delivery.status === "open" && (delivery.candidateCount ?? 0) > 0) {
+      setCandidateDelivery(delivery);
+      return;
+    }
+    if (delivery.status === "active") {
+      setSelectedId(delivery.id);
+      animateSheetTo(SHEET_PEEK);
+    }
+  }
+
+  async function chooseCandidate(candidate: DriverCandidate) {
+    if (!candidateDelivery) return;
+    setApplyingId(candidate.id);
+    try {
+      await selectCandidateMutation.mutateAsync({ deliveryId: candidateDelivery.id, candidateId: candidate.id });
+      setCandidateDelivery(null);
+      await Promise.all([utilities.deliveries.list.invalidate(), utilities.notifications.list.invalidate()]);
+    } catch (cause) {
+      Alert.alert("Sélection indisponible", cause instanceof Error ? cause.message : "Réessayez dans un instant.");
+    } finally {
+      setApplyingId(null);
+    }
+  }
+
   const isDriver = role === "driver";
   const firstNameDisplay = isDriver ? firstName : "à vous";
   const countLabel = isDriver ? `${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité` : `${filteredList.length} livraison${filteredList.length > 1 ? "s" : ""} affichée${filteredList.length > 1 ? "s" : ""}`;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <MapBackground selected={selected} />
+      <MapBackground selected={selected} role={role} />
 
       <Pressable
         onPress={() => {
@@ -221,11 +272,7 @@ export function HomeScreen() {
                   {driverOnline ? "EN SERVICE" : "HORS SERVICE"}
                 </Text>
               </Pressable>
-            ) : (
-              <Pressable onPress={() => openDrawer()} style={({ pressed }) => [styles.servicePill, styles.servicePillNeutral, pressed && styles.pressed]} accessibilityLabel="Ouvrir le menu">
-                <MaterialIcons name="menu" size={16} color="#111111" />
-              </Pressable>
-            )}
+            ) : null}
           </View>
         </View>
 
@@ -234,7 +281,7 @@ export function HomeScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {isDriver && driverWallet ? <WalletCard walletBalance={availableWalletBalance(driverWallet)} totalBalance={driverWallet.total} pendingBalance={0} blockedBalance={driverWallet.blocked} /> : null}
+          {isDriver && driverWallet ? <WalletCard walletBalance={availableWalletBalance(driverWallet)} totalBalance={driverWallet.total} blockedBalance={driverWallet.blocked} /> : null}
 
           {isDriver ? (
             <View style={styles.searchRow}>
@@ -259,7 +306,7 @@ export function HomeScreen() {
           ) : null}
 
           <View style={styles.filterRow}>
-            {FILTERS.map((item) => (
+            {FILTERS.filter((item) => isDriver || item.key !== "completed").map((item) => (
               <Pressable key={item.key} onPress={() => setFilter(item.key)} style={({ pressed }) => [styles.chip, filter === item.key && styles.chipActive, pressed && styles.pressed]}>
                 <Text style={[styles.chipText, filter === item.key && styles.chipTextActive]}>{item.label}</Text>
               </Pressable>
@@ -300,12 +347,8 @@ export function HomeScreen() {
             <UrgentCard
               delivery={selected}
               role={role}
-              driverDistance={null}
-              driverLocationStatus={null}
-              applying={false}
-              onAction={() => router.push(`/delivery/${selected.id}/map` as any)}
-              onDetails={() => router.push(`/delivery/${selected.id}` as any)}
-              onApply={() => {}}
+              applying={applyingId === selected.id}
+              onAction={() => handleSenderAction(selected)}
             />
           )}
 
@@ -322,18 +365,26 @@ export function HomeScreen() {
                   applying={applyingId === delivery.id}
                   onPress={() => setSelectedId(delivery.id)}
                   onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
-                  onApply={() => handleApply(delivery.id)}
+                  onApply={() => isDriver ? void handleApply(delivery.id) : handleSenderAction(delivery)}
                 />
               ))}
             </View>
           ) : null}
         </ScrollView>
       </Animated.View>
+      <CandidatesSheet
+        visible={Boolean(candidateDelivery)}
+        candidates={candidatesQuery.data ?? []}
+        deliveryStatus={candidateDelivery?.status ?? "open"}
+        loadingId={applyingId}
+        onClose={() => setCandidateDelivery(null)}
+        onChoose={(candidate) => void chooseCandidate(candidate)}
+      />
     </SafeAreaView>
   );
 }
 
-function WalletCard({ walletBalance, totalBalance, pendingBalance, blockedBalance }: { walletBalance: number; totalBalance: number; pendingBalance: number; blockedBalance: number }) {
+function WalletCard({ walletBalance, totalBalance, blockedBalance }: { walletBalance: number; totalBalance: number; blockedBalance: number }) {
   return (
     <View style={styles.walletCard}>
       <Text style={styles.walletEyebrow}>SOLDE DISPONIBLE</Text>
@@ -354,17 +405,13 @@ function WalletCard({ walletBalance, totalBalance, pendingBalance, blockedBalanc
           <Text style={styles.walletStatLabel}>Bloquée</Text>
           <Text style={styles.walletStatValue}>{formatMoney(blockedBalance)}</Text>
         </View>
-        <View style={styles.walletStat}>
-          <Text style={styles.walletStatLabel}>En attente</Text>
-          <Text style={styles.walletStatValue}>{formatMoney(pendingBalance)}</Text>
-        </View>
       </View>
     </View>
   );
 }
 
-function MapBackground({ selected }: { selected: Delivery | null | undefined }) {
-  const hasDriver = selected ? selected.status !== "open" : false;
+function MapBackground({ selected, role }: { selected: Delivery | null | undefined; role: "sender" | "driver" }) {
+  const hasDriver = false;
   const pickup = selected?.pickup;
   const dropoff = selected?.dropoff;
   const routeLine = useMemo(() => {
@@ -417,7 +464,7 @@ function MapBackground({ selected }: { selected: Delivery | null | undefined }) 
       <View style={[styles.marker, styles.markerStart]}>
         <MaterialIcons name="inventory-2" size={14} color="#FFFFFF" />
       </View>
-      {hasDriver ? (
+      {hasDriver && role === "driver" ? (
         <View style={[styles.marker, styles.markerDriver]}>
           <MaterialIcons name="two-wheeler" size={18} color="#FFFFFF" />
         </View>
@@ -432,18 +479,18 @@ function MapBackground({ selected }: { selected: Delivery | null | undefined }) 
 function UrgentCard({
   delivery,
   role,
+  applying,
   onAction,
 }: {
   delivery: Delivery;
   role: "sender" | "driver";
-  driverDistance: null;
-  driverLocationStatus: null;
   applying: boolean;
   onAction: () => void;
-  onDetails: () => void;
-  onApply: () => void;
 }) {
   const isSender = role === "sender";
+  const senderAction = delivery.status === "open"
+    ? (delivery.candidateCount ?? 0) > 0 ? "Candidats" : "Annuler"
+    : delivery.status === "active" ? "Suivre" : null;
   return (
     <View style={[styles.urgentCard, isSender ? styles.urgentCardSender : styles.urgentCardDriver]}>
       <View style={styles.urgentHead}>
@@ -458,9 +505,9 @@ function UrgentCard({
               : `${(delivery.vehicleTypes ?? []).join(" · ") || "Moto"}`}
           </Text>
         </View>
-        <View style={[styles.urgentChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}>
+        {isSender ? <View style={[styles.urgentChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}> 
           <Text style={[styles.urgentChipText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text>
-        </View>
+        </View> : null}
       </View>
       <View style={styles.urgentPricing}>
         <View>
@@ -469,10 +516,9 @@ function UrgentCard({
         </View>
       </View>
       <View style={styles.urgentActions}>
-        {isSender ? (
-          <Pressable onPress={onAction} style={({ pressed }) => [styles.urgentBtnWhite, pressed && styles.pressed]}>
-            <MaterialIcons name="my-location" size={15} color="#111111" />
-            <Text style={styles.urgentBtnWhiteText}>Suivre la course</Text>
+        {isSender && senderAction ? (
+          <Pressable onPress={onAction} disabled={applying} style={({ pressed }) => [styles.urgentBtnWhite, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}>
+            {applying ? <ActivityIndicator size="small" color="#111111" /> : <><MaterialIcons name={senderAction === "Candidats" ? "group" : senderAction === "Annuler" ? "close" : "my-location"} size={15} color="#111111" /><Text style={styles.urgentBtnWhiteText}>{senderAction}</Text></>}
           </Pressable>
         ) : null}
       </View>
@@ -503,7 +549,13 @@ function DeliveryRow({
 }) {
   const isSender = role === "sender";
   const isDriver = role === "driver";
-  const mayApply = isDriver && delivery.status === "open" && !["applied", "selected", "confirmed"].includes(delivery.ownCandidateStatus ?? "");
+  const driverAction = delivery.ownCandidateStatus === "applied"
+    ? "Renoncer"
+    : delivery.ownCandidateStatus === "selected"
+      ? "Confirmer"
+      : delivery.ownCandidateStatus === "confirmed" || delivery.status === "active"
+        ? "Démarrer"
+        : "Postuler";
   const vehicleLabel = (delivery.vehicleTypes ?? []).join(" · ") || "Moto";
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const dateInfo = formatDeliveryCreationDate(delivery.createdAt);
@@ -527,7 +579,7 @@ function DeliveryRow({
         <View style={styles.rowMain}>
           <View style={styles.rowTitleLine}>
             <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
-            {isDriver ? <View style={styles.rowDriverDistance}><MaterialIcons name="navigation" size={12} color="#007B8B" /><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text></View> : null}
+            {isDriver ? <View style={styles.rowDriverDistance}><MaterialIcons name="explore" size={15} color="#007B8B" /><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text></View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text></View> : null}
           </View>
           <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff} · {vehicleLabel}</Text>
         </View>
@@ -554,19 +606,20 @@ function DeliveryRow({
           <Pressable onPress={onDetails} style={({ pressed }) => [styles.rowBtnOutline, pressed && styles.pressed]}>
             <Text style={styles.rowBtnOutlineText}>Détails</Text>
           </Pressable>
-          {isDriver && mayApply ? (
+          {isDriver ? (
             <Pressable
               onPress={onApply}
               disabled={applying}
               style={({ pressed }) => [styles.rowBtnFilled, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
             >
-              {applying ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.rowBtnFilledText}>Postuler</Text>}
+              {applying ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.rowBtnFilledText}>{driverAction}</Text>}
             </Pressable>
-          ) : (
-            <Pressable onPress={onDetails} style={({ pressed }) => [styles.rowBtnFilled, pressed && styles.pressed]}>
-              <Text style={styles.rowBtnFilledText}>{isSender ? "Suivre" : "Voir"}</Text>
-            </Pressable>
-          )}
+          ) : (() => {
+            const senderAction = delivery.status === "open" ? (delivery.candidateCount ?? 0) > 0 ? "Candidats" : "Annuler" : delivery.status === "active" ? "Suivre" : null;
+            return senderAction ? <Pressable onPress={onApply} disabled={applying} style={({ pressed }) => [styles.rowBtnFilled, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}>
+              {applying ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.rowBtnFilledText}>{senderAction}</Text>}
+            </Pressable> : null;
+          })()}
         </View>
       </View>
     </Pressable>
@@ -583,14 +636,14 @@ const styles = StyleSheet.create({
   mapRoad2: { top: "56%", left: "-20%", width: "80%", height: 14, transform: [{ rotate: "6deg" }] },
   mapRoad3: { top: "78%", left: "20%", right: "-10%", height: 12, transform: [{ rotate: "-4deg" }] },
   routeLine: { position: "absolute", height: 3, backgroundColor: "#007B8B", borderRadius: 2 } as any,
-  marker: { position: "absolute", width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  marker: { position: "absolute", width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
   markerStart: { top: "32%", left: "16%", backgroundColor: "#007B8B" },
   markerDriver: { top: "50%", left: "42%", backgroundColor: "#111111" },
   markerEnd: { top: "64%", right: "18%", backgroundColor: "#FFFFFF", borderColor: "#B4232D" },
 
-  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", shadowColor: "#007B8B", shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 6, zIndex: 10 },
+  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#006874", zIndex: 10 },
 
-  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, shadowColor: "#000", shadowOpacity: 0.1, shadowRadius: 12, shadowOffset: { width: 0, height: -4 }, elevation: 8, overflow: "hidden" },
+  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
   sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", marginBottom: 10 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
@@ -598,7 +651,7 @@ const styles = StyleSheet.create({
   sheetTitle: { color: "#111111", fontSize: 14, fontWeight: "700", lineHeight: 18 },
   sheetSubtitle: { color: "#666666", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 
-  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#007B8B", flexDirection: "row", alignItems: "center", gap: 6, shadowColor: "#007B8B", shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#007B8B", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#006874" },
   servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE", shadowOpacity: 0, elevation: 0 },
   servicePillNeutral: { backgroundColor: "#EEEDF3", shadowOpacity: 0, elevation: 0 },
   serviceText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
@@ -660,7 +713,9 @@ const styles = StyleSheet.create({
   rowTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
   rowTitle: { color: "#111111", fontSize: 12.5, fontWeight: "600" },
   rowDriverDistance: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 3, paddingTop: 1 },
-  rowDriverDistanceText: { color: "#007B8B", fontSize: 10.5, fontWeight: "600" },
+  rowDriverDistanceText: { color: "#007B8B", fontSize: 12.5, fontWeight: "600" },
+  rowStatusChip: { marginLeft: "auto", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
+  rowStatusText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.35 },
   rowSub: { color: "#666666", fontSize: 10.5, marginTop: 1 },
   rowPrice: { color: "#111111", fontSize: 14, fontWeight: "700" },
   rowDateRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },

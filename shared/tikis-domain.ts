@@ -7,7 +7,8 @@ export type DeliveryStatus =
   | "active"
   | "completed"
   | "disabled"
-  | "cancelled";
+  | "cancelled"
+  | "expired";
 
 export type DeliveryRouteVisibility = "exact" | "approximate";
 
@@ -199,4 +200,5 @@ export const deliveryStatusMeta: Record<
   completed: { label: "Terminée", color: "#677489", background: "#EEF1F5" },
   disabled: { label: "Désactivée", color: "#C23B45", background: "#FEE2E2" },
   cancelled: { label: "Annulée", color: "#C23B45", background: "#FEE2E2" },
+  expired: { label: "Expirée", color: "#747474", background: "#ECECEC" },
 };

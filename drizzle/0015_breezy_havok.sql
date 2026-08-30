@@ -1,0 +1,1 @@
+ALTER TABLE `tikis_deliveries` MODIFY COLUMN `status` enum('draft','open','pending_confirmation','active','completed','disabled','cancelled','expired') NOT NULL DEFAULT 'open';

@@ -1,6 +1,6 @@
 export type DeliveryStatusBroadcast = {
   deliveryId: string;
-  status: "draft" | "open" | "pending_confirmation" | "active" | "completed" | "disabled" | "cancelled";
+  status: "draft" | "open" | "pending_confirmation" | "active" | "completed" | "disabled" | "cancelled" | "expired";
   title: string;
   body: string;
   occurredAt: string;

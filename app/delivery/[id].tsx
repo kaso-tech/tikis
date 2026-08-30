@@ -92,7 +92,7 @@ export default function DeliveryDetailScreen() {
   }
 
   if (!delivery) {
-    return <SafeAreaView style={styles.safe}><View style={styles.notFound}><Text style={styles.notFoundTitle}>Livraison introuvable</Text><TikisButton label="Retour aux courses" onPress={() => router.replace("/(tabs)/deliveries" as any)} /></View></SafeAreaView>;
+    return <SafeAreaView style={styles.safe}><View style={styles.notFound}><Text style={styles.notFoundTitle}>Livraison introuvable</Text><TikisButton label="Retour à l’accueil" onPress={() => router.replace("/(tabs)" as any)} /></View></SafeAreaView>;
   }
 
   const status = deliveryStatusMeta[delivery.status];
