@@ -1,5 +1,6 @@
+import { decodeJwt } from "jose";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createTikisProfileSession, verifyTikisProfileSession } from "../server/tikis-session";
+import { createTikisProfileSession, TIKIS_SESSION_TTL_SECONDS, verifyTikisProfileSession } from "../server/tikis-session";
 
 const previousJwtSecret = process.env.JWT_SECRET;
 
@@ -16,6 +17,13 @@ describe("session Tikis signée", () => {
   it("signe une session de profil et en vérifie l’identité", async () => {
     const token = await createTikisProfileSession("+22670000000");
     await expect(verifyTikisProfileSession(token)).resolves.toBe("+22670000000");
+  });
+
+  it("conserve une session de profil valide pendant trente jours", async () => {
+    const payload = decodeJwt(await createTikisProfileSession("+22670000001"));
+    expect(payload.exp).toBeTypeOf("number");
+    expect(payload.iat).toBeTypeOf("number");
+    expect((payload.exp ?? 0) - (payload.iat ?? 0)).toBe(TIKIS_SESSION_TTL_SECONDS);
   });
 
   it("rejette un jeton non signé ou une identité invalide", async () => {

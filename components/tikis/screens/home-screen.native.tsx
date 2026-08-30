@@ -19,6 +19,7 @@ const { height: SCREEN_H } = Dimensions.get("window");
 const SHEET_MIN = 130;
 const SHEET_PEEK = 420;
 const SHEET_EXPANDED = Math.min(SCREEN_H * 0.78, 720);
+const PICKUP_TOOLTIP_DURATION_MS = 3_000;
 
 const TYPE_ICON: Record<Delivery["type"], React.ComponentProps<typeof MaterialIcons>["name"]> = {
   Plis: "inventory-2",
@@ -615,14 +616,23 @@ function DeliveryRow({
   const dateBg = dateInfo.tone === "primary" ? "#E6F4F5" : "#F0F0F2";
   const totalDistance = formatDistanceKm(delivery.distanceKm);
   const pickupTitle = locationTitle(delivery.pickup);
+  const pickupDistrict = delivery.pickup.district || delivery.pickup.city || "Quartier non renseigné";
+  const dropoffTitle = locationTitle(delivery.dropoff);
+  const dropoffDistrict = delivery.dropoff.district || delivery.dropoff.city || "Quartier non renseigné";
   const deliveryDetails = [delivery.type, delivery.passengers ? `${delivery.passengers} pers.` : null, `${totalDistance.value} ${totalDistance.unit}`, dimensions, vehicleLabel].filter(Boolean).join(" · ");
   const driverDistText = driverDistance
     ? `${driverDistance.value} ${driverDistance.unit}`
     : driverLocationStatus === "loading" || driverLocationStatus === "idle"
       ? "…"
-      : driverLocationStatus === "denied"
-        ? "GPS off"
-        : "—";
+        : driverLocationStatus === "denied"
+          ? "GPS off"
+          : "—";
+
+  useEffect(() => {
+    if (!showPickupTooltip) return;
+    const timeout = setTimeout(() => setShowPickupTooltip(false), PICKUP_TOOLTIP_DURATION_MS);
+    return () => clearTimeout(timeout);
+  }, [showPickupTooltip]);
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.row, selected && styles.rowSelected, pressed && styles.pressed]}>
@@ -633,9 +643,9 @@ function DeliveryRow({
         <View style={styles.rowMain}>
           <View style={styles.rowTitleLine}>
             <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
-            {isDriver ? <View accessibilityLabel={`Direction du point de collecte, à ${driverDistText}`} style={styles.rowDriverDistance}><Pressable onPress={() => setShowPickupTooltip((visible) => !visible)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Afficher le point de collecte : ${pickupTitle}`} style={({ pressed }) => [styles.directionButton, pressed && styles.pressed]}><MaterialIcons accessible={false} name="navigation" size={17} color="#007B8B" style={{ transform: [{ rotate: `${compassRotation}deg` }] }} /></Pressable><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text>{showPickupTooltip ? <View style={styles.pickupTooltip}><Text style={styles.pickupTooltipLabel}>COLLECTE</Text><Text style={styles.pickupTooltipText} numberOfLines={1}>{pickupTitle}</Text></View> : null}</View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text></View> : null}
+            {isDriver ? <View accessibilityLabel={`Direction du point de collecte, à ${driverDistText}`} style={styles.rowDriverDistance}><Pressable onPress={() => setShowPickupTooltip((visible) => !visible)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Afficher les lieux de collecte et destination : ${pickupTitle}, ${pickupDistrict}; destination ${dropoffTitle}, ${dropoffDistrict}`} style={({ pressed }) => [styles.directionButton, pressed && styles.pressed]}><MaterialIcons accessible={false} name="navigation" size={17} color="#007B8B" style={{ transform: [{ rotate: `${compassRotation}deg` }] }} /></Pressable><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text>{showPickupTooltip ? <View style={styles.pickupTooltip}><Text style={styles.pickupTooltipLabel}>COLLECTE</Text><Text style={styles.pickupTooltipText} numberOfLines={1}>{pickupTitle}</Text><Text style={styles.pickupTooltipDistrict} numberOfLines={1}>{pickupDistrict}</Text><View style={styles.pickupTooltipDivider} /><Text style={styles.pickupTooltipLabel}>DESTINATION</Text><Text style={styles.pickupTooltipText} numberOfLines={1}>{dropoffTitle}</Text><Text style={styles.pickupTooltipDistrict} numberOfLines={1}>{dropoffDistrict}</Text></View> : null}</View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text></View> : null}
           </View>
-          <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff} · {vehicleLabel}</Text>
+          <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff}</Text>
         </View>
       </View>
       <View style={styles.rowDateRow}>
@@ -756,9 +766,11 @@ const styles = StyleSheet.create({
   rowDriverDistance: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 3, paddingTop: 1, position: "relative" },
   directionButton: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
   rowDriverDistanceText: { color: "#007B8B", fontSize: 12.5, fontWeight: "600" },
-  pickupTooltip: { position: "absolute", right: 0, top: 28, minWidth: 138, maxWidth: 216, backgroundColor: "#111111", borderRadius: 7, paddingHorizontal: 9, paddingVertical: 7, zIndex: 20 },
+  pickupTooltip: { position: "absolute", right: 0, top: 28, minWidth: 168, maxWidth: 236, backgroundColor: "#111111", borderRadius: 7, paddingHorizontal: 9, paddingVertical: 7, zIndex: 20 },
   pickupTooltipLabel: { color: "rgba(255,255,255,0.64)", fontSize: 8, fontWeight: "700", letterSpacing: 0.55 },
   pickupTooltipText: { color: "#FFFFFF", fontSize: 11, fontWeight: "600", marginTop: 2 },
+  pickupTooltipDistrict: { color: "rgba(255,255,255,0.68)", fontSize: 10, marginTop: 1 },
+  pickupTooltipDivider: { height: 1, backgroundColor: "rgba(255,255,255,0.16)", marginVertical: 6 },
   rowStatusChip: { marginLeft: "auto", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
   rowStatusText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.35 },
   rowDateRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },

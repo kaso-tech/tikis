@@ -3,6 +3,7 @@ import { SignJWT, jwtVerify } from "jose";
 const SESSION_ISSUER = "tikis-mobile";
 const SESSION_AUDIENCE = "tikis-profile";
 const PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
+export const TIKIS_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 function signingKey() {
   const value = process.env.TIKIS_SESSION_SECRET ?? process.env.JWT_SECRET;
@@ -20,7 +21,7 @@ export async function createTikisProfileSession(phone: string) {
     .setAudience(SESSION_AUDIENCE)
     .setSubject(phone)
     .setIssuedAt()
-    .setExpirationTime("7d")
+    .setExpirationTime("30d")
     .sign(signingKey());
 }
 

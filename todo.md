@@ -338,3 +338,7 @@
 - [x] Synchroniser le projet et examiner l’indicateur de navigation actuel.
 - [x] Ajouter au toucher une infobulle compacte contenant le nom du point de collecte.
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer l’infobulle de collecte.
+- [x] Synchroniser le projet et auditer la durée de session, les cartes de livraison et l’infobulle actuelle.
+- [x] Prolonger de manière sécurisée la session Tikis avec des tests de validité et d’expiration.
+- [x] Retirer le doublon de type d’engin, enrichir l’infobulle avec quartier et destination, puis la fermer après trois secondes.
+- [ ] Tester, relancer Expo, pousser vers GitHub et livrer les améliorations de session et d’interface.
