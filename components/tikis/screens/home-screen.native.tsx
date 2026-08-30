@@ -7,7 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
 import { haptic } from "@/lib/haptics";
 import { trpc } from "@/lib/trpc";
-import { formatListRouteParts } from "@/lib/geo-rules";
+import { formatListRouteParts, locationTitle } from "@/lib/geo-rules";
 import { useDriverLocation } from "@/hooks/use-driver-location";
 import { useDeviceHeading } from "@/hooks/use-device-heading";
 import { compassRotationToTarget } from "@/lib/compass";
@@ -595,6 +595,7 @@ function DeliveryRow({
   onDetails: () => void;
   onApply: () => void;
 }) {
+  const [showPickupTooltip, setShowPickupTooltip] = useState(false);
   const isSender = role === "sender";
   const isDriver = role === "driver";
   const driverAction = delivery.ownCandidateStatus === "applied"
@@ -613,6 +614,7 @@ function DeliveryRow({
   const dateColor = dateInfo.tone === "primary" ? "#007B8B" : "#747474";
   const dateBg = dateInfo.tone === "primary" ? "#E6F4F5" : "#F0F0F2";
   const totalDistance = formatDistanceKm(delivery.distanceKm);
+  const pickupTitle = locationTitle(delivery.pickup);
   const deliveryDetails = [delivery.type, delivery.passengers ? `${delivery.passengers} pers.` : null, `${totalDistance.value} ${totalDistance.unit}`, dimensions, vehicleLabel].filter(Boolean).join(" · ");
   const driverDistText = driverDistance
     ? `${driverDistance.value} ${driverDistance.unit}`
@@ -631,7 +633,7 @@ function DeliveryRow({
         <View style={styles.rowMain}>
           <View style={styles.rowTitleLine}>
             <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
-            {isDriver ? <View accessible accessibilityLabel={`Direction du point de collecte, à ${driverDistText}`} style={styles.rowDriverDistance}><MaterialIcons accessible={false} name="navigation" size={17} color="#007B8B" style={{ transform: [{ rotate: `${compassRotation}deg` }] }} /><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text></View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text></View> : null}
+            {isDriver ? <View accessibilityLabel={`Direction du point de collecte, à ${driverDistText}`} style={styles.rowDriverDistance}><Pressable onPress={() => setShowPickupTooltip((visible) => !visible)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Afficher le point de collecte : ${pickupTitle}`} style={({ pressed }) => [styles.directionButton, pressed && styles.pressed]}><MaterialIcons accessible={false} name="navigation" size={17} color="#007B8B" style={{ transform: [{ rotate: `${compassRotation}deg` }] }} /></Pressable><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text>{showPickupTooltip ? <View style={styles.pickupTooltip}><Text style={styles.pickupTooltipLabel}>COLLECTE</Text><Text style={styles.pickupTooltipText} numberOfLines={1}>{pickupTitle}</Text></View> : null}</View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text></View> : null}
           </View>
           <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff} · {vehicleLabel}</Text>
         </View>
@@ -751,8 +753,12 @@ const styles = StyleSheet.create({
   rowSub: { color: "#666666", fontSize: 10.5, marginTop: 1 },
   rowPrice: { color: "#111111", fontSize: 14, fontWeight: "700", textAlign: "right" },
   rowDetails: { flex: 1, color: "#111111", fontSize: 11.5, lineHeight: 16, paddingRight: 8 },
-  rowDriverDistance: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 3, paddingTop: 1 },
+  rowDriverDistance: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 3, paddingTop: 1, position: "relative" },
+  directionButton: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
   rowDriverDistanceText: { color: "#007B8B", fontSize: 12.5, fontWeight: "600" },
+  pickupTooltip: { position: "absolute", right: 0, top: 28, minWidth: 138, maxWidth: 216, backgroundColor: "#111111", borderRadius: 7, paddingHorizontal: 9, paddingVertical: 7, zIndex: 20 },
+  pickupTooltipLabel: { color: "rgba(255,255,255,0.64)", fontSize: 8, fontWeight: "700", letterSpacing: 0.55 },
+  pickupTooltipText: { color: "#FFFFFF", fontSize: 11, fontWeight: "600", marginTop: 2 },
   rowStatusChip: { marginLeft: "auto", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
   rowStatusText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.35 },
   rowDateRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },

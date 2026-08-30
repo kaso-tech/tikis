@@ -335,3 +335,6 @@
 - [x] Synchroniser le projet et vérifier l’indicateur de direction dynamique actuel.
 - [x] Remplacer l’icône de boussole par une flèche triangulaire dont la pointe indexe la collecte.
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer le correctif visuel de direction.
+- [x] Synchroniser le projet et examiner l’indicateur de navigation actuel.
+- [x] Ajouter au toucher une infobulle compacte contenant le nom du point de collecte.
+- [ ] Tester, relancer Expo, pousser vers GitHub et livrer l’infobulle de collecte.
