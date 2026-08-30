@@ -358,4 +358,4 @@
 - [x] Synchroniser le projet et auditer les flux Wallet, candidatures et sélection depuis l’accueil.
 - [x] Corriger la mise à jour du Wallet et la sélection expéditeur sans contrôle de solde indu.
 - [x] Ajouter les confirmations et contrôles de solde requis aux actions de l’accueil.
-- [ ] Tester, relancer Expo, pousser vers GitHub et livrer les corrections financières.
+- [x] Tester, relancer Expo, pousser vers GitHub et livrer les corrections financières.
