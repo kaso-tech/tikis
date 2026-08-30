@@ -7,9 +7,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
 import { haptic } from "@/lib/haptics";
 import { trpc } from "@/lib/trpc";
-import { formatListRouteParts, locationTitle } from "@/lib/geo-rules";
+import { formatListRouteParts, geodesicDistanceKm, locationTitle } from "@/lib/geo-rules";
 import { useDriverLocation } from "@/hooks/use-driver-location";
 import { useDeviceHeading } from "@/hooks/use-device-heading";
+import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { compassRotationToTarget } from "@/lib/compass";
 import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
@@ -136,6 +137,10 @@ export function HomeScreen() {
     }
     return filteredList[0] ?? null;
   }, [filteredList, selectedId, role]);
+  const liveDeliveryId = role === "sender" && selected?.status === "active" ? selected.id : null;
+  const senderLivePosition = useLiveDeliveryPosition(liveDeliveryId, role === "sender");
+  const publishLivePositionMutation = trpc.deliveries.updateLivePosition.useMutation();
+  const lastPublishedPosition = useRef<{ deliveryId: string; latitude: number; longitude: number; at: number } | null>(null);
 
   useEffect(() => {
     if (!selectedId && selected) setSelectedId(selected.id);
@@ -151,6 +156,26 @@ export function HomeScreen() {
       }
     }
   }, [filteredList, selectedId, role]);
+
+  useEffect(() => {
+    if (role !== "driver" || selected?.status !== "active" || !driverLocation.location) return;
+    const previous = lastPublishedPosition.current;
+    const elapsed = Date.now() - (previous?.at ?? 0);
+    const movedMeters = previous?.deliveryId === selected.id
+      ? geodesicDistanceKm(previous, driverLocation.location) * 1_000
+      : Infinity;
+    if (previous?.deliveryId === selected.id && movedMeters < 4 && elapsed < 5_000) return;
+    const position = driverLocation.location;
+    lastPublishedPosition.current = { deliveryId: selected.id, ...position, at: Date.now() };
+    void publishLivePositionMutation.mutateAsync({
+      deliveryId: selected.id,
+      latitude: position.latitude,
+      longitude: position.longitude,
+      heading: typeof deviceHeading === "number" && Number.isFinite(deviceHeading) ? deviceHeading : 0,
+    }).catch(() => {
+      lastPublishedPosition.current = null;
+    });
+  }, [deviceHeading, driverLocation.location, publishLivePositionMutation, role, selected?.id, selected?.status]);
 
   const otherDeliveries = useMemo(() => filteredList.filter((d) => d.id !== selected?.id).slice(0, 5), [filteredList, selected?.id]);
 
@@ -319,7 +344,7 @@ export function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <MapBackground selected={selected} role={role} sheetOverlayHeight={sheetValue.current} driverPosition={driverLocation.location} />
+      <MapBackground selected={selected} role={role} sheetOverlayHeight={sheetValue.current} driverPosition={role === "driver" ? driverLocation.location : senderLivePosition} />
 
       {!isDriver ? <Pressable
         onPress={() => {
@@ -531,9 +556,13 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
   const routeMutation = trpc.geography.route.useMutation();
   const routeRequestRef = useRef(routeMutation.mutateAsync);
   const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
+  const [approachCoordinates, setApproachCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
+  const lastApproachRequest = useRef<{ deliveryId: string; latitude: number; longitude: number; at: number } | null>(null);
   const pickup = selected?.pickup;
   const dropoff = selected?.dropoff;
-  const hasDriver = Boolean(selected && role === "driver" && driverPosition && (selected.ownCandidateStatus === "confirmed" || selected.status === "active"));
+  const selectedDeliveryId = selected?.id;
+  const selectedDeliveryStatus = selected?.status;
+  const hasDriver = Boolean(selected?.status === "active" && driverPosition);
   const region = useMemo(() => {
     if (!selected) return { latitude: 5.3599, longitude: -4.0083, latitudeDelta: 0.12, longitudeDelta: 0.12 };
     return fitRegionFor(selected.pickup, selected.dropoff);
@@ -542,13 +571,14 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
   useEffect(() => {
     if (!selected) return;
     const timer = setTimeout(() => {
-      mapRef.current?.fitToCoordinates([selected.pickup, selected.dropoff], {
+      const points = driverPosition && selected.status === "active" ? [driverPosition, selected.pickup, selected.dropoff] : [selected.pickup, selected.dropoff];
+      mapRef.current?.fitToCoordinates(points, {
         edgePadding: { top: 84, left: 24, right: 24, bottom: Math.max(170, sheetOverlayHeight + 24) },
         animated: true,
       });
     }, 220);
     return () => clearTimeout(timer);
-  }, [region, selected, sheetOverlayHeight]);
+  }, [driverPosition, region, selected, sheetOverlayHeight]);
 
   useEffect(() => {
     routeRequestRef.current = routeMutation.mutateAsync;
@@ -562,6 +592,26 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
       .catch(() => { if (active) setRouteCoordinates([]); });
     return () => { active = false; };
   }, [selected?.id, pickup, dropoff]);
+
+  useEffect(() => {
+    let active = true;
+    if (!selectedDeliveryId || selectedDeliveryStatus !== "active" || !pickup || !driverPosition) {
+      setApproachCoordinates([]);
+      return;
+    }
+    const previous = lastApproachRequest.current;
+    const elapsed = Date.now() - (previous?.at ?? 0);
+    const movedMeters = previous?.deliveryId === selectedDeliveryId
+      ? geodesicDistanceKm(previous, driverPosition) * 1_000
+      : Infinity;
+    if (previous?.deliveryId === selectedDeliveryId && movedMeters < 80 && elapsed < 15_000) return;
+    lastApproachRequest.current = { deliveryId: selectedDeliveryId, ...driverPosition, at: Date.now() };
+    const origin = { name: "Position du livreur", district: "", city: "", latitude: driverPosition.latitude, longitude: driverPosition.longitude, source: "manual" as const };
+    void routeRequestRef.current({ origin, destination: pickup })
+      .then((route) => { if (active) setApproachCoordinates(route.coordinates); })
+      .catch(() => { if (active) setApproachCoordinates([driverPosition, pickup]); });
+    return () => { active = false; };
+  }, [driverPosition, pickup, selectedDeliveryId, selectedDeliveryStatus]);
 
   return (
     <View style={styles.mapBg}>
@@ -579,6 +629,7 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
       >
         {selected ? (
           <>
+            {approachCoordinates.length > 1 ? <Polyline coordinates={approachCoordinates} strokeColor="#176C52" strokeWidth={4} lineCap="round" /> : null}
             {routeCoordinates.length > 1 ? <Polyline coordinates={routeCoordinates} strokeColor="#9A6201" strokeWidth={4} lineCap="round" /> : null}
             <Marker coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={{ x: 0.5, y: 0.5 }}>
               <View style={styles.nativeMarkerStart}>

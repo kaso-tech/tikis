@@ -113,6 +113,20 @@
       "when": 1788072587138,
       "tag": "0015_breezy_havok",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "5",
+      "when": 1788107967740,
+      "tag": "0016_swift_sunset_bain",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "5",
+      "when": 1788108727160,
+      "tag": "0017_pale_victor_mancha",
+      "breakpoints": true
     }
   ]
 }

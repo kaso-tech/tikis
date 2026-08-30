@@ -7,6 +7,7 @@ import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { formatListRouteParts } from "@/lib/geo-rules";
 import { useDriverLocation } from "@/hooks/use-driver-location";
+import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
@@ -131,6 +132,10 @@ export function HomeScreen() {
     }
     return filteredList[0] ?? null;
   }, [filteredList, selectedId, role]);
+  const liveDeliveryId = role === "sender" && selected?.status === "active" ? selected.id : null;
+  const senderLivePosition = useLiveDeliveryPosition(liveDeliveryId, role === "sender");
+  const publishLivePositionMutation = trpc.deliveries.updateLivePosition.useMutation();
+  const lastPublishedPosition = useRef<{ deliveryId: string; latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
     if (!selectedId && selected) setSelectedId(selected.id);
@@ -146,6 +151,16 @@ export function HomeScreen() {
       }
     }
   }, [filteredList, selectedId, role]);
+
+  useEffect(() => {
+    if (role !== "driver" || selected?.status !== "active" || !driverLocation.location) return;
+    const position = driverLocation.location;
+    const previous = lastPublishedPosition.current;
+    if (previous?.deliveryId === selected.id && previous.latitude === position.latitude && previous.longitude === position.longitude) return;
+    lastPublishedPosition.current = { deliveryId: selected.id, ...position };
+    void publishLivePositionMutation.mutateAsync({ deliveryId: selected.id, latitude: position.latitude, longitude: position.longitude, heading: 0 })
+      .catch(() => { lastPublishedPosition.current = null; });
+  }, [driverLocation.location, publishLivePositionMutation, role, selected?.id, selected?.status]);
 
   const otherDeliveries = useMemo(() => filteredList.filter((d) => d.id !== selected?.id).slice(0, 5), [filteredList, selected?.id]);
 
@@ -318,7 +333,7 @@ export function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <MapBackground selected={selected} role={role} />
+      <MapBackground selected={selected} role={role} driverPosition={role === "driver" ? driverLocation.location : senderLivePosition} />
 
       <Pressable
         onPress={() => {
@@ -511,8 +526,8 @@ function WalletCard({ walletBalance, totalBalance, blockedBalance }: { walletBal
   );
 }
 
-function MapBackground({ selected, role }: { selected: Delivery | null | undefined; role: "sender" | "driver" }) {
-  const hasDriver = false;
+function MapBackground({ selected, role, driverPosition }: { selected: Delivery | null | undefined; role: "sender" | "driver"; driverPosition: { latitude: number; longitude: number } | null }) {
+  const hasDriver = Boolean(selected?.status === "active" && driverPosition);
   const pickup = selected?.pickup;
   const dropoff = selected?.dropoff;
   const routeLine = useMemo(() => {
@@ -536,6 +551,20 @@ function MapBackground({ selected, role }: { selected: Delivery | null | undefin
     const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
     return { left: projection.originX, top: projection.originY, length, angle };
   }, [pickup, dropoff]);
+  const approachLine = useMemo(() => {
+    if (!pickup || !driverPosition || selected?.status !== "active") return null;
+    const points = [driverPosition, pickup, ...(dropoff ? [dropoff] : [])];
+    const minLat = Math.min(...points.map((point) => point.latitude));
+    const maxLat = Math.max(...points.map((point) => point.latitude));
+    const minLng = Math.min(...points.map((point) => point.longitude));
+    const maxLng = Math.max(...points.map((point) => point.longitude));
+    const latPad = (maxLat - minLat || 0.005) * 0.4;
+    const lngPad = (maxLng - minLng || 0.005) * 0.4;
+    const projection = projectOntoCanvas(driverPosition, pickup, { minLat: minLat - latPad, maxLat: maxLat + latPad, minLng: minLng - lngPad, maxLng: maxLng + lngPad }, { width: 320, height: 640 }, 60);
+    const dx = projection.x - projection.originX;
+    const dy = projection.y - projection.originY;
+    return { left: projection.originX, top: projection.originY, length: Math.max(1, Math.hypot(dx, dy)), angle: (Math.atan2(dy, dx) * 180) / Math.PI };
+  }, [driverPosition, dropoff, pickup, selected?.status]);
 
   return (
     <View style={styles.mapBg}>
@@ -547,6 +576,20 @@ function MapBackground({ selected, role }: { selected: Delivery | null | undefin
       <View style={[styles.mapRoad, styles.mapRoad2]} />
       <View style={[styles.mapRoad, styles.mapRoad3]} />
 
+      {approachLine ? (
+        <View
+          style={[
+            styles.approachLine,
+            {
+              left: approachLine.left,
+              top: approachLine.top,
+              width: approachLine.length,
+              transform: [{ translateY: -1.5 }, { rotate: `${approachLine.angle}deg` }],
+              transformOrigin: "0% 50%",
+            },
+          ]}
+        />
+      ) : null}
       {routeLine ? (
         <View
           style={[
@@ -565,8 +608,8 @@ function MapBackground({ selected, role }: { selected: Delivery | null | undefin
       <View style={[styles.marker, styles.markerStart]}>
         <MaterialIcons name="inventory-2" size={14} color="#FFFFFF" />
       </View>
-      {hasDriver && role === "driver" ? (
-        <View style={[styles.marker, styles.markerDriver]}>
+      {hasDriver && approachLine ? (
+        <View style={[styles.marker, styles.markerDriver, { left: approachLine.left - 16, top: approachLine.top - 16 }]}>
           <MaterialIcons name="two-wheeler" size={18} color="#FFFFFF" />
         </View>
       ) : null}
@@ -737,6 +780,7 @@ const styles = StyleSheet.create({
   mapRoad2: { top: "56%", left: "-20%", width: "80%", height: 14, transform: [{ rotate: "6deg" }] },
   mapRoad3: { top: "78%", left: "20%", right: "-10%", height: 12, transform: [{ rotate: "-4deg" }] },
   routeLine: { position: "absolute", height: 3, backgroundColor: "#9A6201", borderRadius: 2 } as any,
+  approachLine: { position: "absolute", height: 3, backgroundColor: "#176C52", borderRadius: 2 } as any,
   marker: { position: "absolute", width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
   markerStart: { top: "32%", left: "16%", backgroundColor: "#9A6201" },
   markerDriver: { top: "50%", left: "42%", backgroundColor: "#111111" },

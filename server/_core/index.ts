@@ -9,6 +9,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { sdk } from "./sdk";
 import { expireOpenTikisDeliveries } from "../db";
+import { publishDeliveryStatusBroadcast } from "../supabase-realtime";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -69,6 +70,12 @@ async function startServer() {
       const user = await sdk.authenticateRequest(req);
       if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
       const result = await expireOpenTikisDeliveries();
+      for (const deliveryId of result.completedDeliveryIds) {
+        void publishDeliveryStatusBroadcast({ deliveryId, status: "completed", title: "Livraison finalisée automatiquement", body: "La course active a été clôturée après 24 heures.", occurredAt: new Date().toISOString() });
+      }
+      for (const deliveryId of result.expiredDeliveryIds) {
+        void publishDeliveryStatusBroadcast({ deliveryId, status: "expired", title: "Livraison non terminée", body: "La course a expiré avant son démarrage et ses mouvements financiers ont été annulés.", occurredAt: new Date().toISOString() });
+      }
       return res.json({ ok: true, ...result, taskUid: user.taskUid });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erreur inconnue";

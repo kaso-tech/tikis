@@ -2,7 +2,7 @@ import { z } from "zod";
 import { COOKIE_NAME } from "../shared/const";
 import { randomInt, randomUUID } from "node:crypto";
 import * as db from "./db";
-import { publishDeliveryStatusBroadcast, syncDeliveryRealtimeMembers } from "./supabase-realtime";
+import { publishDeliveryPositionBroadcast, publishDeliveryStatusBroadcast, syncDeliveryRealtimeMembers } from "./supabase-realtime";
 import { storagePut } from "./storage";
 import * as geography from "./geography";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -297,6 +297,28 @@ export const appRouter = router({
       }
       return deliveryForProfile(delivery, profile);
     }),
+    livePosition: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).query(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      const record = await db.getTikisDeliveryRecordById(input.deliveryId);
+      if (!record || record.status !== "active" || !record.driverPhone) return null;
+      const isParticipant = profile.accountType === "sender"
+        ? record.senderPhone === profile.phone
+        : record.driverPhone === profile.phone;
+      if (!isParticipant) throw new Error("Cette position n’est pas accessible.");
+      return db.getTikisDeliveryLiveLocation(input.deliveryId);
+    }),
+    updateLivePosition: tikisProtectedProcedure.input(z.object({
+      deliveryId: z.string().uuid(),
+      latitude: coordinateSchema.min(-90).max(90),
+      longitude: coordinateSchema.min(-180).max(180),
+      heading: z.number().finite().min(0).max(360),
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "driver") throw new Error("Seul le livreur assigné peut partager sa position.");
+      const position = await db.saveTikisDeliveryLiveLocation({ ...input, driverPhone: profile.phone });
+      void publishDeliveryPositionBroadcast({ deliveryId: input.deliveryId, ...position });
+      return position;
+    }),
     create: tikisProtectedProcedure.input(deliveryInputSchema).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "sender") throw new Error("Seul un expéditeur peut publier une livraison.");
@@ -413,9 +435,9 @@ export const appRouter = router({
     }),
     complete: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
-      const delivery = await db.completeTikisDeliveryWithEvents(input.deliveryId, profile.phone);
-      if (delivery) { await syncDeliveryParticipants(delivery); void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livraison terminée", body: "La livraison a été déclarée terminée.", occurredAt: new Date().toISOString() }); }
-      return delivery;
+      const result = await db.completeTikisDeliveryWithEvents(input.deliveryId, profile.phone);
+      if (result.delivery) { await syncDeliveryParticipants(result.delivery); void publishDeliveryStatusBroadcast({ deliveryId: result.delivery.id, status: result.delivery.status, title: "Livraison terminée", body: "La livraison a été déclarée terminée.", occurredAt: new Date().toISOString() }); }
+      return result;
     }),
   }),
   wallet: router({

@@ -11,7 +11,7 @@ export type DeliveryPosition = {
 type RealtimeListener = (position: DeliveryPosition) => void;
 export type DeliveryStatusEvent = {
   deliveryId: string;
-  status: "draft" | "open" | "pending_confirmation" | "active" | "completed" | "disabled" | "cancelled";
+  status: "draft" | "open" | "pending_confirmation" | "active" | "completed" | "disabled" | "cancelled" | "expired";
   title: string;
   body: string;
   occurredAt: string;
@@ -75,7 +75,7 @@ export function normalizeDeliveryPosition(input: unknown): DeliveryPosition | nu
 export function normalizeDeliveryStatusEvent(input: unknown): DeliveryStatusEvent | null {
   if (!input || typeof input !== "object") return null;
   const value = input as Record<string, unknown>;
-  const allowed = ["draft", "open", "pending_confirmation", "active", "completed", "disabled", "cancelled"] as const;
+  const allowed = ["draft", "open", "pending_confirmation", "active", "completed", "disabled", "cancelled", "expired"] as const;
   if (typeof value.deliveryId !== "string" || !allowed.includes(value.status as typeof allowed[number])) return null;
   if (typeof value.title !== "string" || typeof value.body !== "string" || typeof value.occurredAt !== "string") return null;
   if (value.deliveryId.length > 96 || value.title.length > 120 || value.body.length > 300 || !Number.isFinite(new Date(value.occurredAt).getTime())) return null;

@@ -1,11 +1,11 @@
 import { randomUUID } from "crypto";
 import { and, count, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisDelivery, TikisDeliveryCandidate, TikisPlace, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryReviews, tikisFavoritePlaces, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisWalletLedger, tikisWallets, users } from "../drizzle/schema";
+import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisDelivery, TikisDeliveryCandidate, TikisPlace, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReviews, tikisFavoritePlaces, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisWalletLedger, tikisWallets, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppNotification, LocationLabel, SelectableVehicleType, WalletOperation, WalletSnapshot } from "../shared/tikis-domain";
 import { candidateMovementVersion } from "../shared/wallet-commission";
-import { DELIVERY_EXPIRATION_MS } from "../shared/delivery-expiration";
+import { DELIVERY_EXPIRATION_MS, deliveryExpirationOutcome } from "../shared/delivery-expiration";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -302,6 +302,60 @@ export async function getTikisDeliveryRecordById(id: string) {
   return rows[0];
 }
 
+export type TikisLiveDeliveryPosition = {
+  latitude: number;
+  longitude: number;
+  heading: number;
+  recordedAt: string;
+};
+
+export async function saveTikisDeliveryLiveLocation(input: {
+  deliveryId: string;
+  driverPhone: string;
+  latitude: number;
+  longitude: number;
+  heading: number;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Le suivi en direct est temporairement indisponible.");
+  const delivery = await getTikisDeliveryRecordById(input.deliveryId);
+  if (!delivery || delivery.status !== "active" || delivery.driverPhone !== input.driverPhone) {
+    throw new Error("Cette position ne peut pas être publiée pour cette livraison.");
+  }
+  const recordedAt = new Date();
+  await db.insert(tikisDeliveryLiveLocations).values({
+    deliveryId: input.deliveryId,
+    driverPhone: input.driverPhone,
+    latitude: String(input.latitude),
+    longitude: String(input.longitude),
+    heading: String(input.heading),
+    recordedAt,
+  }).onDuplicateKeyUpdate({
+    set: {
+      driverPhone: input.driverPhone,
+      latitude: String(input.latitude),
+      longitude: String(input.longitude),
+      heading: String(input.heading),
+      recordedAt,
+    },
+  });
+  return { latitude: input.latitude, longitude: input.longitude, heading: input.heading, recordedAt: recordedAt.toISOString() } satisfies TikisLiveDeliveryPosition;
+}
+
+export async function getTikisDeliveryLiveLocation(deliveryId: string): Promise<TikisLiveDeliveryPosition | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(tikisDeliveryLiveLocations).where(eq(tikisDeliveryLiveLocations.deliveryId, deliveryId)).limit(1);
+  const location = rows[0];
+  if (!location) return null;
+  return {
+    latitude: Number(location.latitude),
+    longitude: Number(location.longitude),
+    heading: Number(location.heading),
+    recordedAt: location.recordedAt.toISOString(),
+  };
+}
+
 export async function listTikisDeliveriesForProfile(profilePhone: string, role: "sender" | "driver") {
   const db = await getDb();
   if (!db) return [];
@@ -314,18 +368,47 @@ export async function listTikisDeliveriesForProfile(profilePhone: string, role: 
 
 export async function expireOpenTikisDeliveries(now = new Date()) {
   const db = await getDb();
-  if (!db) return { expiredCount: 0 } as const;
+  if (!db) return { expiredCount: 0, completedCount: 0, expiredDeliveryIds: [], completedDeliveryIds: [] } as const;
   const cutoff = new Date(now.getTime() - DELIVERY_EXPIRATION_MS);
   return db.transaction(async (tx) => {
     const stale = await tx.select().from(tikisDeliveries)
-      .where(and(eq(tikisDeliveries.status, "open"), lt(tikisDeliveries.createdAt, cutoff)))
+      .where(and(inArray(tikisDeliveries.status, ["open", "pending_confirmation", "active", "disabled"]), lt(tikisDeliveries.createdAt, cutoff)))
       .for("update");
+    let expiredCount = 0;
+    let completedCount = 0;
+    const expiredDeliveryIds: string[] = [];
+    const completedDeliveryIds: string[] = [];
     for (const delivery of stale) {
+      const outcome = deliveryExpirationOutcome(delivery.status as "open" | "pending_confirmation" | "active" | "disabled", delivery.createdAt, now.getTime());
+      if (outcome === "complete" && delivery.driverPhone) {
+        const earning = Math.round(delivery.offeredPrice ?? delivery.estimatedPrice);
+        await applyWalletMovement(tx, {
+          profilePhone: delivery.driverPhone,
+          deliveryId: delivery.id,
+          operation: "credit",
+          amount: earning,
+          availableDelta: earning,
+          heldDelta: 0,
+          reason: "Gain de livraison crédité après clôture automatique à 24 h",
+          idempotencyKey: `${delivery.id}:delivery-earning`,
+        });
+        await tx.update(tikisDeliveries).set({ status: "completed", completedAt: now, updatedAt: now }).where(eq(tikisDeliveries.id, delivery.id));
+        await appendDeliveryEvent(tx, { deliveryId: delivery.id, eventType: "delivery_completed", status: "completed", recipientPhone: delivery.senderPhone, title: "Livraison finalisée automatiquement", body: "La livraison en cours a été clôturée après 24 heures.", tone: "success", idempotencyKey: `${delivery.id}:auto-completed-sender` });
+        await appendDeliveryEvent(tx, { deliveryId: delivery.id, eventType: "delivery_completed", status: "completed", recipientPhone: delivery.driverPhone, title: "Gain de livraison crédité", body: `Votre gain de ${earning} FCFA a été ajouté après la clôture automatique de la course.`, tone: "success", idempotencyKey: `${delivery.id}:auto-completed-driver` });
+        completedCount += 1;
+        completedDeliveryIds.push(delivery.id);
+        continue;
+      }
+      if (outcome !== "expire") continue;
       const candidates = await tx.select().from(tikisDeliveryCandidates)
-        .where(and(eq(tikisDeliveryCandidates.deliveryId, delivery.id), eq(tikisDeliveryCandidates.status, "applied")))
+        .where(and(eq(tikisDeliveryCandidates.deliveryId, delivery.id), inArray(tikisDeliveryCandidates.status, ["applied", "selected"])))
         .for("update");
       for (const candidate of candidates) {
-        if (candidate.commissionBlocked > 0) {
+        const debits = await tx.select().from(tikisWalletLedger).where(and(eq(tikisWalletLedger.deliveryId, delivery.id), eq(tikisWalletLedger.profilePhone, candidate.driverPhone), eq(tikisWalletLedger.operation, "debit"))).for("update");
+        const debitedAmount = debits.reduce((total: number, entry: { amount: number }) => total + Number(entry.amount), 0);
+        if (debitedAmount > 0) {
+          await applyWalletMovement(tx, { profilePhone: candidate.driverPhone, deliveryId: delivery.id, operation: "compensation", amount: debitedAmount, availableDelta: debitedAmount, heldDelta: 0, reason: "Commission compensée : livraison expirée avant départ", idempotencyKey: `${delivery.id}:expired-compensation:${candidate.id}` });
+        } else if (candidate.commissionBlocked > 0) {
           await applyWalletMovement(tx, {
             profilePhone: candidate.driverPhone,
             deliveryId: delivery.id,
@@ -356,12 +439,14 @@ export async function expireOpenTikisDeliveries(now = new Date()) {
         status: "expired",
         recipientPhone: delivery.senderPhone,
         title: "Livraison expirée",
-        body: "Votre livraison a expiré après 24 heures sans attribution.",
+        body: "Votre livraison n’a pas démarré dans les 24 heures et est conservée dans l’historique comme non terminée.",
         tone: "warning",
         idempotencyKey: `delivery-expired-sender:${delivery.id}`,
       });
+      expiredCount += 1;
+      expiredDeliveryIds.push(delivery.id);
     }
-    return { expiredCount: stale.length } as const;
+    return { expiredCount, completedCount, expiredDeliveryIds, completedDeliveryIds } as const;
   });
 }
 
@@ -824,14 +909,26 @@ export async function confirmTikisDeliveryWithEvents(deliveryId: string, driverP
 export async function completeTikisDeliveryWithEvents(deliveryId: string, profilePhone: string) {
   const db = await getDb();
   if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
-  await db.transaction(async (tx) => {
+  const wallet = await db.transaction(async (tx) => {
     const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.status, "active"), or(eq(tikisDeliveries.senderPhone, profilePhone), eq(tikisDeliveries.driverPhone, profilePhone)))).limit(1).for("update"))[0];
     if (!delivery || !delivery.driverPhone) throw new Error("Cette livraison ne peut pas être terminée.");
+    const earning = Math.round(delivery.offeredPrice ?? delivery.estimatedPrice);
+    await applyWalletMovement(tx, {
+      profilePhone: delivery.driverPhone,
+      deliveryId,
+      operation: "credit",
+      amount: earning,
+      availableDelta: earning,
+      heldDelta: 0,
+      reason: "Gain de livraison crédité après confirmation de fin de course",
+      idempotencyKey: `${deliveryId}:delivery-earning`,
+    });
     await tx.update(tikisDeliveries).set({ status: "completed", completedAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_completed", status: "completed", actorPhone: profilePhone, recipientPhone: delivery.senderPhone, title: "Livraison terminée", body: "Votre livraison est terminée. Vous pouvez maintenant évaluer le livreur.", tone: "success", idempotencyKey: `${deliveryId}:completed-sender` });
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_completed", status: "completed", actorPhone: profilePhone, recipientPhone: delivery.driverPhone, title: "Course terminée", body: "La course est ajoutée à votre historique.", tone: "success", idempotencyKey: `${deliveryId}:completed-driver` });
+    return walletSnapshotFromRecord(await ensureTikisWallet(tx, delivery.driverPhone));
   });
-  return getTikisDeliveryById(deliveryId);
+  return { delivery: await getTikisDeliveryById(deliveryId), wallet };
 }
 
 export async function createOrUpdateCandidate(input: { id: string; deliveryId: string; driverPhone: string; offerPrice?: number; commissionBlocked: number }) {

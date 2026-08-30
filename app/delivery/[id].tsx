@@ -128,7 +128,10 @@ export default function DeliveryDetailScreen() {
         const result = await confirmMutation.mutateAsync({ deliveryId });
         utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
       }
-      if (action === "complete") await completeMutation.mutateAsync({ deliveryId });
+      if (action === "complete") {
+        const result = await completeMutation.mutateAsync({ deliveryId });
+        utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
+      }
       await refreshDelivery();
       setAction(null);
       setSelectedCandidate(null);

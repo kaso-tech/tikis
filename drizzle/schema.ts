@@ -98,6 +98,17 @@ export const tikisDeliveries = mysqlTable("tikis_deliveries", {
   index("tikis_deliveries_status_created_index").on(table.status, table.createdAt),
 ]);
 
+/** Latest foreground GPS position published by the driver assigned to an active delivery. */
+export const tikisDeliveryLiveLocations = mysqlTable("tikis_delivery_live_locations", {
+  deliveryId: varchar("deliveryId", { length: 40 }).primaryKey(),
+  driverPhone: varchar("driverPhone", { length: 20 }).notNull(),
+  latitude: decimal("latitude", { precision: 10, scale: 7 }).notNull(),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }).notNull(),
+  heading: decimal("heading", { precision: 6, scale: 2 }).notNull().default("0"),
+  recordedAt: timestamp("recordedAt").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [index("tikis_delivery_live_locations_driver_index").on(table.driverPhone, table.updatedAt)]);
+
 /** A driver can have one candidacy per delivery. Historical status is retained, never deleted. */
 export const tikisDeliveryCandidates = mysqlTable("tikis_delivery_candidates", {
   id: varchar("id", { length: 40 }).primaryKey(),
@@ -187,7 +198,7 @@ export const tikisDeliveryEvents = mysqlTable("tikis_delivery_events", {
   id: varchar("id", { length: 40 }).primaryKey(),
   deliveryId: varchar("deliveryId", { length: 40 }).notNull(),
   eventType: varchar("eventType", { length: 48 }).notNull(),
-  status: mysqlEnum("status", ["draft", "open", "pending_confirmation", "active", "completed", "disabled", "cancelled"]),
+  status: mysqlEnum("status", ["draft", "open", "pending_confirmation", "active", "completed", "disabled", "cancelled", "expired"]),
   actorPhone: varchar("actorPhone", { length: 20 }),
   recipientPhone: varchar("recipientPhone", { length: 20 }).notNull(),
   title: varchar("title", { length: 120 }).notNull(),
@@ -211,6 +222,7 @@ export type InsertTikisPlace = typeof tikisPlaces.$inferInsert;
 export type TikisFavoritePlace = typeof tikisFavoritePlaces.$inferSelect;
 export type TikisDelivery = typeof tikisDeliveries.$inferSelect;
 export type InsertTikisDelivery = typeof tikisDeliveries.$inferInsert;
+export type TikisDeliveryLiveLocation = typeof tikisDeliveryLiveLocations.$inferSelect;
 export type TikisDeliveryCandidate = typeof tikisDeliveryCandidates.$inferSelect;
 export type TikisDeliveryReview = typeof tikisDeliveryReviews.$inferSelect;
 export type TikisWallet = typeof tikisWallets.$inferSelect;

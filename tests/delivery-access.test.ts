@@ -13,6 +13,8 @@ const dbMock = vi.hoisted(() => ({
   countTikisDeliveryCandidates: vi.fn(),
   listTikisDeliveryCandidates: vi.fn(),
   applyForTikisDelivery: vi.fn(),
+  saveTikisDeliveryLiveLocation: vi.fn(),
+  getTikisDeliveryLiveLocation: vi.fn(),
   withdrawTikisDeliveryCandidateWithWallet: vi.fn(),
   selectTikisDeliveryCandidateWithWallet: vi.fn(),
   confirmTikisDeliveryWithEvents: vi.fn(),
@@ -101,6 +103,42 @@ describe("livraisons persistées Tikis", () => {
     const caller = appRouter.createCaller(contextFor(driver.phone));
     await expect(caller.deliveries.submitApplication({ deliveryId } as never)).rejects.toThrow();
     expect(dbMock.applyForTikisDelivery).not.toHaveBeenCalled();
+  });
+
+  it("autorise seulement le livreur assigné à publier une position GPS pour une course active", async () => {
+    const position = { latitude: 12.3714, longitude: -1.5197, heading: 48, recordedAt: "2026-08-30T16:40:00.000Z" };
+    dbMock.getTikisProfileByPhone.mockResolvedValue(driver);
+    dbMock.saveTikisDeliveryLiveLocation.mockResolvedValue(position);
+    const caller = appRouter.createCaller(contextFor(driver.phone));
+    await expect(caller.deliveries.updateLivePosition({ deliveryId, latitude: position.latitude, longitude: position.longitude, heading: position.heading })).resolves.toEqual(position);
+    expect(dbMock.saveTikisDeliveryLiveLocation).toHaveBeenCalledWith(expect.objectContaining({ deliveryId, driverPhone: driver.phone, latitude: position.latitude, longitude: position.longitude }));
+  });
+
+  it("retourne la dernière position uniquement à l’expéditeur ou au livreur d’une course active", async () => {
+    const position = { latitude: 12.3714, longitude: -1.5197, heading: 48, recordedAt: "2026-08-30T16:40:00.000Z" };
+    dbMock.getTikisProfileByPhone.mockResolvedValue(sender);
+    dbMock.getTikisDeliveryRecordById.mockResolvedValue({ id: deliveryId, status: "active", senderPhone: sender.phone, driverPhone: driver.phone });
+    dbMock.getTikisDeliveryLiveLocation.mockResolvedValue(position);
+    const caller = appRouter.createCaller(contextFor(sender.phone));
+    await expect(caller.deliveries.livePosition({ deliveryId })).resolves.toEqual(position);
+    expect(dbMock.getTikisDeliveryLiveLocation).toHaveBeenCalledWith(deliveryId);
+  });
+
+  it("retourne le Wallet crédité lorsque le livreur clôture une course active", async () => {
+    const completed = { id: deliveryId, status: "completed" };
+    const wallet = { total: 14_500, blocked: 0 };
+    dbMock.getTikisProfileByPhone.mockResolvedValue(driver);
+    dbMock.completeTikisDeliveryWithEvents.mockResolvedValue({ delivery: completed, wallet });
+    const caller = appRouter.createCaller(contextFor(driver.phone));
+    await expect(caller.deliveries.complete({ deliveryId })).resolves.toEqual({ delivery: completed, wallet });
+    expect(dbMock.completeTikisDeliveryWithEvents).toHaveBeenCalledWith(deliveryId, driver.phone);
+  });
+
+  it("refuse la lecture d’une position live à un autre livreur", async () => {
+    dbMock.getTikisProfileByPhone.mockResolvedValue({ ...driver, phone: "+22677000000" });
+    dbMock.getTikisDeliveryRecordById.mockResolvedValue({ id: deliveryId, status: "active", senderPhone: sender.phone, driverPhone: driver.phone });
+    const caller = appRouter.createCaller(contextFor("+22677000000"));
+    await expect(caller.deliveries.livePosition({ deliveryId })).rejects.toThrow("n’est pas accessible");
   });
 
   it("sélectionne un livreur sans consulter le Wallet de l’expéditeur", async () => {
