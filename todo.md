@@ -354,4 +354,4 @@
 - [x] Relancer Expo, valider la compilation et les services, puis livrer la version synchronisée.
 - [x] Synchroniser le projet et recenser les icônes de fiche, footer et menu latéral encore hors charte.
 - [x] Appliquer le brun doré aux icônes actives et aux repères de navigation concernés.
-- [ ] Tester, relancer Expo, pousser vers GitHub et livrer la correction chromatique des icônes.
+- [x] Tester, relancer Expo, pousser vers GitHub et livrer la correction chromatique des icônes.
