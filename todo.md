@@ -401,3 +401,5 @@
 - [x] Suspendre l’activation API YengaPay jusqu’à validation des identifiants du projet marchand.
 - [x] Initialiser le modèle de paiement YengaPay en mode test sans appel externe.
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer le modèle de paiement de test.
+- [x] Sécuriser l’état local, récupérer la dernière branche main et vérifier les dépendances modifiées.
+- [x] Relancer Expo, valider la compilation et les services, puis livrer la version synchronisée.
