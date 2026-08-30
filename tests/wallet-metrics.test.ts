@@ -17,7 +17,7 @@ const record = (overrides: Partial<FinancialRecord>): FinancialRecord => ({
 describe("métriques de gains Wallet", () => {
   it("exclut les dépôts des gains et ne conserve que les crédits rattachés à une livraison", () => {
     const metrics = deliveryMetricsForDay([
-      record({ id: "deposit", deliveryId: "", amount: 5000, reason: "Dépôt Ligdi Cash simulé confirmé" }),
+      record({ id: "deposit", deliveryId: "", amount: 5000, reason: "Dépôt YengaPay en mode test confirmé" }),
       record({ id: "course", deliveryId: "delivery-1", amount: 3200, reason: "Gain de livraison" }),
     ], new Date("2026-08-30T12:00:00.000Z"));
 

@@ -391,3 +391,13 @@
 - [x] Ajouter un compte à rebours visuel et accessible avant l’échéance de 24 heures.
 - [x] Notifier expéditeur et livreur lorsque la livraison est automatiquement terminée ou annulée après 24 h.
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer les alertes d’échéance.
+- [x] Synchroniser le projet et analyser la documentation officielle YengaPay.
+- [ ] Mettre à jour puis valider la nouvelle clé API et l’URL officielle YengaPay avec l’Organisation ID et le Projet ID.
+- [ ] Concevoir l’adaptateur YengaPay avec l’Organisation ID, le Projet ID, l’API Key et le secret webhook, uniquement côté serveur.
+- [ ] Remplacer les parcours Wallet LigdiCash par YengaPay avec validations, chargement et feedback.
+- [ ] Tester l’intégration, relancer Expo, pousser vers GitHub et livrer la migration de paiement.
+- [ ] Valider la clé API avec le SDK officiel YengaPay en environnement sandbox.
+- [ ] Remplacer l’adaptateur de paiement Wallet par le SDK et le Checkout YengaPay officiels.
+- [x] Suspendre l’activation API YengaPay jusqu’à validation des identifiants du projet marchand.
+- [x] Initialiser le modèle de paiement YengaPay en mode test sans appel externe.
+- [x] Tester, relancer Expo, pousser vers GitHub et livrer le modèle de paiement de test.

@@ -1,0 +1,1 @@
+ALTER TABLE `tikis_payment_transactions` MODIFY COLUMN `provider` enum('ligdi_simulated','yengapay_test') NOT NULL DEFAULT 'yengapay_test';

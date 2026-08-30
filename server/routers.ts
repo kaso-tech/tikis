@@ -450,13 +450,13 @@ export const appRouter = router({
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       return db.requestTikisWalletOperation(profile.phone, input.type, input.amount);
     }),
-    initiateLigdiSimulation: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000), idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{16,96}$/) })).mutation(async ({ ctx, input }) => {
+    initiateYengaPayTest: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000), idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{16,96}$/) })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
-      return db.initiateSimulatedLigdiPayment({ ...input, profilePhone: profile.phone });
+      return db.initiateYengaPayTestPayment({ ...input, profilePhone: profile.phone });
     }),
-    settleLigdiSimulation: tikisProtectedProcedure.input(z.object({ paymentId: z.string().uuid(), outcome: z.enum(["succeeded", "failed"]) })).mutation(async ({ ctx, input }) => {
+    settleYengaPayTest: tikisProtectedProcedure.input(z.object({ paymentId: z.string().uuid(), outcome: z.enum(["succeeded", "failed"]) })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
-      return db.settleSimulatedLigdiPayment({ ...input, profilePhone: profile.phone });
+      return db.settleYengaPayTestPayment({ ...input, profilePhone: profile.phone });
     }),
   }),
   notifications: router({

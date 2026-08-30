@@ -36,8 +36,8 @@ export default function WalletScreen() {
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 12_000, refetchOnMount: "always", refetchOnWindowFocus: true });
   const wallet = walletQuery.data?.wallet;
   const journal = walletQuery.data?.journal ?? [];
-  const initiateMutation = trpc.wallet.initiateLigdiSimulation.useMutation();
-  const settleMutation = trpc.wallet.settleLigdiSimulation.useMutation();
+  const initiateMutation = trpc.wallet.initiateYengaPayTest.useMutation();
+  const settleMutation = trpc.wallet.settleYengaPayTest.useMutation();
   const [requestType, setRequestType] = useState<"deposit" | "withdrawal" | null>(null);
   const [amountInput, setAmountInput] = useState("");
   const [requestError, setRequestError] = useState("");
@@ -71,9 +71,9 @@ export default function WalletScreen() {
     const error = offeredPriceError(amountInput) ?? (!amount || amount < 100 ? "Saisissez au moins 100 FCFA." : "");
     if (error || !amount) { setRequestError(error || "Montant invalide."); return; }
     try {
-      const result = await initiateMutation.mutateAsync({ type: requestType!, amount, idempotencyKey: `ligdi-${Date.now()}-${Math.random().toString(36).slice(2, 14)}` });
+      const result = await initiateMutation.mutateAsync({ type: requestType!, amount, idempotencyKey: `yengapay-test-${Date.now()}-${Math.random().toString(36).slice(2, 14)}` });
       setPayment(result);
-    } catch (cause) { setRequestError(cause instanceof Error ? cause.message : "La demande Ligdi Cash n’a pas pu être initialisée."); }
+    } catch (cause) { setRequestError(cause instanceof Error ? cause.message : "La demande YengaPay n’a pas pu être initialisée."); }
   }
   async function settlePayment(outcome: "succeeded" | "failed") {
     if (!payment) return;
@@ -87,7 +87,7 @@ export default function WalletScreen() {
       ]);
       await walletQuery.refetch();
       setPayment(null); setRequestType(null); setAmountInput("");
-    } catch (cause) { setRequestError(cause instanceof Error ? cause.message : "La confirmation Ligdi Cash a échoué."); }
+    } catch (cause) { setRequestError(cause instanceof Error ? cause.message : "La confirmation YengaPay a échoué."); }
   }
 
   return (
@@ -148,7 +148,7 @@ export default function WalletScreen() {
             <View style={styles.actionIcon}><MaterialIcons name="add-card" size={15} color="#007B8B" /></View>
             <View style={styles.actionText}>
               <Text style={styles.actionLabel}>Dépôt</Text>
-              <Text style={styles.actionSub}>Ligdi Cash</Text>
+              <Text style={styles.actionSub}>YengaPay · test</Text>
             </View>
           </Pressable>
           <Pressable onPress={() => openRequest("withdrawal")} style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}>
@@ -228,10 +228,10 @@ export default function WalletScreen() {
             {payment ? (
               <>
                 <View style={styles.modalIcon}><MaterialIcons name="verified-user" size={22} color="#007B8B" /></View>
-                <Text style={styles.modalTitle}>Validation Ligdi Cash</Text>
-                <Text style={styles.modalSub}>Mode simulation : confirmez le résultat de votre paiement de {formatMoney(payment.amount)}. Votre Wallet ne changera qu’après cette confirmation serveur.</Text>
+                <Text style={styles.modalTitle}>Validation YengaPay</Text>
+                <Text style={styles.modalSub}>Mode test : confirmez le résultat de votre paiement de {formatMoney(payment.amount)}. Votre Wallet ne changera qu’après cette confirmation serveur.</Text>
                 <View style={styles.referenceCard}>
-                  <Text style={styles.referenceLabel}>RÉFÉRENCE SIMULÉE</Text>
+                  <Text style={styles.referenceLabel}>RÉFÉRENCE YENGAPAY TEST</Text>
                   <Text style={styles.referenceValue}>{payment.providerReference}</Text>
                 </View>
                 {requestError ? <Text style={styles.requestError}>{requestError}</Text> : <Text style={styles.modalHint}>Aucun moyen de paiement réel n’est débité dans ce mode.</Text>}
@@ -243,13 +243,13 @@ export default function WalletScreen() {
             ) : (
               <>
                 <View style={styles.modalIcon}><MaterialIcons name={requestType === "deposit" ? "add-card" : "account-balance-wallet"} size={22} color="#007B8B" /></View>
-                <Text style={styles.modalTitle}>{requestType === "deposit" ? "Dépôt Ligdi Cash" : "Retrait Ligdi Cash"}</Text>
-                <Text style={styles.modalSub}>{requestType === "deposit" ? "Initialisez un dépôt simulé. Le solde ne sera crédité qu'après la confirmation suivante." : "Initialisez un retrait simulé. Le solde ne sera débité qu'après la confirmation suivante."}</Text>
+                <Text style={styles.modalTitle}>{requestType === "deposit" ? "Dépôt YengaPay" : "Retrait YengaPay"}</Text>
+                <Text style={styles.modalSub}>{requestType === "deposit" ? "Initialisez un dépôt de test. Le solde ne sera crédité qu'après la confirmation suivante." : "Initialisez un retrait de test. Le solde ne sera débité qu'après la confirmation suivante."}</Text>
                 <View style={styles.amountWrap}>
                   <TextInput value={amountInput} onChangeText={(value) => setAmountInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} autoFocus style={styles.amountInput} placeholder="Montant" placeholderTextColor="#9AA5B6" />
                   <Text style={styles.amountCurrency}>FCFA</Text>
                 </View>
-                {requestError ? <Text style={styles.requestError}>{requestError}</Text> : <Text style={styles.modalHint}>Le montant et le statut de simulation seront enregistrés dans votre journal financier.</Text>}
+                {requestError ? <Text style={styles.requestError}>{requestError}</Text> : <Text style={styles.modalHint}>Le montant et le statut de test seront enregistrés dans votre journal financier.</Text>}
                 <View style={styles.modalActions}>
                   <TikisButton label="Annuler" variant="secondary" disabled={requestLoading} onPress={() => setRequestType(null)} style={styles.modalAction} />
                   <TikisButton label="Initialiser" loading={requestLoading} disabled={requestLoading} onPress={() => void confirmRequest()} style={styles.modalAction} />

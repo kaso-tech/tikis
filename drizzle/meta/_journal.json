@@ -127,6 +127,13 @@
       "when": 1788108727160,
       "tag": "0017_pale_victor_mancha",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "5",
+      "when": 1788131136926,
+      "tag": "0018_left_scarecrow",
+      "breakpoints": true
     }
   ]
 }

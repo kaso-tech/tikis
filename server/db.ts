@@ -549,10 +549,10 @@ export async function requestTikisWalletOperation(profilePhone: string, type: "d
   return { success: true } as const;
 }
 
-type SimulatedPaymentView = { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; createdAt: string; settledAt?: string };
-type SimulatedPaymentSettlement = { payment: SimulatedPaymentView; wallet: WalletSnapshot };
+type YengaPayTestPaymentView = { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; createdAt: string; settledAt?: string };
+type YengaPayTestPaymentSettlement = { payment: YengaPayTestPaymentView; wallet: WalletSnapshot };
 
-function simulatedPaymentToView(payment: { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; createdAt: Date; settledAt: Date | null }): SimulatedPaymentView {
+function yengaPayTestPaymentToView(payment: { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; createdAt: Date; settledAt: Date | null }): YengaPayTestPaymentView {
   return { id: payment.id, type: payment.type, amount: payment.amount, status: payment.status, providerReference: payment.providerReference, createdAt: payment.createdAt.toISOString(), ...(payment.settledAt ? { settledAt: payment.settledAt.toISOString() } : {}) };
 }
 
@@ -560,7 +560,7 @@ function walletSnapshotFromRecord(wallet: { availableBalance: number; heldBalanc
   return { total: wallet.availableBalance + wallet.heldBalance, blocked: wallet.heldBalance };
 }
 
-export async function initiateSimulatedLigdiPayment(input: { profilePhone: string; type: "deposit" | "withdrawal"; amount: number; idempotencyKey: string }) {
+export async function initiateYengaPayTestPayment(input: { profilePhone: string; type: "deposit" | "withdrawal"; amount: number; idempotencyKey: string }) {
   if (!Number.isSafeInteger(input.amount) || input.amount < 100 || input.amount > 10_000_000) throw new Error("Le montant demandé est invalide.");
   if (!/^[A-Za-z0-9_-]{16,96}$/.test(input.idempotencyKey)) throw new Error("Référence de paiement invalide.");
   const db = await getDb();
@@ -569,43 +569,43 @@ export async function initiateSimulatedLigdiPayment(input: { profilePhone: strin
     const existing = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.idempotencyKey, input.idempotencyKey)).limit(1).for("update"))[0];
     if (existing) {
       if (existing.profilePhone !== input.profilePhone) throw new Error("Référence de paiement invalide.");
-      return simulatedPaymentToView(existing);
+      return yengaPayTestPaymentToView(existing);
     }
     const wallet = await ensureTikisWallet(tx, input.profilePhone);
     if (input.type === "withdrawal" && wallet.availableBalance < input.amount) throw new Error("Votre solde disponible est insuffisant pour ce retrait.");
     const id = randomUUID();
-    const providerReference = `LIGDI-SIM-${randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
-    await tx.insert(tikisPaymentTransactions).values({ id, profilePhone: input.profilePhone, type: input.type, amount: input.amount, status: "pending", providerReference, idempotencyKey: input.idempotencyKey });
-    await tx.insert(tikisWalletLedger).values({ id: randomUUID(), profilePhone: input.profilePhone, deliveryId: null, operation: input.type === "deposit" ? "deposit_request" : "withdrawal_request", amount: input.amount, availableBefore: wallet.availableBalance, availableAfter: wallet.availableBalance, heldBefore: wallet.heldBalance, heldAfter: wallet.heldBalance, reason: `Demande ${input.type === "deposit" ? "de dépôt" : "de retrait"} Ligdi Cash simulée`, idempotencyKey: `${id}:requested` });
+    const providerReference = `YENGA-TEST-${randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
+    await tx.insert(tikisPaymentTransactions).values({ id, profilePhone: input.profilePhone, type: input.type, provider: "yengapay_test", amount: input.amount, status: "pending", providerReference, idempotencyKey: input.idempotencyKey });
+    await tx.insert(tikisWalletLedger).values({ id: randomUUID(), profilePhone: input.profilePhone, deliveryId: null, operation: input.type === "deposit" ? "deposit_request" : "withdrawal_request", amount: input.amount, availableBefore: wallet.availableBalance, availableAfter: wallet.availableBalance, heldBefore: wallet.heldBalance, heldAfter: wallet.heldBalance, reason: `Demande ${input.type === "deposit" ? "de dépôt" : "de retrait"} YengaPay en mode test`, idempotencyKey: `${id}:requested` });
     const created = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, id)).limit(1))[0];
     if (!created) throw new Error("La demande de paiement n’a pas pu être créée.");
-    return simulatedPaymentToView(created);
+    return yengaPayTestPaymentToView(created);
   });
 }
 
-export async function settleSimulatedLigdiPayment(input: { profilePhone: string; paymentId: string; outcome: "succeeded" | "failed" }) {
+export async function settleYengaPayTestPayment(input: { profilePhone: string; paymentId: string; outcome: "succeeded" | "failed" }) {
   const db = await getDb();
   if (!db) throw new Error("Le paiement est temporairement indisponible.");
   return db.transaction(async (tx) => {
     const payment = (await tx.select().from(tikisPaymentTransactions).where(and(eq(tikisPaymentTransactions.id, input.paymentId), eq(tikisPaymentTransactions.profilePhone, input.profilePhone))).limit(1).for("update"))[0];
-    if (!payment) throw new Error("Transaction Ligdi Cash introuvable.");
+    if (!payment) throw new Error("Transaction YengaPay introuvable.");
     if (payment.status !== "pending") {
       const wallet = await ensureTikisWallet(tx, payment.profilePhone);
-      return { payment: simulatedPaymentToView(payment), wallet: walletSnapshotFromRecord(wallet) } satisfies SimulatedPaymentSettlement;
+      return { payment: yengaPayTestPaymentToView(payment), wallet: walletSnapshotFromRecord(wallet) } satisfies YengaPayTestPaymentSettlement;
     }
     if (input.outcome === "failed") {
       await tx.update(tikisPaymentTransactions).set({ status: "failed", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
     } else if (payment.type === "deposit") {
-      await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "credit", amount: payment.amount, availableDelta: payment.amount, heldDelta: 0, reason: "Dépôt Ligdi Cash simulé confirmé", idempotencyKey: `${payment.id}:settled` });
+      await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "credit", amount: payment.amount, availableDelta: payment.amount, heldDelta: 0, reason: "Dépôt YengaPay en mode test confirmé", idempotencyKey: `${payment.id}:settled` });
       await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
     } else {
-      await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "debit", amount: payment.amount, availableDelta: -payment.amount, heldDelta: 0, reason: "Retrait Ligdi Cash simulé confirmé", idempotencyKey: `${payment.id}:settled` });
+      await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "debit", amount: payment.amount, availableDelta: -payment.amount, heldDelta: 0, reason: "Retrait YengaPay en mode test confirmé", idempotencyKey: `${payment.id}:settled` });
       await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
     }
     const settled = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, payment.id)).limit(1))[0];
     if (!settled) throw new Error("La transaction n’a pas pu être finalisée.");
     const wallet = await ensureTikisWallet(tx, payment.profilePhone);
-    return { payment: simulatedPaymentToView(settled), wallet: walletSnapshotFromRecord(wallet) } satisfies SimulatedPaymentSettlement;
+    return { payment: yengaPayTestPaymentToView(settled), wallet: walletSnapshotFromRecord(wallet) } satisfies YengaPayTestPaymentSettlement;
   });
 }
 
