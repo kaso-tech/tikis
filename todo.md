@@ -381,9 +381,9 @@
 - [x] Fiabiliser la publication et la réception de position GPS réelle du livreur.
 - [x] Afficher deux itinéraires colorés : livreur–collecte et collecte–destination, pour le livreur et l’expéditeur.
 - [x] Ajouter des régressions de suivi GPS et de tracés cartographiques.
-- [ ] Tester, relancer Expo, pousser vers GitHub et livrer le suivi temps réel.
+- [x] Tester, relancer Expo, pousser vers GitHub et livrer le suivi temps réel.
 - [x] Synchroniser le projet et auditer les transitions de statut, expiration et écritures financières.
 - [x] Créditer le gain du livreur à la clôture d’une livraison active et finaliser automatiquement les courses actives à 24 h.
 - [x] Historiser les expirations avant départ comme non terminées et libérer ou annuler tous les mouvements financiers associés.
 - [x] Ajouter les régressions du cycle financier et d’expiration.
-- [ ] Tester, relancer Expo, pousser vers GitHub et livrer le cycle métier corrigé.
+- [x] Tester, relancer Expo, pousser vers GitHub et livrer le cycle métier corrigé.
