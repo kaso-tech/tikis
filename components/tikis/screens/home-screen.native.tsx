@@ -6,6 +6,7 @@ import MapView, { Marker, Polyline, type Region } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
 import { useTikisNavigation } from "@/lib/tikis-navigation";
+import { haptic } from "@/lib/haptics";
 import { trpc } from "@/lib/trpc";
 import { formatListRouteParts } from "@/lib/geo-rules";
 import { useDriverLocation } from "@/hooks/use-driver-location";
@@ -93,6 +94,7 @@ export function HomeScreen() {
   const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
   const sheetValue = useRef(SHEET_PEEK);
   const dragStartHeight = useRef(SHEET_PEEK);
+  const lastSheetSnap = useRef(SHEET_PEEK);
   const driverLocation = useDriverLocation({ enabled: role === "driver" });
 
   const filteredList = useMemo(() => {
@@ -163,6 +165,10 @@ export function HomeScreen() {
         : gesture.vy >= 0.65
           ? SHEET_MIN
           : targets.reduce((closest, snap) => Math.abs(snap - current) < Math.abs(closest - current) ? snap : closest, SHEET_PEEK);
+      if (target !== lastSheetSnap.current) {
+        lastSheetSnap.current = target;
+        haptic.selection();
+      }
       animateSheetTo(target);
     },
   })).current;
@@ -384,7 +390,10 @@ function WalletCard({ walletBalance, totalBalance, pendingBalance, blockedBalanc
 function MapBackground({ selected, sheetOverlayHeight, driverPosition }: { selected: Delivery | null | undefined; sheetOverlayHeight: number; driverPosition: { latitude: number; longitude: number } | null }) {
   const mapRef = useRef<MapView>(null);
   const routeMutation = trpc.geography.route.useMutation();
+  const routeRequestRef = useRef(routeMutation.mutateAsync);
   const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
+  const pickup = selected?.pickup;
+  const dropoff = selected?.dropoff;
   const hasDriver = selected ? selected.status !== "open" : false;
   const region = useMemo(() => {
     if (!selected) return { latitude: 5.3599, longitude: -4.0083, latitudeDelta: 0.12, longitudeDelta: 0.12 };
@@ -403,13 +412,17 @@ function MapBackground({ selected, sheetOverlayHeight, driverPosition }: { selec
   }, [region, selected, sheetOverlayHeight]);
 
   useEffect(() => {
+    routeRequestRef.current = routeMutation.mutateAsync;
+  }, [routeMutation.mutateAsync]);
+
+  useEffect(() => {
     let active = true;
-    if (!selected) { setRouteCoordinates([]); return; }
-    void routeMutation.mutateAsync({ origin: selected.pickup, destination: selected.dropoff })
+    if (!pickup || !dropoff) { setRouteCoordinates([]); return; }
+    void routeRequestRef.current({ origin: pickup, destination: dropoff })
       .then((route) => { if (active) setRouteCoordinates(route.coordinates); })
       .catch(() => { if (active) setRouteCoordinates([]); });
     return () => { active = false; };
-  }, [selected?.id]);
+  }, [selected?.id, pickup, dropoff]);
 
   return (
     <View style={styles.mapBg}>

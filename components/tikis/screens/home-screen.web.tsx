@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Animated, Linking, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
@@ -71,11 +71,6 @@ function projectOntoCanvas(
   const xFor = (lng: number) => padding + ((lng - bounds.minLng) / lngRange) * innerWidth;
   const yFor = (lat: number) => padding + (1 - (lat - bounds.minLat) / latRange) * innerHeight;
   return { x: xFor(target.longitude), y: yFor(target.latitude), originX: xFor(origin.longitude), originY: yFor(origin.latitude) };
-}
-
-function openNavigation(pickup: { latitude: number; longitude: number }, dropoff: { latitude: number; longitude: number }) {
-  const url = `https://www.google.com/maps/dir/?api=1&origin=${pickup.latitude},${pickup.longitude}&destination=${dropoff.latitude},${dropoff.longitude}&travelmode=driving`;
-  void Linking.openURL(url);
 }
 
 export function HomeScreen() {

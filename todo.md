@@ -308,3 +308,7 @@
 - [x] Stabiliser les ancrages haut, intermédiaire et bas de la feuille cartographique.
 - [x] Tester les retouches, relancer Expo et livrer la version vérifiée.
 - [x] Corriger la syntaxe résiduelle de la variante web révélée par la compilation.
+- [x] Vérifier les ancrages de feuille et les conventions haptiques Expo.
+- [x] Ajouter un retour haptique léger à chaque changement d’ancrage.
+- [x] Tester le geste, relancer Expo et livrer la version vérifiée.
+- [x] Supprimer les avertissements lint résiduels sans modifier les parcours utilisateur.
