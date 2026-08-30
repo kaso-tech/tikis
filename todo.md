@@ -349,4 +349,4 @@
 - [x] Définir puis appliquer un mode sombre basé sur des nuances brunes accessibles.
 - [x] Harmoniser les couleurs des statuts de livraison avec la charte brun doré.
 - [x] Régénérer puis intégrer une icône Tikis sur fond blanc avec le symbole brun doré #9A6201.
-- [ ] Tester, relancer Expo, pousser vers GitHub et livrer la nouvelle identité visuelle.
+- [x] Tester, relancer Expo, pousser vers GitHub et livrer la nouvelle identité visuelle.
