@@ -5,7 +5,7 @@ import { haptic } from "@/lib/haptics";
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 const buttonColors: Record<ButtonVariant, { background: string; foreground: string; border?: string }> = {
-  primary: { background: "#007B8B", foreground: "#FFFFFF", border: "#006D7C" },
+  primary: { background: "#9A6201", foreground: "#FFFFFF", border: "#754A01" },
   secondary: { background: "#FFFFFF", foreground: "#111111", border: "#D7D5DE" },
   ghost: { background: "#E4E3E9", foreground: "#111111", border: "#D0CED7" },
   danger: { background: "#F8E8E9", foreground: "#B4232D", border: "#E8C7CA" },
@@ -61,7 +61,7 @@ export function Avatar({ initials, color = "#111111", size = 44 }: { initials: s
 export const tikisStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#EEEDF3" },
   screenContent: { paddingHorizontal: 16, paddingBottom: 104 },
-  eyebrow: { color: "#007B8B", fontSize: 12, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },
+  eyebrow: { color: "#9A6201", fontSize: 12, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },
   title: { color: "#111111", fontSize: 26, lineHeight: 32, fontWeight: "600", letterSpacing: -0.35 },
   subtitle: { color: "#667085", fontSize: 14, lineHeight: 20 },
   body: { color: "#252525", fontSize: 14, lineHeight: 20 },
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 13, borderWidth: 0, elevation: 0 },
   sectionHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   sectionTitle: { fontSize: 17, fontWeight: "600", color: "#111111", letterSpacing: -0.15 },
-  sectionAction: { color: "#007B8B", fontSize: 13, fontWeight: "600" },
+  sectionAction: { color: "#9A6201", fontSize: 13, fontWeight: "600" },
   statusBadge: { alignSelf: "flex-start", paddingHorizontal: 8, height: 24, borderRadius: 6, flexDirection: "row", alignItems: "center", gap: 5 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 11, fontWeight: "600" },

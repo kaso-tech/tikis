@@ -339,7 +339,7 @@ export function HomeScreen() {
 
           {deliveriesQuery.isLoading ? (
             <View style={styles.loadingState}>
-              <ActivityIndicator color="#007B8B" />
+              <ActivityIndicator color="#9A6201" />
               <Text style={styles.loadingText}>Chargement de vos livraisons…</Text>
             </View>
           ) : !selected ? (
@@ -498,7 +498,7 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
       >
         {selected ? (
           <>
-            {routeCoordinates.length > 1 ? <Polyline coordinates={routeCoordinates} strokeColor="#007B8B" strokeWidth={4} lineCap="round" /> : null}
+            {routeCoordinates.length > 1 ? <Polyline coordinates={routeCoordinates} strokeColor="#9A6201" strokeWidth={4} lineCap="round" /> : null}
             <Marker coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={{ x: 0.5, y: 0.5 }}>
               <View style={styles.nativeMarkerStart}>
                 <MaterialIcons name="inventory-2" size={15} color="#FFFFFF" />
@@ -542,7 +542,7 @@ function UrgentCard({
     <View style={[styles.urgentCard, isSender ? styles.urgentCardSender : styles.urgentCardDriver]}>
       <View style={styles.urgentHead}>
         <View style={[styles.urgentThumb, isSender ? styles.urgentThumbSender : styles.urgentThumbDriver]}>
-          <MaterialIcons name={TYPE_ICON[delivery.type] ?? "local-shipping"} size={18} color={isSender ? "#FFFFFF" : "#007B8B"} />
+          <MaterialIcons name={TYPE_ICON[delivery.type] ?? "local-shipping"} size={18} color={isSender ? "#FFFFFF" : "#9A6201"} />
         </View>
         <View style={styles.urgentMeta}>
           <Text style={styles.urgentTitle} numberOfLines={1}>{delivery.title}</Text>
@@ -612,8 +612,8 @@ function DeliveryRow({
     : null;
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const dateInfo = formatDeliveryCreationDate(delivery.createdAt);
-  const dateColor = dateInfo.tone === "primary" ? "#007B8B" : "#747474";
-  const dateBg = dateInfo.tone === "primary" ? "#E6F4F5" : "#F0F0F2";
+  const dateColor = dateInfo.tone === "primary" ? "#9A6201" : "#747474";
+  const dateBg = dateInfo.tone === "primary" ? "#F8F0E5" : "#F0F0F2";
   const totalDistance = formatDistanceKm(delivery.distanceKm);
   const pickupTitle = locationTitle(delivery.pickup);
   const pickupDistrict = delivery.pickup.district || delivery.pickup.city || "Quartier non renseigné";
@@ -685,11 +685,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#EEEDF3" },
 
   mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#EEEDF3" },
-  nativeMarkerStart: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
+  nativeMarkerStart: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
   nativeMarkerDriver: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#111111", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
   nativeMarkerEnd: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#B4232D" },
 
-  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#006874", zIndex: 10 },
+  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#754A01", zIndex: 10 },
 
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
@@ -699,7 +699,7 @@ const styles = StyleSheet.create({
   sheetTitle: { color: "#111111", fontSize: 14, fontWeight: "700", lineHeight: 18 },
   sheetSubtitle: { color: "#666666", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 
-  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#007B8B", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#006874" },
+  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#9A6201", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#754A01" },
   servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE", shadowOpacity: 0, elevation: 0 },
   servicePillNeutral: { backgroundColor: "#EEEDF3", shadowOpacity: 0, elevation: 0 },
   serviceText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
@@ -725,7 +725,7 @@ const styles = StyleSheet.create({
 
   filterRow: { flexDirection: "row", gap: 6, paddingHorizontal: 14, paddingBottom: 10, flexWrap: "wrap" },
   chip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
-  chipActive: { backgroundColor: "#007B8B", borderColor: "#007B8B" },
+  chipActive: { backgroundColor: "#9A6201", borderColor: "#9A6201" },
   chipText: { color: "#666666", fontSize: 11, fontWeight: "600" },
   chipTextActive: { color: "#FFFFFF" },
 
@@ -734,10 +734,10 @@ const styles = StyleSheet.create({
 
   urgentCard: { borderRadius: 12, padding: 12, gap: 10 },
   urgentCardSender: { backgroundColor: "#111111" },
-  urgentCardDriver: { backgroundColor: "#007B8B" },
+  urgentCardDriver: { backgroundColor: "#9A6201" },
   urgentHead: { flexDirection: "row", alignItems: "center", gap: 10 },
   urgentThumb: { width: 36, height: 36, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  urgentThumbSender: { backgroundColor: "#007B8B" },
+  urgentThumbSender: { backgroundColor: "#9A6201" },
   urgentThumbDriver: { backgroundColor: "#FFFFFF" },
   urgentMeta: { flex: 1, minWidth: 0 },
   urgentTitle: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
@@ -749,14 +749,14 @@ const styles = StyleSheet.create({
   urgentPriceExtra: { color: "rgba(255,255,255,0.6)", fontSize: 10, marginTop: 1 },
   urgentActions: { flexDirection: "row", gap: 7 },
   urgentBtnWhite: { flex: 1, height: 38, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
-  urgentBtnWhiteText: { color: "#007B8B", fontSize: 12, fontWeight: "700" },
+  urgentBtnWhiteText: { color: "#9A6201", fontSize: 12, fontWeight: "700" },
 
   listSection: { marginTop: 4, gap: 8 },
   row: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 11, borderWidth: 1, borderColor: "#E3E3E3" },
-  rowSelected: { borderColor: "#007B8B", backgroundColor: "#F5FBFB" },
+  rowSelected: { borderColor: "#9A6201", backgroundColor: "#FAF4EB" },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 9 },
   rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
-  rowThumbDriver: { backgroundColor: "#007B8B" },
+  rowThumbDriver: { backgroundColor: "#9A6201" },
   rowMain: { flex: 1, minWidth: 0 },
   rowTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
   rowTitle: { color: "#111111", fontSize: 12.5, fontWeight: "600" },
@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
   rowDetails: { flex: 1, color: "#111111", fontSize: 11.5, lineHeight: 16, paddingRight: 8 },
   rowDriverDistance: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 3, paddingTop: 1, position: "relative" },
   directionButton: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
-  rowDriverDistanceText: { color: "#007B8B", fontSize: 12.5, fontWeight: "600" },
+  rowDriverDistanceText: { color: "#9A6201", fontSize: 12.5, fontWeight: "600" },
   pickupTooltip: { position: "absolute", right: 0, top: 28, minWidth: 168, maxWidth: 236, backgroundColor: "#111111", borderRadius: 7, paddingHorizontal: 9, paddingVertical: 7, zIndex: 20 },
   pickupTooltipLabel: { color: "rgba(255,255,255,0.64)", fontSize: 8, fontWeight: "700", letterSpacing: 0.55 },
   pickupTooltipText: { color: "#FFFFFF", fontSize: 11, fontWeight: "600", marginTop: 2 },
@@ -782,7 +782,7 @@ const styles = StyleSheet.create({
   rowActions: { marginLeft: "auto", flexDirection: "row", gap: 6 },
   rowBtnOutline: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
   rowBtnOutlineText: { color: "#111111", fontSize: 10.5, fontWeight: "600" },
-  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#007B8B", minWidth: 64, alignItems: "center", flexDirection: "row", gap: 4, justifyContent: "center" },
+  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#9A6201", minWidth: 64, alignItems: "center", flexDirection: "row", gap: 4, justifyContent: "center" },
   rowBtnFilledText: { color: "#FFFFFF", fontSize: 10.5, fontWeight: "700" },
 
   loadingState: { alignItems: "center", paddingVertical: 32, gap: 8 },

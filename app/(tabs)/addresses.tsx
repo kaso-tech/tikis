@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   emptySub: { color: "#666666", fontSize: 12, textAlign: "center", lineHeight: 18, marginTop: 6, maxWidth: 260 },
 
   footer: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopWidth: 1, borderTopColor: "#ECECEC", padding: 12, paddingBottom: 18 },
-  footerBtn: { backgroundColor: "#007B8B", borderRadius: 10, height: 46, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  footerBtn: { backgroundColor: "#9A6201", borderRadius: 10, height: 46, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   footerBtnText: { color: "#FFFFFF", fontSize: 13, fontWeight: "600" },
 
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.42)" },
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   sheetTitle: { color: "#111111", fontSize: 17, fontWeight: "600" },
   sheetSub: { color: "#666666", fontSize: 12, marginTop: 4 },
 
-  renameCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, backgroundColor: "#E2F3F4", borderRadius: 10, marginTop: 14 },
+  renameCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, backgroundColor: "#F8F0E5", borderRadius: 10, marginTop: 14 },
   renameIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
   renameInfo: { flex: 1, minWidth: 0 },
   renameName: { color: "#111111", fontSize: 12, fontWeight: "600" },

@@ -39,7 +39,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
             { latitude: pickup.latitude, longitude: pickup.longitude },
             { latitude: dropoff.latitude, longitude: dropoff.longitude },
           ]}
-          strokeColor="#007B8B"
+          strokeColor="#9A6201"
           strokeWidth={3}
           lineCap="round"
         />
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: "#007B8B",
+    backgroundColor: "#9A6201",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#007B8B",
+    backgroundColor: "#9A6201",
   },
   legendDotDropoff: {
     width: 8,

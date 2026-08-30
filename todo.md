@@ -342,3 +342,6 @@
 - [x] Prolonger de manière sécurisée la session Tikis avec des tests de validité et d’expiration.
 - [x] Retirer le doublon de type d’engin, enrichir l’infobulle avec quartier et destination, puis la fermer après trois secondes.
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer les améliorations de session et d’interface.
+- [x] Synchroniser le projet et auditer les usages de la couleur principale actuelle.
+- [x] Remplacer l’accent bleu par #9A6201 dans les écrans, cartes, actions et états associés.
+- [ ] Tester, relancer Expo, pousser vers GitHub et livrer le nouveau thème principal.

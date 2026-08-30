@@ -98,7 +98,7 @@ const config: ExpoConfig = {
     [
       "expo-notifications",
       {
-        color: "#007B8B",
+        color: "#9A6201",
         defaultChannel: "tikis-delivery-tracking",
       },
     ],

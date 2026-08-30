@@ -414,11 +414,11 @@ const styles = StyleSheet.create({
   iconBtnSpacer: { width: 36 },
   topTitleWrap: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   topTitle: { color: "#111111", fontSize: 15, fontWeight: "600" },
-  topStep: { color: "#007B8B", fontSize: 11, fontWeight: "700" },
+  topStep: { color: "#9A6201", fontSize: 11, fontWeight: "700" },
 
   progressWrap: { paddingHorizontal: 16, paddingBottom: 8 },
   progressTrack: { height: 4, backgroundColor: "#ECECEC", borderRadius: 2, overflow: "hidden" },
-  progressFill: { height: "100%", backgroundColor: "#007B8B", borderRadius: 2 },
+  progressFill: { height: "100%", backgroundColor: "#9A6201", borderRadius: 2 },
 
   eyebrow: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 4 },
   sectionTitle: { color: "#111111", fontSize: 14, fontWeight: "600", marginBottom: 10 },
@@ -426,11 +426,11 @@ const styles = StyleSheet.create({
 
   routeCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, gap: 4 },
   routeInput: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, backgroundColor: "#EEEDF3", borderRadius: 9, borderLeftWidth: 3 },
-  routeInputFrom: { borderLeftColor: "#007B8B" },
+  routeInputFrom: { borderLeftColor: "#9A6201" },
   routeInputTo: { borderLeftColor: "#B4232D" },
   routeInputInvalid: { borderColor: "#B4232D", borderWidth: 1 },
   routeInputIcon: { width: 24, height: 24, borderRadius: 12, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
-  routeInputIconFrom: { backgroundColor: "#E2F3F4" },
+  routeInputIconFrom: { backgroundColor: "#F8F0E5" },
   routeInputIconTo: { backgroundColor: "#FDEBEC" },
   routeInputContent: { flex: 1, minWidth: 0 },
   routeInputLabel: { color: "#747474", fontSize: 9, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase" },
@@ -445,14 +445,14 @@ const styles = StyleSheet.create({
   routeConnectorLineDashed: { backgroundColor: "#ECECEC", opacity: 0.5 },
   routeConnectorMeta: { color: "#747474", fontSize: 10, fontWeight: "600" },
 
-  routeMiniSummary: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#E2F3F4", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginTop: 4 },
-  routeMiniSummaryLabel: { color: "#007B8B", fontSize: 11, fontWeight: "600" },
-  routeMiniSummaryValue: { color: "#007B8B", fontSize: 13, fontWeight: "700" },
+  routeMiniSummary: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#F8F0E5", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginTop: 4 },
+  routeMiniSummaryLabel: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
+  routeMiniSummaryValue: { color: "#9A6201", fontSize: 13, fontWeight: "700" },
 
   routeMessage: { color: "#167A55", fontSize: 11, marginTop: 4, lineHeight: 16 },
   routeWarning: { color: "#9A6200" },
   retryRoute: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
-  retryRouteText: { color: "#007B8B", fontSize: 11, fontWeight: "600" },
+  retryRouteText: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
   routeTitle: { color: "#666666", fontSize: 11, marginTop: 6, lineHeight: 16 },
 
   shortcut: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FFFFFF", borderRadius: 9, padding: 12 },
@@ -461,8 +461,8 @@ const styles = StyleSheet.create({
   typeGrid: { flexDirection: "row", gap: 8 },
   typeCard: { flex: 1, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#ECECEC", borderRadius: 10, paddingVertical: 12, paddingHorizontal: 8, alignItems: "center", gap: 4 },
   typeCardActive: { backgroundColor: "#111111", borderColor: "#111111" },
-  typeIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#E2F3F4", alignItems: "center", justifyContent: "center" },
-  typeIconActive: { backgroundColor: "#007B8B" },
+  typeIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#F8F0E5", alignItems: "center", justifyContent: "center" },
+  typeIconActive: { backgroundColor: "#9A6201" },
   typeLabel: { color: "#111111", fontSize: 11, fontWeight: "600" },
   typeLabelActive: { color: "#FFFFFF" },
   typeSub: { color: "#747474", fontSize: 9, fontWeight: "500", textAlign: "center" },
@@ -470,9 +470,9 @@ const styles = StyleSheet.create({
 
   vehicleGrid: { flexDirection: "row", gap: 8 },
   vehicleCard: { flex: 1, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#ECECEC", borderRadius: 10, paddingVertical: 10, alignItems: "center", gap: 4 },
-  vehicleCardActive: { backgroundColor: "#E2F3F4", borderColor: "#007B8B" },
+  vehicleCardActive: { backgroundColor: "#F8F0E5", borderColor: "#9A6201" },
   vehicleLabel: { color: "#111111", fontSize: 10, fontWeight: "600" },
-  vehicleLabelActive: { color: "#007B8B" },
+  vehicleLabelActive: { color: "#9A6201" },
 
   fieldWrap: { gap: 5 },
   fieldLabel: { color: "#111111", fontSize: 12, fontWeight: "600" },
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
   dimensionRow: { flexDirection: "row", gap: 6 },
   miniInput: { flex: 1, backgroundColor: "#EEEDF3", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 10, color: "#111111", fontSize: 12, fontWeight: "600", textAlign: "center" },
 
-  priceCard: { backgroundColor: "#007B8B", borderRadius: 12, padding: 14, gap: 10 },
+  priceCard: { backgroundColor: "#9A6201", borderRadius: 12, padding: 14, gap: 10 },
   priceCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   priceCardLabel: { color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   priceCardValue: { color: "#FFFFFF", fontSize: 20, fontWeight: "700" },
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
   priceCardNote: { color: "rgba(255,255,255,0.7)", fontSize: 11, lineHeight: 16, flex: 1 },
   priceError: { color: "#FFFFFF", fontSize: 11, fontWeight: "600", backgroundColor: "rgba(180,35,45,0.4)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
 
-  publicationLoadingHint: { color: "#007B8B", fontSize: 12, textAlign: "center", marginTop: 4, fontWeight: "600" },
+  publicationLoadingHint: { color: "#9A6201", fontSize: 12, textAlign: "center", marginTop: 4, fontWeight: "600" },
   publicationHint: { color: "#9A6200", fontSize: 12, textAlign: "center", marginTop: 4, fontWeight: "500" },
   footerNote: { color: "#747474", fontSize: 10, lineHeight: 14, textAlign: "center", marginTop: 8 },
 
