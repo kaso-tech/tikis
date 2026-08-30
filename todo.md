@@ -387,3 +387,7 @@
 - [x] Historiser les expirations avant départ comme non terminées et libérer ou annuler tous les mouvements financiers associés.
 - [x] Ajouter les régressions du cycle financier et d’expiration.
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer le cycle métier corrigé.
+- [x] Synchroniser le projet et auditer la fiche de livraison ainsi que les notifications automatiques.
+- [x] Ajouter un compte à rebours visuel et accessible avant l’échéance de 24 heures.
+- [x] Notifier expéditeur et livreur lorsque la livraison est automatiquement terminée ou annulée après 24 h.
+- [ ] Tester, relancer Expo, pousser vers GitHub et livrer les alertes d’échéance.

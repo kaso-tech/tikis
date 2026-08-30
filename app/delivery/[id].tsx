@@ -1,6 +1,6 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, useLocalSearchParams } from "expo-router";
-import { type ComponentProps, useMemo, useState } from "react";
+import { type ComponentProps, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
@@ -8,6 +8,7 @@ import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { SectionHeading, TikisButton } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
+import { deliveryRemainingMs, formatDeliveryCountdown } from "@/lib/delivery-countdown";
 import { offeredPriceError, parseOfferedPrice, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
 import { useTikisStore } from "@/lib/tikis-store";
@@ -57,6 +58,16 @@ export default function DeliveryDetailScreen() {
   const [senderAction, setSenderAction] = useState<SenderAction>(null);
   const [senderProcessing, setSenderProcessing] = useState(false);
   const [candidatesSheetOpen, setCandidatesSheetOpen] = useState(false);
+  const [clock, setClock] = useState(() => Date.now());
+  const countdownDeliveryId = delivery?.id;
+  const countdownStatus = delivery?.status;
+
+  useEffect(() => {
+    if (!countdownDeliveryId || countdownStatus === "completed" || countdownStatus === "expired" || countdownStatus === "cancelled") return;
+    setClock(Date.now());
+    const interval = setInterval(() => setClock(Date.now()), 1_000);
+    return () => clearInterval(interval);
+  }, [countdownDeliveryId, countdownStatus]);
 
   async function refreshDelivery() {
     await Promise.all([
@@ -110,6 +121,9 @@ export default function DeliveryDetailScreen() {
   const dropoffPresentation = formatDeliveryDetailPlace(delivery.dropoff);
   const statusBadgeColor = status.color;
   const statusBadgeText = isActive ? `EN COURS · ETA 8 min` : isCompleted ? "TERMINÉE" : status.label.toUpperCase();
+  const countdown = formatDeliveryCountdown(deliveryRemainingMs(delivery.createdAt, clock));
+  const showsCountdown = delivery.status === "open" || delivery.status === "pending_confirmation" || delivery.status === "disabled" || isActive;
+  const countdownLabel = isActive ? "Clôture automatique dans" : "Expiration automatique dans";
 
   async function confirmAction() {
     setProcessing(true);
@@ -225,6 +239,7 @@ export default function DeliveryDetailScreen() {
             </>
           ) : null}
         </View>
+        {showsCountdown ? <View style={styles.countdown} accessibilityRole="text" accessibilityLabel={`${countdownLabel} ${countdown}`}><MaterialIcons name="schedule" size={15} color="#9A6201" /><Text style={styles.countdownLabel}>{countdownLabel}</Text><Text style={styles.countdownValue}>{countdown}</Text></View> : null}
 
         <View style={styles.timelineCard}>
           <Text style={styles.eyebrowSmall}>SUIVI</Text>
@@ -444,6 +459,9 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
   metaText: { color: "#666666", fontSize: 11 },
   metaDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: "#747474" },
+  countdown: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 6, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: "#FEF6E2", borderRadius: 7 },
+  countdownLabel: { color: "#6D4701", fontSize: 10, fontWeight: "600" },
+  countdownValue: { color: "#9A6201", fontSize: 11, fontWeight: "700", fontVariant: ["tabular-nums"] },
 
   timelineCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, marginTop: 4 },
   timeline: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginTop: 10 },

@@ -18,6 +18,13 @@ describe("contrat du cycle de livraison à vingt-quatre heures", () => {
     expect(databaseSource).toContain("livraison expirée avant départ");
   });
 
+  it("notifie l’expéditeur et le livreur lors d’un traitement automatique", () => {
+    expect(databaseSource).toContain("Livraison terminée automatiquement");
+    expect(databaseSource).toContain("Livraison annulée automatiquement");
+    expect(databaseSource).toContain("auto-completed-sender");
+    expect(databaseSource).toContain("auto-completed-driver");
+  });
+
   it("conserve les livraisons non terminées dans l’historique", () => {
     expect(historySource).toContain('delivery.status === "expired"');
     expect(historySource).toContain('delivery.status === "cancelled"');

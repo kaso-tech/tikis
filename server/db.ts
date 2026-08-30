@@ -393,8 +393,8 @@ export async function expireOpenTikisDeliveries(now = new Date()) {
           idempotencyKey: `${delivery.id}:delivery-earning`,
         });
         await tx.update(tikisDeliveries).set({ status: "completed", completedAt: now, updatedAt: now }).where(eq(tikisDeliveries.id, delivery.id));
-        await appendDeliveryEvent(tx, { deliveryId: delivery.id, eventType: "delivery_completed", status: "completed", recipientPhone: delivery.senderPhone, title: "Livraison finalisée automatiquement", body: "La livraison en cours a été clôturée après 24 heures.", tone: "success", idempotencyKey: `${delivery.id}:auto-completed-sender` });
-        await appendDeliveryEvent(tx, { deliveryId: delivery.id, eventType: "delivery_completed", status: "completed", recipientPhone: delivery.driverPhone, title: "Gain de livraison crédité", body: `Votre gain de ${earning} FCFA a été ajouté après la clôture automatique de la course.`, tone: "success", idempotencyKey: `${delivery.id}:auto-completed-driver` });
+        await appendDeliveryEvent(tx, { deliveryId: delivery.id, eventType: "delivery_completed", status: "completed", recipientPhone: delivery.senderPhone, title: "Livraison terminée automatiquement", body: "La course en cours a été clôturée automatiquement après 24 heures.", tone: "success", idempotencyKey: `${delivery.id}:auto-completed-sender` });
+        await appendDeliveryEvent(tx, { deliveryId: delivery.id, eventType: "delivery_completed", status: "completed", recipientPhone: delivery.driverPhone, title: "Livraison terminée automatiquement", body: `La course a été clôturée après 24 heures. Votre gain de ${earning} FCFA a été ajouté à votre Wallet.`, tone: "success", idempotencyKey: `${delivery.id}:auto-completed-driver` });
         completedCount += 1;
         completedDeliveryIds.push(delivery.id);
         continue;
@@ -426,8 +426,8 @@ export async function expireOpenTikisDeliveries(now = new Date()) {
           eventType: "delivery_expired",
           status: "expired",
           recipientPhone: candidate.driverPhone,
-          title: "Livraison expirée",
-          body: "Cette livraison n’est plus disponible après 24 heures.",
+          title: "Livraison annulée automatiquement",
+          body: "Cette livraison n’a pas démarré dans les 24 heures. Votre commission a été libérée ou compensée.",
           tone: "warning",
           idempotencyKey: `delivery-expired-candidate:${delivery.id}:${candidate.id}`,
         });
@@ -438,7 +438,7 @@ export async function expireOpenTikisDeliveries(now = new Date()) {
         eventType: "delivery_expired",
         status: "expired",
         recipientPhone: delivery.senderPhone,
-        title: "Livraison expirée",
+        title: "Livraison annulée automatiquement",
         body: "Votre livraison n’a pas démarré dans les 24 heures et est conservée dans l’historique comme non terminée.",
         tone: "warning",
         idempotencyKey: `delivery-expired-sender:${delivery.id}`,
