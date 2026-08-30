@@ -9,6 +9,8 @@ import { haptic } from "@/lib/haptics";
 import { trpc } from "@/lib/trpc";
 import { formatListRouteParts } from "@/lib/geo-rules";
 import { useDriverLocation } from "@/hooks/use-driver-location";
+import { useDeviceHeading } from "@/hooks/use-device-heading";
+import { compassRotationToTarget } from "@/lib/compass";
 import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { availableWalletBalance, formatMoney, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
@@ -54,18 +56,6 @@ function matchesFilter(status: DeliveryStatus, filter: FilterKey): boolean {
   return true;
 }
 
-function bearingTo(origin: { latitude: number; longitude: number } | null, target: { latitude: number; longitude: number }): number {
-  if (!origin) return 0;
-  const radians = (value: number) => value * Math.PI / 180;
-  const degrees = (value: number) => value * 180 / Math.PI;
-  const originLatitude = radians(origin.latitude);
-  const targetLatitude = radians(target.latitude);
-  const deltaLongitude = radians(target.longitude - origin.longitude);
-  const y = Math.sin(deltaLongitude) * Math.cos(targetLatitude);
-  const x = Math.cos(originLatitude) * Math.sin(targetLatitude) - Math.sin(originLatitude) * Math.cos(targetLatitude) * Math.cos(deltaLongitude);
-  return (degrees(Math.atan2(y, x)) + 360) % 360;
-}
-
 function driverSortPriority(d: Delivery): number {
   if (d.ownCandidateStatus === "confirmed" || d.status === "active") return 0;
   if (d.ownCandidateStatus === "selected" || d.status === "pending_confirmation") return 1;
@@ -109,6 +99,7 @@ export function HomeScreen() {
   const dragStartHeight = useRef(SHEET_PEEK);
   const lastSheetSnap = useRef(SHEET_PEEK);
   const driverLocation = useDriverLocation({ enabled: role === "driver" });
+  const deviceHeading = useDeviceHeading(role === "driver");
 
   const filteredList = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -372,7 +363,7 @@ export function HomeScreen() {
                   selected={delivery.id === selected.id}
                   driverDistance={driverLocation.distanceTo(delivery.pickup)}
                   driverLocationStatus={driverLocation.status}
-                  compassRotation={bearingTo(driverLocation.location, delivery.pickup)}
+                  compassRotation={compassRotationToTarget(driverLocation.location, delivery.pickup, deviceHeading)}
                   applying={actioningId === delivery.id}
                   onPress={() => setSelectedId(delivery.id)}
                   onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
@@ -399,7 +390,7 @@ export function HomeScreen() {
                   selected={false}
                   driverDistance={isDriver ? driverLocation.distanceTo(delivery.pickup) : null}
                   driverLocationStatus={isDriver ? driverLocation.status : null}
-                  compassRotation={isDriver ? bearingTo(driverLocation.location, delivery.pickup) : 0}
+                  compassRotation={isDriver ? compassRotationToTarget(driverLocation.location, delivery.pickup, deviceHeading) : 0}
                   applying={actioningId === delivery.id}
                   onPress={() => setSelectedId(delivery.id)}
                   onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
@@ -640,7 +631,7 @@ function DeliveryRow({
         <View style={styles.rowMain}>
           <View style={styles.rowTitleLine}>
             <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
-            {isDriver ? <View style={styles.rowDriverDistance}><MaterialIcons name="explore" size={15} color="#007B8B" style={{ transform: [{ rotate: `${compassRotation}deg` }] }} /><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text></View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text></View> : null}
+            {isDriver ? <View accessible accessibilityLabel={`Direction du point de collecte, à ${driverDistText}`} style={styles.rowDriverDistance}><MaterialIcons accessible={false} name="explore" size={15} color="#007B8B" style={{ transform: [{ rotate: `${compassRotation}deg` }] }} /><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text></View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text></View> : null}
           </View>
           <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff} · {vehicleLabel}</Text>
         </View>

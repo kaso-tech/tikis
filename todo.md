@@ -328,3 +328,7 @@
 - [x] Corriger la restitution exacte des points de collecte et destination après publication, avec régression automatisée.
 - [x] Retirer l’onglet Adresses du compte livreur et franciser avec une icône adaptée celui de l’expéditeur.
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer la correction des coordonnées et onglets.
+- [x] Synchroniser le projet et auditer l’indicateur de distance ainsi que les capteurs d’orientation utilisables.
+- [x] Transformer l’icône de proximité native en boussole qui suit instantanément l’orientation du téléphone vers la collecte.
+- [x] Prévoir un repli web accessible et valider la boussole avec les cartes existantes.
+- [ ] Tester, relancer Expo, pousser vers GitHub et livrer la boussole dynamique.
