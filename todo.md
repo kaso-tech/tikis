@@ -312,3 +312,8 @@
 - [x] Ajouter un retour haptique léger à chaque changement d’ancrage.
 - [x] Tester le geste, relancer Expo et livrer la version vérifiée.
 - [x] Supprimer les avertissements lint résiduels sans modifier les parcours utilisateur.
+- [x] Synchroniser le projet et auditer les routes, liens et composants de Live Tracking.
+- [x] Rediriger les accès de suivi vers l’accueil et retirer la route Live Tracking.
+- [x] Nettoyer les composants et dépendances de suivi interne devenus inutiles.
+- [x] Tester les parcours, relancer Expo et livrer la version vérifiée.
+- [x] Rétablir les contrats DeliveryStatus et WalletSnapshot régressés par le rebase.
