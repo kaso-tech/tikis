@@ -961,6 +961,7 @@ export async function listTikisDeliveryCandidates(deliveryId: string): Promise<D
   }
   const completedByDriver = new Map<string, number>();
   for (const c of completedRows) {
+    if (!c.driverPhone) continue;
     completedByDriver.set(c.driverPhone, (completedByDriver.get(c.driverPhone) ?? 0) + 1);
   }
   return rows.map(({ candidate, profile }) => {

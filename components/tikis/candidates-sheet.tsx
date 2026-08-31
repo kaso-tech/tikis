@@ -148,9 +148,6 @@ function CandidateCard({ candidate, deliveryStatus, loading, onChoose, theme }: 
               backgroundColor: candidate.isCertified
                 ? (isDark(theme) ? theme.foreground : theme.foreground)
                 : mutedFg,
-              color: candidate.isCertified
-                ? (isDark(theme) ? theme.background : theme.background)
-                : theme.surface,
             },
           ]}
         >

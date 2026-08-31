@@ -1,7 +1,5 @@
-import { useContext } from "react";
-import { useColorScheme } from "react-native";
 import { SchemeColors, type ColorScheme, type ThemeColorPalette } from "@/lib/_core/theme";
-import { ThemeContext } from "@/lib/theme-provider";
+import { useThemeContext } from "@/lib/theme-provider";
 
 export type ThemedColors = ThemeColorPalette & {
   text: string;
@@ -23,6 +21,8 @@ function buildThemed(scheme: ColorScheme): ThemedColors {
     background: base.background,
     tint: base.primary,
     icon: base.muted,
+    tabIconDefault: base.muted,
+    tabIconSelected: base.primary,
     border: base.border,
     input: scheme === "light" ? "#EEEDF3" : "#231A10",
     pressed: scheme === "light" ? "#E3DFEA" : "#2A2018",
@@ -32,8 +32,7 @@ function buildThemed(scheme: ColorScheme): ThemedColors {
 }
 
 export function useThemeColors(): { scheme: ColorScheme; isDark: boolean; colors: ThemedColors } {
-  const ctx = useContext(ThemeContext);
-  const fallback = (useColorScheme() as ColorScheme | null) ?? "light";
-  const scheme: ColorScheme = ctx?.colorScheme ?? fallback;
+  const { colorScheme } = useThemeContext();
+  const scheme: ColorScheme = colorScheme;
   return { scheme, isDark: scheme === "dark", colors: buildThemed(scheme) };
 }

@@ -403,3 +403,6 @@
 - [x] Tester, relancer Expo, pousser vers GitHub et livrer le modèle de paiement de test.
 - [x] Sécuriser l’état local, récupérer la dernière branche main et vérifier les dépendances modifiées.
 - [x] Relancer Expo, valider la compilation et les services, puis livrer la version synchronisée.
+- [x] Corriger les erreurs TypeScript de la refonte des cartes candidats, des couleurs de thème et du calcul des statistiques livreur.
+- [x] Revalider la compilation, les tests et les services après correction des erreurs introduites par la synchronisation GitHub.
+- [x] Restaurer le contrat de filtrage des statuts expiré et annulé dans l’écran Historique.

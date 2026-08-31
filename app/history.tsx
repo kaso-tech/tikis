@@ -68,7 +68,7 @@ export default function HistoryScreen() {
   const [filter, setFilter] = useState<FilterKey>("all");
 
   const history = useMemo(() => {
-    const all = (deliveriesQuery.data ?? []).filter((d) => d.status === "completed" || d.status === "expired" || d.status === "cancelled" || d.status === "disabled");
+    const all = (deliveriesQuery.data ?? []).filter((delivery) => delivery.status === "completed" || delivery.status === "expired" || delivery.status === "cancelled" || delivery.status === "disabled");
     const q = search.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr-FR").trim();
     return all
       .filter((d) => {
@@ -97,7 +97,7 @@ export default function HistoryScreen() {
   }, [history]);
 
   const counts = useMemo(() => {
-    const all = (deliveriesQuery.data ?? []).filter((d) => d.status === "completed" || d.status === "expired" || d.status === "cancelled" || d.status === "disabled");
+    const all = (deliveriesQuery.data ?? []).filter((delivery) => delivery.status === "completed" || delivery.status === "expired" || delivery.status === "cancelled" || delivery.status === "disabled");
     return {
       all: all.length,
       ongoing: all.filter((d) => statusKey(d) === "ongoing").length,
