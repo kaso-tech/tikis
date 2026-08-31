@@ -448,3 +448,5 @@
 - [ ] Valider la compilation, les tests et la disponibilité des services après synchronisation.
 - [ ] Synchroniser la dernière branche main Tikis et vérifier les dépendances distantes.
 - [ ] Valider la compilation, les tests et la disponibilité des services après synchronisation.
+- [ ] Corriger la régression du contrat d’historique qui doit conserver les livraisons non terminées.
+- [ ] Revalider compilation, tests et services après la correction de la synchronisation.

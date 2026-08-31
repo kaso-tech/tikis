@@ -15,7 +15,7 @@ type PeriodFilter = "all" | "week" | "month";
 const ARCHIVABLE_STATUSES: DeliveryStatus[] = ["completed", "expired", "cancelled", "disabled"];
 
 function isArchivable(delivery: Delivery) {
-  return ARCHIVABLE_STATUSES.includes(delivery.status);
+  return delivery.status === "completed" || delivery.status === "expired" || delivery.status === "cancelled" || delivery.status === "disabled";
 }
 
 function groupMonthLabel(value: string): string {
