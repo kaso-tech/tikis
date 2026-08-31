@@ -37,7 +37,7 @@ const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: st
   expired: { label: "EXPIRÉE", color: "#6B6257", bg: "#EEE8E0" },
 };
 
-type FilterKey = "all" | "active" | "open" | "applied" | "pending" | "completed";
+type FilterKey = "all" | "active" | "open" | "pending" | "completed";
 type PendingHomeAction =
   | { kind: "withdraw"; delivery: Delivery }
   | { kind: "confirm"; delivery: Delivery }
@@ -53,20 +53,19 @@ const SENDER_FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 const DRIVER_FILTERS: { key: FilterKey; label: string }[] = [
-  { key: "open", label: "Disponibles" },
-  { key: "applied", label: "Postulées" },
-  { key: "pending", label: "À confirmer" },
+  { key: "open", label: "Publiées" },
+  { key: "pending", label: "Attribuées" },
   { key: "active", label: "En cours" },
+  { key: "completed", label: "Terminées" },
 ];
 
 function matchesFilter(delivery: Delivery, filter: FilterKey, isDriver: boolean): boolean {
   const { status } = delivery;
   if (filter === "all") return status !== "cancelled" && status !== "disabled" && status !== "expired" && status !== "completed";
   if (filter === "active") return status === "active";
-  if (filter === "open") return status === "open" && (!isDriver || !delivery.ownCandidateStatus || delivery.ownCandidateStatus === "withdrawn" || delivery.ownCandidateStatus === "replaced");
-  if (filter === "applied") return isDriver && delivery.ownCandidateStatus === "applied";
+  if (filter === "open") return status === "open";
   if (filter === "pending") return status === "pending_confirmation" || (isDriver && delivery.ownCandidateStatus === "selected");
-  if (filter === "completed") return !isDriver && status === "completed";
+  if (filter === "completed") return isDriver ? isDeliveryCompletedToday(delivery) : status === "completed";
   return true;
 }
 
@@ -356,6 +355,7 @@ export function HomeScreen() {
 
   const isDriver = role === "driver";
   const filterItems = isDriver ? DRIVER_FILTERS : SENDER_FILTERS;
+  const filterCounts = useMemo(() => Object.fromEntries(filterItems.map((item) => [item.key, deliveries.filter((delivery) => matchesFilter(delivery, item.key, isDriver)).length])) as Record<FilterKey, number>, [deliveries, filterItems, isDriver]);
   const firstNameDisplay = isDriver ? firstName : "à vous";
   const countLabel = isDriver ? `${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité` : `${filteredList.length} livraison${filteredList.length > 1 ? "s" : ""} affichée${filteredList.length > 1 ? "s" : ""}`;
 
@@ -427,8 +427,9 @@ export function HomeScreen() {
 
           <View style={styles.filterRow}>
             {filterItems.map((item) => (
-              <Pressable key={item.key} onPress={() => setFilter(item.key)} style={({ pressed }) => [styles.chip, filter === item.key && styles.chipActive, pressed && styles.pressed]}>
+              <Pressable key={item.key} onPress={() => setFilter(item.key)} accessibilityRole="tab" accessibilityState={{ selected: filter === item.key }} accessibilityLabel={`${item.label}, ${filterCounts[item.key]} livraison${filterCounts[item.key] > 1 ? "s" : ""}`} style={({ pressed }) => [styles.chip, filter === item.key && styles.chipActive, pressed && styles.pressed]}>
                 <Text style={[styles.chipText, filter === item.key && styles.chipTextActive]}>{item.label}</Text>
+                <View style={[styles.chipCount, filter === item.key && styles.chipCountActive]}><Text style={styles.chipCountText}>{filterCounts[item.key]}</Text></View>
               </Pressable>
             ))}
           </View>
@@ -851,10 +852,13 @@ const styles = StyleSheet.create({
   walletStatValue: { color: "#FFFFFF", fontSize: 13, fontWeight: "700", marginTop: 2 },
 
   filterRow: { flexDirection: "row", gap: 6, paddingHorizontal: 14, paddingBottom: 10, flexWrap: "wrap" },
-  chip: { paddingHorizontal: 11, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
-  chipActive: { backgroundColor: "#9A6201", borderColor: "#9A6201" },
-  chipText: { color: "#666666", fontSize: 11, fontWeight: "600" },
-  chipTextActive: { color: "#FFFFFF" },
+  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", flexDirection: "row", alignItems: "center", gap: 6 },
+  chipActive: { backgroundColor: "#F7EFE5", borderColor: "#9A6201" },
+  chipText: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
+  chipTextActive: { color: "#9A6201" },
+  chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
+  chipCountActive: { backgroundColor: "#9A6201" },
+  chipCountText: { color: "#F7EFE5", fontSize: 10, fontWeight: "700", lineHeight: 12 },
 
   scrollArea: { flex: 1, marginTop: 2 },
   scrollContent: { paddingHorizontal: 14, paddingTop: 6, paddingBottom: 90, gap: 8 },

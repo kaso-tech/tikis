@@ -419,3 +419,6 @@
 - [x] Ajouter l’onglet « Postulées » entre « Disponibles » et « À confirmer » sur l’accueil livreur.
 - [x] Retirer l’onglet « Terminées » de l’accueil livreur et valider le filtrage restant.
 - [x] Valider la compilation, les tests et les services après la réorganisation des onglets.
+- [x] Réorganiser les onglets livreur en « Publiées », « Attribuées », « En cours » et « Terminées aujourd’hui ».
+- [x] Appliquer le style actuel des boutons aux onglets de l’accueil livreur.
+- [x] Ajouter un badge de compteur sur chaque onglet et valider compilation, tests et services.
