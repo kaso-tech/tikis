@@ -7,7 +7,7 @@ import { useThemeColors } from "@/lib/use-theme-colors";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { formatListRouteParts } from "@/lib/geo-rules";
-import { deliveryStatusMeta, formatMoney, formatRelativeDate, type Delivery, type DeliveryStatus } from "@/shared/tikis-domain";
+import { formatMoney, type Delivery, type DeliveryStatus } from "@/shared/tikis-domain";
 
 type FilterKey = "all" | "ongoing" | "done";
 
@@ -60,9 +60,16 @@ function statusLabel(status: DeliveryStatus): string {
   return "Brouillon";
 }
 
+function historyStatusColor(status: DeliveryStatus, theme: { success: string; warning: string; error: string; muted: string }) {
+  if (status === "completed") return theme.success;
+  if (status === "cancelled" || status === "disabled") return theme.error;
+  if (status === "expired") return theme.warning;
+  return theme.muted;
+}
+
 export default function HistoryScreen() {
   const { role, profile } = useTikisStore();
-  const { isDark, colors: theme } = useThemeColors();
+  const { colors: theme } = useThemeColors();
   const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -124,9 +131,7 @@ export default function HistoryScreen() {
             isLoading={deliveriesQuery.isLoading}
           />
         }
-        renderItem={({ item: [month, items] }) => (
-          <HistorySection month={month} items={items} role={role} isDark={isDark} theme={theme} />
-        )}
+        renderItem={({ item: [month, items] }) => <HistorySection month={month} items={items} role={role} theme={theme} />}
         ListEmptyComponent={
           <View style={styles.empty}>
             <MaterialIcons name={deliveriesQuery.isLoading ? "hourglass-empty" : "history"} size={32} color={theme.muted} />
@@ -148,11 +153,10 @@ function HistoryHeader({ role, filter, setFilter, search, setSearch, counts, isL
   return (
     <View>
       <View style={styles.pageHeader}>
-        <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.back, pressed && styles.pressed]} accessibilityLabel="Retour">
+        <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.back, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]} accessibilityLabel="Retour">
           <MaterialIcons name="arrow-back" size={20} color={theme.foreground} />
         </Pressable>
         <View style={styles.pageHeaderText}>
-          <Text style={[styles.pageEyebrow, { color: theme.muted }]}>Historique</Text>
           <Text style={[styles.pageTitle, { color: theme.foreground }]}>{role === "sender" ? "Toutes mes courses" : "Mes courses"}</Text>
         </View>
       </View>
@@ -169,7 +173,7 @@ function HistoryHeader({ role, filter, setFilter, search, setSearch, counts, isL
             maxLength={80}
           />
           {search ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Effacer" onPress={() => setSearch("")} style={styles.searchClear}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Effacer" onPress={() => setSearch("")} style={[styles.searchClear, { backgroundColor: theme.pressed }]}>
               <MaterialIcons name="close" size={12} color={theme.muted} />
             </Pressable>
           ) : null}
@@ -191,27 +195,26 @@ function Tab({ label, count, active, onPress }: { label: string; count: number; 
   const { colors: theme } = useThemeColors();
   return (
     <Pressable onPress={onPress} accessibilityRole="tab" accessibilityState={{ selected: active }} style={({ pressed }) => [styles.tab, pressed && styles.pressed]}>
-      <Text style={[styles.tabLabel, { color: active ? theme.foreground : theme.muted }]}>{label}</Text>
+      <Text style={[styles.tabLabel, { color: active ? theme.primary : theme.muted }]}>{label}</Text>
       <Text style={[styles.tabCount, { color: theme.muted }]}>{count}</Text>
-      {active ? <View style={[styles.tabIndicator, { backgroundColor: theme.foreground }]} /> : null}
+      {active ? <View style={[styles.tabIndicator, { backgroundColor: theme.primary }]} /> : null}
     </Pressable>
   );
 }
 
-function HistorySection({ month, items, role, isDark, theme }: { month: string; items: Delivery[]; role: "sender" | "driver"; isDark: boolean; theme: any }) {
+function HistorySection({ month, items, role, theme }: { month: string; items: Delivery[]; role: "sender" | "driver"; theme: any }) {
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: theme.muted }]}>{month.toUpperCase()}</Text>
         <Text style={[styles.sectionCount, { color: theme.muted }]}>{items.length} course{items.length > 1 ? "s" : ""}</Text>
       </View>
-      <View style={[styles.listCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+      <View style={[styles.listCard, { backgroundColor: theme.surface }]}>
         {items.map((delivery, index) => (
           <HistoryRow
             key={delivery.id}
             delivery={delivery}
             role={role}
-            isDark={isDark}
             theme={theme}
             isLast={index === items.length - 1}
           />
@@ -221,19 +224,19 @@ function HistorySection({ month, items, role, isDark, theme }: { month: string; 
   );
 }
 
-function HistoryRow({ delivery, role, isDark, theme, isLast }: { delivery: Delivery; role: "sender" | "driver"; isDark: boolean; theme: any; isLast: boolean }) {
+function HistoryRow({ delivery, role, theme, isLast }: { delivery: Delivery; role: "sender" | "driver"; theme: any; isLast: boolean }) {
   const counterpart = role === "sender" ? delivery.driverName ?? "Livreur" : delivery.senderName ?? "Expéditeur";
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const amount = delivery.offeredPrice ?? delivery.estimatedPrice;
   const isMonetary = delivery.status === "completed";
-  const stripeOpacity = delivery.status === "completed" ? 1 : 0.35;
-  const stripeColor = delivery.status === "completed" ? theme.foreground : theme.muted;
+  const stripeOpacity = delivery.status === "completed" ? 1 : 0.72;
+  const stripeColor = historyStatusColor(delivery.status, theme);
   const dateLine = `${statusLabel(delivery.status)} · ${shortDate(delivery.createdAt)}`;
   const routeLine = route.pickup && route.dropoff ? `${route.pickup} → ${route.dropoff}` : route.pickup || route.dropoff;
   return (
     <Pressable
       onPress={() => router.push(`/delivery/${delivery.id}` as any)}
-      style={({ pressed }) => [styles.row, !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border }, pressed && styles.rowPressed]}
+      style={({ pressed }) => [styles.row, !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border }, pressed && { backgroundColor: theme.pressed }]}
       accessibilityRole="button"
     >
       <View style={[styles.stripe, { backgroundColor: stripeColor, opacity: stripeOpacity }]} />
@@ -251,19 +254,18 @@ function HistoryRow({ delivery, role, isDark, theme, isLast }: { delivery: Deliv
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  content: { paddingHorizontal: 20, paddingBottom: 32, gap: 16 },
+  content: { paddingHorizontal: 16, paddingBottom: 32, gap: 14 },
 
   pageHeader: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 12, paddingBottom: 4 },
-  back: { width: 36, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  back: { width: 36, height: 36, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   pageHeaderText: { flex: 1 },
-  pageEyebrow: { fontSize: 11, fontWeight: "500", letterSpacing: 0.3 },
-  pageTitle: { fontSize: 20, fontWeight: "600", letterSpacing: -0.4, marginTop: 2, lineHeight: 26 },
-  pressed: { opacity: 0.5 },
+  pageTitle: { fontSize: 21, fontWeight: "600", letterSpacing: -0.35, lineHeight: 27 },
+  pressed: { opacity: 0.68 },
 
   searchRow: { paddingTop: 8, paddingBottom: 4 },
   search: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, height: 40, borderRadius: 8, borderWidth: 1 },
   searchInput: { flex: 1, fontSize: 13, fontWeight: "500", paddingVertical: 0 },
-  searchClear: { width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0,0,0,0.06)" },
+  searchClear: { width: 20, height: 20, borderRadius: 6, alignItems: "center", justifyContent: "center" },
 
   tabs: { flexDirection: "row", gap: 20, marginTop: 4, borderBottomWidth: 1 },
   tab: { paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 5, position: "relative" },
@@ -276,9 +278,8 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 10, fontWeight: "700", letterSpacing: 1.2 },
   sectionCount: { fontSize: 10, fontWeight: "500" },
 
-  listCard: { borderRadius: 10, borderWidth: 1, overflow: "hidden" },
+  listCard: { borderRadius: 9, overflow: "hidden" },
   row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 14 },
-  rowPressed: { backgroundColor: "rgba(0,0,0,0.02)" },
   stripe: { width: 2, alignSelf: "stretch", borderRadius: 1 },
   rowBody: { flex: 1, minWidth: 0 },
   rowTitle: { fontSize: 13, fontWeight: "600", letterSpacing: -0.1 },

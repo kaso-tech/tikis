@@ -408,3 +408,6 @@
 - [x] Restaurer le contrat de filtrage des statuts expiré et annulé dans l’écran Historique.
 - [x] Réorganiser les onglets de l’accueil livreur : Disponibles, À confirmer, En cours et Terminées aujourd’hui.
 - [x] Valider les filtres, les compteurs et le rendu des onglets livreur sur mobile et web.
+- [x] Permettre l’ajout sécurisé d’une adresse directement depuis la page Adresses.
+- [x] Harmoniser les pages Adresses, Historique des livraisons, Parrainage et Liste des candidats avec le thème Tikis épuré.
+- [x] Valider la création d’adresse, la compilation, les tests et les services après la refonte.

@@ -27,7 +27,7 @@ function shortRelative(iso: string, now = Date.now()): string {
 }
 
 export function CandidatesSheet({ visible, candidates, deliveryStatus, loadingId, onClose, onChoose }: Props) {
-  const { colors: theme } = useThemeColors();
+  const { colors: theme, isDark } = useThemeColors();
   const [tab, setTab] = useState<Tab>("all");
 
   const filtered = useMemo(() => {
@@ -47,7 +47,7 @@ export function CandidatesSheet({ visible, candidates, deliveryStatus, loadingId
       <View style={[styles.overlay, { backgroundColor: theme.overlay }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={[styles.sheet, { backgroundColor: theme.surface }]}>
-          <View style={[styles.sheetGrip, { backgroundColor: isDark(theme) ? "#3A3A3A" : "#D5D5DC" }]} />
+          <View style={[styles.sheetGrip, { backgroundColor: theme.border }]} />
 
           <View style={styles.header}>
             <View style={styles.headerText}>
@@ -58,7 +58,7 @@ export function CandidatesSheet({ visible, candidates, deliveryStatus, loadingId
                   : `${candidates.length} livreur${candidates.length > 1 ? "s" : ""} proposent leur service`}
               </Text>
             </View>
-            <Pressable onPress={onClose} style={({ pressed }) => [styles.close, { backgroundColor: isDark(theme) ? "#1F1F1F" : "#F0F0F0" }, pressed && styles.pressed]} accessibilityLabel="Fermer">
+            <Pressable onPress={onClose} style={({ pressed }) => [styles.close, { backgroundColor: theme.pressed, borderColor: theme.border }, pressed && styles.pressed]} accessibilityLabel="Fermer">
               <MaterialIcons name="close" size={16} color={theme.foreground} />
             </Pressable>
           </View>
@@ -79,6 +79,7 @@ export function CandidatesSheet({ visible, candidates, deliveryStatus, loadingId
                     loading={loadingId === candidate.id}
                     onChoose={() => onChoose(candidate)}
                     theme={theme}
+                    isDark={isDark}
                   />
                 ))}
               </ScrollView>
@@ -100,44 +101,31 @@ export function CandidatesSheet({ visible, candidates, deliveryStatus, loadingId
   );
 }
 
-function isDark(theme: any) {
-  return theme.foreground === "#F5F5F5";
-}
-
 function TabButton({ label, count, active, onPress, theme }: { label: string; count: number; active: boolean; onPress: () => void; theme: any }) {
   return (
     <Pressable onPress={onPress} accessibilityRole="tab" accessibilityState={{ selected: active }} style={({ pressed }) => [styles.tab, pressed && styles.pressed]}>
-      <Text style={[styles.tabLabel, { color: active ? theme.foreground : theme.muted }]}>{label}</Text>
+      <Text style={[styles.tabLabel, { color: active ? theme.primary : theme.muted }]}>{label}</Text>
       <Text style={[styles.tabCount, { color: theme.muted }]}>{count}</Text>
-      {active ? <View style={[styles.tabIndicator, { backgroundColor: theme.foreground }]} /> : null}
+      {active ? <View style={[styles.tabIndicator, { backgroundColor: theme.primary }]} /> : null}
     </Pressable>
   );
 }
 
-function CandidateCard({ candidate, deliveryStatus, loading, onChoose, theme }: { candidate: DriverCandidate; deliveryStatus: string; loading: boolean; onChoose: () => void; theme: any }) {
+function CandidateCard({ candidate, deliveryStatus, loading, onChoose, theme, isDark }: { candidate: DriverCandidate; deliveryStatus: string; loading: boolean; onChoose: () => void; theme: any; isDark: boolean }) {
   const isSelected = candidate.status === "selected" || candidate.status === "confirmed";
   const label = isSelected ? "En attente" : deliveryStatus === "active" ? "Remplacer" : "Choisir";
   const canChoose = !isSelected && !loading;
   const vehiclePrice = candidate.offerPrice ?? candidate.commissionBlocked * 10;
   const postedAt = shortRelative(candidate.createdAt);
-  const showBearing = false; // hooké plus tard avec la position driver
-  const bearingDeg = 0;
-  const certColor = isDark(theme) ? "#5BC0DE" : "#007B8B";
-  const certBg = isDark(theme) ? "rgba(91,192,222,0.18)" : "#E5F4F7";
-  const dividerColor = isDark(theme) ? "#262626" : "#E8E8E8";
-  const subFg = isDark(theme) ? "#8A8A8A" : "#6B6B6B";
-  const mutedFg = isDark(theme) ? "#5A5A5A" : "#9A9A9A";
-  const disabledBg = isDark(theme) ? "#1A1A1A" : "#F0F0F0";
+  const certColor = theme.primary;
+  const certBg = isDark ? "#312515" : "#F8E8CE";
+  const disabledBg = theme.pressed;
 
   return (
     <View
       style={[
         styles.card,
-        {
-          backgroundColor: theme.surface,
-          borderColor: isSelected ? theme.foreground : dividerColor,
-          borderWidth: isSelected ? 2 : 1,
-        },
+        { backgroundColor: isSelected ? theme.input : theme.surface },
       ]}
     >
       <View style={styles.cardTop}>
@@ -145,13 +133,11 @@ function CandidateCard({ candidate, deliveryStatus, loading, onChoose, theme }: 
           style={[
             styles.avatar,
             {
-              backgroundColor: candidate.isCertified
-                ? (isDark(theme) ? theme.foreground : theme.foreground)
-                : mutedFg,
+              backgroundColor: candidate.isCertified ? theme.primary : theme.muted,
             },
           ]}
         >
-          <Text style={[styles.avatarText, { color: candidate.isCertified ? (isDark(theme) ? theme.background : theme.background) : theme.surface }]}>
+          <Text style={[styles.avatarText, { color: theme.surface }]}>
             {candidate.initials || candidate.name.split(/\s+/).map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
           </Text>
         </View>
@@ -166,18 +152,13 @@ function CandidateCard({ candidate, deliveryStatus, loading, onChoose, theme }: 
               </View>
             ) : null}
           </View>
-          <Text style={[styles.meta, { color: subFg }]} numberOfLines={1}>
+          <Text style={[styles.meta, { color: theme.muted }]} numberOfLines={1}>
             {candidate.completedDeliveries} livraison{candidate.completedDeliveries > 1 ? "s" : ""} · ★ {candidate.rating.toLocaleString("fr-FR")}
           </Text>
         </View>
         <View style={styles.distanceBlock}>
           <View style={styles.distanceLine}>
-            <MaterialIcons
-              name="navigation"
-              size={12}
-              color={certColor}
-              style={{ transform: [{ rotate: showBearing ? `${bearingDeg}deg` : "0deg" }] }}
-            />
+            <MaterialIcons name="star" size={13} color={certColor} />
             <Text style={[styles.distanceValue, { color: theme.foreground }]}>
               {candidate.completedDeliveries > 0 ? "1,2 km" : "—"}
             </Text>
@@ -186,12 +167,12 @@ function CandidateCard({ candidate, deliveryStatus, loading, onChoose, theme }: 
         </View>
       </View>
 
-      <View style={[styles.cardFooter, { borderTopColor: dividerColor }]}>
-        <Text style={[styles.postedAt, { color: mutedFg }]}>{postedAt}</Text>
+      <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
+        <Text style={[styles.postedAt, { color: theme.muted }]}>{postedAt}</Text>
         {isSelected ? (
           <View style={styles.footerRight}>
-            <View style={[styles.selectedPill, { borderColor: theme.foreground }]}>
-              <Text style={[styles.selectedPillText, { color: theme.foreground }]}>SÉLECTIONNÉ</Text>
+            <View style={[styles.selectedPill, { backgroundColor: certBg }]}>
+              <Text style={[styles.selectedPillText, { color: theme.primary }]}>SÉLECTIONNÉ</Text>
             </View>
             <Pressable
               onPress={onChoose}
@@ -199,17 +180,17 @@ function CandidateCard({ candidate, deliveryStatus, loading, onChoose, theme }: 
               style={({ pressed }) => [styles.cta, { backgroundColor: disabledBg }, pressed && styles.pressed]}
               accessibilityLabel="En attente"
             >
-              <Text style={[styles.ctaText, { color: mutedFg }]}>{label}</Text>
+              <Text style={[styles.ctaText, { color: theme.muted }]}>{label}</Text>
             </Pressable>
           </View>
         ) : (
           <Pressable
             onPress={onChoose}
             disabled={!canChoose}
-            style={({ pressed }) => [styles.cta, { backgroundColor: theme.foreground }, !canChoose && { backgroundColor: disabledBg }, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.cta, { backgroundColor: theme.primary, borderColor: theme.primary }, !canChoose && { backgroundColor: disabledBg, borderColor: theme.border }, pressed && styles.pressed]}
             accessibilityLabel={label}
           >
-            <Text style={[styles.ctaText, { color: isDark(theme) ? theme.background : theme.background }]}>{label}</Text>
+            <Text style={styles.ctaText}>{label}</Text>
           </Pressable>
         )}
       </View>
@@ -219,7 +200,7 @@ function CandidateCard({ candidate, deliveryStatus, loading, onChoose, theme }: 
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: "flex-end" },
-  sheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 8, paddingBottom: 18, maxHeight: "92%", minHeight: 240 },
+  sheet: { borderTopLeftRadius: 12, borderTopRightRadius: 12, paddingTop: 8, paddingBottom: 18, maxHeight: "92%", minHeight: 240 },
 
   sheetGrip: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 12 },
 
@@ -227,7 +208,7 @@ const styles = StyleSheet.create({
   headerText: { flex: 1 },
   eyebrow: { fontSize: 11, fontWeight: "500", letterSpacing: 0.3, marginBottom: 2 },
   title: { fontSize: 17, fontWeight: "600", letterSpacing: -0.3, lineHeight: 22 },
-  close: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  close: { width: 32, height: 32, borderRadius: 7, borderWidth: 1, alignItems: "center", justifyContent: "center" },
 
   pressed: { opacity: 0.6 },
 
@@ -238,9 +219,9 @@ const styles = StyleSheet.create({
   tabIndicator: { position: "absolute", left: 0, right: 0, bottom: -1, height: 1 },
 
   list: { flex: 1 },
-  listContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 24, gap: 5 },
+  listContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 24, gap: 8 },
 
-  card: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  card: { borderRadius: 9, paddingHorizontal: 14, paddingVertical: 12 },
   cardTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   avatarText: { fontWeight: "600", fontSize: 14 },
@@ -258,10 +239,10 @@ const styles = StyleSheet.create({
   cardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 10, borderTopWidth: 1 },
   postedAt: { fontSize: 11, fontWeight: "500" },
   footerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
-  selectedPill: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1 },
+  selectedPill: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
   selectedPillText: { fontSize: 8, fontWeight: "700", letterSpacing: 0.4 },
-  cta: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, alignItems: "center", justifyContent: "center" },
-  ctaText: { fontSize: 12, fontWeight: "600" },
+  cta: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  ctaText: { color: "#FFFFFF", fontSize: 12, fontWeight: "600" },
 
   empty: { alignItems: "center", paddingVertical: 50, paddingHorizontal: 30, gap: 6 },
   emptyIcon: { width: 64, height: 64, borderRadius: 16, alignItems: "center", justifyContent: "center", marginBottom: 12 },

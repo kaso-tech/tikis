@@ -9,6 +9,7 @@ import { YangoAddressPicker } from "@/components/tikis/yango-address-picker";
 import { TikisButton } from "@/components/tikis/ui";
 import { offeredPriceError, parseOfferedPrice, priceDifferencePercent, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
 import { estimateDeliveryPrice, formatListRoute, formatFavoritePlace, provisionalRoute, sanitizePlaceText, validateDeliveryMeasurement } from "@/lib/geo-rules";
+import { favoriteToLocation, toPlacePayload } from "@/lib/place-favorites";
 import { deliveryTextInputIssue, isAllowedDeliveryText, sanitizeDeliveryText } from "@/lib/tikis-engine";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
@@ -27,14 +28,6 @@ const DELIVERY_TYPES: { value: DeliveryType; icon: React.ComponentProps<typeof M
   { value: "Autre", icon: "inventory-2", label: "Autre", sub: "Marchandises" },
 ];
 type DeliveryFieldName = "title" | "details" | "passengers" | "pickup" | "dropoff" | "price";
-
-function toPlacePayload(place: LocationLabel) {
-  return { name: place.name, district: place.district, city: place.city, latitude: place.latitude, longitude: place.longitude, ...(place.googlePlaceId ? { googlePlaceId: place.googlePlaceId } : {}), ...(place.mapboxId ? { mapboxId: place.mapboxId } : {}), ...(place.mapboxSessionToken ? { mapboxSessionToken: place.mapboxSessionToken } : {}), ...(place.formattedAddress ? { formattedAddress: place.formattedAddress } : {}), ...(place.street ? { street: place.street } : {}), ...(place.province ? { province: place.province } : {}), ...(place.country ? { country: place.country } : {}), ...(place.source ? { source: place.source } : {}) };
-}
-
-function favoriteToLocation(item: { place: { placeName: string; district: string | null; city: string | null; latitude: string; longitude: string; googlePlaceId: string | null; mapboxPlaceId: string | null; formattedAddress: string; street: string | null; province: string | null; country: string | null; provider: string; source: string; featureType: string; precision: string } }): LocationLabel {
-  return { name: item.place.placeName, district: item.place.district ?? "", city: item.place.city ?? "", latitude: Number(item.place.latitude), longitude: Number(item.place.longitude), ...(item.place.googlePlaceId ? { googlePlaceId: item.place.googlePlaceId } : {}), ...(item.place.mapboxPlaceId ? { mapboxId: item.place.mapboxPlaceId } : {}), ...(item.place.formattedAddress ? { formattedAddress: item.place.formattedAddress } : {}), ...(item.place.street ? { street: item.place.street } : {}), ...(item.place.province ? { province: item.place.province } : {}), ...(item.place.country ? { country: item.place.country } : {}), provider: item.place.provider === "mapbox" ? "mapbox" : item.place.provider === "manual" ? "manual" : "legacy", source: ["retrieve", "reverse", "forward", "favorite", "manual", "legacy"].includes(item.place.source) ? item.place.source as LocationLabel["source"] : "legacy", featureType: ["address", "secondary_address", "poi", "street", "neighborhood", "locality", "place", "point", "unknown"].includes(item.place.featureType) ? item.place.featureType as LocationLabel["featureType"] : "unknown", precision: ["exact", "street", "area", "city", "unknown"].includes(item.place.precision) ? item.place.precision as LocationLabel["precision"] : "unknown" };
-}
 
 export default function CreateDeliveryScreen() {
   const { colors: theme } = useThemeColors();
