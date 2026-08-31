@@ -436,7 +436,7 @@ export function HomeScreen() {
                 style={({ pressed }) => [styles.sheetFab, pressed && styles.pressed]}
                 accessibilityLabel="Créer une livraison"
               >
-                <MaterialIcons name="add" size={22} color="#9A6201" />
+                <MaterialIcons name="add" size={22} color="#FFFFFF" />
               </Pressable>
             )}
           </View>
@@ -449,27 +449,36 @@ export function HomeScreen() {
         >
           {isDriver && driverWallet ? <WalletCard walletBalance={availableWalletBalance(driverWallet)} totalBalance={driverWallet.total} blockedBalance={driverWallet.blocked} /> : null}
 
-          {isDriver ? (
-            <View style={styles.searchRow}>
-              <View style={styles.searchPill}>
-                <MaterialIcons name="search" size={16} color="#747474" />
-                <TextInput
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  placeholder="Rechercher une opportunité…"
-                  placeholderTextColor="#B48753"
-                  style={styles.searchInput}
-                  returnKeyType="search"
-                  clearButtonMode="while-editing"
-                />
-                {searchQuery.length > 0 ? (
-                  <Pressable onPress={() => setSearchQuery("")} hitSlop={8} accessibilityLabel="Effacer la recherche">
-                    <MaterialIcons name="close" size={16} color="#747474" />
-                  </Pressable>
-                ) : null}
+          {isDriver && !profile?.photoUrl ? (
+            <Pressable onPress={() => router.push("/(tabs)/profile" as any)} style={({ pressed }) => [styles.kycBanner, pressed && styles.pressed]} accessibilityLabel="Vérifier mon profil">
+              <MaterialIcons name="verified-user" size={18} color="#9A6201" />
+              <View style={styles.kycBannerCopy}>
+                <Text style={styles.kycBannerTitle}>Profil à vérifier</Text>
+                <Text style={styles.kycBannerText}>Ajoutez votre photo et vos documents pour pouvoir candidater aux livraisons.</Text>
               </View>
-            </View>
+              <MaterialIcons name="chevron-right" size={18} color="#9A6201" />
+            </Pressable>
           ) : null}
+
+          <View style={styles.searchRow}>
+            <View style={styles.searchPill}>
+              <MaterialIcons name="search" size={16} color="#747474" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder={isDriver ? "Rechercher une opportunité…" : "Rechercher une livraison…"}
+                placeholderTextColor="#B48753"
+                style={styles.searchInput}
+                returnKeyType="search"
+                clearButtonMode="while-editing"
+              />
+              {searchQuery.length > 0 ? (
+                <Pressable onPress={() => setSearchQuery("")} hitSlop={8} accessibilityLabel="Effacer la recherche">
+                  <MaterialIcons name="close" size={16} color="#747474" />
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow} style={styles.filterScroll}>
             {filterItems.map((item) => (
@@ -875,7 +884,7 @@ const styles = StyleSheet.create({
   markerEnd: { top: "64%", right: "18%", backgroundColor: "#FFFFFF", borderColor: "#B4232D" },
 
   fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#F7EFE5", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E5D2B9", zIndex: 10 },
-  sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#F7EFE5", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E5D2B9" },
+  sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
 
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#EEEDF3", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
@@ -894,6 +903,10 @@ const styles = StyleSheet.create({
   onlineDotOffline: { backgroundColor: "#747474" },
 
   searchRow: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6 },
+  kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: "#F7EFE5", borderRadius: 10, borderWidth: 1, borderColor: "#E5D2B9" },
+  kycBannerCopy: { flex: 1 },
+  kycBannerTitle: { color: "#9A6201", fontSize: 12, fontWeight: "700" },
+  kycBannerText: { color: "#6B4A1B", fontSize: 11, marginTop: 2, lineHeight: 16 },
   searchPill: { height: 40, backgroundColor: "#F7EFE5", borderRadius: 11, borderWidth: 1, borderColor: "#E5D2B9", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: "#9A6201", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
 

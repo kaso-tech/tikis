@@ -96,6 +96,7 @@ export default function WalletScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={[styles.balanceCard, isDriver ? styles.balanceCardDriver : styles.balanceCardSender]}>
+          <View style={styles.balanceGradient} pointerEvents="none" />
           <Text style={[styles.balanceEyebrow, isDriver && styles.balanceEyebrowLight]}>
             {isDriver ? "SOLDE DISPONIBLE" : "VOTRE WALLET EXPÉDITEUR"}
           </Text>
@@ -120,6 +121,10 @@ export default function WalletScreen() {
                 <View style={styles.balanceCol}>
                   <Text style={[styles.balanceLabel, isDriver && styles.balanceLabelLight]}>Solde total</Text>
                   <Text style={styles.balanceSub}>{displayWalletAmount(wallet?.total ?? null)}</Text>
+                </View>
+                <View style={styles.balanceCol}>
+                  <Text style={[styles.balanceLabel, isDriver && styles.balanceLabelLight]}>Bonus</Text>
+                  <Text style={styles.balanceSub}>0 F</Text>
                 </View>
                 <View style={styles.balanceCol}>
                   <Text style={[styles.balanceLabel, isDriver && styles.balanceLabelLight]}>Bloquée</Text>
@@ -147,14 +152,14 @@ export default function WalletScreen() {
 
         <View style={styles.actionsRow}>
           <Pressable onPress={() => openRequest("deposit")} style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}>
-            <View style={styles.actionIcon}><MaterialIcons name="add-card" size={15} color="#007B8B" /></View>
+            <View style={styles.actionIcon}><MaterialIcons name="add-card" size={15} color="#9A6201" /></View>
             <View style={styles.actionText}>
               <Text style={styles.actionLabel}>Dépôt</Text>
               <Text style={styles.actionSub}>YengaPay · test</Text>
             </View>
           </Pressable>
           <Pressable onPress={() => openRequest("withdrawal")} style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}>
-            <View style={[styles.actionIcon, styles.actionIconAlt]}><MaterialIcons name="account-balance-wallet" size={15} color="#007B8B" /></View>
+            <View style={[styles.actionIcon, styles.actionIconAlt]}><MaterialIcons name="account-balance-wallet" size={15} color="#9A6201" /></View>
             <View style={styles.actionText}>
               <Text style={styles.actionLabel}>Retrait</Text>
               <Text style={styles.actionSub}>Mobile Money</Text>
@@ -229,7 +234,7 @@ export default function WalletScreen() {
             <View style={styles.sheetGrip} />
             {payment ? (
               <>
-                <View style={styles.modalIcon}><MaterialIcons name="verified-user" size={22} color="#007B8B" /></View>
+                <View style={styles.modalIcon}><MaterialIcons name="verified-user" size={22} color="#9A6201" /></View>
                 <Text style={styles.modalTitle}>Validation YengaPay</Text>
                 <Text style={styles.modalSub}>Mode test : confirmez le résultat de votre paiement de {formatMoney(payment.amount)}. Votre Wallet ne changera qu’après cette confirmation serveur.</Text>
                 <View style={styles.referenceCard}>
@@ -244,7 +249,7 @@ export default function WalletScreen() {
               </>
             ) : (
               <>
-                <View style={styles.modalIcon}><MaterialIcons name={requestType === "deposit" ? "add-card" : "account-balance-wallet"} size={22} color="#007B8B" /></View>
+                <View style={styles.modalIcon}><MaterialIcons name={requestType === "deposit" ? "add-card" : "account-balance-wallet"} size={22} color="#9A6201" /></View>
                 <Text style={styles.modalTitle}>{requestType === "deposit" ? "Dépôt YengaPay" : "Retrait YengaPay"}</Text>
                 <Text style={styles.modalSub}>{requestType === "deposit" ? "Initialisez un dépôt de test. Le solde ne sera crédité qu'après la confirmation suivante." : "Initialisez un retrait de test. Le solde ne sera débité qu'après la confirmation suivante."}</Text>
                 <View style={styles.amountWrap}>
@@ -277,7 +282,7 @@ function QuickStat({ icon, value, label, tone }: { icon: React.ComponentProps<ty
   return (
     <View style={styles.quickStat}>
       <View style={[styles.quickStatIcon, tone === "primary" ? styles.quickStatIconPrimary : tone === "amber" ? styles.quickStatIconAmber : styles.quickStatIconSuccess]}>
-        <MaterialIcons name={icon} size={14} color={tone === "primary" ? "#007B8B" : tone === "amber" ? "#9A6200" : "#167A55"} />
+        <MaterialIcons name={icon} size={14} color={tone === "primary" ? "#9A6201" : tone === "amber" ? "#9A6201" : "#167A55"} />
       </View>
       <Text style={styles.quickStatValue}>{value}</Text>
       <Text style={styles.quickStatLabel}>{label}</Text>
@@ -292,9 +297,10 @@ const styles = StyleSheet.create({
 
   scroll: { padding: 8, paddingBottom: 24, gap: 12 },
 
-  balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#111111" },
-  balanceCardDriver: { backgroundColor: "#111111" },
-  balanceCardSender: { backgroundColor: "#007B8B" },
+  balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#9A6201", position: "relative", overflow: "hidden" },
+  balanceCardDriver: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#9A6201", borderWidth: 0, overflow: "hidden" },
+  balanceCardSender: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#007B8B", borderWidth: 0, overflow: "hidden" },
+  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#D7A447", opacity: 0.25, borderRadius: 14 },
   balanceEyebrow: { color: "rgba(255,255,255,0.6)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   balanceEyebrowLight: { color: "rgba(255,255,255,0.7)" },
   balanceValueRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
