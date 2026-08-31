@@ -71,6 +71,14 @@ function matchesFilter(delivery: Delivery, filter: FilterKey, isDriver: boolean)
   return true;
 }
 
+function badgeFilterForDelivery(delivery: Delivery, isDriver: boolean): FilterKey | null {
+  if (delivery.status === "open") return "open";
+  if (delivery.status === "pending_confirmation") return "pending";
+  if (delivery.status === "active") return "active";
+  if (delivery.status === "completed" && matchesFilter(delivery, "completed", isDriver)) return "completed";
+  return null;
+}
+
 function driverSortPriority(d: Delivery): number {
   if (d.ownCandidateStatus === "confirmed" || d.status === "active") return 0;
   if (d.ownCandidateStatus === "selected" || d.status === "pending_confirmation") return 1;
@@ -122,6 +130,13 @@ export function HomeScreen() {
   const dragStartHeight = useRef(SHEET_PEEK);
   const lastSheetSnap = useRef(SHEET_PEEK);
   const filterTransition = useRef(new Animated.Value(1)).current;
+  const previousDeliveryStatuses = useRef<Record<string, DeliveryStatus> | null>(null);
+  const badgeScales = useRef<Record<FilterKey, Animated.Value>>({
+    open: new Animated.Value(1),
+    pending: new Animated.Value(1),
+    active: new Animated.Value(1),
+    completed: new Animated.Value(1),
+  }).current;
   const driverLocation = useDriverLocation({ enabled: role === "driver" });
   const deviceHeading = useDeviceHeading(role === "driver");
 
@@ -370,6 +385,31 @@ export function HomeScreen() {
   const firstNameDisplay = isDriver ? firstName : "à vous";
   const countLabel = isDriver ? `${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité` : `${filteredList.length} livraison${filteredList.length > 1 ? "s" : ""} affichée${filteredList.length > 1 ? "s" : ""}`;
 
+  function pulseBadge(filterKey: FilterKey) {
+    const badgeScale = badgeScales[filterKey];
+    badgeScale.stopAnimation();
+    badgeScale.setValue(1);
+    Animated.sequence([
+      Animated.timing(badgeScale, { toValue: 1.14, duration: 110, useNativeDriver: true }),
+      Animated.timing(badgeScale, { toValue: 1, duration: 170, useNativeDriver: true }),
+    ]).start();
+  }
+
+  useEffect(() => {
+    const currentStatuses = Object.fromEntries(deliveries.map((delivery) => [delivery.id, delivery.status])) as Record<string, DeliveryStatus>;
+    const previousStatuses = previousDeliveryStatuses.current;
+    previousDeliveryStatuses.current = currentStatuses;
+    if (!previousStatuses) return;
+
+    const changedFilters = new Set<FilterKey>();
+    deliveries.forEach((delivery) => {
+      if (previousStatuses[delivery.id] === delivery.status) return;
+      const filterKey = badgeFilterForDelivery(delivery, isDriver);
+      if (filterKey) changedFilters.add(filterKey);
+    });
+    changedFilters.forEach(pulseBadge);
+  }, [deliveries, isDriver]);
+
   function selectFilter(nextFilter: FilterKey) {
     if (nextFilter === filter) return;
     filterTransition.stopAnimation();
@@ -451,7 +491,9 @@ export function HomeScreen() {
             {filterItems.map((item) => (
               <Pressable key={item.key} onPress={() => selectFilter(item.key)} accessibilityRole="tab" accessibilityState={{ selected: filter === item.key }} accessibilityLabel={`${item.label}, ${filterCounts[item.key]} livraison${filterCounts[item.key] > 1 ? "s" : ""}`} style={({ pressed }) => [styles.chip, filter === item.key && styles.chipActive, pressed && styles.pressed]}>
                 <Text style={[styles.chipText, filter === item.key && styles.chipTextActive]}>{item.label}</Text>
-                <View style={[styles.chipCount, filter === item.key && styles.chipCountActive]}><Text style={styles.chipCountText}>{filterCounts[item.key]}</Text></View>
+                <Animated.View style={{ transform: [{ scale: badgeScales[item.key] }] }}>
+                  <View style={[styles.chipCount, filter === item.key && styles.chipCountActive]}><Text style={styles.chipCountText}>{filterCounts[item.key]}</Text></View>
+                </Animated.View>
               </Pressable>
             ))}
           </View>

@@ -426,3 +426,5 @@
 - [x] Limiter l’onglet expéditeur Terminées aux livraisons finalisées depuis moins de vingt-quatre heures.
 - [x] Ajouter une transition fluide et accessible entre les onglets de l’accueil.
 - [x] Valider les filtres, la compilation, les tests et les services après la refonte expéditeur.
+- [x] Détecter les livraisons dont le statut a changé et déclencher une pulsation ponctuelle sur le badge d’onglet concerné.
+- [x] Valider l’animation de badges, la compilation, les tests et les services.
