@@ -411,3 +411,5 @@
 - [x] Permettre l’ajout sécurisé d’une adresse directement depuis la page Adresses.
 - [x] Harmoniser les pages Adresses, Historique des livraisons, Parrainage et Liste des candidats avec le thème Tikis épuré.
 - [x] Valider la création d’adresse, la compilation, les tests et les services après la refonte.
+- [x] Remplacer le fond `#9A6201` par `#F7EFE5` et le texte blanc par `#9A6201` sur les boutons hors authentification.
+- [x] Préserver la palette actuelle des boutons d’authentification et valider la compilation, les tests et les services après la modification.

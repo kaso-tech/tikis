@@ -356,7 +356,7 @@ export default function DeliveryDetailScreen() {
 
         {role === "sender" && (isActive || delivery.status === "pending_confirmation") ? (
           <Pressable onPress={() => router.push(`/delivery/${deliveryId}/map` as any)} style={({ pressed }) => [styles.trackButton, pressed && styles.pressed]}>
-            <MaterialIcons name="my-location" size={16} color="#FFFFFF" />
+            <MaterialIcons name="my-location" size={16} color="#9A6201" />
             <Text style={styles.trackButtonText}>Suivre en direct</Text>
           </Pressable>
         ) : null}
@@ -526,8 +526,8 @@ const styles = StyleSheet.create({
   detailsLast: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: "#ECECEC", marginTop: 2 },
   detailsDescription: { color: "#666666", fontSize: 12, lineHeight: 18 },
 
-  trackButton: { backgroundColor: "#9A6201", borderRadius: 10, paddingVertical: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  trackButtonText: { color: "#FFFFFF", fontSize: 13, fontWeight: "600" },
+  trackButton: { backgroundColor: "#F7EFE5", borderRadius: 10, borderWidth: 1, borderColor: "#E5D2B9", paddingVertical: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  trackButtonText: { color: "#9A6201", fontSize: 13, fontWeight: "600" },
 
   senderActions: { gap: 8, marginTop: 4 },
   senderActionBtn: { minHeight: 46 },

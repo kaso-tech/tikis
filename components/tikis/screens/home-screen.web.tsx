@@ -368,7 +368,7 @@ export function HomeScreen() {
         style={({ pressed }) => [styles.fab, pressed && styles.pressed]}
         accessibilityLabel={!isDriver ? "Créer une livraison" : ""}
       >
-        {!isDriver && <MaterialIcons name="add" size={26} color="#FFFFFF" />}
+        {!isDriver && <MaterialIcons name="add" size={26} color="#9A6201" />}
       </Pressable>
 
       <Animated.View style={[styles.sheet, { height: sheetHeight }]}>
@@ -784,12 +784,12 @@ function DeliveryRow({
               disabled={applying}
               style={({ pressed }) => [styles.rowBtnFilled, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
             >
-              {applying ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.rowBtnFilledText}>{driverAction}</Text>}
+              {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.rowBtnFilledText}>{driverAction}</Text>}
             </Pressable>
           ) : (() => {
             const senderAction = delivery.status === "open" ? (delivery.candidateCount ?? 0) > 0 ? "Candidats" : "Annuler" : delivery.status === "active" ? "Suivre" : null;
             return senderAction ? <Pressable onPress={onApply} disabled={applying} style={({ pressed }) => [styles.rowBtnFilled, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}>
-              {applying ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={styles.rowBtnFilledText}>{senderAction}</Text>}
+              {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.rowBtnFilledText}>{senderAction}</Text>}
             </Pressable> : null;
           })()}
         </View>
@@ -814,7 +814,7 @@ const styles = StyleSheet.create({
   markerDriver: { top: "50%", left: "42%", backgroundColor: "#111111" },
   markerEnd: { top: "64%", right: "18%", backgroundColor: "#FFFFFF", borderColor: "#B4232D" },
 
-  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#754A01", zIndex: 10 },
+  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#F7EFE5", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E5D2B9", zIndex: 10 },
 
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
@@ -824,12 +824,12 @@ const styles = StyleSheet.create({
   sheetTitle: { color: "#111111", fontSize: 14, fontWeight: "700", lineHeight: 18 },
   sheetSubtitle: { color: "#666666", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 
-  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#9A6201", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#754A01" },
+  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#F7EFE5", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E5D2B9" },
   servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE", shadowOpacity: 0, elevation: 0 },
   servicePillNeutral: { backgroundColor: "#EEEDF3", shadowOpacity: 0, elevation: 0 },
-  serviceText: { color: "#FFFFFF", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
+  serviceText: { color: "#9A6201", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   serviceTextOffline: { color: "#111111" },
-  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FFFFFF" },
+  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9A6201" },
   onlineDotOffline: { backgroundColor: "#747474" },
 
   searchRow: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6 },
@@ -900,8 +900,8 @@ const styles = StyleSheet.create({
   rowActions: { marginLeft: "auto", flexDirection: "row", gap: 6 },
   rowBtnOutline: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
   rowBtnOutlineText: { color: "#111111", fontSize: 10.5, fontWeight: "600" },
-  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#9A6201", minWidth: 64, alignItems: "center", flexDirection: "row", gap: 4, justifyContent: "center" },
-  rowBtnFilledText: { color: "#FFFFFF", fontSize: 10.5, fontWeight: "700" },
+  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", minWidth: 64, alignItems: "center", flexDirection: "row", gap: 4, justifyContent: "center" },
+  rowBtnFilledText: { color: "#9A6201", fontSize: 10.5, fontWeight: "700" },
 
   loadingState: { alignItems: "center", paddingVertical: 32, gap: 8 },
   loadingText: { color: "#666666", fontSize: 12 },

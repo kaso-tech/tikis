@@ -4,8 +4,10 @@ import { haptic } from "@/lib/haptics";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
-const buttonColors: Record<ButtonVariant, { background: string; foreground: string; border?: string }> = {
-  primary: { background: "#9A6201", foreground: "#FFFFFF", border: "#754A01" },
+type ButtonPalette = { background: string; foreground: string; border?: string };
+
+const buttonColors: Record<ButtonVariant, ButtonPalette> = {
+  primary: { background: "#F7EFE5", foreground: "#9A6201", border: "#E5D2B9" },
   secondary: { background: "#FFFFFF", foreground: "#111111", border: "#D7D5DE" },
   ghost: { background: "#E4E3E9", foreground: "#111111", border: "#D0CED7" },
   danger: { background: "#F8E8E9", foreground: "#B4232D", border: "#E8C7CA" },
@@ -15,12 +17,14 @@ export function TikisButton({
   label,
   onPress,
   variant = "primary",
+  authStyle = false,
   loading = false,
   loadingLabel,
   disabled = false,
   icon,
   style,
 }: {
+  authStyle?: boolean;
   label: string;
   onPress: () => void;
   variant?: ButtonVariant;
@@ -30,7 +34,9 @@ export function TikisButton({
   icon?: React.ComponentProps<typeof MaterialIcons>["name"];
   style?: ViewStyle;
 }) {
-  const palette = buttonColors[variant];
+  const palette: ButtonPalette = authStyle && variant === "primary"
+    ? { background: "#9A6201", foreground: "#FFFFFF", border: "#754A01" }
+    : buttonColors[variant];
   const blocked = disabled || loading;
 
   return <Pressable accessibilityRole="button" accessibilityState={{ disabled: blocked, busy: loading }} disabled={blocked} onPress={() => { haptic.light(); onPress(); }} style={({ pressed }) => [styles.button, { backgroundColor: palette.background, borderColor: palette.border ?? palette.background }, style, (pressed || blocked) && styles.buttonPressed]}>
