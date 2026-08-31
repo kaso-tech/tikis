@@ -28,8 +28,8 @@ function shortRelative(iso: string, now = Date.now()): string {
 
 const SCREEN_H = Dimensions.get("window").height;
 const SHEET_CLOSED = 84;
-const SHEET_PEEK = Math.round(SCREEN_H * 0.55);
-const SHEET_EXPANDED = Math.round(SCREEN_H * 0.92);
+const SHEET_PEEK = Math.round(SCREEN_H * 0.45);
+const SHEET_EXPANDED = Math.round(SCREEN_H * 0.7);
 const SWIPE_THRESHOLD = 24;
 
 function nextSnap(current: number, velocityY: number): number {

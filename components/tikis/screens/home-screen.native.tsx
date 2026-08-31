@@ -422,15 +422,6 @@ export function HomeScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
       <MapBackground selected={selected} role={role} sheetOverlayHeight={sheetValue.current} driverPosition={role === "driver" ? driverLocation.location : senderLivePosition} />
 
-      {!isDriver ? <Pressable
-        onPress={() => {
-          if (!isDriver) router.push("/create-delivery" as any);
-        }}
-        style={({ pressed }) => [styles.fab, pressed && styles.pressed]}
-        accessibilityLabel={!isDriver ? "Créer une livraison" : ""}
-      >
-        {!isDriver && <MaterialIcons name="add" size={26} color="#9A6201" />}
-      </Pressable> : null}
 
       <Animated.View style={[styles.sheet, { height: sheetHeight }]}>
         <View {...panResponder.panHandlers} style={styles.sheetHeader}>
@@ -451,7 +442,15 @@ export function HomeScreen() {
                   {driverOnline ? "EN SERVICE" : "HORS SERVICE"}
                 </Text>
               </Pressable>
-            ) : null}
+            ) : (
+              <Pressable
+                onPress={() => router.push("/create-delivery" as any)}
+                style={({ pressed }) => [styles.sheetFab, pressed && styles.pressed]}
+                accessibilityLabel="Créer une livraison"
+              >
+                <MaterialIcons name="add" size={22} color="#9A6201" />
+              </Pressable>
+            )}
           </View>
         </View>
 
@@ -487,7 +486,7 @@ export function HomeScreen() {
             </View>
           ) : null}
 
-          <View style={styles.filterRow}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow} style={styles.filterScroll}>
             {filterItems.map((item) => (
               <Pressable key={item.key} onPress={() => selectFilter(item.key)} accessibilityRole="tab" accessibilityState={{ selected: filter === item.key }} accessibilityLabel={`${item.label}, ${filterCounts[item.key]} livraison${filterCounts[item.key] > 1 ? "s" : ""}`} style={({ pressed }) => [styles.chip, filter === item.key && styles.chipActive, pressed && styles.pressed]}>
                 <Text style={[styles.chipText, filter === item.key && styles.chipTextActive]}>{item.label}</Text>
@@ -496,7 +495,7 @@ export function HomeScreen() {
                 </Animated.View>
               </Pressable>
             ))}
-          </View>
+          </ScrollView>
 
           <Animated.View style={[styles.tabContent, { opacity: filterTransition, transform: [{ translateY: filterTranslateY }] }]}>
           {deliveriesQuery.isLoading ? (
@@ -537,11 +536,18 @@ export function HomeScreen() {
               ))}
             </View>
           ) : (
-            <UrgentCard
+            <DeliveryRow
+              key={selected.id}
               delivery={selected}
               role={role}
+              selected
+              driverDistance={null}
+              driverLocationStatus={null}
+              compassRotation={0}
               applying={actioningId === selected.id}
-              onAction={() => handleSenderAction(selected)}
+              onPress={() => {}}
+              onDetails={() => router.push(`/delivery/${selected.id}` as any)}
+              onApply={() => handleSenderAction(selected)}
             />
           )}
 
@@ -814,13 +820,15 @@ function DeliveryRow({
   const [showPickupTooltip, setShowPickupTooltip] = useState(false);
   const isSender = role === "sender";
   const isDriver = role === "driver";
-  const driverAction = delivery.ownCandidateStatus === "applied"
-    ? "Renoncer"
-    : delivery.ownCandidateStatus === "selected"
-      ? "Confirmer"
-      : delivery.ownCandidateStatus === "confirmed" || delivery.status === "active"
-        ? "Démarrer"
-        : "Postuler";
+  const driverAction = delivery.status === "completed"
+    ? null
+    : delivery.ownCandidateStatus === "applied"
+      ? "Renoncer"
+      : delivery.ownCandidateStatus === "selected"
+        ? "Confirmer"
+        : delivery.ownCandidateStatus === "confirmed" || delivery.status === "active"
+          ? "Démarrer"
+          : "Postuler";
   const vehicleLabel = (delivery.vehicleTypes ?? []).join(" · ") || "Moto";
   const dimensions = delivery.dimensions?.lengthCm && delivery.dimensions?.widthCm && delivery.dimensions?.heightCm
     ? `${delivery.dimensions.lengthCm}×${delivery.dimensions.widthCm}×${delivery.dimensions.heightCm} cm`
@@ -905,8 +913,9 @@ const styles = StyleSheet.create({
   nativeMarkerEnd: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#B4232D" },
 
   fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#F7EFE5", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E5D2B9", zIndex: 10 },
+  sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#F7EFE5", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E5D2B9" },
 
-  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
+  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#EEEDF3", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
   sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", marginBottom: 10 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
@@ -938,7 +947,8 @@ const styles = StyleSheet.create({
   walletStatLabel: { color: "rgba(255,255,255,0.55)", fontSize: 10 },
   walletStatValue: { color: "#FFFFFF", fontSize: 13, fontWeight: "700", marginTop: 2 },
 
-  filterRow: { flexDirection: "row", gap: 6, paddingHorizontal: 14, paddingBottom: 10, flexWrap: "wrap" },
+  filterRow: { flexDirection: "row", gap: 6, paddingHorizontal: 14, paddingBottom: 10, alignItems: "center" },
+  filterScroll: { flexGrow: 0 },
   chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", flexDirection: "row", alignItems: "center", gap: 6 },
   chipActive: { backgroundColor: "#F7EFE5", borderColor: "#9A6201" },
   chipText: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
@@ -971,8 +981,8 @@ const styles = StyleSheet.create({
   urgentBtnWhiteText: { color: "#9A6201", fontSize: 12, fontWeight: "700" },
 
   listSection: { marginTop: 4, gap: 8 },
-  row: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 11, borderWidth: 1, borderColor: "#E3E3E3" },
-  rowSelected: { borderColor: "#9A6201", backgroundColor: "#FAF4EB" },
+  row: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 11, borderWidth: 0, borderColor: "transparent" },
+  rowSelected: { borderColor: "transparent", backgroundColor: "#FFFFFF" },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 9 },
   rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
   rowThumbDriver: { backgroundColor: "#9A6201" },
