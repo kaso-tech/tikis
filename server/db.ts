@@ -63,7 +63,7 @@ export type PersistedTikisProfile = {
 
 export async function getTikisProfileByPhone(phone: string) {
   const db = await getDb();
-  if (!db) return undefined;
+  if (!db) throw new Error("Le service des profils est temporairement indisponible.");
   const result = await db.select().from(tikisProfiles).where(eq(tikisProfiles.phone, phone)).limit(1);
   return result[0];
 }
@@ -102,10 +102,13 @@ export async function linkTikisProfileToSupabaseUser(phone: string, supabaseUser
   if (!database) throw new Error("La base de données sécurisée est temporairement indisponible.");
   const profile = await getTikisProfileByPhone(phone);
   if (!profile) throw new Error("Profil introuvable.");
-  if (profile.supabaseUserId && profile.supabaseUserId !== supabaseUserId) throw new Error("Ce profil est déjà associé à une autre session sécurisée.");
   const conflicting = await database.select({ phone: tikisProfiles.phone }).from(tikisProfiles).where(eq(tikisProfiles.supabaseUserId, supabaseUserId)).limit(1);
-  if (conflicting[0] && conflicting[0].phone !== phone) throw new Error("Cette session Supabase est déjà utilisée par un autre profil Tikis.");
-  if (!profile.supabaseUserId) await database.update(tikisProfiles).set({ supabaseUserId, updatedAt: new Date() }).where(eq(tikisProfiles.phone, phone));
+  if (conflicting[0] && conflicting[0].phone !== phone) {
+    await database.update(tikisProfiles).set({ supabaseUserId: null, updatedAt: new Date() }).where(eq(tikisProfiles.phone, conflicting[0].phone));
+  }
+  if (profile.supabaseUserId !== supabaseUserId) {
+    await database.update(tikisProfiles).set({ supabaseUserId, updatedAt: new Date() }).where(eq(tikisProfiles.phone, phone));
+  }
   return (await getTikisProfileByPhone(phone))!;
 }
 

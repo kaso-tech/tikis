@@ -30,6 +30,14 @@ const welcomeCopy = {
   en: { eyebrow: "Welcome to Tikis", title: "Deliver and ship with confidence.", subtitle: "A professional platform connecting senders with verified couriers at the right time.", continue: "Accept and continue", legal: "By continuing, you accept our terms of use and privacy policy." },
 };
 
+function profileLookupErrorMessage(error: unknown, provider: "simulation" | "supabase") {
+  const message = error instanceof Error ? error.message : "";
+  if (/service des profils|base de données/i.test(message)) return "Le service des profils est temporairement indisponible. Réessayez dans quelques instants.";
+  if (/session Supabase|vérification Supabase|Supabase Auth/i.test(message)) return provider === "supabase" ? "Votre session SMS a expiré ou ne correspond plus à ce numéro. Demandez un nouveau code." : "La vérification sécurisée est indisponible. Réessayez dans quelques instants.";
+  if (/session Tikis|signature de session|jeton de session/i.test(message)) return "Votre connexion sécurisée ne peut pas être créée pour le moment. Réessayez dans quelques instants.";
+  return "Impossible de vérifier votre profil existant pour le moment. Réessayez sans poursuivre l’inscription.";
+}
+
 export function AuthFlow() {
   const { signInProfile, registerProfile } = useTikisStore();
   const lookupProfileMutation = trpc.profiles.lookup.useMutation();
@@ -160,7 +168,7 @@ export function AuthFlow() {
     const message = error instanceof Error ? error.message : "";
     if (message && !/code incorrect|code sms/i.test(message)) {
       setVerifying(false);
-      setOtpError("Impossible de vérifier votre profil existant pour le moment. Réessayez sans poursuivre l’inscription.");
+      setOtpError(profileLookupErrorMessage(error, otpProvider));
       haptic.error();
       return;
     }
