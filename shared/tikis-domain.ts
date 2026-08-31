@@ -105,6 +105,7 @@ export interface Delivery {
   vehicleTypes: SelectableVehicleType[];
   createdAt: string;
   scheduledAt: string;
+  completedAt?: string;
   senderName: string;
   senderPhone?: string;
   driverId?: string;
@@ -119,6 +120,15 @@ export interface Delivery {
   ownCandidateStatus?: CandidateStatus;
   candidateCount?: number;
   routeVisibility?: DeliveryRouteVisibility;
+}
+
+export function isDeliveryCompletedToday(delivery: Pick<Delivery, "status" | "completedAt">, now = new Date()): boolean {
+  if (delivery.status !== "completed" || !delivery.completedAt) return false;
+  const completedAt = new Date(delivery.completedAt);
+  if (!Number.isFinite(completedAt.getTime())) return false;
+  return completedAt.getFullYear() === now.getFullYear()
+    && completedAt.getMonth() === now.getMonth()
+    && completedAt.getDate() === now.getDate();
 }
 
 export interface DriverCandidate {

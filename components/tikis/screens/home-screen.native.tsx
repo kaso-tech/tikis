@@ -16,7 +16,7 @@ import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format"
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
-import { availableWalletBalance, commissionFor, formatMoney, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
+import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
 import { resolveDriverHomeAction } from "@/shared/delivery-home-action";
 import { useThemeColors } from "@/lib/use-theme-colors";
 
@@ -48,7 +48,7 @@ type PendingHomeAction =
   | { kind: "withdraw" | "confirm" | "cancel"; delivery: Delivery }
   | { kind: "select"; delivery: Delivery; candidate: DriverCandidate };
 
-const FILTERS: { key: FilterKey; label: string }[] = [
+const SENDER_FILTERS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "Toutes" },
   { key: "active", label: "En cours" },
   { key: "open", label: "Publiées" },
@@ -56,12 +56,20 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "completed", label: "Terminées" },
 ];
 
-function matchesFilter(status: DeliveryStatus, filter: FilterKey): boolean {
+const DRIVER_FILTERS: { key: FilterKey; label: string }[] = [
+  { key: "open", label: "Disponibles" },
+  { key: "pending", label: "À confirmer" },
+  { key: "active", label: "En cours" },
+  { key: "completed", label: "Terminées" },
+];
+
+function matchesFilter(delivery: Delivery, filter: FilterKey, isDriver: boolean): boolean {
+  const { status } = delivery;
   if (filter === "all") return status !== "cancelled" && status !== "disabled" && status !== "expired" && status !== "completed";
   if (filter === "active") return status === "active";
   if (filter === "open") return status === "open";
   if (filter === "pending") return status === "pending_confirmation";
-  if (filter === "completed") return status === "completed";
+  if (filter === "completed") return isDriver ? isDeliveryCompletedToday(delivery) : status === "completed";
   return true;
 }
 
@@ -96,8 +104,12 @@ export function HomeScreen() {
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 12_000, refetchOnMount: "always", refetchOnWindowFocus: true });
   const driverWallet = walletQuery.data?.wallet;
 
-  const [filter, setFilter] = useState<FilterKey>("all");
+  const [filter, setFilter] = useState<FilterKey>(role === "driver" ? "open" : "all");
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    setFilter(role === "driver" ? "open" : "all");
+  }, [role]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [driverOnline, setDriverOnline] = useState(true);
   const [actioningId, setActioningId] = useState<string | null>(null);
@@ -116,7 +128,7 @@ export function HomeScreen() {
   const filteredList = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     const matches = (d: Delivery) => {
-      if (!matchesFilter(d.status, filter)) return false;
+      if (!matchesFilter(d, filter, role === "driver")) return false;
       if (q.length === 0) return true;
       const route = formatListRouteParts(d.pickup, d.dropoff);
       const haystack = [d.title, d.type, route.pickup, route.dropoff, (d.vehicleTypes ?? []).join(" ")].join(" ").toLowerCase();
@@ -352,6 +364,7 @@ export function HomeScreen() {
   }
 
   const isDriver = role === "driver";
+  const filterItems = isDriver ? DRIVER_FILTERS : SENDER_FILTERS;
   const firstNameDisplay = isDriver ? firstName : "à vous";
   const countLabel = isDriver ? `${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité` : `${filteredList.length} livraison${filteredList.length > 1 ? "s" : ""} affichée${filteredList.length > 1 ? "s" : ""}`;
 
@@ -425,7 +438,7 @@ export function HomeScreen() {
           ) : null}
 
           <View style={styles.filterRow}>
-            {FILTERS.filter((item) => isDriver || item.key !== "completed").map((item) => (
+            {filterItems.map((item) => (
               <Pressable key={item.key} onPress={() => setFilter(item.key)} style={({ pressed }) => [styles.chip, filter === item.key && styles.chipActive, pressed && styles.pressed]}>
                 <Text style={[styles.chipText, filter === item.key && styles.chipTextActive]}>{item.label}</Text>
               </Pressable>
@@ -442,12 +455,14 @@ export function HomeScreen() {
               <View style={styles.emptyIcon}>
                 <MaterialIcons name={isDriver ? "local-shipping" : "add"} size={26} color="#747474" />
               </View>
-              <Text style={styles.emptyTitle}>{isDriver ? "Aucune opportunité disponible" : "Aucune livraison en cours"}</Text>
-              <Text style={styles.emptyText}>
-                {isDriver
-                  ? "Revenez dans quelques minutes, de nouvelles courses arrivent régulièrement."
-                  : "Publiez votre première course et comparez les livreurs disponibles."}
-              </Text>
+                <Text style={styles.emptyTitle}>{isDriver && filter === "completed" ? "Aucune livraison terminée aujourd’hui" : isDriver ? "Aucune opportunité disponible" : "Aucune livraison en cours"}</Text>
+                <Text style={styles.emptyText}>
+                  {isDriver && filter === "completed"
+                    ? "Les livraisons terminées aujourd’hui apparaîtront ici."
+                    : isDriver
+                      ? "Revenez dans quelques minutes, de nouvelles courses arrivent régulièrement."
+                      : "Publiez votre première course et comparez les livreurs disponibles."}
+                </Text>
             </View>
           ) : isDriver ? (
             <View style={styles.listSection}>

@@ -248,6 +248,7 @@ function deliveryToView(join: DeliveryJoin): Delivery {
     vehicleTypes: parseVehicles(row.vehicleTypes),
     createdAt: row.createdAt.toISOString(),
     scheduledAt: row.createdAt.toISOString(),
+    ...(row.completedAt ? { completedAt: row.completedAt.toISOString() } : {}),
     senderName: join.senderName,
     ...(row.driverPhone ? { driverId: row.driverPhone } : {}),
     ...(join.driverName ? { driverName: join.driverName } : {}),

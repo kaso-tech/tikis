@@ -406,3 +406,5 @@
 - [x] Corriger les erreurs TypeScript de la refonte des cartes candidats, des couleurs de thème et du calcul des statistiques livreur.
 - [x] Revalider la compilation, les tests et les services après correction des erreurs introduites par la synchronisation GitHub.
 - [x] Restaurer le contrat de filtrage des statuts expiré et annulé dans l’écran Historique.
+- [x] Réorganiser les onglets de l’accueil livreur : Disponibles, À confirmer, En cours et Terminées aujourd’hui.
+- [x] Valider les filtres, les compteurs et le rendu des onglets livreur sur mobile et web.
