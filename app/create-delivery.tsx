@@ -208,7 +208,8 @@ export default function CreateDeliveryScreen() {
   }
 
   async function executePublication() {
-    if (loading || !canPublish) {
+    if (loading) return;
+    if (!canPublish) {
       setTouched({ title: true, details: true, passengers: deliveryType === "Personne", pickup: true, dropoff: true, price: Boolean(offeredPriceInput) });
       setInputIssues((current) => ({ ...current, title: deliveryTextInputIssue(title), details: deliveryTextInputIssue(details), passengers: deliveryType === "Personne" && (!Number(passengers) || Number(passengers) > 4) ? "Indiquez entre 1 et 4 personnes." : "", price: priceInputError || "" }));
       if (!pickup || !dropoff) setRouteMessage("Sélectionnez les deux lieux requis pour calculer l’itinéraire.");
@@ -224,7 +225,13 @@ export default function CreateDeliveryScreen() {
       const delivery = isEditing && deliveryId ? await updateDeliveryMutation.mutateAsync({ ...payload, deliveryId }) : await createDeliveryMutation.mutateAsync(payload);
       if (!delivery) throw new Error("La livraison n’a pas pu être enregistrée.");
       router.replace(`/delivery/${delivery.id}` as any);
-    } catch { setPublicationStage(isEditing ? "Modification indisponible. Vérifiez votre connexion puis réessayez." : "Publication indisponible. Vérifiez votre connexion puis réessayez."); }
+    } catch (error) {
+      console.error("[create-delivery] publication failed", error);
+      const message = error instanceof Error ? error.message : "Une erreur inattendue est survenue.";
+      const reason = isEditing ? "Modification indisponible" : "Publication indisponible";
+      setPublicationStage(`${reason} : ${message}`);
+      Alert.alert(reason, `${message}\n\nVérifiez votre connexion puis réessayez.`);
+    }
     finally { setLoading(false); setPublicationStage(""); }
   }
 
@@ -262,7 +269,7 @@ export default function CreateDeliveryScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
-      <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}>
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Retour">
             <MaterialIcons name="arrow-back" size={20} color="#111111" />

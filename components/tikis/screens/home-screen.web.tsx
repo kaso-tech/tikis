@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, PanResponder, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
@@ -422,24 +422,6 @@ export function HomeScreen() {
               <Text style={styles.sheetTitle}>Bonjour {firstNameDisplay} 👋</Text>
               <Text style={styles.sheetSubtitle}>{countLabel}</Text>
             </View>
-            <Pressable
-              onPress={async () => {
-                if (deliveriesQuery.isRefetching || walletQuery.isRefetching) return;
-                await Promise.all([
-                  utilities.deliveries.list.invalidate(),
-                  utilities.notifications.list.invalidate(),
-                  role === "driver" ? utilities.wallet.snapshot.invalidate() : Promise.resolve(),
-                ]);
-              }}
-              style={({ pressed }) => [styles.refreshIndicator, pressed && styles.pressed]}
-              accessibilityLabel="Actualiser les livraisons"
-            >
-              {(deliveriesQuery.isRefetching || walletQuery.isRefetching) ? (
-                <ActivityIndicator size="small" color="#9A6201" />
-              ) : (
-                <MaterialIcons name="refresh" size={18} color="#9A6201" />
-              )}
-            </Pressable>
             {isDriver ? (
               <Pressable
                 onPress={() => setDriverOnline((prev) => !prev)}
@@ -467,23 +449,6 @@ export function HomeScreen() {
           style={styles.scrollArea}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <View style={styles.hiddenRefreshControl}>
-              <RefreshControl
-                refreshing={deliveriesQuery.isRefetching || walletQuery.isRefetching}
-                onRefresh={async () => {
-                  await Promise.all([
-                    utilities.deliveries.list.invalidate(),
-                    utilities.notifications.list.invalidate(),
-                    role === "driver" ? utilities.wallet.snapshot.invalidate() : Promise.resolve(),
-                  ]);
-                }}
-                tintColor="transparent"
-                colors={["transparent"]}
-                progressBackgroundColor="transparent"
-              />
-            </View>
-          }
         >
           {isDriver && driverWallet ? <WalletCard walletBalance={availableWalletBalance(driverWallet)} totalBalance={driverWallet.total} blockedBalance={driverWallet.blocked} /> : null}
 
@@ -923,8 +888,6 @@ const styles = StyleSheet.create({
 
   fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#F7EFE5", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E5D2B9", zIndex: 10 },
   sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
-  refreshIndicator: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#D7D5DE" },
-  hiddenRefreshControl: { opacity: 0, position: "absolute", top: 0, left: 0, right: 0 },
 
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#EEEDF3", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
