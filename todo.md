@@ -428,3 +428,5 @@
 - [x] Valider les filtres, la compilation, les tests et les services après la refonte expéditeur.
 - [x] Détecter les livraisons dont le statut a changé et déclencher une pulsation ponctuelle sur le badge d’onglet concerné.
 - [x] Valider l’animation de badges, la compilation, les tests et les services.
+- [x] Synchroniser la dernière branche main Tikis et vérifier les dépendances distantes.
+- [x] Valider la compilation, les tests et la disponibilité des services après synchronisation.
