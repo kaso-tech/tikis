@@ -1,6 +1,7 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useMemo } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
@@ -37,6 +38,7 @@ function timeShort(date: Date) {
 }
 
 export default function NotificationsScreen() {
+  const { colors: theme } = useThemeColors();
   const { profile } = useTikisStore();
   const notificationsQuery = trpc.notifications.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 12_000 });
   const markReadMutation = trpc.notifications.markRead.useMutation({ onSuccess: () => void notificationsQuery.refetch() });
@@ -65,7 +67,7 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
       <View style={styles.topBar}>
         <Pressable onPress={() => null} style={styles.iconBtn} accessibilityLabel="Ouvrir le menu">
           <MaterialIcons name="menu" size={20} color="#111111" />

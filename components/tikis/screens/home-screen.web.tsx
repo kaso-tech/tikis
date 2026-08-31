@@ -14,6 +14,7 @@ import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
 import { availableWalletBalance, commissionFor, formatMoney, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
 import { resolveDriverHomeAction } from "@/shared/delivery-home-action";
+import { useThemeColors } from "@/lib/use-theme-colors";
 
 const SHEET_MIN = 130;
 const SHEET_PEEK = 420;
@@ -52,7 +53,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 function matchesFilter(status: DeliveryStatus, filter: FilterKey): boolean {
-  if (filter === "all") return status !== "cancelled" && status !== "disabled" && status !== "expired";
+  if (filter === "all") return status !== "cancelled" && status !== "disabled" && status !== "expired" && status !== "completed";
   if (filter === "active") return status === "active";
   if (filter === "open") return status === "open";
   if (filter === "pending") return status === "pending_confirmation";
@@ -85,6 +86,7 @@ function projectOntoCanvas(
 
 export function HomeScreen() {
   const { role, profile } = useTikisStore();
+  const { isDark, colors: theme } = useThemeColors();
   const firstName = profile?.fullName.split(" ")[0] ?? "à vous";
 
   const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 10_000 });
@@ -332,7 +334,7 @@ export function HomeScreen() {
   const countLabel = isDriver ? `${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité` : `${filteredList.length} livraison${filteredList.length > 1 ? "s" : ""} affichée${filteredList.length > 1 ? "s" : ""}`;
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
       <MapBackground selected={selected} role={role} driverPosition={role === "driver" ? driverLocation.location : senderLivePosition} />
 
       <Pressable

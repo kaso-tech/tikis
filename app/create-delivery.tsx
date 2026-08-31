@@ -2,6 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { type SavedFavorite } from "@/components/tikis/place-sheets";
 import { YangoAddressPicker } from "@/components/tikis/yango-address-picker";
@@ -36,6 +37,7 @@ function favoriteToLocation(item: { place: { placeName: string; district: string
 }
 
 export default function CreateDeliveryScreen() {
+  const { colors: theme } = useThemeColors();
   const { deliveryId } = useLocalSearchParams<{ deliveryId?: string }>();
   const { profile } = useTikisStore();
   const [title, setTitle] = useState("");
@@ -202,7 +204,7 @@ export default function CreateDeliveryScreen() {
   const ctaLabel = isEditing ? "Enregistrer" : "Publier";
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
       <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Retour">

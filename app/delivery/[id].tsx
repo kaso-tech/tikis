@@ -2,6 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, useLocalSearchParams } from "expo-router";
 import { type ComponentProps, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
@@ -29,6 +30,7 @@ function DetailRow({ icon, label, value }: { icon: ComponentProps<typeof Materia
 }
 
 export default function DeliveryDetailScreen() {
+  const { colors: theme } = useThemeColors();
   const params = useLocalSearchParams<{ id: string }>();
   const { role, profile } = useTikisStore();
   const utilities = trpc.useUtils();
@@ -99,11 +101,11 @@ export default function DeliveryDetailScreen() {
   }, [senderAction]);
 
   if (deliveryQuery.isLoading) {
-    return <SafeAreaView style={styles.safe}><View style={styles.notFound}><ActivityIndicator color="#9A6201" /><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
+    return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.notFound}><ActivityIndicator color="#9A6201" /><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
   }
 
   if (!delivery) {
-    return <SafeAreaView style={styles.safe}><View style={styles.notFound}><Text style={styles.notFoundTitle}>Livraison introuvable</Text><TikisButton label="Retour à l’accueil" onPress={() => router.replace("/(tabs)" as any)} /></View></SafeAreaView>;
+    return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.notFound}><Text style={styles.notFoundTitle}>Livraison introuvable</Text><TikisButton label="Retour à l’accueil" onPress={() => router.replace("/(tabs)" as any)} /></View></SafeAreaView>;
   }
 
   const status = deliveryStatusMeta[delivery.status];
@@ -200,7 +202,7 @@ export default function DeliveryDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Retour">

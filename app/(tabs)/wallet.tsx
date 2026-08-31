@@ -1,6 +1,7 @@
 import { useState } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { offeredPriceError, parseOfferedPrice, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
@@ -31,6 +32,7 @@ const TONE_COLOR: Record<Tone, string> = {
 };
 
 export default function WalletScreen() {
+  const { colors: theme } = useThemeColors();
   const { role, profile } = useTikisStore();
   const utilities = trpc.useUtils();
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 12_000, refetchOnMount: "always", refetchOnWindowFocus: true });
@@ -91,7 +93,7 @@ export default function WalletScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={[styles.balanceCard, isDriver ? styles.balanceCardDriver : styles.balanceCardSender]}>
           <Text style={[styles.balanceEyebrow, isDriver && styles.balanceEyebrowLight]}>

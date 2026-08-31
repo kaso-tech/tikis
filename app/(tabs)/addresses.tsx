@@ -1,6 +1,7 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { sanitizePlaceText } from "@/lib/geo-rules";
@@ -28,6 +29,7 @@ function categoryIcon(category: AddressCategory): React.ComponentProps<typeof Ma
 }
 
 export default function AddressesScreen() {
+  const { colors: theme } = useThemeColors();
   const { profile } = useTikisStore();
   const utils = trpc.useUtils();
   const query = trpc.geography.favorites.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
@@ -87,7 +89,7 @@ export default function AddressesScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["left", "right"]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["left", "right"]}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Text style={styles.eyebrow}>GESTION</Text>
