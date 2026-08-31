@@ -416,3 +416,6 @@
 - [x] Harmoniser les champs de saisie avec le fond `#F7EFE5`, le texte `#9A6201` et des états focus/erreur accessibles.
 - [x] Harmoniser les menus déroulants et sélecteurs avec la même palette sans modifier l’authentification.
 - [x] Valider le clavier, la compilation, les tests et les services après la refonte des contrôles.
+- [x] Ajouter l’onglet « Postulées » entre « Disponibles » et « À confirmer » sur l’accueil livreur.
+- [x] Retirer l’onglet « Terminées » de l’accueil livreur et valider le filtrage restant.
+- [x] Valider la compilation, les tests et les services après la réorganisation des onglets.

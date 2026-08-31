@@ -16,7 +16,7 @@ import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format"
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
-import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
+import { availableWalletBalance, commissionFor, formatMoney, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
 import { resolveDriverHomeAction } from "@/shared/delivery-home-action";
 import { useThemeColors } from "@/lib/use-theme-colors";
 
@@ -43,7 +43,7 @@ const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: st
   expired: { label: "EXPIRÉE", color: "#6B6257", bg: "#EEE8E0" },
 };
 
-type FilterKey = "all" | "active" | "open" | "pending" | "completed";
+type FilterKey = "all" | "active" | "open" | "applied" | "pending" | "completed";
 type PendingHomeAction =
   | { kind: "withdraw" | "confirm" | "cancel"; delivery: Delivery }
   | { kind: "select"; delivery: Delivery; candidate: DriverCandidate };
@@ -58,26 +58,28 @@ const SENDER_FILTERS: { key: FilterKey; label: string }[] = [
 
 const DRIVER_FILTERS: { key: FilterKey; label: string }[] = [
   { key: "open", label: "Disponibles" },
+  { key: "applied", label: "Postulées" },
   { key: "pending", label: "À confirmer" },
   { key: "active", label: "En cours" },
-  { key: "completed", label: "Terminées" },
 ];
 
 function matchesFilter(delivery: Delivery, filter: FilterKey, isDriver: boolean): boolean {
   const { status } = delivery;
   if (filter === "all") return status !== "cancelled" && status !== "disabled" && status !== "expired" && status !== "completed";
   if (filter === "active") return status === "active";
-  if (filter === "open") return status === "open";
-  if (filter === "pending") return status === "pending_confirmation";
-  if (filter === "completed") return isDriver ? isDeliveryCompletedToday(delivery) : status === "completed";
+  if (filter === "open") return status === "open" && (!isDriver || !delivery.ownCandidateStatus || delivery.ownCandidateStatus === "withdrawn" || delivery.ownCandidateStatus === "replaced");
+  if (filter === "applied") return isDriver && delivery.ownCandidateStatus === "applied";
+  if (filter === "pending") return status === "pending_confirmation" || (isDriver && delivery.ownCandidateStatus === "selected");
+  if (filter === "completed") return !isDriver && status === "completed";
   return true;
 }
 
 function driverSortPriority(d: Delivery): number {
   if (d.ownCandidateStatus === "confirmed" || d.status === "active") return 0;
   if (d.ownCandidateStatus === "selected" || d.status === "pending_confirmation") return 1;
-  if (d.status === "open") return 2;
-  return 3;
+  if (d.ownCandidateStatus === "applied") return 2;
+  if (d.status === "open") return 3;
+  return 4;
 }
 
 function fitRegionFor(pickup: { latitude: number; longitude: number }, dropoff: { latitude: number; longitude: number }): Region {
