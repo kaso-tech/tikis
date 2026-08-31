@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, PanResponder, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
@@ -60,6 +60,7 @@ const DRIVER_FILTERS: { key: FilterKey; label: string }[] = [
 
 function matchesFilter(delivery: Delivery, filter: FilterKey, isDriver: boolean): boolean {
   const { status } = delivery;
+  if (status === "expired" || status === "cancelled" || status === "disabled") return false;
   if (filter === "active") return status === "active";
   if (filter === "open") return status === "open";
   if (filter === "pending") return status === "pending_confirmation" || (isDriver && delivery.ownCandidateStatus === "selected");
@@ -446,6 +447,21 @@ export function HomeScreen() {
           style={styles.scrollArea}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={deliveriesQuery.isRefetching || walletQuery.isRefetching}
+              onRefresh={async () => {
+                await Promise.all([
+                  utilities.deliveries.list.invalidate(),
+                  utilities.notifications.list.invalidate(),
+                  role === "driver" ? utilities.wallet.snapshot.invalidate() : Promise.resolve(),
+                ]);
+              }}
+              tintColor="#9A6201"
+              colors={["#9A6201"]}
+              progressBackgroundColor="#F7EFE5"
+            />
+          }
         >
           {isDriver && driverWallet ? <WalletCard walletBalance={availableWalletBalance(driverWallet)} totalBalance={driverWallet.total} blockedBalance={driverWallet.blocked} /> : null}
 

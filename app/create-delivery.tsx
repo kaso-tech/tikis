@@ -13,7 +13,9 @@ import { favoriteToLocation, toPlacePayload } from "@/lib/place-favorites";
 import { deliveryTextInputIssue, isAllowedDeliveryText, sanitizeDeliveryText } from "@/lib/tikis-engine";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
+import { haptic } from "@/lib/haptics";
 import { locationSubtitle, locationTitle, type DeliveryType, type LocationLabel, type SelectableVehicleType } from "@/shared/tikis-domain";
+import { getDeliveryDraft, saveDeliveryDraft, type DeliveryDraft } from "@/lib/delivery-drafts";
 
 const VEHICLES: SelectableVehicleType[] = ["Vélo", "Moto", "Tricycle", "Voiture"];
 const VEHICLE_ICON: Record<SelectableVehicleType, React.ComponentProps<typeof MaterialIcons>["name"]> = {
@@ -31,7 +33,7 @@ type DeliveryFieldName = "title" | "details" | "passengers" | "pickup" | "dropof
 
 export default function CreateDeliveryScreen() {
   const { colors: theme } = useThemeColors();
-  const { deliveryId } = useLocalSearchParams<{ deliveryId?: string }>();
+  const { deliveryId, draftId } = useLocalSearchParams<{ deliveryId?: string; draftId?: string }>();
   const { profile } = useTikisStore();
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
@@ -80,6 +82,29 @@ export default function CreateDeliveryScreen() {
     setOfferedPriceInput(delivery.offeredPrice ? String(delivery.offeredPrice) : "");
   }, [deliveryQuery.data]);
 
+  useEffect(() => {
+    if (!draftId || !profile?.phone) return;
+    let active = true;
+    (async () => {
+      const draft = await getDeliveryDraft(profile.phone, draftId);
+      if (!active || !draft) return;
+      setTitle(draft.title);
+      setDetails(draft.details);
+      setDeliveryType(draft.deliveryType);
+      setVehicle(draft.vehicle);
+      setPickup(draft.pickup as LocationLabel | null);
+      setDropoff(draft.dropoff as LocationLabel | null);
+      setWeightKg(draft.weightKg ?? "");
+      setLengthCm(draft.lengthCm ?? "");
+      setWidthCm(draft.widthCm ?? "");
+      setHeightCm(draft.heightCm ?? "");
+      setPassengers(draft.passengers ?? "");
+      setOfferedPriceInput(draft.offeredPriceInput ?? "");
+      Alert.alert("Brouillon restauré", `« ${draft.title || "Sans titre"} » a été chargé. Vous pouvez le modifier puis le publier.`);
+    })();
+    return () => { active = false; };
+  }, [draftId, profile?.phone]);
+
   const dimensions = useMemo(() => ({ ...(lengthCm ? { lengthCm: Number(lengthCm) } : {}), ...(widthCm ? { widthCm: Number(widthCm) } : {}), ...(heightCm ? { heightCm: Number(heightCm) } : {}) }), [lengthCm, widthCm, heightCm]);
   const measurement = useMemo(() => ({ ...(weightKg ? { weightKg: Number(weightKg) } : {}), ...(deliveryType === "Personne" ? { passengers: Number(passengers) } : {}), ...(Object.keys(dimensions).length ? { dimensions } : {}) }), [weightKg, deliveryType, passengers, dimensions]);
 
@@ -116,7 +141,7 @@ export default function CreateDeliveryScreen() {
   const titleReady = !deliveryTextInputIssue(title) && !inputIssues.title;
   const detailsReady = !deliveryTextInputIssue(details) && !inputIssues.details;
   const passengerReady = deliveryType !== "Personne" || (Number(passengers) >= 1 && Number(passengers) <= 4 && !inputIssues.passengers);
-  const canPublish = Boolean(titleReady && detailsReady && pickup && dropoff && route && estimate && passengerReady && !measurementIssue && !priceInputError);
+  const canPublish = Boolean(titleReady && detailsReady && pickup && dropoff && route && estimate && passengerReady && !measurementIssue && !priceInputError && parsedOfferedPrice);
   const publishedPrice = parsedOfferedPrice ?? estimate;
   const priceDifference = parsedOfferedPrice && estimate ? priceDifferencePercent(parsedOfferedPrice, estimate) : 0;
   const favoriteLocations: SavedFavorite[] = useMemo(() => (favoritesQuery.data ?? []).map((item) => ({ id: item.id, label: item.label, location: favoriteToLocation(item) })), [favoritesQuery.data]);
@@ -141,6 +166,45 @@ export default function CreateDeliveryScreen() {
       await favoriteMutation.mutateAsync({ placeId: persisted.id, label: sanitizePlaceText(label, 80) || formatFavoritePlace(place) || "Lieu favori" });
       await favoritesQuery.refetch();
     } catch { throw new Error("Impossible d’enregistrer cette adresse. Vérifiez votre connexion puis réessayez."); }
+  }
+
+  async function saveDraft() {
+    if (!profile?.phone) {
+      Alert.alert("Brouillon indisponible", "Vous devez être connecté pour enregistrer un brouillon.");
+      return;
+    }
+    if (!title.trim() && !pickup && !dropoff) {
+      Alert.alert("Brouillon vide", "Renseignez au moins le titre ou une adresse pour enregistrer un brouillon.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const now = new Date().toISOString();
+      await saveDeliveryDraft(profile.phone, {
+        id,
+        createdAt: now,
+        updatedAt: now,
+        title,
+        details,
+        deliveryType,
+        vehicle,
+        pickup,
+        dropoff,
+        weightKg,
+        lengthCm,
+        widthCm,
+        heightCm,
+        passengers,
+        offeredPriceInput,
+      });
+      haptic.success();
+      Alert.alert("Brouillon enregistré", "Vous pouvez le retrouver depuis l'onglet Brouillons.", [{ text: "OK" }]);
+    } catch {
+      Alert.alert("Brouillon indisponible", "Impossible d'enregistrer le brouillon. Réessayez dans un instant.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function executePublication() {
@@ -218,10 +282,18 @@ export default function CreateDeliveryScreen() {
 
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.section}>
-            <Text style={styles.eyebrow}>ITINÉRAIRE</Text>
-            <Text style={styles.sectionTitle}>D’où à où ?</Text>
+            <View style={styles.routeHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.eyebrow}>ITINÉRAIRE</Text>
+                <Text style={styles.sectionTitle}>D’où à où ?</Text>
+              </View>
+              <Pressable onPress={() => router.push("/delivery-drafts" as any)} style={({ pressed }) => [styles.draftsButton, pressed && styles.pressed]} accessibilityLabel="Brouillons">
+                <MaterialIcons name="folder-open" size={14} color="#9A6201" />
+                <Text style={styles.draftsButtonText}>Brouillons</Text>
+              </Pressable>
+            </View>
             <View style={styles.routeCard}>
-              <RouteInput tone="pickup" label="RÉCUPÉRATION" value={pickup} invalid={Boolean(pickupIssue)} onPress={() => setPickerTarget("pickup")} />
+              <RouteInput tone="pickup" label="RÉCUPÉRATION" value={pickup} invalid={Boolean(pickupIssue)} onPress={() => setPickerTarget("pickup")} onAddFavorite={pickup ? (label) => void addFavorite(pickup, label) : undefined} />
               {route ? (
                 <View style={styles.routeConnector}>
                   <View style={styles.routeConnectorLine} />
@@ -232,31 +304,15 @@ export default function CreateDeliveryScreen() {
                   <View style={[styles.routeConnectorLine, styles.routeConnectorLineDashed]} />
                 </View>
               )}
-              <RouteInput tone="dropoff" label="DESTINATION" value={dropoff} invalid={Boolean(dropoffIssue)} onPress={() => setPickerTarget("dropoff")} />
-              {route ? (
-                <View style={styles.routeMiniSummary}>
-                  <Text style={styles.routeMiniSummaryLabel}>Distance estimée</Text>
-                  <Text style={styles.routeMiniSummaryValue}>{route.distanceKm.toFixed(1)} km · ~{Math.max(1, Math.round(route.durationMinutes))} min</Text>
-                </View>
-              ) : null}
+              <RouteInput tone="dropoff" label="DESTINATION" value={dropoff} invalid={Boolean(dropoffIssue)} onPress={() => setPickerTarget("dropoff")} onAddFavorite={dropoff ? (label) => void addFavorite(dropoff, label) : undefined} />
             </View>
             {routeMessage ? <Text style={[styles.routeMessage, !route?.precise && styles.routeWarning]}>{routeMessage}</Text> : null}
             {pickup && dropoff && (!route || !route.precise) ? (
               <Pressable accessibilityRole="button" onPress={retryRoute} style={({ pressed }) => [styles.retryRoute, pressed && styles.pressed]}>
-                <MaterialIcons name="refresh" size={14} color="#007B8B" />
+                <MaterialIcons name="refresh" size={14} color="#9A6201" />
                 <Text style={styles.retryRouteText}>{route ? "Recalculer avec Routes API" : "Réessayer le calcul d’itinéraire"}</Text>
               </Pressable>
             ) : null}
-            {pickup && dropoff ? <Text style={styles.routeTitle}>{formatListRoute(pickup, dropoff)}</Text> : null}
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.eyebrow}>RACCOURCI</Text>
-            <Pressable onPress={() => router.push("/(tabs)/addresses" as any)} style={({ pressed }) => [styles.shortcut, pressed && styles.pressed]}>
-              <MaterialIcons name="bookmark" size={16} color="#747474" />
-              <Text style={styles.shortcutText}>Choisir depuis mes adresses enregistrées</Text>
-              <MaterialIcons name="chevron-right" size={16} color="#747474" />
-            </Pressable>
           </View>
 
           <View style={styles.section}>
@@ -268,7 +324,7 @@ export default function CreateDeliveryScreen() {
                 return (
                   <Pressable key={item.value} onPress={() => setDeliveryType(item.value)} style={({ pressed }) => [styles.typeCard, active && styles.typeCardActive, pressed && styles.pressed]}>
                     <View style={[styles.typeIcon, active && styles.typeIconActive]}>
-                      <MaterialIcons name={item.icon} size={18} color={active ? "#FFFFFF" : "#007B8B"} />
+                      <MaterialIcons name={item.icon} size={18} color="#9A6201" />
                     </View>
                     <Text style={[styles.typeLabel, active && styles.typeLabelActive]}>{item.label}</Text>
                     <Text style={[styles.typeSub, active && styles.typeSubActive]}>{item.sub}</Text>
@@ -286,7 +342,7 @@ export default function CreateDeliveryScreen() {
                 const active = vehicle === item;
                 return (
                   <Pressable key={item} onPress={() => setVehicle(item)} style={({ pressed }) => [styles.vehicleCard, active && styles.vehicleCardActive, pressed && styles.pressed]}>
-                    <MaterialIcons name={VEHICLE_ICON[item]} size={18} color={active ? "#007B8B" : "#666666"} />
+                    <MaterialIcons name={VEHICLE_ICON[item]} size={18} color="#9A6201" />
                     <Text style={[styles.vehicleLabel, active && styles.vehicleLabelActive]}>{item}</Text>
                   </Pressable>
                 );
@@ -325,7 +381,7 @@ export default function CreateDeliveryScreen() {
                 <Text style={styles.priceCardValue}>{estimate ? `${estimate.toLocaleString("fr-FR")} F` : "—"}</Text>
               </View>
               <View style={styles.priceCardInput}>
-                <TextInput value={offeredPriceInput} onBlur={() => setTouched((current) => ({ ...current, price: true }))} onChangeText={(value) => setOfferedPriceInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} placeholder={estimate ? `${estimate.toLocaleString("fr-FR")} F CFA` : "Ex. 4 500"} placeholderTextColor="#B48753" style={styles.priceCardInputText} />
+                <TextInput value={offeredPriceInput} onBlur={() => setTouched((current) => ({ ...current, price: true }))} onChangeText={(value) => setOfferedPriceInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} placeholder="Saisir le prix de la course" placeholderTextColor="#B48753" style={styles.priceCardInputText} />
                 <Text style={styles.priceCardInputSuffix}>F CFA</Text>
               </View>
               {priceInputError ? (
@@ -333,24 +389,32 @@ export default function CreateDeliveryScreen() {
               ) : parsedOfferedPrice && estimate ? (
                 <View style={styles.priceCardHelper}>
                   <MaterialIcons name="check" size={12} color="#FFFFFF" />
-                  <Text style={styles.priceCardNote}>{priceDifference === 0 ? "Aligné sur l’estimation intelligente." : `${priceDifference > 0 ? "+" : ""}${priceDifference}% vs estimation · Les livreurs voient cette majoration et peuvent candidater.`}</Text>
+                  <Text style={styles.priceCardNote}>{priceDifference === 0 ? "Aligné sur l’estimation." : `${priceDifference > 0 ? "+" : ""}${priceDifference}% vs estimation · Les livreurs voient cette majoration et peuvent candidater.`}</Text>
                 </View>
-              ) : (
-                <Text style={styles.priceCardNote}>Sans saisie, l’estimation intelligente sera publiée comme prix proposé.</Text>
-              )}
+              ) : null}
+              {touched.price && !parsedOfferedPrice ? (
+                <Text style={styles.priceCardNote}>Le prix est obligatoire pour publier la course.</Text>
+              ) : null}
             </View>
           </View>
 
           {loading ? <Text style={styles.publicationLoadingHint}>{publicationStage || "Publication en cours…"}</Text> : null}
           {!loading && !canPublish ? <Text style={styles.publicationHint}>Complétez les champs requis et sélectionnez les deux lieux GPS pour {isEditing ? "enregistrer" : "publier"}.</Text> : null}
-          <Text style={styles.footerNote}>Aucun débit immédiat. Les coordonnées complètes servent uniquement à la course et au calcul de distance.</Text>
         </ScrollView>
 
         <View style={styles.footer}>
           <View style={styles.footerSummary}>
-            <Text style={styles.footerSummaryLabel}>{isEditing ? "Total" : "Total à publier"}</Text>
+            <Text style={styles.footerSummaryLabel}>{isEditing ? "Total" : "Prix"}</Text>
             <Text style={styles.footerSummaryValue}>{footerLabel}</Text>
           </View>
+          <Pressable
+            onPress={() => { if (!loading) void saveDraft(); }}
+            style={({ pressed }) => [styles.draftButton, pressed && styles.pressed]}
+            accessibilityLabel="Enregistrer comme brouillon"
+            disabled={loading}
+          >
+            <MaterialIcons name="save" size={16} color="#9A6201" />
+          </Pressable>
           <TikisButton
             label={`${ctaLabel}${publishedPrice ? ` · ${publishedPrice.toLocaleString("fr-FR")} F` : ""}`}
             icon={isEditing ? "save" : "publish"}
@@ -367,27 +431,52 @@ export default function CreateDeliveryScreen() {
   );
 }
 
-function RouteInput({ tone, label, value, invalid, onPress }: { tone: "pickup" | "dropoff"; label: string; value: LocationLabel | null; invalid: boolean; onPress: () => void }) {
+function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { tone: "pickup" | "dropoff"; label: string; value: LocationLabel | null; invalid: boolean; onPress: () => void; onAddFavorite?: (label: string) => void }) {
   const isPickup = tone === "pickup";
+  const [showFavoriteInput, setShowFavoriteInput] = useState(false);
+  const [favoriteLabel, setFavoriteLabel] = useState("");
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.routeInput, isPickup ? styles.routeInputFrom : styles.routeInputTo, invalid && styles.routeInputInvalid, pressed && styles.pressed]}>
-      <View style={[styles.routeInputIcon, isPickup ? styles.routeInputIconFrom : styles.routeInputIconTo]}>
-        <MaterialIcons name={isPickup ? "trip-origin" : "location-on"} size={14} color={isPickup ? "#9A6201" : "#B4232D"} />
-      </View>
-      <View style={styles.routeInputContent}>
-        <Text style={[styles.routeInputLabel, invalid && styles.routeInputLabelInvalid]}>{label}</Text>
-        {value ? (
-          <>
-            <Text style={styles.routeInputValue} numberOfLines={1}>{locationTitle(value)}</Text>
-            <Text style={styles.routeInputMeta} numberOfLines={1}>{locationSubtitle(value)}</Text>
-          </>
-        ) : (
-          <Text style={styles.routeInputPlaceholder}>Choisir une adresse</Text>
-        )}
-        {invalid ? <Text style={styles.routeInputIssue}>Lieu requis</Text> : null}
-      </View>
-      <MaterialIcons name="chevron-right" size={18} color="#747474" />
-    </Pressable>
+    <View>
+      <Pressable onPress={onPress} style={({ pressed }) => [styles.routeInput, isPickup ? styles.routeInputFrom : styles.routeInputTo, invalid && styles.routeInputInvalid, pressed && styles.pressed]}>
+        <View style={[styles.routeInputIcon, isPickup ? styles.routeInputIconFrom : styles.routeInputIconTo]}>
+          <MaterialIcons name={isPickup ? "trip-origin" : "location-on"} size={14} color={isPickup ? "#9A6201" : "#B4232D"} />
+        </View>
+        <View style={styles.routeInputContent}>
+          <Text style={[styles.routeInputLabel, invalid && styles.routeInputLabelInvalid]}>{label}</Text>
+          {value ? (
+            <>
+              <Text style={styles.routeInputValue} numberOfLines={1}>{locationTitle(value)}</Text>
+              <Text style={styles.routeInputMeta} numberOfLines={1}>{locationSubtitle(value)}</Text>
+            </>
+          ) : (
+            <Text style={styles.routeInputPlaceholder}>Choisir une adresse</Text>
+          )}
+          {invalid ? <Text style={styles.routeInputIssue}>Lieu requis</Text> : null}
+        </View>
+        {onAddFavorite && value ? (
+          <Pressable
+            onPress={(event) => { event.stopPropagation(); setShowFavoriteInput((current) => !current); }}
+            style={({ pressed }) => [styles.routeFavoriteBtn, pressed && styles.pressed]}
+            accessibilityLabel="Ajouter aux favoris"
+          >
+            <MaterialIcons name={showFavoriteInput ? "close" : "star-outline"} size={18} color="#9A6201" />
+          </Pressable>
+        ) : null}
+        <MaterialIcons name="chevron-right" size={18} color="#747474" />
+      </Pressable>
+      {showFavoriteInput && value ? (
+        <View style={styles.favoriteInputRow}>
+          <TextInput value={favoriteLabel} onChangeText={setFavoriteLabel} placeholder="Nom du favori (ex. Maison, Bureau)" placeholderTextColor="#B48753" style={styles.favoriteInput} maxLength={40} />
+          <Pressable
+            onPress={() => { if (onAddFavorite) { onAddFavorite(favoriteLabel.trim() || locationTitle(value) || "Adresse favorite"); setShowFavoriteInput(false); setFavoriteLabel(""); } }}
+            style={({ pressed }) => [styles.favoriteSaveBtn, pressed && styles.pressed]}
+            accessibilityLabel="Enregistrer le favori"
+          >
+            <Text style={styles.favoriteSaveBtnText}>OK</Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -418,6 +507,14 @@ const styles = StyleSheet.create({
   eyebrow: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 4 },
   sectionTitle: { color: "#111111", fontSize: 14, fontWeight: "600", marginBottom: 10 },
   section: { gap: 4 },
+  routeHeaderRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  draftsButton: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9" },
+  draftsButtonText: { color: "#9A6201", fontSize: 11, fontWeight: "700" },
+  routeFavoriteBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", alignItems: "center", justifyContent: "center" },
+  favoriteInputRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 38, paddingTop: 6, paddingRight: 6 },
+  favoriteInput: { flex: 1, backgroundColor: "#F7EFE5", borderRadius: 8, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 10, paddingVertical: 8, color: "#9A6201", fontSize: 12, fontWeight: "500" },
+  favoriteSaveBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: "#9A6201" },
+  favoriteSaveBtnText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
 
   routeCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, gap: 4 },
   routeInput: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, backgroundColor: "#F7EFE5", borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", borderLeftWidth: 3 },
@@ -455,17 +552,17 @@ const styles = StyleSheet.create({
 
   typeGrid: { flexDirection: "row", gap: 8 },
   typeCard: { flex: 1, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#ECECEC", borderRadius: 10, paddingVertical: 12, paddingHorizontal: 8, alignItems: "center", gap: 4 },
-  typeCardActive: { backgroundColor: "#111111", borderColor: "#111111" },
+  typeCardActive: { backgroundColor: "#F7EFE5", borderColor: "#9A6201" },
   typeIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#F8F0E5", alignItems: "center", justifyContent: "center" },
-  typeIconActive: { backgroundColor: "#9A6201" },
+  typeIconActive: { backgroundColor: "#F7EFE5" },
   typeLabel: { color: "#111111", fontSize: 11, fontWeight: "600" },
-  typeLabelActive: { color: "#FFFFFF" },
+  typeLabelActive: { color: "#9A6201" },
   typeSub: { color: "#747474", fontSize: 9, fontWeight: "500", textAlign: "center" },
-  typeSubActive: { color: "rgba(255,255,255,0.6)" },
+  typeSubActive: { color: "#9A6201" },
 
   vehicleGrid: { flexDirection: "row", gap: 8 },
   vehicleCard: { flex: 1, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#ECECEC", borderRadius: 10, paddingVertical: 10, alignItems: "center", gap: 4 },
-  vehicleCardActive: { backgroundColor: "#F8F0E5", borderColor: "#9A6201" },
+  vehicleCardActive: { backgroundColor: "#F7EFE5", borderColor: "#9A6201" },
   vehicleLabel: { color: "#111111", fontSize: 10, fontWeight: "600" },
   vehicleLabelActive: { color: "#9A6201" },
 
@@ -506,6 +603,7 @@ const styles = StyleSheet.create({
   footerSummaryLabel: { color: "#747474", fontSize: 10, fontWeight: "600" },
   footerSummaryValue: { color: "#111111", fontSize: 14, fontWeight: "700", marginTop: 1 },
   footerCta: { minWidth: 160, minHeight: 44 },
+  draftButton: { width: 44, height: 44, borderRadius: 9, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", alignItems: "center", justifyContent: "center" },
 
   pressed: { opacity: 0.7 },
 });
