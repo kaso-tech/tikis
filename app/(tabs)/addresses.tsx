@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
 
   header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12 },
   eyebrow: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
-  pageTitle: { color: "#111111", fontSize: 22, fontWeight: "700", marginTop: 4, lineHeight: 1.2 },
+  pageTitle: { color: "#111111", fontSize: 22, fontWeight: "700", marginTop: 4, lineHeight: 26 },
   pageSub: { color: "#666666", fontSize: 12, lineHeight: 18, marginTop: 6 },
 
   searchRow: { paddingHorizontal: 16, paddingBottom: 12 },
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
   searchClear: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
 
   filterRow: { flexDirection: "row", gap: 6, paddingHorizontal: 16, paddingBottom: 12 },
-  chip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 99, backgroundColor: "#FFFFFF" },
+  chip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 6, height: 32, borderRadius: 99, backgroundColor: "#FFFFFF" },
   chipActive: { backgroundColor: "#111111" },
   chipText: { color: "#666666", fontSize: 11, fontWeight: "600" },
   chipTextActive: { color: "#FFFFFF" },

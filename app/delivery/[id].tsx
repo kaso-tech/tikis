@@ -455,7 +455,7 @@ const styles = StyleSheet.create({
 
   eyebrow: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", marginTop: 4 },
   eyebrowSmall: { color: "#747474", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
-  title: { color: "#111111", fontSize: 22, fontWeight: "700", lineHeight: 1.2, marginTop: 4 },
+  title: { color: "#111111", fontSize: 22, fontWeight: "700", lineHeight: 26, marginTop: 4 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
   metaText: { color: "#666666", fontSize: 11 },
   metaDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: "#747474" },

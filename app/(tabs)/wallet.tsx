@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   balanceEyebrow: { color: "rgba(255,255,255,0.6)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   balanceEyebrowLight: { color: "rgba(255,255,255,0.7)" },
   balanceValueRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
-  balanceValue: { color: "#FFFFFF", fontSize: 28, fontWeight: "700", lineHeight: 1.1 },
+  balanceValue: { color: "#FFFFFF", fontSize: 28, fontWeight: "700", lineHeight: 32 },
   trendPill: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: "rgba(22,122,85,0.25)", borderRadius: 99 },
   trendText: { color: "#48B889", fontSize: 10, fontWeight: "700" },
   trendPillLight: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 99 },
