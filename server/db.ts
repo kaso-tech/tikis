@@ -1,11 +1,11 @@
 import { randomUUID } from "crypto";
-import { and, count, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisDelivery, TikisDeliveryCandidate, TikisPlace, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReviews, tikisFavoritePlaces, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisWalletLedger, tikisWallets, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppNotification, LocationLabel, SelectableVehicleType, WalletOperation, WalletSnapshot } from "../shared/tikis-domain";
 import { candidateMovementVersion } from "../shared/wallet-commission";
-import { DELIVERY_EXPIRATION_MS, deliveryExpirationOutcome } from "../shared/delivery-expiration";
+import { DELIVERY_EXPIRATION_MS, deliveryActivityTimestamp, deliveryExpirationOutcome } from "../shared/delivery-expiration";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -376,14 +376,15 @@ export async function expireOpenTikisDeliveries(now = new Date()) {
   const cutoff = new Date(now.getTime() - DELIVERY_EXPIRATION_MS);
   return db.transaction(async (tx) => {
     const stale = await tx.select().from(tikisDeliveries)
-      .where(and(inArray(tikisDeliveries.status, ["open", "pending_confirmation", "active", "disabled"]), lt(tikisDeliveries.createdAt, cutoff)))
+      .where(and(inArray(tikisDeliveries.status, ["open", "pending_confirmation", "active", "disabled"]), lt(sql`GREATEST(${tikisDeliveries.updatedAt}, ${tikisDeliveries.createdAt})`, cutoff)))
       .for("update");
     let expiredCount = 0;
     let completedCount = 0;
     const expiredDeliveryIds: string[] = [];
     const completedDeliveryIds: string[] = [];
     for (const delivery of stale) {
-      const outcome = deliveryExpirationOutcome(delivery.status as "open" | "pending_confirmation" | "active" | "disabled", delivery.createdAt, now.getTime());
+      const activityAt = deliveryActivityTimestamp({ createdAt: delivery.createdAt, updatedAt: delivery.updatedAt });
+      const outcome = deliveryExpirationOutcome(delivery.status as "open" | "pending_confirmation" | "active" | "disabled", activityAt ?? delivery.createdAt, now.getTime());
       if (outcome === "complete" && delivery.driverPhone) {
         const earning = Math.round(delivery.offeredPrice ?? delivery.estimatedPrice);
         await applyWalletMovement(tx, {

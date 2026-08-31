@@ -18,6 +18,7 @@ import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
 import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
 import { resolveDriverHomeAction } from "@/shared/delivery-home-action";
+import { isOpenDeliveryStale } from "@/shared/delivery-freshness";
 import { useThemeColors } from "@/lib/use-theme-colors";
 
 const { height: SCREEN_H } = Dimensions.get("window");
@@ -65,6 +66,7 @@ const DRIVER_FILTERS: { key: FilterKey; label: string }[] = [
 function matchesFilter(delivery: Delivery, filter: FilterKey, isDriver: boolean): boolean {
   const { status } = delivery;
   if (status === "expired" || status === "cancelled" || status === "disabled") return false;
+  if (isOpenDeliveryStale(delivery)) return false;
   if (filter === "active") return status === "active";
   if (filter === "open") return status === "open";
   if (filter === "pending") return status === "pending_confirmation" || (isDriver && delivery.ownCandidateStatus === "selected");
@@ -432,6 +434,24 @@ export function HomeScreen() {
               <Text style={styles.sheetTitle}>Bonjour {firstNameDisplay} 👋</Text>
               <Text style={styles.sheetSubtitle}>{countLabel}</Text>
             </View>
+            <Pressable
+              onPress={async () => {
+                if (deliveriesQuery.isRefetching || walletQuery.isRefetching) return;
+                await Promise.all([
+                  utilities.deliveries.list.invalidate(),
+                  utilities.notifications.list.invalidate(),
+                  role === "driver" ? utilities.wallet.snapshot.invalidate() : Promise.resolve(),
+                ]);
+              }}
+              style={({ pressed }) => [styles.refreshIndicator, pressed && styles.pressed]}
+              accessibilityLabel="Actualiser les livraisons"
+            >
+              {(deliveriesQuery.isRefetching || walletQuery.isRefetching) ? (
+                <ActivityIndicator size="small" color="#9A6201" />
+              ) : (
+                <MaterialIcons name="refresh" size={18} color="#9A6201" />
+              )}
+            </Pressable>
             {isDriver ? (
               <Pressable
                 onPress={() => setDriverOnline((prev) => !prev)}
@@ -472,9 +492,9 @@ export function HomeScreen() {
                   role === "driver" ? utilities.wallet.snapshot.invalidate() : Promise.resolve(),
                 ]);
               }}
-              tintColor="#9A6201"
-              colors={["#9A6201"]}
-              progressBackgroundColor="#F7EFE5"
+              tintColor="transparent"
+              colors={["transparent"]}
+              progressBackgroundColor="transparent"
             />
           }
         >
@@ -939,6 +959,7 @@ const styles = StyleSheet.create({
 
   fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#F7EFE5", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E5D2B9", zIndex: 10 },
   sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
+  refreshIndicator: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#D7D5DE" },
 
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#EEEDF3", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
