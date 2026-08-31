@@ -17,7 +17,7 @@ describe("onglets de l’accueil livreur", () => {
     expect(block.indexOf("Publiées")).toBeLessThan(block.indexOf("Attribuées"));
     expect(block.indexOf("Attribuées")).toBeLessThan(block.indexOf("En cours"));
     expect(block.indexOf("En cours")).toBeLessThan(block.indexOf("Terminées"));
-    expect(source).toContain('if (filter === "completed") return isDriver ? isDeliveryCompletedToday(delivery) : status === "completed";');
+    expect(source).toContain('if (filter === "completed") return isDriver ? isDeliveryCompletedToday(delivery) : isDeliveryCompletedWithinLast24Hours(delivery);');
   });
 
   it.each([nativeSource, webSource])("affiche un compteur et le style bouton sur chaque onglet", (source) => {

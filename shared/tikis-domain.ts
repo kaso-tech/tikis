@@ -131,6 +131,13 @@ export function isDeliveryCompletedToday(delivery: Pick<Delivery, "status" | "co
     && completedAt.getDate() === now.getDate();
 }
 
+export function isDeliveryCompletedWithinLast24Hours(delivery: Pick<Delivery, "status" | "completedAt">, now = new Date()): boolean {
+  if (delivery.status !== "completed" || !delivery.completedAt) return false;
+  const completedAt = new Date(delivery.completedAt);
+  const ageMs = now.getTime() - completedAt.getTime();
+  return Number.isFinite(completedAt.getTime()) && ageMs >= 0 && ageMs < 24 * 60 * 60 * 1_000;
+}
+
 export interface DriverCandidate {
   id: string;
   deliveryId: string;

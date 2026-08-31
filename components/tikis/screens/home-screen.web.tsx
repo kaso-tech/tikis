@@ -12,7 +12,7 @@ import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format"
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
-import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
+import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
 import { resolveDriverHomeAction } from "@/shared/delivery-home-action";
 import { useThemeColors } from "@/lib/use-theme-colors";
 
@@ -37,7 +37,7 @@ const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: st
   expired: { label: "EXPIRÉE", color: "#6B6257", bg: "#EEE8E0" },
 };
 
-type FilterKey = "all" | "active" | "open" | "pending" | "completed";
+type FilterKey = "active" | "open" | "pending" | "completed";
 type PendingHomeAction =
   | { kind: "withdraw"; delivery: Delivery }
   | { kind: "confirm"; delivery: Delivery }
@@ -45,10 +45,9 @@ type PendingHomeAction =
   | { kind: "select"; delivery: Delivery; candidate: DriverCandidate };
 
 const SENDER_FILTERS: { key: FilterKey; label: string }[] = [
-  { key: "all", label: "Toutes" },
-  { key: "active", label: "En cours" },
   { key: "open", label: "Publiées" },
-  { key: "pending", label: "À confirmer" },
+  { key: "pending", label: "Attribuées" },
+  { key: "active", label: "En cours" },
   { key: "completed", label: "Terminées" },
 ];
 
@@ -61,11 +60,10 @@ const DRIVER_FILTERS: { key: FilterKey; label: string }[] = [
 
 function matchesFilter(delivery: Delivery, filter: FilterKey, isDriver: boolean): boolean {
   const { status } = delivery;
-  if (filter === "all") return status !== "cancelled" && status !== "disabled" && status !== "expired" && status !== "completed";
   if (filter === "active") return status === "active";
   if (filter === "open") return status === "open";
   if (filter === "pending") return status === "pending_confirmation" || (isDriver && delivery.ownCandidateStatus === "selected");
-  if (filter === "completed") return isDriver ? isDeliveryCompletedToday(delivery) : status === "completed";
+  if (filter === "completed") return isDriver ? isDeliveryCompletedToday(delivery) : isDeliveryCompletedWithinLast24Hours(delivery);
   return true;
 }
 
@@ -104,11 +102,11 @@ export function HomeScreen() {
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 12_000, refetchOnMount: "always", refetchOnWindowFocus: true });
   const driverWallet = walletQuery.data?.wallet;
 
-  const [filter, setFilter] = useState<FilterKey>(role === "driver" ? "open" : "all");
+  const [filter, setFilter] = useState<FilterKey>("open");
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    setFilter(role === "driver" ? "open" : "all");
+    setFilter("open");
   }, [role]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [driverOnline, setDriverOnline] = useState(true);
@@ -119,6 +117,7 @@ export function HomeScreen() {
   const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
   const sheetValue = useRef(SHEET_PEEK);
   const dragStartHeight = useRef(SHEET_PEEK);
+  const filterTransition = useRef(new Animated.Value(1)).current;
   const driverLocation = useDriverLocation({ enabled: role === "driver" });
 
   const filteredList = useMemo(() => {
@@ -133,7 +132,7 @@ export function HomeScreen() {
     if (role === "driver") {
       return [...deliveries].filter(matches).sort((a, b) => driverSortPriority(a) - driverSortPriority(b) || a.distanceKm - b.distanceKm);
     }
-    return deliveries.filter((delivery) => matches(delivery) && delivery.status !== "completed" && delivery.status !== "expired");
+    return deliveries.filter(matches);
   }, [deliveries, filter, role, searchQuery]);
 
   const selected = useMemo(() => {
@@ -356,8 +355,17 @@ export function HomeScreen() {
   const isDriver = role === "driver";
   const filterItems = isDriver ? DRIVER_FILTERS : SENDER_FILTERS;
   const filterCounts = useMemo(() => Object.fromEntries(filterItems.map((item) => [item.key, deliveries.filter((delivery) => matchesFilter(delivery, item.key, isDriver)).length])) as Record<FilterKey, number>, [deliveries, filterItems, isDriver]);
+  const filterTranslateY = filterTransition.interpolate({ inputRange: [0, 1], outputRange: [6, 0] });
   const firstNameDisplay = isDriver ? firstName : "à vous";
   const countLabel = isDriver ? `${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité` : `${filteredList.length} livraison${filteredList.length > 1 ? "s" : ""} affichée${filteredList.length > 1 ? "s" : ""}`;
+
+  function selectFilter(nextFilter: FilterKey) {
+    if (nextFilter === filter) return;
+    filterTransition.stopAnimation();
+    filterTransition.setValue(0);
+    setFilter(nextFilter);
+    Animated.timing(filterTransition, { toValue: 1, duration: 180, useNativeDriver: true }).start();
+  }
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
@@ -427,13 +435,14 @@ export function HomeScreen() {
 
           <View style={styles.filterRow}>
             {filterItems.map((item) => (
-              <Pressable key={item.key} onPress={() => setFilter(item.key)} accessibilityRole="tab" accessibilityState={{ selected: filter === item.key }} accessibilityLabel={`${item.label}, ${filterCounts[item.key]} livraison${filterCounts[item.key] > 1 ? "s" : ""}`} style={({ pressed }) => [styles.chip, filter === item.key && styles.chipActive, pressed && styles.pressed]}>
+              <Pressable key={item.key} onPress={() => selectFilter(item.key)} accessibilityRole="tab" accessibilityState={{ selected: filter === item.key }} accessibilityLabel={`${item.label}, ${filterCounts[item.key]} livraison${filterCounts[item.key] > 1 ? "s" : ""}`} style={({ pressed }) => [styles.chip, filter === item.key && styles.chipActive, pressed && styles.pressed]}>
                 <Text style={[styles.chipText, filter === item.key && styles.chipTextActive]}>{item.label}</Text>
                 <View style={[styles.chipCount, filter === item.key && styles.chipCountActive]}><Text style={styles.chipCountText}>{filterCounts[item.key]}</Text></View>
               </Pressable>
             ))}
           </View>
 
+          <Animated.View style={[styles.tabContent, { opacity: filterTransition, transform: [{ translateY: filterTranslateY }] }]}>
           {deliveriesQuery.isLoading ? (
             <View style={styles.loadingState}>
               <ActivityIndicator color="#9A6201" />
@@ -444,10 +453,10 @@ export function HomeScreen() {
               <View style={styles.emptyIcon}>
                 <MaterialIcons name={isDriver ? "local-shipping" : "add"} size={26} color="#747474" />
               </View>
-              <Text style={styles.emptyTitle}>{isDriver && filter === "completed" ? "Aucune livraison terminée aujourd’hui" : isDriver ? "Aucune opportunité disponible" : "Aucune livraison en cours"}</Text>
+              <Text style={styles.emptyTitle}>{filter === "completed" ? isDriver ? "Aucune livraison terminée aujourd’hui" : "Aucune livraison terminée récemment" : isDriver ? "Aucune opportunité disponible" : "Aucune livraison disponible"}</Text>
               <Text style={styles.emptyText}>
-                {isDriver && filter === "completed"
-                  ? "Les livraisons terminées aujourd’hui apparaîtront ici."
+                {filter === "completed"
+                  ? isDriver ? "Les livraisons terminées aujourd’hui apparaîtront ici." : "Les livraisons terminées au cours des dernières 24 heures apparaîtront ici."
                   : isDriver
                     ? "Revenez dans quelques minutes, de nouvelles courses arrivent régulièrement."
                     : "Publiez votre première course et comparez les livreurs disponibles."}
@@ -474,8 +483,7 @@ export function HomeScreen() {
               onAction={() => handleSenderAction(selected)}
             />
           )}
-
-          {otherDeliveries.length > 0 ? (
+          {!isDriver && otherDeliveries.length > 0 ? (
             <View style={styles.listSection}>
               {otherDeliveries.map((delivery) => (
                 <DeliveryRow
@@ -493,6 +501,7 @@ export function HomeScreen() {
               ))}
             </View>
           ) : null}
+          </Animated.View>
         </ScrollView>
       </Animated.View>
       <CandidatesSheet
@@ -859,6 +868,7 @@ const styles = StyleSheet.create({
   chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
   chipCountActive: { backgroundColor: "#9A6201" },
   chipCountText: { color: "#F7EFE5", fontSize: 10, fontWeight: "700", lineHeight: 12 },
+  tabContent: { minHeight: 1 },
 
   scrollArea: { flex: 1, marginTop: 2 },
   scrollContent: { paddingHorizontal: 14, paddingTop: 6, paddingBottom: 90, gap: 8 },

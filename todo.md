@@ -422,3 +422,7 @@
 - [x] Réorganiser les onglets livreur en « Publiées », « Attribuées », « En cours » et « Terminées aujourd’hui ».
 - [x] Appliquer le style actuel des boutons aux onglets de l’accueil livreur.
 - [x] Ajouter un badge de compteur sur chaque onglet et valider compilation, tests et services.
+- [x] Réorganiser les onglets expéditeur en « Publiées », « Attribuées », « En cours » et « Terminées ».
+- [x] Limiter l’onglet expéditeur Terminées aux livraisons finalisées depuis moins de vingt-quatre heures.
+- [x] Ajouter une transition fluide et accessible entre les onglets de l’accueil.
+- [x] Valider les filtres, la compilation, les tests et les services après la refonte expéditeur.
