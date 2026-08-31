@@ -1,4 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
+import { Alert, Platform } from "react-native";
 import { useCallback, useMemo, useState } from "react";
 
 import type { KycCapture, KycDocumentKind } from "@/components/tikis/kyc-uploader";
@@ -30,20 +31,32 @@ function validateImage(mime: string | undefined, bytes: number): { ok: true; mim
   return { ok: true, mime: mime as "image/jpeg" | "image/png" | "image/webp" };
 }
 
+type PickSource = "camera" | "library";
+
+async function launchSource(source: PickSource, kind: KycDocumentKind): Promise<ImagePicker.ImagePickerResult | null> {
+  const aspect: [number, number] = kind === "selfie" ? [1, 1] : [16, 10];
+  if (source === "camera") {
+    const camera = await ImagePicker.requestCameraPermissionsAsync();
+    if (!camera.granted) return null;
+    return ImagePicker.launchCameraAsync({ allowsEditing: true, aspect, quality: 0.55, base64: true });
+  }
+  if (Platform.OS === "web") {
+    return ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect, quality: 0.55, base64: true });
+  }
+  const media = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!media.granted) return null;
+  return ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect, quality: 0.55, base64: true });
+}
+
 export function useKyc() {
   const [state, setState] = useState<KycState>(INITIAL);
   const [loadingKind, setLoadingKind] = useState<KycDocumentKind | null>(null);
 
-  const pickDocument = useCallback(async (kind: KycDocumentKind) => {
+  const captureFromSource = useCallback(async (kind: KycDocumentKind, source: PickSource) => {
     setLoadingKind(kind);
     try {
-      const camera = await ImagePicker.requestCameraPermissionsAsync();
-      const media =
-        camera.granted ? await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: kind === "selfie" ? [1, 1] : [16, 10], quality: 0.55, base64: true }) : null;
-      const result = media && !media.canceled
-        ? media
-        : await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: kind === "selfie" ? [1, 1] : [16, 10], quality: 0.55, base64: true });
-      if (result.canceled || !result.assets[0]) return;
+      const result = await launchSource(source, kind);
+      if (!result || result.canceled || !result.assets[0]) return;
       const asset = result.assets[0];
       const validation = validateImage(asset.mimeType, asset.fileSize ?? 0);
       if (!validation.ok) {
@@ -62,6 +75,27 @@ export function useKyc() {
       setLoadingKind(null);
     }
   }, []);
+
+  const askAndPick = useCallback(async (kind: KycDocumentKind) => {
+    if (Platform.OS === "web") {
+      await captureFromSource(kind, "library");
+      return;
+    }
+    return new Promise<void>((resolve) => {
+      Alert.alert(
+        kind === "selfie" ? "Ajouter un selfie" : "Ajouter un document",
+        "Choisissez la source de l'image.",
+        [
+          { text: "Annuler", style: "cancel", onPress: () => resolve() },
+          { text: "Prendre une photo", onPress: async () => { await captureFromSource(kind, "camera"); resolve(); } },
+          { text: "Sélectionner une image", onPress: async () => { await captureFromSource(kind, "library"); resolve(); } },
+        ],
+        { cancelable: true, onDismiss: () => resolve() },
+      );
+    });
+  }, [captureFromSource]);
+
+  const pickDocument = useCallback((kind: KycDocumentKind) => askAndPick(kind), [askAndPick]);
 
   const clearDocument = useCallback((kind: KycDocumentKind) => {
     setState((current) => {

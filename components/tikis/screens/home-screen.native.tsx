@@ -129,6 +129,11 @@ export function HomeScreen() {
   const [applicationDelivery, setApplicationDelivery] = useState<Delivery | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingHomeAction | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [, setNow] = useState(Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
   const scrollRef = useRef<ScrollView>(null);
   const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
   const sheetValue = useRef(SHEET_PEEK);
@@ -434,8 +439,15 @@ export function HomeScreen() {
           <View style={styles.sheetGrip} />
           <View style={styles.sheetTop}>
             <View style={styles.greetingBlock}>
-              <Text style={styles.sheetTitle}>{isDriver ? "Gains du jour" : `Bonjour ${firstNameDisplay} 👋`}</Text>
-              <Text style={styles.sheetSubtitle}>{isDriver ? `${formatMoney(todaysEarnings)} · ${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité` : countLabel}</Text>
+              {isDriver ? (
+                <View style={styles.driverGainsRow}>
+                  <Text style={styles.sheetTitle}>Gains du jour</Text>
+                  <Text style={styles.driverGainsValue}>{formatMoney(todaysEarnings)}</Text>
+                </View>
+              ) : (
+                <Text style={styles.sheetTitle}>{`Bonjour ${firstNameDisplay} 👋`}</Text>
+              )}
+              <Text style={styles.sheetSubtitle}>{isDriver ? `${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité` : countLabel}</Text>
             </View>
             {isDriver ? (
               <Pressable
@@ -526,7 +538,7 @@ export function HomeScreen() {
           </ScrollView>
 
           <Animated.View style={[styles.tabContent, { opacity: filterTransition, transform: [{ translateY: filterTranslateY }] }]}>
-          {deliveriesQuery.isLoading ? (
+          {deliveriesQuery.isLoading && !deliveriesQuery.data ? (
             <View style={styles.loadingState}>
               <ActivityIndicator color="#9A6201" />
               <Text style={styles.loadingText}>Chargement de vos livraisons…</Text>
@@ -748,9 +760,13 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
           <>
             {approachCoordinates.length > 1 ? <Polyline coordinates={approachCoordinates} strokeColor="#176C52" strokeWidth={4} lineCap="round" /> : null}
             {routeCoordinates.length > 1 ? <Polyline coordinates={routeCoordinates} strokeColor="#9A6201" strokeWidth={4} lineCap="round" /> : null}
-            <Marker coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={{ x: 0.5, y: 0.5 }}>
-              <View style={styles.nativeMarkerStart}>
-                <MaterialIcons name="inventory-2" size={15} color="#FFFFFF" />
+            <Marker coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={{ x: 0.5, y: 1 }} centerOffset={{ x: 0, y: -22 }}>
+              <View style={styles.pinWrap}>
+                <View style={styles.pinShadow} />
+                <View style={[styles.pinCircle, styles.pinCircleStart]}>
+                  <MaterialIcons name="trip-origin" size={14} color="#FFFFFF" />
+                </View>
+                <View style={[styles.pinTriangle, styles.pinTriangleStart]} />
               </View>
             </Marker>
             {hasDriver && driverPosition ? (
@@ -760,9 +776,13 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
                 </View>
               </Marker>
             ) : null}
-            <Marker coordinate={{ latitude: selected.dropoff.latitude, longitude: selected.dropoff.longitude }} anchor={{ x: 0.5, y: 0.85 }}>
-              <View style={styles.nativeMarkerEnd}>
-                <MaterialIcons name="location-on" size={18} color="#B4232D" />
+            <Marker coordinate={{ latitude: selected.dropoff.latitude, longitude: selected.dropoff.longitude }} anchor={{ x: 0.5, y: 1 }} centerOffset={{ x: 0, y: -22 }}>
+              <View style={styles.pinWrap}>
+                <View style={styles.pinShadow} />
+                <View style={[styles.pinCircle, styles.pinCircleEnd]}>
+                  <MaterialIcons name="location-on" size={14} color="#B4232D" />
+                </View>
+                <View style={[styles.pinTriangle, styles.pinTriangleEnd]} />
               </View>
             </Marker>
           </>
@@ -940,6 +960,15 @@ const styles = StyleSheet.create({
   nativeMarkerDriver: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#111111", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
   nativeMarkerEnd: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#B4232D" },
 
+  pinWrap: { alignItems: "center", width: 36, paddingTop: 0 },
+  pinShadow: { position: "absolute", bottom: 0, width: 14, height: 4, borderRadius: 7, backgroundColor: "rgba(0,0,0,0.25)" },
+  pinCircle: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2.5, borderColor: "#FFFFFF", marginBottom: -2 },
+  pinCircleStart: { backgroundColor: "#9A6201" },
+  pinCircleEnd: { backgroundColor: "#FFFFFF" },
+  pinTriangle: { width: 0, height: 0, borderLeftWidth: 6, borderRightWidth: 6, borderTopWidth: 8, borderLeftColor: "transparent", borderRightColor: "transparent", marginTop: -2 },
+  pinTriangleStart: { borderTopColor: "#9A6201" },
+  pinTriangleEnd: { borderTopColor: "#FFFFFF" },
+
   fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#F7EFE5", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E5D2B9", zIndex: 10 },
   sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
 
@@ -948,6 +977,8 @@ const styles = StyleSheet.create({
   sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", marginBottom: 10 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
   greetingBlock: { flex: 1, minWidth: 0 },
+  driverGainsRow: { flexDirection: "row", alignItems: "baseline", gap: 6, flexWrap: "wrap" },
+  driverGainsValue: { color: "#9A6201", fontSize: 14, fontWeight: "700" },
   sheetTitle: { color: "#111111", fontSize: 14, fontWeight: "700", lineHeight: 18 },
   sheetSubtitle: { color: "#666666", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 

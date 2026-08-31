@@ -57,8 +57,6 @@ export default function WalletScreen() {
     .slice(0, 20);
   const deliveryMetrics = deliveryMetricsForDay(journal);
   const todaysCount = deliveryMetrics.activityCount;
-  const todaysEarnings = deliveryMetrics.earnings;
-  const completedDriverCourses = deliveryMetrics.completedCourses;
   const currentMonthSpending = journal
     .filter((entry) => {
       const date = new Date(entry.createdAt);
@@ -167,13 +165,7 @@ export default function WalletScreen() {
           </Pressable>
         </View>
 
-        {isDriver ? (
-          <View style={styles.quickStats}>
-            <QuickStat icon="local-shipping" value={String(todaysCount)} label="Aujourd'hui" tone="primary" />
-            <QuickStat icon="savings" value={formatMoney(todaysEarnings)} label="Gains" tone="success" />
-            <QuickStat icon="two-wheeler" value={String(completedDriverCourses)} label="Courses" tone="amber" />
-          </View>
-        ) : (
+        {isDriver ? null : (
           <View style={styles.senderInfo}>
             <View style={styles.senderInfoIcon}><MaterialIcons name="handshake" size={16} color="#FFFFFF" /></View>
             <Text style={styles.senderInfoText}>
@@ -276,18 +268,6 @@ function iconBgForTone(tone: Tone) {
   if (tone === "error") return styles.iconBgError;
   if (tone === "primary") return styles.iconBgPrimary;
   return styles.iconBgNeutral;
-}
-
-function QuickStat({ icon, value, label, tone }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; value: string; label: string; tone: "primary" | "success" | "amber" }) {
-  return (
-    <View style={styles.quickStat}>
-      <View style={[styles.quickStatIcon, tone === "primary" ? styles.quickStatIconPrimary : tone === "amber" ? styles.quickStatIconAmber : styles.quickStatIconSuccess]}>
-        <MaterialIcons name={icon} size={14} color={tone === "primary" ? "#9A6201" : tone === "amber" ? "#9A6201" : "#167A55"} />
-      </View>
-      <Text style={styles.quickStatValue}>{value}</Text>
-      <Text style={styles.quickStatLabel}>{label}</Text>
-    </View>
-  );
 }
 
 const styles = StyleSheet.create({

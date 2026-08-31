@@ -251,6 +251,36 @@ export const appRouter = router({
       const profile = await db.updateTikisProfile(input.phone, { fullName: input.fullName ?? current.fullName, photoKey: photoKey ?? current.photoKey });
       return toPublicProfile(profile);
     }),
+    requestContactOtp: publicProcedure.input(z.object({
+      kind: z.enum(["phone", "email"]),
+      value: z.string().min(3).max(180),
+      phone: phoneSchema,
+      otp: simulationOtpSchema,
+    })).mutation(async ({ input }) => {
+      if (input.kind === "phone") {
+        if (!/^\+?[0-9 ]{8,20}$/.test(input.value.trim())) throw new Error("Numéro de téléphone invalide.");
+      } else {
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.value.trim())) throw new Error("Adresse e-mail invalide.");
+      }
+      return { ok: true, demoOtp: "123456" };
+    }),
+    updateContact: publicProcedure.input(z.object({
+      kind: z.enum(["phone", "email"]),
+      value: z.string().min(3).max(180),
+      otp: z.string().min(6).max(6),
+      phone: phoneSchema,
+      sessionOtp: simulationOtpSchema,
+    })).mutation(async ({ input }) => {
+      if (input.otp !== input.sessionOtp) throw new Error("Code de confirmation invalide.");
+      const current = await db.getTikisProfileByPhone(input.phone);
+      if (!current) throw new Error("Profil introuvable.");
+      if (input.kind === "phone") {
+        if (!/^\+?[0-9 ]{8,20}$/.test(input.value.trim())) throw new Error("Numéro de téléphone invalide.");
+        return { phone: input.value.trim(), phoneVerified: true, email: current.email ?? undefined, emailVerified: current.emailVerified ?? false };
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.value.trim())) throw new Error("Adresse e-mail invalide.");
+      return { phone: current.phone, phoneVerified: true, email: input.value.trim(), emailVerified: true };
+    }),
   }),
   geography: router({
     search: protectedGeographyProcedure.input(z.object({ query: z.string().min(2).max(120), countryCode: countryCodeSchema.optional(), biasLatitude: coordinateSchema.min(-90).max(90).optional(), biasLongitude: coordinateSchema.min(-180).max(180).optional(), includeCommunityFallback: z.boolean().optional() })).mutation(async ({ ctx, input }) => geography.searchPlaces(input.query, input.biasLatitude !== undefined && input.biasLongitude !== undefined ? { latitude: input.biasLatitude, longitude: input.biasLongitude } : undefined, sessionCountryCode(ctx.tikisProfilePhone), input.includeCommunityFallback === true)),

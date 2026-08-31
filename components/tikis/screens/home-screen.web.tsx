@@ -127,6 +127,11 @@ export function HomeScreen() {
   const [candidateDelivery, setCandidateDelivery] = useState<Delivery | null>(null);
   const [applicationDelivery, setApplicationDelivery] = useState<Delivery | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingHomeAction | null>(null);
+  const [, setNow] = useState(Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(interval);
+  }, []);
   const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
   const sheetValue = useRef(SHEET_PEEK);
   const dragStartHeight = useRef(SHEET_PEEK);
@@ -422,8 +427,15 @@ export function HomeScreen() {
           <View style={styles.sheetGrip} />
           <View style={styles.sheetTop}>
             <View style={styles.greetingBlock}>
-              <Text style={styles.sheetTitle}>{isDriver ? "Gains du jour" : `Bonjour ${firstNameDisplay} 👋`}</Text>
-              <Text style={styles.sheetSubtitle}>{isDriver ? `${formatMoney(todaysEarnings)} · ${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité` : countLabel}</Text>
+              {isDriver ? (
+                <View style={styles.driverGainsRow}>
+                  <Text style={styles.sheetTitle}>Gains du jour</Text>
+                  <Text style={styles.driverGainsValue}>{formatMoney(todaysEarnings)}</Text>
+                </View>
+              ) : (
+                <Text style={styles.sheetTitle}>{`Bonjour ${firstNameDisplay} 👋`}</Text>
+              )}
+              <Text style={styles.sheetSubtitle}>{isDriver ? `${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité` : countLabel}</Text>
             </View>
             {isDriver ? (
               <Pressable
@@ -511,7 +523,7 @@ export function HomeScreen() {
           </ScrollView>
 
           <Animated.View style={[styles.tabContent, { opacity: filterTransition, transform: [{ translateY: filterTranslateY }] }]}>
-          {deliveriesQuery.isLoading ? (
+          {deliveriesQuery.isLoading && !deliveriesQuery.data ? (
             <View style={styles.loadingState}>
               <ActivityIndicator color="#9A6201" />
               <Text style={styles.loadingText}>Chargement de vos livraisons…</Text>
@@ -910,6 +922,8 @@ const styles = StyleSheet.create({
   sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", marginBottom: 10 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
   greetingBlock: { flex: 1, minWidth: 0 },
+  driverGainsRow: { flexDirection: "row", alignItems: "baseline", gap: 6, flexWrap: "wrap" },
+  driverGainsValue: { color: "#9A6201", fontSize: 14, fontWeight: "700" },
   sheetTitle: { color: "#111111", fontSize: 14, fontWeight: "700", lineHeight: 18 },
   sheetSubtitle: { color: "#666666", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 

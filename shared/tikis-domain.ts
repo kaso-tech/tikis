@@ -29,6 +29,9 @@ export interface RegisteredProfile {
   roleLocked: true;
   photoUrl?: string;
   referralCode?: string;
+  email?: string;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
 }
 
 export interface DeliveryReview {

@@ -145,6 +145,14 @@ export default function CreateDeliveryScreen() {
   const publishedPrice = parsedOfferedPrice ?? estimate;
   const priceDifference = parsedOfferedPrice && estimate ? priceDifferencePercent(parsedOfferedPrice, estimate) : 0;
   const favoriteLocations: SavedFavorite[] = useMemo(() => (favoritesQuery.data ?? []).map((item) => ({ id: item.id, label: item.label, location: favoriteToLocation(item) })), [favoritesQuery.data]);
+  const isAddressInFavorites = useCallback((place: LocationLabel | null) => {
+    if (!place || favoriteLocations.length === 0) return false;
+    return favoriteLocations.some((fav) => {
+      const lat = fav.location.latitude;
+      const lng = fav.location.longitude;
+      return Math.abs(lat - place.latitude) < 0.00005 && Math.abs(lng - place.longitude) < 0.00005;
+    });
+  }, [favoriteLocations]);
 
   const filledCount = useMemo(() => {
     let count = 0;
@@ -218,6 +226,12 @@ export default function CreateDeliveryScreen() {
     const cleanTitle = sanitizeDeliveryText(title);
     const cleanDetails = sanitizeDeliveryText(details);
     if (!pickup || !dropoff || !route || !isAllowedDeliveryText(cleanTitle) || !isAllowedDeliveryText(cleanDetails)) return;
+    const pickupKey = `${pickup.latitude.toFixed(5)}|${pickup.longitude.toFixed(5)}`;
+    const dropoffKey = `${dropoff.latitude.toFixed(5)}|${dropoff.longitude.toFixed(5)}`;
+    if (pickupKey === dropoffKey) {
+      Alert.alert("Adresses identiques", "L'adresse de collecte ne peut pas être identique à l'adresse de destination. Choisissez une autre destination.");
+      return;
+    }
     setPublicationStage("Enregistrement des lieux…"); setLoading(true);
     try {
       setPublicationStage(isEditing ? "Mise à jour de la livraison…" : "Publication auprès des livreurs…");
@@ -300,7 +314,7 @@ export default function CreateDeliveryScreen() {
               </Pressable>
             </View>
             <View style={styles.routeCard}>
-              <RouteInput tone="pickup" label="RÉCUPÉRATION" value={pickup} invalid={Boolean(pickupIssue)} onPress={() => setPickerTarget("pickup")} onAddFavorite={pickup ? (label) => void addFavorite(pickup, label) : undefined} />
+              <RouteInput tone="pickup" label="RÉCUPÉRATION" value={pickup} invalid={Boolean(pickupIssue)} onPress={() => setPickerTarget("pickup")} onAddFavorite={pickup && !isAddressInFavorites(pickup) ? (label) => void addFavorite(pickup, label) : undefined} />
               {route ? (
                 <View style={styles.routeConnector}>
                   <View style={styles.routeConnectorLine} />
@@ -311,7 +325,7 @@ export default function CreateDeliveryScreen() {
                   <View style={[styles.routeConnectorLine, styles.routeConnectorLineDashed]} />
                 </View>
               )}
-              <RouteInput tone="dropoff" label="DESTINATION" value={dropoff} invalid={Boolean(dropoffIssue)} onPress={() => setPickerTarget("dropoff")} onAddFavorite={dropoff ? (label) => void addFavorite(dropoff, label) : undefined} />
+              <RouteInput tone="dropoff" label="DESTINATION" value={dropoff} invalid={Boolean(dropoffIssue)} onPress={() => setPickerTarget("dropoff")} onAddFavorite={dropoff && !isAddressInFavorites(dropoff) ? (label) => void addFavorite(dropoff, label) : undefined} />
             </View>
             {routeMessage ? <Text style={[styles.routeMessage, !route?.precise && styles.routeWarning]}>{routeMessage}</Text> : null}
             {pickup && dropoff && (!route || !route.precise) ? (

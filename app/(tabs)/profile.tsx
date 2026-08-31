@@ -6,6 +6,7 @@ import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text,
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
+import { ContactSection } from "@/components/tikis/contact-section";
 import { haptic } from "@/lib/haptics";
 import { useTikisLogout } from "@/lib/tikis-logout";
 import { sanitizeFullName, validateFullName } from "@/lib/registration-rules";
@@ -244,6 +245,8 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
+
+        <ContactSection />
 
         {driver ? (
           <Section title="KYC & engins">
