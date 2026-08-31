@@ -268,26 +268,26 @@ export default function CreateDeliveryScreen() {
   const ctaLabel = isEditing ? "Enregistrer" : "Publier";
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
-      <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}>
-        <View style={styles.topBar}>
-          <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Retour">
-            <MaterialIcons name="arrow-back" size={20} color="#111111" />
-          </Pressable>
-          <View style={styles.topTitleWrap}>
-            <Text style={styles.topTitle}>{isEditing ? "Modifier la livraison" : "Nouvelle livraison"}</Text>
-            <Text style={styles.topStep}>{progress}%</Text>
-          </View>
-          <View style={styles.iconBtnSpacer} />
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
+      <View style={styles.topBar}>
+        <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Retour">
+          <MaterialIcons name="arrow-back" size={20} color="#111111" />
+        </Pressable>
+        <View style={styles.topTitleWrap}>
+          <Text style={styles.topTitle}>{isEditing ? "Modifier la livraison" : "Nouvelle livraison"}</Text>
+          <Text style={styles.topStep}>{progress}%</Text>
         </View>
+        <View style={styles.iconBtnSpacer} />
+      </View>
 
-        <View style={styles.progressWrap}>
+      <View style={styles.progressWrap}>
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${progress}%` }]} />
           </View>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} keyboardDismissMode="interactive">
           <View style={styles.section}>
             <View style={styles.routeHeaderRow}>
               <View style={{ flex: 1 }}>

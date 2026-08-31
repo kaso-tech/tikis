@@ -1,4 +1,4 @@
-export const MIN_OFFERED_PRICE = 100;
+export const MIN_OFFERED_PRICE = 500;
 export const MAX_OFFERED_PRICE = 10_000_000;
 
 /** Removes any non-numeric input before the amount is parsed or displayed. */
@@ -16,8 +16,11 @@ export function parseOfferedPrice(value: string): number | undefined {
 
 export function offeredPriceError(value: string) {
   if (!value.trim()) return undefined;
-  const amount = parseOfferedPrice(value);
-  return amount === undefined ? `Saisissez un montant entre ${MIN_OFFERED_PRICE.toLocaleString("fr-FR")} et ${MAX_OFFERED_PRICE.toLocaleString("fr-FR")} FCFA.` : undefined;
+  const normalized = sanitizeOfferedPriceInput(value);
+  const amount = Number(normalized);
+  if (!Number.isFinite(amount) || amount < MIN_OFFERED_PRICE) return `Saisissez un montant supérieur ou égal à ${MIN_OFFERED_PRICE.toLocaleString("fr-FR")} FCFA.`;
+  if (amount > MAX_OFFERED_PRICE) return `Saisissez un montant inférieur ou égal à ${MAX_OFFERED_PRICE.toLocaleString("fr-FR")} FCFA.`;
+  return undefined;
 }
 
 export function priceDifferencePercent(offeredPrice: number, estimatedPrice: number) {

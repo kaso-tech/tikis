@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, PanResponder, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
@@ -15,6 +15,7 @@ import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-
 import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
 import { resolveDriverHomeAction } from "@/shared/delivery-home-action";
 import { isOpenDeliveryStale } from "@/shared/delivery-freshness";
+import { deliveryMetricsForDay } from "@/lib/wallet-metrics";
 import { useThemeColors } from "@/lib/use-theme-colors";
 
 const SHEET_MIN = 130;
@@ -107,11 +108,12 @@ export function HomeScreen() {
   const { isDark, colors: theme } = useThemeColors();
   const firstName = profile?.fullName.split(" ")[0] ?? "à vous";
 
-  const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 10_000 });
+  const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 5_000 });
   const deliveries = useMemo(() => deliveriesQuery.data ?? [], [deliveriesQuery.data]);
 
-  const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 12_000, refetchOnMount: "always", refetchOnWindowFocus: true });
+  const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 5_000, refetchOnMount: "always", refetchOnWindowFocus: true });
   const driverWallet = walletQuery.data?.wallet;
+  const driverJournal = walletQuery.data?.journal ?? [];
 
   const [filter, setFilter] = useState<FilterKey>("open");
   const [searchQuery, setSearchQuery] = useState("");
@@ -375,7 +377,8 @@ export function HomeScreen() {
   const filterCounts = useMemo(() => Object.fromEntries(filterItems.map((item) => [item.key, deliveries.filter((delivery) => matchesFilter(delivery, item.key, isDriver)).length])) as Record<FilterKey, number>, [deliveries, filterItems, isDriver]);
   const filterTranslateY = filterTransition.interpolate({ inputRange: [0, 1], outputRange: [6, 0] });
   const firstNameDisplay = isDriver ? firstName : "à vous";
-  const countLabel = isDriver ? `${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité` : `${filteredList.length} livraison${filteredList.length > 1 ? "s" : ""} affichée${filteredList.length > 1 ? "s" : ""}`;
+  const todaysEarnings = useMemo(() => isDriver ? deliveryMetricsForDay(driverJournal).earnings : 0, [driverJournal, isDriver]);
+  const countLabel = isDriver ? `Gains du jour : ${formatMoney(todaysEarnings)}` : `${filteredList.length} livraison${filteredList.length > 1 ? "s" : ""} affichée${filteredList.length > 1 ? "s" : ""}`;
 
   function pulseBadge(filterKey: FilterKey) {
     const badgeScale = badgeScales[filterKey];
@@ -419,8 +422,8 @@ export function HomeScreen() {
           <View style={styles.sheetGrip} />
           <View style={styles.sheetTop}>
             <View style={styles.greetingBlock}>
-              <Text style={styles.sheetTitle}>Bonjour {firstNameDisplay} 👋</Text>
-              <Text style={styles.sheetSubtitle}>{countLabel}</Text>
+              <Text style={styles.sheetTitle}>{isDriver ? "Gains du jour" : `Bonjour ${firstNameDisplay} 👋`}</Text>
+              <Text style={styles.sheetSubtitle}>{isDriver ? `${formatMoney(todaysEarnings)} · ${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité` : countLabel}</Text>
             </View>
             {isDriver ? (
               <Pressable
@@ -449,9 +452,22 @@ export function HomeScreen() {
           style={styles.scrollArea}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={deliveriesQuery.isRefetching && !deliveriesQuery.isLoading}
+              onRefresh={async () => {
+                await Promise.all([
+                  utilities.deliveries.list.invalidate(),
+                  utilities.notifications.list.invalidate(),
+                  role === "driver" ? utilities.wallet.snapshot.invalidate() : Promise.resolve(),
+                ]);
+              }}
+              tintColor="transparent"
+              colors={["transparent"]}
+              progressBackgroundColor="transparent"
+            />
+          }
         >
-          {isDriver && driverWallet ? <WalletCard walletBalance={availableWalletBalance(driverWallet)} totalBalance={driverWallet.total} blockedBalance={driverWallet.blocked} /> : null}
-
           {isDriver && !profile?.photoUrl ? (
             <Pressable onPress={() => router.push("/(tabs)/profile" as any)} style={({ pressed }) => [styles.kycBanner, pressed && styles.pressed]} accessibilityLabel="Vérifier mon profil">
               <MaterialIcons name="verified-user" size={18} color="#9A6201" />
@@ -905,7 +921,7 @@ const styles = StyleSheet.create({
   onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9A6201" },
   onlineDotOffline: { backgroundColor: "#747474" },
 
-  searchRow: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6 },
+  searchRow: { paddingTop: 10, paddingBottom: 6 },
   kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: "#F7EFE5", borderRadius: 10, borderWidth: 1, borderColor: "#E5D2B9" },
   kycBannerCopy: { flex: 1 },
   kycBannerTitle: { color: "#9A6201", fontSize: 12, fontWeight: "700" },
@@ -925,7 +941,7 @@ const styles = StyleSheet.create({
   walletStatLabel: { color: "rgba(255,255,255,0.55)", fontSize: 10 },
   walletStatValue: { color: "#FFFFFF", fontSize: 13, fontWeight: "700", marginTop: 2 },
 
-  filterRow: { flexDirection: "row", gap: 6, paddingHorizontal: 14, paddingBottom: 10, alignItems: "center" },
+  filterRow: { flexDirection: "row", gap: 6, paddingBottom: 10, alignItems: "center" },
   filterScroll: { flexGrow: 0 },
   chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", flexDirection: "row", alignItems: "center", gap: 6 },
   chipActive: { backgroundColor: "#F7EFE5", borderColor: "#9A6201" },
