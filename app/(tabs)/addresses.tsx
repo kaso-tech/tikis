@@ -87,69 +87,73 @@ export default function AddressesScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.header}>
-        <Text style={styles.eyebrow}>GESTION</Text>
-        <Text style={styles.pageTitle}>Mes adresses</Text>
-        <Text style={styles.pageSub}>Vos lieux habituels pour publier des livraisons plus rapidement.</Text>
-      </View>
-
-      <View style={styles.searchRow}>
-        <View style={styles.search}>
-          <MaterialIcons name="search" size={16} color="#747474" />
-          <TextInput value={search} onChangeText={(value) => setSearch(sanitizePlaceText(value, 80, { preserveTrailingSpace: true }))} placeholder="Rechercher une adresse" placeholderTextColor="#9AA5B6" style={styles.searchInput} maxLength={80} />
-          {search ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Effacer la recherche" onPress={() => setSearch("")} style={styles.searchClear}>
-              <MaterialIcons name="close" size={12} color="#747474" />
-            </Pressable>
-          ) : null}
+    <SafeAreaView style={styles.safe} edges={["left", "right"]}>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <View style={styles.header}>
+          <Text style={styles.eyebrow}>GESTION</Text>
+          <Text style={styles.pageTitle} numberOfLines={2}>Mes adresses</Text>
+          <Text style={styles.pageSub}>Vos lieux habituels pour publier des livraisons plus rapidement.</Text>
         </View>
-      </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-        <FilterChip label="Toutes" count={counts.all} active={filter === "all"} onPress={() => setFilter("all")} />
-        <FilterChip label="Maison" count={counts.maison} active={filter === "maison"} onPress={() => setFilter("maison")} />
-        <FilterChip label="Bureau" count={counts.bureau} active={filter === "bureau"} onPress={() => setFilter("bureau")} />
-        <FilterChip label="Famille" count={counts.famille} active={filter === "famille"} onPress={() => setFilter("famille")} />
-        <FilterChip label="Autres" count={counts.autre} active={filter === "autre"} onPress={() => setFilter("autre")} />
-      </ScrollView>
-
-      <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        {query.isLoading ? (
-          <View style={styles.loading}><ActivityIndicator color="#007B8B" /></View>
-        ) : filtered.length === 0 ? (
-          <View style={styles.empty}>
-            <View style={styles.emptyIcon}>
-              <MaterialIcons name={search || filter !== "all" ? "search-off" : "bookmark-border"} size={28} color="#747474" />
-            </View>
-            <Text style={styles.emptyTitle}>{search || filter !== "all" ? "Aucun résultat" : "Aucune adresse enregistrée"}</Text>
-            <Text style={styles.emptySub}>{search ? "Essayez un autre terme ou retirez les filtres." : "Ajoutez vos lieux habituels depuis la carte lors d'une nouvelle livraison."}</Text>
+        <View style={styles.searchRow}>
+          <View style={styles.search}>
+            <MaterialIcons name="search" size={16} color="#747474" />
+            <TextInput value={search} onChangeText={(value) => setSearch(sanitizePlaceText(value, 80, { preserveTrailingSpace: true }))} placeholder="Rechercher une adresse" placeholderTextColor="#9AA5B6" style={styles.searchInput} maxLength={80} />
+            {search ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="Effacer la recherche" onPress={() => setSearch("")} style={styles.searchClear}>
+                <MaterialIcons name="close" size={12} color="#747474" />
+              </Pressable>
+            ) : null}
           </View>
-        ) : (
-          filtered.map((favorite, index) => (
-            <View key={String(favorite.id)} style={styles.addressCard}>
-              <View style={[styles.addressIcon, iconStyle(favorite.category)]}>
-                <MaterialIcons name={categoryIcon(favorite.category)} size={18} color={iconColor(favorite.category)} />
+        </View>
+
+        <View style={styles.filterScrollWrap}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow} style={styles.filterScroll}>
+            <FilterChip label="Toutes" count={counts.all} active={filter === "all"} onPress={() => setFilter("all")} />
+            <FilterChip label="Maison" count={counts.maison} active={filter === "maison"} onPress={() => setFilter("maison")} />
+            <FilterChip label="Bureau" count={counts.bureau} active={filter === "bureau"} onPress={() => setFilter("bureau")} />
+            <FilterChip label="Famille" count={counts.famille} active={filter === "famille"} onPress={() => setFilter("famille")} />
+            <FilterChip label="Autres" count={counts.autre} active={filter === "autre"} onPress={() => setFilter("autre")} />
+          </ScrollView>
+        </View>
+
+        <View style={styles.listWrap}>
+          {query.isLoading ? (
+            <View style={styles.loading}><ActivityIndicator color="#007B8B" /></View>
+          ) : filtered.length === 0 ? (
+            <View style={styles.empty}>
+              <View style={styles.emptyIcon}>
+                <MaterialIcons name={search || filter !== "all" ? "search-off" : "bookmark-border"} size={28} color="#747474" />
               </View>
-              <View style={styles.addressBody}>
-                <View style={styles.addressLabelRow}>
-                  <Text style={styles.addressLabel} numberOfLines={1}>{favorite.label}</Text>
-                  {index === 0 && filter === "all" && !search ? <View style={styles.defaultBadge}><Text style={styles.defaultBadgeText}>Défaut</Text></View> : null}
-                </View>
-                <Text style={styles.addressName} numberOfLines={1}>{favorite.place.placeName}</Text>
-                <Text style={styles.addressMeta} numberOfLines={1}>{subtitle(favorite.place)}</Text>
-              </View>
-              <View style={styles.addressActions}>
-                <Pressable accessibilityRole="button" accessibilityLabel={`Renommer ${favorite.label}`} onPress={() => { setEditing(favorite); setDraft(favorite.label); }} style={({ pressed }) => [styles.addressAction, pressed && styles.pressed]}>
-                  <MaterialIcons name="edit" size={15} color="#666666" />
-                </Pressable>
-                <Pressable accessibilityRole="button" accessibilityLabel={`Supprimer ${favorite.label}`} onPress={() => requestRemove(favorite)} disabled={deletingId === Number(favorite.id)} style={({ pressed }) => [styles.addressAction, styles.addressActionDanger, (pressed || deletingId === Number(favorite.id)) && styles.pressed]}>
-                  {deletingId === Number(favorite.id) ? <ActivityIndicator size="small" color="#B4232D" /> : <MaterialIcons name="delete-outline" size={15} color="#B4232D" />}
-                </Pressable>
-              </View>
+              <Text style={styles.emptyTitle}>{search || filter !== "all" ? "Aucun résultat" : "Aucune adresse enregistrée"}</Text>
+              <Text style={styles.emptySub}>{search ? "Essayez un autre terme ou retirez les filtres." : "Ajoutez vos lieux habituels depuis la carte lors d'une nouvelle livraison."}</Text>
             </View>
-          ))
-        )}
+          ) : (
+            filtered.map((favorite, index) => (
+              <View key={String(favorite.id)} style={styles.addressCard}>
+                <View style={[styles.addressIcon, iconStyle(favorite.category)]}>
+                  <MaterialIcons name={categoryIcon(favorite.category)} size={18} color={iconColor(favorite.category)} />
+                </View>
+                <View style={styles.addressBody}>
+                  <View style={styles.addressLabelRow}>
+                    <Text style={styles.addressLabel} numberOfLines={1}>{favorite.label}</Text>
+                    {index === 0 && filter === "all" && !search ? <View style={styles.defaultBadge}><Text style={styles.defaultBadgeText}>Défaut</Text></View> : null}
+                  </View>
+                  <Text style={styles.addressName} numberOfLines={1}>{favorite.place.placeName}</Text>
+                  <Text style={styles.addressMeta} numberOfLines={1}>{subtitle(favorite.place)}</Text>
+                </View>
+                <View style={styles.addressActions}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Renommer ${favorite.label}`} onPress={() => { setEditing(favorite); setDraft(favorite.label); }} style={({ pressed }) => [styles.addressAction, pressed && styles.pressed]}>
+                    <MaterialIcons name="edit" size={15} color="#666666" />
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Supprimer ${favorite.label}`} onPress={() => requestRemove(favorite)} disabled={deletingId === Number(favorite.id)} style={({ pressed }) => [styles.addressAction, styles.addressActionDanger, (pressed || deletingId === Number(favorite.id)) && styles.pressed]}>
+                    {deletingId === Number(favorite.id) ? <ActivityIndicator size="small" color="#B4232D" /> : <MaterialIcons name="delete-outline" size={15} color="#B4232D" />}
+                  </Pressable>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
       </ScrollView>
 
       <View style={styles.footer}>
@@ -214,7 +218,7 @@ function iconColor(category: AddressCategory) {
 function FilterChip({ label, count, active, onPress }: { label: string; count: number; active: boolean; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && styles.pressed]}>
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+      <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>{label}</Text>
       <View style={[styles.chipCount, active ? styles.chipCountActive : styles.chipCountInactive]}><Text style={[styles.chipCountText, active ? styles.chipCountTextActive : styles.chipCountTextInactive]}>{count}</Text></View>
     </Pressable>
   );
@@ -222,12 +226,13 @@ function FilterChip({ label, count, active, onPress }: { label: string; count: n
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#EEEDF3" },
+  scrollContent: { paddingBottom: 100 },
 
   pressed: { opacity: 0.7 },
 
   header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12 },
   eyebrow: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
-  pageTitle: { color: "#111111", fontSize: 22, fontWeight: "700", marginTop: 4, lineHeight: 26 },
+  pageTitle: { color: "#111111", fontSize: 22, fontWeight: "700", marginTop: 4, lineHeight: 28 },
   pageSub: { color: "#666666", fontSize: 12, lineHeight: 18, marginTop: 6 },
 
   searchRow: { paddingHorizontal: 16, paddingBottom: 12 },
@@ -235,19 +240,21 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, color: "#111111", fontSize: 13 },
   searchClear: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
 
-  filterRow: { flexDirection: "row", gap: 6, paddingHorizontal: 16, paddingBottom: 12 },
-  chip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 6, height: 32, borderRadius: 99, backgroundColor: "#FFFFFF" },
+  filterScrollWrap: { paddingBottom: 12 },
+  filterScroll: { flexGrow: 0 },
+  filterRow: { flexDirection: "row", gap: 6, paddingHorizontal: 16, alignItems: "center" },
+  chip: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, height: 30, borderRadius: 99, backgroundColor: "#FFFFFF" },
   chipActive: { backgroundColor: "#111111" },
   chipText: { color: "#666666", fontSize: 11, fontWeight: "600" },
   chipTextActive: { color: "#FFFFFF" },
-  chipCount: { paddingHorizontal: 6, borderRadius: 99, minWidth: 18, alignItems: "center" },
+  chipCount: { paddingHorizontal: 6, borderRadius: 99, minWidth: 18, height: 18, alignItems: "center", justifyContent: "center" },
   chipCountActive: { backgroundColor: "rgba(255,255,255,0.2)" },
   chipCountInactive: { backgroundColor: "#EEEDF3" },
   chipCountText: { fontSize: 9, fontWeight: "600" },
   chipCountTextActive: { color: "#FFFFFF" },
   chipCountTextInactive: { color: "#747474" },
 
-  list: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 100, gap: 8 },
+  listWrap: { paddingHorizontal: 16, gap: 8 },
   loading: { alignItems: "center", paddingVertical: 32 },
 
   addressCard: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12 },
@@ -272,7 +279,7 @@ const styles = StyleSheet.create({
   emptySub: { color: "#666666", fontSize: 12, textAlign: "center", lineHeight: 18, marginTop: 6, maxWidth: 260 },
 
   footer: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopWidth: 1, borderTopColor: "#ECECEC", padding: 12, paddingBottom: 18 },
-  footerBtn: { backgroundColor: "#9A6201", borderRadius: 10, height: 46, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  footerBtn: { backgroundColor: "#007B8B", borderRadius: 10, height: 46, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   footerBtnText: { color: "#FFFFFF", fontSize: 13, fontWeight: "600" },
 
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.42)" },
