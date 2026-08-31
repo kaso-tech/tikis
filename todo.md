@@ -437,3 +437,6 @@
 - [x] Auditer l’échec de vérification d’un profil existant après validation OTP côté client et serveur.
 - [x] Corriger durablement la vérification de profil existant sans basculer vers l’inscription.
 - [x] Ajouter des tests de régression et valider l’authentification, la compilation, les tests et les services.
+- [x] Synchroniser la dernière branche main Tikis et vérifier les dépendances distantes.
+- [x] Valider la compilation, les tests et la disponibilité des services après synchronisation.
+- [x] Corriger la compatibilité des adresses avec les brouillons de livraison introduits par la dernière synchronisation.

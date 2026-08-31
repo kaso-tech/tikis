@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { LocationLabel } from "@/shared/tikis-domain";
 
 export type DeliveryDraft = {
   id: string;
@@ -8,8 +9,8 @@ export type DeliveryDraft = {
   details: string;
   deliveryType: "Plis" | "Personne" | "Autre";
   vehicle: "Vélo" | "Moto" | "Tricycle" | "Voiture";
-  pickup: { name: string; district: string | null; city: string | null; formattedAddress: string; street: string | null; latitude: number; longitude: number; mapboxId?: string | null; googlePlaceId?: string | null; province?: string | null; country?: string | null; source?: string; featureType?: string; precision?: string } | null;
-  dropoff: { name: string; district: string | null; city: string | null; formattedAddress: string; street: string | null; latitude: number; longitude: number; mapboxId?: string | null; googlePlaceId?: string | null; province?: string | null; country?: string | null; source?: string; featureType?: string; precision?: string } | null;
+  pickup: LocationLabel | null;
+  dropoff: LocationLabel | null;
   weightKg?: string;
   lengthCm?: string;
   widthCm?: string;
