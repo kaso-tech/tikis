@@ -122,12 +122,12 @@ export default function ContactScreen() {
 
               <Text style={styles.label}>SUJET</Text>
               <View style={styles.inputWrap}>
-                <TextInput value={subject} onChangeText={(value) => { setSubject(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={120} placeholder="Décrivez votre sujet en quelques mots" placeholderTextColor="#9AA5B6" style={styles.input} />
+                <TextInput value={subject} onChangeText={(value) => { setSubject(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={120} placeholder="Décrivez votre sujet en quelques mots" placeholderTextColor="#B48753" style={styles.input} />
               </View>
 
               <Text style={styles.label}>VOTRE MESSAGE</Text>
               <View style={[styles.inputWrap, styles.textareaWrap]}>
-                <TextInput value={message} onChangeText={(value) => { setMessage(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={1000} multiline placeholder="Donnez-nous le maximum de détails pour vous aider au mieux." placeholderTextColor="#9AA5B6" style={[styles.input, styles.textarea]} textAlignVertical="top" />
+                <TextInput value={message} onChangeText={(value) => { setMessage(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={1000} multiline placeholder="Donnez-nous le maximum de détails pour vous aider au mieux." placeholderTextColor="#B48753" style={[styles.input, styles.textarea]} textAlignVertical="top" />
                 <Text style={styles.counter}>{message.length}/1000</Text>
               </View>
 
@@ -159,14 +159,14 @@ const styles = StyleSheet.create({
   label: { color: "#747474", fontSize: 10, fontWeight: "600", letterSpacing: 0.6, textTransform: "uppercase", marginTop: 6, marginBottom: 6 },
   reasons: { gap: 7 },
   reason: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 11 },
-  reasonActive: { backgroundColor: "#111111" },
+  reasonActive: { backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9" },
   reasonText: { color: "#111111", fontSize: 13, fontWeight: "600" },
-  reasonTextActive: { color: "#FFFFFF" },
+  reasonTextActive: { color: "#9A6201" },
   reasonHelper: { color: "#666666", fontSize: 11, marginTop: 2 },
   reasonHelperActive: { color: "#BBBBBB" },
-  inputWrap: { backgroundColor: "#FFFFFF", borderRadius: 9, padding: 12, minHeight: 48, justifyContent: "center" },
+  inputWrap: { backgroundColor: "#F7EFE5", borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", padding: 12, minHeight: 48, justifyContent: "center" },
   textareaWrap: { minHeight: 140, paddingTop: 12 },
-  input: { color: "#111111", fontSize: 14, fontWeight: "500", minHeight: 22 },
+  input: { color: "#9A6201", fontSize: 14, fontWeight: "500", minHeight: 22 },
   textarea: { minHeight: 110, textAlignVertical: "top" },
   counter: { color: "#747474", fontSize: 10, fontWeight: "500", textAlign: "right", marginTop: 4 },
   helper: { color: "#666666", fontSize: 11, lineHeight: 16 },

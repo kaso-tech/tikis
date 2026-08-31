@@ -248,7 +248,7 @@ export default function WalletScreen() {
                 <Text style={styles.modalTitle}>{requestType === "deposit" ? "Dépôt YengaPay" : "Retrait YengaPay"}</Text>
                 <Text style={styles.modalSub}>{requestType === "deposit" ? "Initialisez un dépôt de test. Le solde ne sera crédité qu'après la confirmation suivante." : "Initialisez un retrait de test. Le solde ne sera débité qu'après la confirmation suivante."}</Text>
                 <View style={styles.amountWrap}>
-                  <TextInput value={amountInput} onChangeText={(value) => setAmountInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} autoFocus style={styles.amountInput} placeholder="Montant" placeholderTextColor="#9AA5B6" />
+                  <TextInput value={amountInput} onChangeText={(value) => setAmountInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} autoFocus style={styles.amountInput} placeholder="Montant" placeholderTextColor="#B48753" />
                   <Text style={styles.amountCurrency}>FCFA</Text>
                 </View>
                 {requestError ? <Text style={styles.requestError}>{requestError}</Text> : <Text style={styles.modalHint}>Le montant et le statut de test seront enregistrés dans votre journal financier.</Text>}
@@ -374,9 +374,9 @@ const styles = StyleSheet.create({
   referenceLabel: { color: "#666666", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textAlign: "center" },
   referenceValue: { color: "#111111", fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4, letterSpacing: 0.3 },
   requestError: { color: "#B4232D", fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: 6 },
-  amountWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "#EEEDF3", borderRadius: 9, paddingHorizontal: 12, marginTop: 14 },
-  amountInput: { flex: 1, color: "#111111", fontSize: 15, fontWeight: "500", minHeight: 46 },
-  amountCurrency: { color: "#666666", fontSize: 11, fontWeight: "600" },
+  amountWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "#F7EFE5", borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 12, marginTop: 14 },
+  amountInput: { flex: 1, color: "#9A6201", fontSize: 15, fontWeight: "500", minHeight: 46 },
+  amountCurrency: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
   modalActions: { flexDirection: "row", gap: 8, marginTop: 16 },
   modalAction: { flex: 1, minHeight: 42 },
 });

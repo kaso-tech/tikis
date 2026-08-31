@@ -409,7 +409,7 @@ export function HomeScreen() {
                   value={searchQuery}
                   onChangeText={setSearchQuery}
                   placeholder="Rechercher une opportunité…"
-                  placeholderTextColor="#747474"
+                  placeholderTextColor="#B48753"
                   style={styles.searchInput}
                   returnKeyType="search"
                   clearButtonMode="while-editing"
@@ -833,8 +833,8 @@ const styles = StyleSheet.create({
   onlineDotOffline: { backgroundColor: "#747474" },
 
   searchRow: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6 },
-  searchPill: { height: 40, backgroundColor: "#EEEDF3", borderRadius: 11, flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
-  searchInput: { flex: 1, color: "#111111", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
+  searchPill: { height: 40, backgroundColor: "#F7EFE5", borderRadius: 11, borderWidth: 1, borderColor: "#E5D2B9", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
+  searchInput: { flex: 1, color: "#9A6201", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
 
   walletCard: { marginHorizontal: 14, marginTop: 6, marginBottom: 8, backgroundColor: "#111111", borderRadius: 12, padding: 14 },
   walletEyebrow: { color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },

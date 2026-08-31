@@ -24,7 +24,7 @@ function buildThemed(scheme: ColorScheme): ThemedColors {
     tabIconDefault: base.muted,
     tabIconSelected: base.primary,
     border: base.border,
-    input: scheme === "light" ? "#EEEDF3" : "#231A10",
+    input: scheme === "light" ? "#F7EFE5" : "#3A2B1A",
     pressed: scheme === "light" ? "#E3DFEA" : "#2A2018",
     overlay: scheme === "light" ? "rgba(0,0,0,0.42)" : "rgba(0,0,0,0.62)",
     divider: scheme === "light" ? "#ECECEC" : "#33271B",

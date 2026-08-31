@@ -154,7 +154,7 @@ export function FavoritePlacesSheet({
           <Text style={styles.subtitle}>Retrouvez, renommez ou choisissez un lieu pour votre course.</Text>
           <View style={styles.searchBox}>
             <MaterialIcons name="search" size={19} color="#697386" />
-            <TextInput value={query} onChangeText={(value) => setQuery(value.replace(/[^\p{L}\p{N} .,'’()\-]/gu, "").replace(/\s{2,}/g, " "))} placeholder="Rechercher un favori" placeholderTextColor="#9AA5B6" style={styles.searchInput} maxLength={80} />
+            <TextInput value={query} onChangeText={(value) => setQuery(value.replace(/[^\p{L}\p{N} .,'’()\-]/gu, "").replace(/\s{2,}/g, " "))} placeholder="Rechercher un favori" placeholderTextColor="#B48753" style={styles.searchInput} maxLength={80} />
             {query ? <Pressable accessibilityRole="button" accessibilityLabel="Effacer la recherche" onPress={() => setQuery("")} style={({ pressed }) => [styles.clearSearch, pressed && styles.pressed]}><MaterialIcons name="close" size={16} color="#697386" /></Pressable> : null}
           </View>
           {actionError ? <Text style={styles.actionError}>{actionError}</Text> : null}
@@ -175,7 +175,7 @@ export function FavoritePlacesSheet({
                   <TikisButton label="Destination" icon="location-on" onPress={() => { onDropoff(favorite.location); onClose(); }} style={styles.favoriteAction} />
                 </View>
                 <View style={styles.manageActions}>
-                  <Pressable accessibilityRole="button" onPress={() => { setActionError(""); setDraftLabel(favorite.label); setEditing(favorite); }} style={({ pressed }) => [styles.manageButton, pressed && styles.pressed]}><MaterialIcons name="edit" size={16} color="#007B8B" /><Text style={styles.manageText}>Renommer</Text></Pressable>
+                  <Pressable accessibilityRole="button" onPress={() => { setActionError(""); setDraftLabel(favorite.label); setEditing(favorite); }} style={({ pressed }) => [styles.manageButton, pressed && styles.pressed]}><MaterialIcons name="edit" size={16} color="#9A6201" /><Text style={styles.manageText}>Renommer</Text></Pressable>
                   <Pressable accessibilityRole="button" onPress={() => { setActionError(""); setRemoving(favorite); }} style={({ pressed }) => [styles.manageButton, styles.manageDelete, pressed && styles.pressed]}><MaterialIcons name="delete-outline" size={16} color="#B4232D" /><Text style={[styles.manageText, styles.deleteText]}>Supprimer</Text></Pressable>
                 </View>
               </View>
@@ -228,9 +228,9 @@ const styles = StyleSheet.create({
   confirmationFact: { color: "#167A55", fontSize: 10, fontWeight: "600", backgroundColor: "#EEEDF3", borderRadius: 6, overflow: "hidden", paddingHorizontal: 7, paddingVertical: 3 },
   confirmationActions: { flexDirection: "row", gap: 8, marginTop: 14 },
   confirmationAction: { flex: 1, minHeight: 42 },
-  searchBox: { height: 44, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, backgroundColor: "#FFFFFF", borderRadius: 9, marginBottom: 12 },
-  searchInput: { flex: 1, color: "#111111", fontSize: 14, fontWeight: "500", height: "100%" },
-  clearSearch: { width: 24, height: 24, borderRadius: 6, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
+  searchBox: { height: 44, flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, backgroundColor: "#F7EFE5", borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", marginBottom: 12 },
+  searchInput: { flex: 1, color: "#9A6201", fontSize: 14, fontWeight: "500", height: "100%" },
+  clearSearch: { width: 24, height: 24, borderRadius: 6, alignItems: "center", justifyContent: "center", backgroundColor: "#F7EFE5" },
   actionError: { color: "#B4232D", fontSize: 12, fontWeight: "600", lineHeight: 18, marginBottom: 8 },
   favoriteCard: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 12, marginBottom: 10 },
   favoriteTop: { flexDirection: "row", alignItems: "center", gap: 9 },
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   manageActions: { flexDirection: "row", gap: 7, marginTop: 8 },
   manageButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, flex: 1, minHeight: 34, backgroundColor: "#EEEDF3", borderRadius: 8 },
   manageDelete: { backgroundColor: "#FFF3F3" },
-  manageText: { color: "#007B8B", fontSize: 11, fontWeight: "600" },
+  manageText: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
   deleteText: { color: "#B4232D" },
   empty: { alignItems: "center", paddingVertical: 38, paddingHorizontal: 24, backgroundColor: "#FFFFFF", borderRadius: 10 },
   emptyTitle: { color: "#111111", fontSize: 15, fontWeight: "600", marginTop: 10 },
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   dialog: { width: "100%", maxWidth: 400, backgroundColor: "#FFFFFF", borderRadius: 14, padding: 18 },
   dialogTitle: { color: "#111111", fontSize: 17, fontWeight: "600", textAlign: "center" },
   dialogText: { color: "#666666", fontSize: 13, lineHeight: 19, textAlign: "center", marginTop: 6 },
-  renameInput: { minHeight: 44, borderRadius: 9, borderWidth: 0, backgroundColor: "#EEEDF3", color: "#111111", fontSize: 14, fontWeight: "500", paddingHorizontal: 12, marginTop: 14 },
+  renameInput: { minHeight: 44, borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", backgroundColor: "#F7EFE5", color: "#9A6201", fontSize: 14, fontWeight: "500", paddingHorizontal: 12, marginTop: 14 },
   dialogActions: { flexDirection: "row", gap: 8, marginTop: 16 },
   dialogAction: { flex: 1, minHeight: 42 },
   dangerIcon: { width: 44, height: 44, borderRadius: 10, alignItems: "center", justifyContent: "center", alignSelf: "center", backgroundColor: "#FFF3F3", marginBottom: 10 },

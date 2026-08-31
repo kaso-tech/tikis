@@ -222,7 +222,7 @@ export default function ProfileScreen() {
               maxLength={70}
               autoCapitalize="words"
               placeholder="Ex. Mariam ou Mariam Ouédraogo"
-              placeholderTextColor="#A1ADBC"
+              placeholderTextColor="#B48753"
               style={[styles.input, error ? styles.inputError : null]}
             />
             {error ? <Text style={styles.error}>{error}</Text> : <Text style={styles.helper}>Un nom unique est accepté. Les séparateurs successifs sont retirés automatiquement.</Text>}
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   photoPickerText: { color: "#9A6201", fontSize: 12, fontWeight: "600", flex: 1 },
 
   fieldLabel: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
-  input: { backgroundColor: "#EEEDF3", borderRadius: 9, paddingHorizontal: 12, paddingVertical: 12, color: "#111111", fontSize: 13, fontWeight: "500" },
+  input: { backgroundColor: "#F7EFE5", borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 12, paddingVertical: 12, color: "#9A6201", fontSize: 13, fontWeight: "500" },
   inputError: { borderWidth: 1, borderColor: "#B4232D" },
   helper: { color: "#747474", fontSize: 10, marginTop: 4 },
   error: { color: "#B4232D", fontSize: 11, fontWeight: "600", marginTop: 4 },

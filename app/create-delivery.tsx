@@ -325,7 +325,7 @@ export default function CreateDeliveryScreen() {
                 <Text style={styles.priceCardValue}>{estimate ? `${estimate.toLocaleString("fr-FR")} F` : "—"}</Text>
               </View>
               <View style={styles.priceCardInput}>
-                <TextInput value={offeredPriceInput} onBlur={() => setTouched((current) => ({ ...current, price: true }))} onChangeText={(value) => setOfferedPriceInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} placeholder={estimate ? `${estimate.toLocaleString("fr-FR")} F CFA` : "Ex. 4 500"} placeholderTextColor="rgba(255,255,255,0.5)" style={styles.priceCardInputText} />
+                <TextInput value={offeredPriceInput} onBlur={() => setTouched((current) => ({ ...current, price: true }))} onChangeText={(value) => setOfferedPriceInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} placeholder={estimate ? `${estimate.toLocaleString("fr-FR")} F CFA` : "Ex. 4 500"} placeholderTextColor="#B48753" style={styles.priceCardInputText} />
                 <Text style={styles.priceCardInputSuffix}>F CFA</Text>
               </View>
               {priceInputError ? (
@@ -372,7 +372,7 @@ function RouteInput({ tone, label, value, invalid, onPress }: { tone: "pickup" |
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.routeInput, isPickup ? styles.routeInputFrom : styles.routeInputTo, invalid && styles.routeInputInvalid, pressed && styles.pressed]}>
       <View style={[styles.routeInputIcon, isPickup ? styles.routeInputIconFrom : styles.routeInputIconTo]}>
-        <MaterialIcons name={isPickup ? "trip-origin" : "location-on"} size={14} color={isPickup ? "#007B8B" : "#B4232D"} />
+        <MaterialIcons name={isPickup ? "trip-origin" : "location-on"} size={14} color={isPickup ? "#9A6201" : "#B4232D"} />
       </View>
       <View style={styles.routeInputContent}>
         <Text style={[styles.routeInputLabel, invalid && styles.routeInputLabelInvalid]}>{label}</Text>
@@ -392,11 +392,11 @@ function RouteInput({ tone, label, value, invalid, onPress }: { tone: "pickup" |
 }
 
 function Field({ label, icon, keyboardType, error, ...props }: { label: string; icon?: React.ComponentProps<typeof MaterialIcons>["name"]; keyboardType?: "default" | "number-pad" | "decimal-pad"; value: string; onChangeText: (value: string) => void; onBlur?: () => void; placeholder: string; multiline?: boolean; error?: string }) {
-  return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#B4232D" : "#007B8B"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor="#9AA5B6" /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>;
+  return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#B4232D" : "#9A6201"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor="#B48753" /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>;
 }
 
 function MiniNumber({ value, onChangeText, placeholder }: { value: string; onChangeText: (value: string) => void; placeholder: string }) {
-  return <TextInput value={value} onChangeText={(text) => onChangeText(text.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" placeholder={placeholder} placeholderTextColor="#9AA5B6" style={styles.miniInput} />;
+  return <TextInput value={value} onChangeText={(text) => onChangeText(text.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" placeholder={placeholder} placeholderTextColor="#B48753" style={styles.miniInput} />;
 }
 
 const styles = StyleSheet.create({
@@ -420,19 +420,19 @@ const styles = StyleSheet.create({
   section: { gap: 4 },
 
   routeCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, gap: 4 },
-  routeInput: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, backgroundColor: "#EEEDF3", borderRadius: 9, borderLeftWidth: 3 },
+  routeInput: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, backgroundColor: "#F7EFE5", borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", borderLeftWidth: 3 },
   routeInputFrom: { borderLeftColor: "#9A6201" },
   routeInputTo: { borderLeftColor: "#B4232D" },
   routeInputInvalid: { borderColor: "#B4232D", borderWidth: 1 },
   routeInputIcon: { width: 24, height: 24, borderRadius: 12, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
-  routeInputIconFrom: { backgroundColor: "#F8F0E5" },
+  routeInputIconFrom: { backgroundColor: "#F7EFE5" },
   routeInputIconTo: { backgroundColor: "#FDEBEC" },
   routeInputContent: { flex: 1, minWidth: 0 },
   routeInputLabel: { color: "#747474", fontSize: 9, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase" },
   routeInputLabelInvalid: { color: "#B4232D" },
-  routeInputValue: { color: "#111111", fontSize: 13, fontWeight: "600", marginTop: 1 },
+  routeInputValue: { color: "#9A6201", fontSize: 13, fontWeight: "600", marginTop: 1 },
   routeInputMeta: { color: "#666666", fontSize: 10, marginTop: 1 },
-  routeInputPlaceholder: { color: "#747474", fontSize: 12, fontWeight: "500", marginTop: 4 },
+  routeInputPlaceholder: { color: "#9A6201", fontSize: 12, fontWeight: "500", marginTop: 4 },
   routeInputIssue: { color: "#B4232D", fontSize: 10, fontWeight: "600", marginTop: 2 },
 
   routeConnector: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 18, paddingVertical: 4 },
@@ -472,11 +472,11 @@ const styles = StyleSheet.create({
   fieldWrap: { gap: 5 },
   fieldLabel: { color: "#111111", fontSize: 12, fontWeight: "600" },
   fieldLabelInvalid: { color: "#B4232D" },
-  field: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10, gap: 8, borderWidth: 1, borderColor: "#ECECEC" },
+  field: { flexDirection: "row", alignItems: "center", backgroundColor: "#F7EFE5", borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10, gap: 8, borderWidth: 1, borderColor: "#E5D2B9" },
   fieldMultiline: { alignItems: "flex-start", paddingVertical: 12, minHeight: 80 },
   fieldInvalid: { borderColor: "#B4232D" },
   fieldIcon: { marginRight: 2 },
-  input: { flex: 1, color: "#111111", fontSize: 13, fontWeight: "500" },
+  input: { flex: 1, color: "#9A6201", fontSize: 13, fontWeight: "500" },
   inputMultiline: { minHeight: 60, textAlignVertical: "top" },
   fieldIssue: { color: "#B4232D", fontSize: 11, fontWeight: "500" },
 
@@ -484,15 +484,15 @@ const styles = StyleSheet.create({
   measureTitle: { color: "#111111", fontSize: 12, fontWeight: "600" },
   measureSubtitle: { color: "#666666", fontSize: 11, lineHeight: 16 },
   dimensionRow: { flexDirection: "row", gap: 6 },
-  miniInput: { flex: 1, backgroundColor: "#EEEDF3", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 10, color: "#111111", fontSize: 12, fontWeight: "600", textAlign: "center" },
+  miniInput: { flex: 1, backgroundColor: "#F7EFE5", borderRadius: 8, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 10, paddingVertical: 10, color: "#9A6201", fontSize: 12, fontWeight: "600", textAlign: "center" },
 
   priceCard: { backgroundColor: "#9A6201", borderRadius: 12, padding: 14, gap: 10 },
   priceCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   priceCardLabel: { color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   priceCardValue: { color: "#FFFFFF", fontSize: 20, fontWeight: "700" },
-  priceCardInput: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.18)", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12, gap: 8 },
-  priceCardInputText: { flex: 1, color: "#FFFFFF", fontSize: 15, fontWeight: "600" },
-  priceCardInputSuffix: { color: "rgba(255,255,255,0.7)", fontSize: 12, fontWeight: "600" },
+  priceCardInput: { flexDirection: "row", alignItems: "center", backgroundColor: "#F7EFE5", borderRadius: 8, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 12, paddingVertical: 12, gap: 8 },
+  priceCardInputText: { flex: 1, color: "#9A6201", fontSize: 15, fontWeight: "600" },
+  priceCardInputSuffix: { color: "#9A6201", fontSize: 12, fontWeight: "600" },
   priceCardHelper: { flexDirection: "row", alignItems: "center", gap: 4 },
   priceCardNote: { color: "rgba(255,255,255,0.7)", fontSize: 11, lineHeight: 16, flex: 1 },
   priceError: { color: "#FFFFFF", fontSize: 11, fontWeight: "600", backgroundColor: "rgba(180,35,45,0.4)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },

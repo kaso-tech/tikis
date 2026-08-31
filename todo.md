@@ -413,3 +413,6 @@
 - [x] Valider la création d’adresse, la compilation, les tests et les services après la refonte.
 - [x] Remplacer le fond `#9A6201` par `#F7EFE5` et le texte blanc par `#9A6201` sur les boutons hors authentification.
 - [x] Préserver la palette actuelle des boutons d’authentification et valider la compilation, les tests et les services après la modification.
+- [x] Harmoniser les champs de saisie avec le fond `#F7EFE5`, le texte `#9A6201` et des états focus/erreur accessibles.
+- [x] Harmoniser les menus déroulants et sélecteurs avec la même palette sans modifier l’authentification.
+- [x] Valider le clavier, la compilation, les tests et les services après la refonte des contrôles.
