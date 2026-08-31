@@ -134,6 +134,15 @@ export interface DriverCandidate {
   status: CandidateStatus;
   commissionBlocked: number;
   isVerified: boolean;
+  isCertified: boolean;
+  createdAt: string;
+}
+
+export const CERTIFICATION_MIN_DELIVERIES = 100;
+export const CERTIFICATION_MIN_RATING = 4.5;
+
+export function isDriverCertified(rating: number, completedDeliveries: number): boolean {
+  return completedDeliveries >= CERTIFICATION_MIN_DELIVERIES && rating >= CERTIFICATION_MIN_RATING;
 }
 
 export interface WalletSnapshot {

@@ -212,6 +212,17 @@ export function HomeScreen() {
   };
 
   function requestApply(delivery: Delivery) {
+    if (!profile?.photoUrl) {
+      Alert.alert(
+        "Profil à vérifier",
+        "Pour candidater à des livraisons, vous devez d’abord faire vérifier votre profil. Ouvrez votre profil, ajoutez une photo et soumettez vos documents d’identité.",
+        [
+          { text: "Plus tard", style: "cancel" },
+          { text: "Vérifier mon profil", onPress: () => router.push("/(tabs)/profile" as any) },
+        ],
+      );
+      return;
+    }
     const commission = applicationCommission(delivery);
     if (!driverWallet || commission === null) {
       Alert.alert("Wallet indisponible", "Votre solde doit être chargé avant de pouvoir candidater. Réessayez dans un instant.");

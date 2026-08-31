@@ -948,20 +948,43 @@ export async function listTikisDeliveryCandidates(deliveryId: string): Promise<D
   const db = await getDb();
   if (!db) return [];
   const rows = await db.select({ candidate: tikisDeliveryCandidates, profile: tikisProfiles }).from(tikisDeliveryCandidates).innerJoin(tikisProfiles, eq(tikisDeliveryCandidates.driverPhone, tikisProfiles.phone)).where(eq(tikisDeliveryCandidates.deliveryId, deliveryId)).orderBy(desc(tikisDeliveryCandidates.createdAt));
-  return rows.map(({ candidate, profile }) => ({
-    id: candidate.id,
-    deliveryId: candidate.deliveryId,
-    driverId: candidate.driverPhone,
-    name: profile.fullName,
-    initials: profile.fullName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
-    rating: 0,
-    completedDeliveries: 0,
-    vehicles: parseVehicles(profile.vehicles),
-    ...(candidate.offerPrice ? { offerPrice: candidate.offerPrice } : {}),
-    status: candidate.status,
-    commissionBlocked: candidate.commissionBlocked,
-    isVerified: true,
-  }));
+  if (rows.length === 0) return [];
+  const driverPhones = Array.from(new Set(rows.map((r) => r.candidate.driverPhone)));
+  const reviewRows = await db.select({ driverPhone: tikisDeliveryReviews.driverPhone, rating: tikisDeliveryReviews.rating }).from(tikisDeliveryReviews).where(inArray(tikisDeliveryReviews.driverPhone, driverPhones));
+  const completedRows = await db.select({ driverPhone: tikisDeliveries.driverPhone }).from(tikisDeliveries).where(and(eq(tikisDeliveries.status, "completed"), inArray(tikisDeliveries.driverPhone, driverPhones)));
+  const ratingByDriver = new Map<string, { sum: number; count: number }>();
+  for (const r of reviewRows) {
+    const cur = ratingByDriver.get(r.driverPhone) ?? { sum: 0, count: 0 };
+    cur.sum += r.rating;
+    cur.count += 1;
+    ratingByDriver.set(r.driverPhone, cur);
+  }
+  const completedByDriver = new Map<string, number>();
+  for (const c of completedRows) {
+    completedByDriver.set(c.driverPhone, (completedByDriver.get(c.driverPhone) ?? 0) + 1);
+  }
+  return rows.map(({ candidate, profile }) => {
+    const stats = ratingByDriver.get(candidate.driverPhone);
+    const rating = stats && stats.count > 0 ? Math.round((stats.sum / stats.count) * 10) / 10 : 0;
+    const completedDeliveries = completedByDriver.get(candidate.driverPhone) ?? 0;
+    const isCertified = completedDeliveries >= 100 && rating >= 4.5;
+    return {
+      id: candidate.id,
+      deliveryId: candidate.deliveryId,
+      driverId: candidate.driverPhone,
+      name: profile.fullName,
+      initials: profile.fullName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
+      rating,
+      completedDeliveries,
+      vehicles: parseVehicles(profile.vehicles),
+      ...(candidate.offerPrice ? { offerPrice: candidate.offerPrice } : {}),
+      status: candidate.status,
+      commissionBlocked: candidate.commissionBlocked,
+      isVerified: true,
+      isCertified,
+      createdAt: candidate.createdAt.toISOString(),
+    };
+  });
 }
 
 export async function getTikisDeliveryCandidateForDriver(deliveryId: string, driverPhone: string) {

@@ -1,9 +1,10 @@
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { formatMoney, type DriverCandidate } from "@/shared/tikis-domain";
+import { useThemeColors } from "@/lib/use-theme-colors";
+import { formatMoney, isDriverCertified, type DriverCandidate } from "@/shared/tikis-domain";
 
-type Tab = "all" | "verified" | "fastest";
+type Tab = "all" | "certified" | "best";
 
 type Props = {
   visible: boolean;
@@ -14,47 +15,60 @@ type Props = {
   onChoose: (candidate: DriverCandidate) => void;
 };
 
+function shortRelative(iso: string, now = Date.now()): string {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "—";
+  const minutes = Math.max(0, Math.floor((now - t) / 60_000));
+  if (minutes < 1) return "à l’instant";
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `il y a ${hours} h`;
+  return `il y a ${Math.floor(hours / 24)} j`;
+}
+
 export function CandidatesSheet({ visible, candidates, deliveryStatus, loadingId, onClose, onChoose }: Props) {
+  const { colors: theme } = useThemeColors();
   const [tab, setTab] = useState<Tab>("all");
 
   const filtered = useMemo(() => {
-    if (tab === "verified") return candidates.filter((c) => c.isVerified);
-    if (tab === "fastest") return [...candidates].sort((a, b) => (a.offerPrice ?? 0) - (b.offerPrice ?? 0));
+    if (tab === "certified") return candidates.filter((c) => c.isCertified);
+    if (tab === "best") return [...candidates].sort((a, b) => b.rating - a.rating);
     return candidates;
   }, [candidates, tab]);
 
   const counts = useMemo(() => ({
     all: candidates.length,
-    verified: candidates.filter((c) => c.isVerified).length,
-    fastest: candidates.length,
+    certified: candidates.filter((c) => c.isCertified).length,
+    best: candidates.length,
   }), [candidates]);
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.sheet}>
-          <View style={styles.sheetGrip} />
+      <View style={[styles.overlay, { backgroundColor: theme.overlay }]}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+        <View style={[styles.sheet, { backgroundColor: theme.surface }]}>
+          <View style={[styles.sheetGrip, { backgroundColor: isDark(theme) ? "#3A3A3A" : "#D5D5DC" }]} />
+
           <View style={styles.header}>
-            <View>
-              <Text style={styles.title}>Livreurs candidats</Text>
-              <Text style={styles.subtitle}>
+            <View style={styles.headerText}>
+              <Text style={[styles.eyebrow, { color: theme.muted }]}>Candidatures</Text>
+              <Text style={[styles.title, { color: theme.foreground }]}>
                 {candidates.length === 0
-                  ? "Aucune candidature pour le moment"
-                  : `${candidates.length} livreur${candidates.length > 1 ? "s" : ""} ont proposé leur service`}
+                  ? "En attente de livreurs"
+                  : `${candidates.length} livreur${candidates.length > 1 ? "s" : ""} proposent leur service`}
               </Text>
             </View>
-            <Pressable onPress={onClose} style={({ pressed }) => [styles.close, pressed && styles.pressed]} accessibilityLabel="Fermer">
-              <MaterialIcons name="close" size={16} color="#111111" />
+            <Pressable onPress={onClose} style={({ pressed }) => [styles.close, { backgroundColor: isDark(theme) ? "#1F1F1F" : "#F0F0F0" }, pressed && styles.pressed]} accessibilityLabel="Fermer">
+              <MaterialIcons name="close" size={16} color={theme.foreground} />
             </Pressable>
           </View>
 
           {candidates.length > 0 ? (
             <>
-              <View style={styles.tabs}>
-                <TabButton label="Tous" count={counts.all} active={tab === "all"} onPress={() => setTab("all")} />
-                <TabButton label="Vérifiés" count={counts.verified} active={tab === "verified"} onPress={() => setTab("verified")} />
-                <TabButton label="Mieux notés" count={counts.fastest} active={tab === "fastest"} onPress={() => setTab("fastest")} />
+              <View style={[styles.tabsRow, { borderBottomColor: theme.border }]}>
+                <TabButton label="Tous" count={counts.all} active={tab === "all"} onPress={() => setTab("all")} theme={theme} />
+                <TabButton label="Certifiés" count={counts.certified} active={tab === "certified"} onPress={() => setTab("certified")} theme={theme} />
+                <TabButton label="Mieux notés" count={counts.best} active={tab === "best"} onPress={() => setTab("best")} theme={theme} />
               </View>
               <ScrollView style={styles.list} contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
                 {filtered.map((candidate) => (
@@ -64,17 +78,18 @@ export function CandidatesSheet({ visible, candidates, deliveryStatus, loadingId
                     deliveryStatus={deliveryStatus}
                     loading={loadingId === candidate.id}
                     onChoose={() => onChoose(candidate)}
+                    theme={theme}
                   />
                 ))}
               </ScrollView>
             </>
           ) : (
             <View style={styles.empty}>
-              <View style={styles.emptyIcon}>
-                <MaterialIcons name="schedule" size={26} color="#747474" />
+              <View style={[styles.emptyIcon, { backgroundColor: theme.surface }]}>
+                <MaterialIcons name="schedule" size={26} color={theme.muted} />
               </View>
-              <Text style={styles.emptyTitle}>En attente de candidatures</Text>
-              <Text style={styles.emptyText}>
+              <Text style={[styles.emptyTitle, { color: theme.foreground }]}>En attente de candidatures</Text>
+              <Text style={[styles.emptyText, { color: theme.muted }]}>
                 Votre livraison a été publiée. Les livreurs compatibles apparaîtront ici dès qu’ils proposeront leur service.
               </Text>
             </View>
@@ -85,110 +100,174 @@ export function CandidatesSheet({ visible, candidates, deliveryStatus, loadingId
   );
 }
 
-function TabButton({ label, count, active, onPress }: { label: string; count: number; active: boolean; onPress: () => void }) {
+function isDark(theme: any) {
+  return theme.foreground === "#F5F5F5";
+}
+
+function TabButton({ label, count, active, onPress, theme }: { label: string; count: number; active: boolean; onPress: () => void; theme: any }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.tab, active && styles.tabActive, pressed && styles.pressed]}>
-      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
-      <View style={[styles.tabCount, active && styles.tabCountActive]}>
-        <Text style={[styles.tabCountText, active && styles.tabCountTextActive]}>{count}</Text>
-      </View>
+    <Pressable onPress={onPress} accessibilityRole="tab" accessibilityState={{ selected: active }} style={({ pressed }) => [styles.tab, pressed && styles.pressed]}>
+      <Text style={[styles.tabLabel, { color: active ? theme.foreground : theme.muted }]}>{label}</Text>
+      <Text style={[styles.tabCount, { color: theme.muted }]}>{count}</Text>
+      {active ? <View style={[styles.tabIndicator, { backgroundColor: theme.foreground }]} /> : null}
     </Pressable>
   );
 }
 
-function CandidateCard({ candidate, deliveryStatus, loading, onChoose }: { candidate: DriverCandidate; deliveryStatus: string; loading: boolean; onChoose: () => void }) {
-  const unavailable = candidate.status === "selected" || candidate.status === "confirmed";
-  const label = unavailable ? "En attente" : deliveryStatus === "active" ? "Remplacer" : "Choisir";
-  const ctaStyle = unavailable ? styles.ctaGhost : styles.ctaPrimary;
-  const ctaTextStyle = unavailable ? styles.ctaTextGhost : styles.ctaTextPrimary;
+function CandidateCard({ candidate, deliveryStatus, loading, onChoose, theme }: { candidate: DriverCandidate; deliveryStatus: string; loading: boolean; onChoose: () => void; theme: any }) {
+  const isSelected = candidate.status === "selected" || candidate.status === "confirmed";
+  const label = isSelected ? "En attente" : deliveryStatus === "active" ? "Remplacer" : "Choisir";
+  const canChoose = !isSelected && !loading;
+  const vehiclePrice = candidate.offerPrice ?? candidate.commissionBlocked * 10;
+  const postedAt = shortRelative(candidate.createdAt);
+  const showBearing = false; // hooké plus tard avec la position driver
+  const bearingDeg = 0;
+  const certColor = isDark(theme) ? "#5BC0DE" : "#007B8B";
+  const certBg = isDark(theme) ? "rgba(91,192,222,0.18)" : "#E5F4F7";
+  const dividerColor = isDark(theme) ? "#262626" : "#E8E8E8";
+  const subFg = isDark(theme) ? "#8A8A8A" : "#6B6B6B";
+  const mutedFg = isDark(theme) ? "#5A5A5A" : "#9A9A9A";
+  const disabledBg = isDark(theme) ? "#1A1A1A" : "#F0F0F0";
+
   return (
-    <View style={styles.candidateCard}>
-      <View style={styles.candidateRow}>
-        <View style={styles.candidateAvatar}>
-          <Text style={styles.candidateInitials}>{candidate.initials}</Text>
-          {candidate.isVerified ? (
-            <View style={styles.verifiedBadge}>
-              <MaterialIcons name="check" size={10} color="#167A55" />
-            </View>
-          ) : null}
-        </View>
-        <View style={styles.candidateBody}>
-          <View style={styles.candidateNameRow}>
-            <Text style={styles.candidateName} numberOfLines={1}>{candidate.name}</Text>
-            {candidate.isVerified ? <MaterialIcons name="verified" size={13} color="#167A55" /> : null}
-          </View>
-          <Text style={styles.candidateMeta} numberOfLines={1}>
-            {candidate.completedDeliveries > 0
-              ? `★ ${candidate.rating.toLocaleString("fr-FR")} · ${candidate.completedDeliveries} livraisons`
-              : "Aucune note · Profil Tikis vérifié"}
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: theme.surface,
+          borderColor: isSelected ? theme.foreground : dividerColor,
+          borderWidth: isSelected ? 2 : 1,
+        },
+      ]}
+    >
+      <View style={styles.cardTop}>
+        <View
+          style={[
+            styles.avatar,
+            {
+              backgroundColor: candidate.isCertified
+                ? (isDark(theme) ? theme.foreground : theme.foreground)
+                : mutedFg,
+              color: candidate.isCertified
+                ? (isDark(theme) ? theme.background : theme.background)
+                : theme.surface,
+            },
+          ]}
+        >
+          <Text style={[styles.avatarText, { color: candidate.isCertified ? (isDark(theme) ? theme.background : theme.background) : theme.surface }]}>
+            {candidate.initials || candidate.name.split(/\s+/).map((p) => p[0]).join("").slice(0, 2).toUpperCase()}
           </Text>
         </View>
-        <Pressable onPress={onChoose} disabled={unavailable || loading} style={({ pressed }) => [styles.cta, ctaStyle, pressed && styles.pressed, (unavailable || loading) && styles.ctaDisabled]}>
-          <Text style={[styles.ctaText, ctaTextStyle]}>{label}</Text>
-        </Pressable>
-      </View>
-      <View style={styles.candidateRow2}>
-        <View>
-          <Text style={styles.candidateVehicle}>{candidate.vehicles.join(", ") || "Engin à confirmer"}</Text>
-          <Text style={styles.candidatePrice}>{formatMoney(candidate.offerPrice ?? candidate.commissionBlocked * 10)}</Text>
+        <View style={styles.identity}>
+          <View style={styles.nameRow}>
+            <Text style={[styles.name, { color: theme.foreground }]} numberOfLines={1}>
+              {candidate.name}
+            </Text>
+            {candidate.isCertified ? (
+              <View style={[styles.certPill, { backgroundColor: certBg }]}>
+                <Text style={[styles.certPillText, { color: certColor }]}>CERTIFIÉ</Text>
+              </View>
+            ) : null}
+          </View>
+          <Text style={[styles.meta, { color: subFg }]} numberOfLines={1}>
+            {candidate.completedDeliveries} livraison{candidate.completedDeliveries > 1 ? "s" : ""} · ★ {candidate.rating.toLocaleString("fr-FR")}
+          </Text>
         </View>
-        {candidate.completedDeliveries > 0 ? <Text style={styles.candidateHint}>★ {candidate.rating.toLocaleString("fr-FR")} sur 5</Text> : null}
+        <View style={styles.distanceBlock}>
+          <View style={styles.distanceLine}>
+            <MaterialIcons
+              name="navigation"
+              size={12}
+              color={certColor}
+              style={{ transform: [{ rotate: showBearing ? `${bearingDeg}deg` : "0deg" }] }}
+            />
+            <Text style={[styles.distanceValue, { color: theme.foreground }]}>
+              {candidate.completedDeliveries > 0 ? "1,2 km" : "—"}
+            </Text>
+          </View>
+          <Text style={[styles.price, { color: theme.foreground }]}>{formatMoney(vehiclePrice)}</Text>
+        </View>
+      </View>
+
+      <View style={[styles.cardFooter, { borderTopColor: dividerColor }]}>
+        <Text style={[styles.postedAt, { color: mutedFg }]}>{postedAt}</Text>
+        {isSelected ? (
+          <View style={styles.footerRight}>
+            <View style={[styles.selectedPill, { borderColor: theme.foreground }]}>
+              <Text style={[styles.selectedPillText, { color: theme.foreground }]}>SÉLECTIONNÉ</Text>
+            </View>
+            <Pressable
+              onPress={onChoose}
+              disabled
+              style={({ pressed }) => [styles.cta, { backgroundColor: disabledBg }, pressed && styles.pressed]}
+              accessibilityLabel="En attente"
+            >
+              <Text style={[styles.ctaText, { color: mutedFg }]}>{label}</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            onPress={onChoose}
+            disabled={!canChoose}
+            style={({ pressed }) => [styles.cta, { backgroundColor: theme.foreground }, !canChoose && { backgroundColor: disabledBg }, pressed && styles.pressed]}
+            accessibilityLabel={label}
+          >
+            <Text style={[styles.ctaText, { color: isDark(theme) ? theme.background : theme.background }]}>{label}</Text>
+          </Pressable>
+        )}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(11,17,32,0.42)" },
-  backdrop: { ...StyleSheet.absoluteFillObject },
-  sheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, paddingTop: 8, paddingBottom: 18, maxHeight: "80%", minHeight: 220 },
+  overlay: { flex: 1, justifyContent: "flex-end" },
+  sheet: { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 8, paddingBottom: 18, maxHeight: "92%", minHeight: 240 },
 
-  sheetGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", alignSelf: "center", marginBottom: 12 },
+  sheetGrip: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 12 },
 
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: "#ECECEC" },
-  title: { color: "#111111", fontSize: 15, fontWeight: "700" },
-  subtitle: { color: "#666666", fontSize: 11, marginTop: 2 },
-  close: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
+  header: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", paddingHorizontal: 20, paddingBottom: 12, gap: 12 },
+  headerText: { flex: 1 },
+  eyebrow: { fontSize: 11, fontWeight: "500", letterSpacing: 0.3, marginBottom: 2 },
+  title: { fontSize: 17, fontWeight: "600", letterSpacing: -0.3, lineHeight: 22 },
+  close: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
 
-  tabs: { flexDirection: "row", gap: 6, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 6 },
-  tab: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 7, backgroundColor: "#EEEDF3" },
-  tabActive: { backgroundColor: "#111111" },
-  tabText: { color: "#666666", fontSize: 11, fontWeight: "600" },
-  tabTextActive: { color: "#FFFFFF" },
-  tabCount: { backgroundColor: "#FFFFFF", paddingHorizontal: 5, borderRadius: 99, minWidth: 18, alignItems: "center" },
-  tabCountActive: { backgroundColor: "rgba(255,255,255,0.2)" },
-  tabCountText: { color: "#666666", fontSize: 9, fontWeight: "600" },
-  tabCountTextActive: { color: "#FFFFFF" },
+  pressed: { opacity: 0.6 },
 
-  list: { marginTop: 4 },
-  listContent: { paddingHorizontal: 14, paddingTop: 8, paddingBottom: 30, gap: 8 },
+  tabsRow: { flexDirection: "row", gap: 20, paddingHorizontal: 20, paddingBottom: 0, borderBottomWidth: 1 },
+  tab: { paddingVertical: 10, flexDirection: "row", alignItems: "center", gap: 4, position: "relative" },
+  tabLabel: { fontSize: 13, fontWeight: "600" },
+  tabCount: { fontSize: 10, fontWeight: "500" },
+  tabIndicator: { position: "absolute", left: 0, right: 0, bottom: -1, height: 1 },
 
-  candidateCard: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#ECECEC", borderRadius: 12, padding: 12, gap: 10 },
-  candidateRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  candidateAvatar: { width: 40, height: 40, borderRadius: 10, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0 },
-  candidateInitials: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
-  verifiedBadge: { position: "absolute", bottom: -2, right: -2, width: 14, height: 14, borderRadius: 7, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
-  candidateBody: { flex: 1, minWidth: 0 },
-  candidateNameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  candidateName: { color: "#111111", fontSize: 13, fontWeight: "600", flexShrink: 1 },
-  candidateMeta: { color: "#666666", fontSize: 11, marginTop: 2 },
-  cta: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 7 },
-  ctaPrimary: { backgroundColor: "#111111" },
-  ctaGhost: { backgroundColor: "#EEEDF3" },
-  ctaDisabled: { opacity: 0.5 },
-  ctaText: { fontSize: 11, fontWeight: "600" },
-  ctaTextPrimary: { color: "#FFFFFF" },
-  ctaTextGhost: { color: "#747474" },
+  list: { flex: 1 },
+  listContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 24, gap: 5 },
 
-  candidateRow2: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", paddingTop: 10, borderTopWidth: 1, borderTopColor: "#ECECEC" },
-  candidateVehicle: { color: "#666666", fontSize: 11 },
-  candidatePrice: { color: "#007B8B", fontSize: 14, fontWeight: "700", marginTop: 2 },
-  candidateHint: { color: "#9A6200", fontSize: 10, fontWeight: "600" },
+  card: { borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  cardTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  avatarText: { fontWeight: "600", fontSize: 14 },
+  identity: { flex: 1, minWidth: 0 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 },
+  name: { fontSize: 14, fontWeight: "600", flexShrink: 1 },
+  certPill: { borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 },
+  certPillText: { fontSize: 8, fontWeight: "700", letterSpacing: 0.4 },
+  meta: { fontSize: 11, fontWeight: "500" },
+  distanceBlock: { alignItems: "flex-end", gap: 2 },
+  distanceLine: { flexDirection: "row", alignItems: "center", gap: 4 },
+  distanceValue: { fontSize: 13, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  price: { fontSize: 12, fontWeight: "600", fontVariant: ["tabular-nums"] },
 
-  empty: { alignItems: "center", paddingHorizontal: 24, paddingVertical: 28, gap: 10 },
-  emptyIcon: { width: 56, height: 56, borderRadius: 14, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
-  emptyTitle: { color: "#111111", fontSize: 14, fontWeight: "600" },
-  emptyText: { color: "#666666", fontSize: 12, textAlign: "center", lineHeight: 18 },
+  cardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12, paddingTop: 10, borderTopWidth: 1 },
+  postedAt: { fontSize: 11, fontWeight: "500" },
+  footerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  selectedPill: { borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1 },
+  selectedPillText: { fontSize: 8, fontWeight: "700", letterSpacing: 0.4 },
+  cta: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, alignItems: "center", justifyContent: "center" },
+  ctaText: { fontSize: 12, fontWeight: "600" },
 
-  pressed: { opacity: 0.7 },
+  empty: { alignItems: "center", paddingVertical: 50, paddingHorizontal: 30, gap: 6 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 16, alignItems: "center", justifyContent: "center", marginBottom: 12 },
+  emptyTitle: { fontSize: 15, fontWeight: "600" },
+  emptyText: { fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 },
 });
