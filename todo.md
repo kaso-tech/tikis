@@ -444,3 +444,5 @@
 - [x] Valider la compilation, les tests et la disponibilité des services après synchronisation.
 - [x] Synchroniser la dernière branche main Tikis et vérifier les dépendances distantes.
 - [x] Valider la compilation, les tests et la disponibilité des services après synchronisation.
+- [ ] Synchroniser la dernière branche main Tikis et vérifier les dépendances distantes.
+- [ ] Valider la compilation, les tests et la disponibilité des services après synchronisation.
