@@ -6,6 +6,23 @@ import { useThemeColors } from "@/lib/use-theme-colors";
 import type { DeliveryStatus } from "@/shared/tikis-domain";
 import { formatMoney } from "@/shared/tikis-domain";
 
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+function estimateEtaMinutes(distanceKm: number): number {
+  if (distanceKm <= 0) return 0;
+  const avgSpeedKmh = 22;
+  return Math.max(1, Math.round((distanceKm / avgSpeedKmh) * 60));
+}
+
 type LiveStep = "published" | "selected" | "pickup" | "delivered";
 
 const TIMELINE_STEPS: { key: LiveStep; label: string; icon: ComponentProps<typeof MaterialIcons>["name"] }[] = [
@@ -31,6 +48,9 @@ type Props = {
   status: DeliveryStatus;
   driverName?: string;
   driverPhone?: string;
+  driverRating?: number | null;
+  driverVehicle?: string;
+  driverPlate?: string;
   pickupName: string;
   pickupAddress: string;
   pickupTime?: string;
@@ -39,12 +59,49 @@ type Props = {
   offeredPrice: number;
   senderName?: string;
   senderPhone?: string;
+  pickupLat?: number;
+  pickupLng?: number;
+  dropoffLat?: number;
+  dropoffLng?: number;
+  driverLat?: number | null;
+  driverLng?: number | null;
+  recentEvents?: { id: string; title: string; time: string; tone?: "live" | "past" }[];
   onOpenMap: () => void;
   onReport?: () => void;
+  onCallDriver?: () => void;
+  onMessageDriver?: () => void;
   children?: ReactNode;
 };
 
-export function LiveTrackingView({ deliveryId, status, driverName, driverPhone, pickupName, pickupAddress, pickupTime, dropoffName, dropoffAddress, offeredPrice, senderName, senderPhone, onOpenMap, onReport, children }: Props) {
+export function LiveTrackingView({
+  deliveryId,
+  status,
+  driverName,
+  driverPhone,
+  driverRating,
+  driverVehicle,
+  driverPlate,
+  pickupName,
+  pickupAddress,
+  pickupTime,
+  dropoffName,
+  dropoffAddress,
+  offeredPrice,
+  senderName,
+  senderPhone,
+  pickupLat,
+  pickupLng,
+  dropoffLat,
+  dropoffLng,
+  driverLat,
+  driverLng,
+  recentEvents,
+  onOpenMap,
+  onReport,
+  onCallDriver,
+  onMessageDriver,
+  children,
+}: Props) {
   const { colors: theme, isDark } = useThemeColors();
   const router = useRouter();
   const currentStep = useMemo(() => deriveStep(status, Boolean(driverPhone)), [status, driverPhone]);
@@ -53,8 +110,21 @@ export function LiveTrackingView({ deliveryId, status, driverName, driverPhone, 
   const isWaiting = status === "open";
   const isCompleted = status === "completed";
 
-  const [etaMinutes, setEtaMinutes] = useState(12);
-  const [remainingKm, setRemainingKm] = useState(2.3);
+  const computedRoute = useMemo(() => {
+    if (typeof pickupLat === "number" && typeof pickupLng === "number" && typeof dropoffLat === "number" && typeof dropoffLng === "number") {
+      const totalKm = haversineKm({ lat: pickupLat, lng: pickupLng }, { lat: dropoffLat, lng: dropoffLng });
+      let remainingKm: number;
+      if (typeof driverLat === "number" && typeof driverLng === "number") {
+        remainingKm = haversineKm({ lat: driverLat, lng: driverLng }, { lat: dropoffLat, lng: dropoffLng });
+      } else {
+        remainingKm = totalKm;
+      }
+      return { totalKm, remainingKm };
+    }
+    return null;
+  }, [pickupLat, pickupLng, dropoffLat, dropoffLng, driverLat, driverLng]);
+
+  const [etaTick, setEtaTick] = useState(0);
   const pulseAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -69,12 +139,13 @@ export function LiveTrackingView({ deliveryId, status, driverName, driverPhone, 
 
   useEffect(() => {
     if (!isLive) return;
-    const id = setInterval(() => {
-      setEtaMinutes((m) => Math.max(0, +(m - 0.3).toFixed(1)));
-      setRemainingKm((k) => Math.max(0, +(k - 0.06).toFixed(2)));
-    }, 5000);
+    const id = setInterval(() => setEtaTick((t) => t + 1), 30000);
     return () => clearInterval(id);
   }, [isLive]);
+
+  const displayKm = computedRoute ? computedRoute.remainingKm : 0;
+  const displayEta = computedRoute ? estimateEtaMinutes(computedRoute.remainingKm) : 0;
+  void etaTick;
 
   const ringScale = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.7] });
   const ringOpacity = pulseAnim.interpolate({ inputRange: [0, 1], outputRange: [0.55, 0] });
@@ -184,7 +255,7 @@ export function LiveTrackingView({ deliveryId, status, driverName, driverPhone, 
               <View style={styles.etaLeft}>
                 <Text style={[styles.etaLabel, { color: theme.muted }]}>Arrivée estimée</Text>
                 <View style={styles.etaValueRow}>
-                  <Text style={[styles.etaValue, { color: theme.foreground }]}>{Math.ceil(etaMinutes)}</Text>
+                  <Text style={[styles.etaValue, { color: theme.foreground }]}>{displayEta}</Text>
                   <Text style={[styles.etaUnit, { color: theme.muted }]}>min</Text>
                 </View>
               </View>
@@ -193,7 +264,7 @@ export function LiveTrackingView({ deliveryId, status, driverName, driverPhone, 
                   <MaterialIcons name="arrow-forward" size={12} color={theme.primary} />
                 </View>
                 <View>
-                  <Text style={[styles.etaStatValue, { color: theme.foreground }]}>{remainingKm.toFixed(1).replace(".", ",")} km</Text>
+                  <Text style={[styles.etaStatValue, { color: theme.foreground }]}>{displayKm < 0.1 ? "< 100 m" : `${displayKm.toFixed(1).replace(".", ",")} km`}</Text>
                   <Text style={[styles.etaStatLabel, { color: theme.muted }]}>restants</Text>
                 </View>
               </View>
@@ -252,20 +323,34 @@ export function LiveTrackingView({ deliveryId, status, driverName, driverPhone, 
             <View style={styles.driverInfo}>
               <Text style={[styles.driverName, { color: theme.foreground }]} numberOfLines={1}>{driverName}</Text>
               <View style={styles.driverMetaRow}>
-                <MaterialIcons name="star" size={11} color={theme.warning} />
-                <Text style={[styles.driverMeta, { color: theme.foreground }]}>Nouveau</Text>
-                <Text style={[styles.driverDot, { color: theme.muted }]}>·</Text>
-                <Text style={[styles.driverMeta, { color: theme.muted }]}>Moto</Text>
+                {driverRating && driverRating > 0 ? (
+                  <>
+                    <MaterialIcons name="star" size={11} color={theme.warning} />
+                    <Text style={[styles.driverMeta, { color: theme.foreground }]}>{driverRating.toFixed(1).replace(".", ",")}</Text>
+                    <Text style={[styles.driverDot, { color: theme.muted }]}>·</Text>
+                  </>
+                ) : null}
+                <Text style={[styles.driverMeta, { color: theme.muted }]} numberOfLines={1}>
+                  {driverVehicle ?? "Livreur"}{driverPlate ? ` · ${driverPlate}` : ""}
+                </Text>
               </View>
             </View>
             <View style={styles.driverActions}>
               {driverPhone ? (
-                <Pressable onPress={() => driverPhone && Linking.openURL(`tel:${driverPhone}`).catch(() => undefined)} style={({ pressed }) => [styles.driverAction, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && { opacity: 0.7 }]} accessibilityLabel="Appeler le livreur">
+                <Pressable
+                  onPress={onCallDriver ?? (() => Linking.openURL(`tel:${driverPhone}`).catch(() => undefined))}
+                  style={({ pressed }) => [styles.driverAction, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && { opacity: 0.7 }]}
+                  accessibilityLabel="Appeler le livreur"
+                >
                   <MaterialIcons name="phone" size={16} color={theme.foreground} />
                 </Pressable>
               ) : null}
               {driverPhone ? (
-                <Pressable onPress={() => driverPhone && Linking.openURL(`sms:${driverPhone}`).catch(() => undefined)} style={({ pressed }) => [styles.driverAction, { backgroundColor: theme.primary }, pressed && { opacity: 0.7 }]} accessibilityLabel="Envoyer un message">
+                <Pressable
+                  onPress={onMessageDriver ?? (() => Linking.openURL(`sms:${driverPhone}`).catch(() => undefined))}
+                  style={({ pressed }) => [styles.driverAction, { backgroundColor: theme.primary }, pressed && { opacity: 0.7 }]}
+                  accessibilityLabel="Envoyer un message"
+                >
                   <MaterialIcons name="chat-bubble" size={16} color="#FFFFFF" />
                 </Pressable>
               ) : null}
@@ -335,6 +420,19 @@ export function LiveTrackingView({ deliveryId, status, driverName, driverPhone, 
           <View style={[styles.noticeCard, { backgroundColor: theme.primary + "10", borderColor: theme.primary + "33" }]}>
             <MaterialIcons name="info" size={14} color={theme.primary} />
             <Text style={[styles.noticeText, { color: theme.foreground }]}>La course expire automatiquement si aucun livreur n'accepte sous 24h.</Text>
+          </View>
+        ) : null}
+
+        {recentEvents && recentEvents.length > 0 ? (
+          <View style={[styles.activityCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <Text style={[styles.activityTitle, { color: theme.muted }]}>Activité récente</Text>
+            {recentEvents.slice(0, 5).map((evt) => (
+              <View key={evt.id} style={styles.activityItem}>
+                <View style={[styles.activityBullet, { backgroundColor: evt.tone === "past" ? theme.muted : theme.primary }]} />
+                <Text style={[styles.activityText, { color: theme.foreground }]} numberOfLines={1}>{evt.title}</Text>
+                <Text style={[styles.activityTime, { color: theme.muted }]}>{evt.time}</Text>
+              </View>
+            ))}
           </View>
         ) : null}
 
@@ -447,4 +545,11 @@ const styles = StyleSheet.create({
 
   noticeCard: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderRadius: 12, borderWidth: 1 },
   noticeText: { flex: 1, fontSize: 11, lineHeight: 16 },
+
+  activityCard: { padding: 12, borderRadius: 14, borderWidth: 1, gap: 6 },
+  activityTitle: { fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 4 },
+  activityItem: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 3 },
+  activityBullet: { width: 6, height: 6, borderRadius: 3 },
+  activityText: { flex: 1, fontSize: 11 },
+  activityTime: { fontSize: 10, fontWeight: "500" },
 });

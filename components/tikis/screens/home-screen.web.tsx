@@ -356,9 +356,8 @@ export function HomeScreen() {
       setCandidateDelivery(delivery);
       return;
     }
-    if (delivery.status === "active") {
-      setSelectedId(delivery.id);
-      animateSheetTo(SHEET_PEEK);
+    if (delivery.status === "active" || delivery.status === "pending_confirmation") {
+      router.push(`/delivery/${delivery.id}` as any);
     }
   }
 
@@ -905,7 +904,7 @@ function DeliveryRow({
               {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.rowBtnFilledText}>{driverAction}</Text>}
             </Pressable>
           ) : (() => {
-            const senderAction = delivery.status === "open" ? (delivery.candidateCount ?? 0) > 0 ? "Candidats" : "Annuler" : delivery.status === "active" ? "Suivre" : null;
+            const senderAction = delivery.status === "open" ? (delivery.candidateCount ?? 0) > 0 ? "Candidats" : "Annuler" : (delivery.status === "active" || delivery.status === "pending_confirmation") ? "Suivre" : null;
             return senderAction ? <Pressable onPress={onApply} disabled={applying} style={({ pressed }) => [styles.rowBtnFilled, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}>
               {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.rowBtnFilledText}>{senderAction}</Text>}
             </Pressable> : null;
