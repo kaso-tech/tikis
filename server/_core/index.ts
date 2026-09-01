@@ -89,8 +89,17 @@ async function startServer() {
     createExpressMiddleware({
       router: appRouter,
       createContext,
+      onError: ({ error, path, type, ctx, req }) => {
+        console.error(`[tRPC] ${type} ${path} failed:`, error);
+      },
     }),
   );
+
+  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    if (res.headersSent) return;
+    console.error("[express] unhandled error:", err);
+    res.status(500).json({ error: { message: err.message ?? "Erreur interne du serveur" } });
+  });
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);

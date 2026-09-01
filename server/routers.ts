@@ -353,29 +353,35 @@ export const appRouter = router({
     create: tikisProtectedProcedure.input(deliveryInputSchema).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "sender") throw new Error("Seul un expéditeur peut publier une livraison.");
-      const [pickup, dropoff] = await Promise.all([saveDeliveryPlace(input.pickup), saveDeliveryPlace(input.dropoff)]);
-      const delivery = await db.createTikisDelivery({
-        id: randomUUID(),
-        senderPhone: profile.phone,
-        pickupPlaceId: pickup.id,
-        dropoffPlaceId: dropoff.id,
-        title: sanitizeDeliveryText(input.title),
-        details: sanitizeDeliveryText(input.details),
-        deliveryType: input.type,
-        status: "open",
-        distanceKm: String(input.distanceKm),
-        routeSource: input.routeSource,
-        estimatedPrice: input.estimatedPrice,
-        offeredPrice: input.offeredPrice ?? null,
-        vehicleTypes: JSON.stringify(input.vehicleTypes),
-        weightKg: input.weightKg ? String(input.weightKg) : null,
-        lengthCm: input.dimensions?.lengthCm ?? null,
-        widthCm: input.dimensions?.widthCm ?? null,
-        heightCm: input.dimensions?.heightCm ?? null,
-        passengers: input.passengers ?? null,
-      });
-      if (!delivery) throw new Error("La livraison n’a pas pu être enregistrée.");
-      return delivery;
+      try {
+        const [pickup, dropoff] = await Promise.all([saveDeliveryPlace(input.pickup), saveDeliveryPlace(input.dropoff)]);
+        const delivery = await db.createTikisDelivery({
+          id: randomUUID(),
+          senderPhone: profile.phone,
+          pickupPlaceId: pickup.id,
+          dropoffPlaceId: dropoff.id,
+          title: sanitizeDeliveryText(input.title),
+          details: sanitizeDeliveryText(input.details),
+          deliveryType: input.type,
+          status: "open",
+          distanceKm: String(input.distanceKm),
+          routeSource: input.routeSource,
+          estimatedPrice: input.estimatedPrice,
+          offeredPrice: input.offeredPrice ?? null,
+          vehicleTypes: JSON.stringify(input.vehicleTypes),
+          weightKg: input.weightKg ? String(input.weightKg) : null,
+          lengthCm: input.dimensions?.lengthCm ?? null,
+          widthCm: input.dimensions?.widthCm ?? null,
+          heightCm: input.dimensions?.heightCm ?? null,
+          passengers: input.passengers ?? null,
+        });
+        if (!delivery) throw new Error("La livraison n’a pas pu être enregistrée.");
+        return delivery;
+      } catch (cause) {
+        console.error("[deliveries.create] failed", cause);
+        if (cause instanceof Error) throw cause;
+        throw new Error("Publication indisponible. Vérifiez votre connexion puis réessayez.");
+      }
     }),
     candidates: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).query(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);

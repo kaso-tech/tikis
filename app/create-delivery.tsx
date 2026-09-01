@@ -241,7 +241,19 @@ export default function CreateDeliveryScreen() {
       router.replace(`/delivery/${delivery.id}` as any);
     } catch (error) {
       console.error("[create-delivery] publication failed", error);
-      const message = error instanceof Error ? error.message : "Une erreur inattendue est survenue.";
+      let message = error instanceof Error ? error.message : "Une erreur inattendue est survenue.";
+      const data = (error as { data?: unknown })?.data;
+      if (typeof data === "string" && data.length > 0 && data.length < 500) {
+        message = `${message} (${data.slice(0, 200)})`;
+      } else if (data && typeof data === "object") {
+        try {
+          const snippet = JSON.stringify(data).slice(0, 200);
+          message = `${message} (${snippet})`;
+        } catch {}
+      }
+      if (message.includes("JSON Parse") || message.includes("Unexpected character")) {
+        message = "Le serveur Tikis ne répond pas. Vérifiez que le serveur dev est bien démarré puis réessayez.";
+      }
       const reason = isEditing ? "Modification indisponible" : "Publication indisponible";
       setPublicationStage(`${reason} : ${message}`);
       Alert.alert(reason, `${message}\n\nVérifiez votre connexion puis réessayez.`);
