@@ -164,10 +164,6 @@ export default function ProfileScreen() {
               </View>
             )}
             <View style={styles.coverOverlay} pointerEvents="none" />
-            <View style={styles.coverHint} pointerEvents="none">
-              <MaterialIcons name="add-a-photo" size={14} color="#FFFFFF" />
-              <Text style={styles.coverHintText}>{coverUri ? "Modifier la couverture" : "Ajouter une couverture"}</Text>
-            </View>
           </Pressable>
         </View>
 
@@ -186,8 +182,7 @@ export default function ProfileScreen() {
               </View>
             </Pressable>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.phoneText, isDark && { color: theme.foreground }]} numberOfLines={1}>{profile?.phone ?? "+226 70 00 00 00"}</Text>
-              <Text style={[styles.name, isDark && { color: theme.muted }]} numberOfLines={1}>{name}</Text>
+              <Text style={[styles.name, isDark && { color: theme.foreground }]} numberOfLines={1}>{name}</Text>
               <View style={[styles.rolePill, driver ? styles.rolePillDriver : styles.rolePillSender]}>
                 <MaterialIcons name={driver ? "two-wheeler" : "inventory-2"} size={11} color={driver ? "#9A6200" : "#007B8B"} />
                 <Text style={[styles.rolePillText, driver ? styles.rolePillTextDriver : styles.rolePillTextSender]}>

@@ -1,7 +1,7 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, useLocalSearchParams } from "expo-router";
 import { type ComponentProps, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
@@ -11,7 +11,6 @@ import { LiveTrackingView } from "@/components/tikis/live-tracking";
 import { SectionHeading, TikisButton } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
 import { deliveryRemainingMs, formatDeliveryCountdown } from "@/lib/delivery-countdown";
-import { offeredPriceError, parseOfferedPrice, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
@@ -38,6 +37,27 @@ export default function DeliveryDetailScreen() {
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: Boolean(profile?.phone) });
   const deliveryQuery = trpc.deliveries.get.useQuery({ id: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
   const candidatesQuery = trpc.deliveries.candidates.useQuery({ deliveryId: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
+  const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
+  const requestRouteMutation = trpc.geography.route.useMutation();
+  const delivery = deliveryQuery.data;
+  useEffect(() => {
+    if (!delivery) return;
+    const pickup = delivery.pickup;
+    const dropoff = delivery.dropoff;
+    if (typeof pickup.latitude !== "number" || typeof dropoff.latitude !== "number") return;
+    let cancelled = false;
+    setRouteCoordinates([]);
+    void requestRouteMutation.mutateAsync({ origin: pickup, destination: dropoff }).then((route) => {
+      if (cancelled) return;
+      setRouteCoordinates(route.coordinates ?? []);
+    }).catch(() => {
+      if (cancelled) return;
+      setRouteCoordinates([]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [delivery, requestRouteMutation]);
   const applyMutation = trpc.deliveries.submitApplication.useMutation();
   const withdrawMutation = trpc.deliveries.withdraw.useMutation();
   const selectMutation = trpc.deliveries.selectCandidate.useMutation();
@@ -48,7 +68,6 @@ export default function DeliveryDetailScreen() {
   const cancelMutation = trpc.deliveries.cancel.useMutation();
   const reviewQuery = trpc.reviews.getForDelivery.useQuery({ deliveryId: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
   const driverReviewsQuery = trpc.reviews.list.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone) });
-  const delivery = deliveryQuery.data;
   const receivedReviewsCount = (driverReviewsQuery.data ?? []).length;
   const isDriverVerified = Boolean(profile?.photoUrl) || receivedReviewsCount > 0;
   const candidates = candidatesQuery.data ?? [];
@@ -57,10 +76,6 @@ export default function DeliveryDetailScreen() {
   const [selectedCandidate, setSelectedCandidate] = useState<DriverCandidate | null>(null);
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState("");
-  const [counterVisible, setCounterVisible] = useState(false);
-  const [counterInput, setCounterInput] = useState("");
-  const [counterError, setCounterError] = useState("");
-  const [counterLoading, setCounterLoading] = useState(false);
   const [senderAction, setSenderAction] = useState<SenderAction>(null);
   const [senderProcessing, setSenderProcessing] = useState(false);
   const [candidatesSheetOpen, setCandidatesSheetOpen] = useState(false);
@@ -131,7 +146,7 @@ export default function DeliveryDetailScreen() {
   const showsCountdown = delivery.status === "open" || delivery.status === "pending_confirmation" || delivery.status === "disabled" || isActive;
   const countdownLabel = isActive ? "Clôture automatique dans" : "Expiration automatique dans";
 
-  async function confirmAction() {
+  async function confirmAction(counterOffer?: { amount: number | null }) {
     if (action === "apply" && role === "driver" && !isDriverVerified) {
       Alert.alert("Profil à vérifier", "Complétez votre photo de profil et la vérification d'identité avant de candidater à une livraison.");
       setAction(null);
@@ -141,7 +156,7 @@ export default function DeliveryDetailScreen() {
     try {
       if (action === "apply") {
         if (!actionConfig?.amount) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
-        const result = await applyMutation.mutateAsync({ deliveryId, confirmedCommission: actionConfig.amount });
+        const result = await applyMutation.mutateAsync({ deliveryId, confirmedCommission: actionConfig.amount, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
         utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
       }
       if (action === "withdraw") {
@@ -186,30 +201,6 @@ export default function DeliveryDetailScreen() {
     setAction("select");
   }
 
-  function openCounterOffer() {
-    if (!delivery) return;
-    setCounterError("");
-    setCounterInput(String(ownCandidate?.offerPrice ?? delivery.offeredPrice ?? delivery.estimatedPrice));
-    setCounterVisible(true);
-  }
-
-  async function submitCounterOffer() {
-    const amount = parseOfferedPrice(counterInput);
-    const inputError = offeredPriceError(counterInput);
-    if (!amount || inputError) { setCounterError(inputError ?? "Saisissez un prix valide."); return; }
-    setCounterLoading(true); setCounterError("");
-    try {
-      const commissionRate = walletQuery.data?.commissionRate;
-      if (!commissionRate) throw new Error("La commission doit être chargée avant d’envoyer la contre-proposition.");
-      const result = await applyMutation.mutateAsync({ deliveryId, offerPrice: amount, confirmedCommission: Math.round(amount * commissionRate) });
-      utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
-      await refreshDelivery();
-      setCounterVisible(false); setMessage("Votre contre-proposition a été envoyée à l’expéditeur."); haptic.success();
-    } catch (cause) {
-      setCounterError(cause instanceof Error ? cause.message : "La contre-proposition n’a pas pu être envoyée.");
-    } finally { setCounterLoading(false); }
-  }
-
   const isLiveTracking = delivery.status === "pending_confirmation" || delivery.status === "active";
   const pickupTime = isLiveTracking && delivery.status === "active" ? formatRelativeDate(delivery.scheduledAt ?? delivery.createdAt) : undefined;
   const liveContent = isLiveTracking ? (
@@ -229,7 +220,7 @@ export default function DeliveryDetailScreen() {
       onOpenMap={() => router.push(`/delivery/${deliveryId}/map` as any)}
       onReport={() => router.push(`/report/${deliveryId}` as any)}
     >
-      {role === "driver" ? <DriverActions deliveryStatus={delivery.status} ownCandidateStatus={ownCandidate?.status} loading={processing} onApply={() => setAction("apply")} onCounterOffer={openCounterOffer} onWithdraw={() => setAction("withdraw")} onConfirm={() => setAction("confirm")} onComplete={() => setAction("complete")} /> : null}
+      {role === "driver" ? <DriverActions deliveryStatus={delivery.status} ownCandidateStatus={ownCandidate?.status} loading={processing} onApply={() => setAction("apply")} onWithdraw={() => setAction("withdraw")} onConfirm={() => setAction("confirm")} onComplete={() => setAction("complete")} /> : null}
       {message ? <Text style={styles.message}>{message}</Text> : null}
     </LiveTrackingView>
   ) : null;
@@ -251,7 +242,7 @@ export default function DeliveryDetailScreen() {
           <DeliveryRouteMap
             pickup={delivery.pickup}
             dropoff={delivery.dropoff}
-            coordinates={[
+            coordinates={routeCoordinates.length >= 2 ? routeCoordinates : [
               { latitude: delivery.pickup.latitude, longitude: delivery.pickup.longitude },
               { latitude: delivery.dropoff.latitude, longitude: delivery.dropoff.longitude },
             ]}
@@ -260,6 +251,12 @@ export default function DeliveryDetailScreen() {
             <View style={[styles.heroMapDot, { backgroundColor: statusBadgeColor }]} />
             <Text style={styles.heroMapStatusText}>{statusBadgeText}</Text>
           </View>
+          {requestRouteMutation.isPending ? (
+            <View style={styles.heroMapRouteLoading} pointerEvents="none">
+              <ActivityIndicator size="small" color="#9A6201" />
+              <Text style={styles.heroMapRouteLoadingText}>Calcul de l'itinéraire…</Text>
+            </View>
+          ) : null}
         </View>
 
         <Text style={styles.eyebrow}>{delivery.type} · {delivery.vehicleTypes[0] ?? "Moto"}</Text>
@@ -409,7 +406,7 @@ export default function DeliveryDetailScreen() {
           </View>
         ) : null}
 
-        {role === "driver" ? <DriverActions deliveryStatus={delivery.status} ownCandidateStatus={ownCandidate?.status} loading={processing} onApply={() => setAction("apply")} onCounterOffer={openCounterOffer} onWithdraw={() => setAction("withdraw")} onConfirm={() => setAction("confirm")} onComplete={() => setAction("complete")} /> : null}
+        {role === "driver" ? <DriverActions deliveryStatus={delivery.status} ownCandidateStatus={ownCandidate?.status} loading={processing} onApply={() => setAction("apply")} onWithdraw={() => setAction("withdraw")} onConfirm={() => setAction("confirm")} onComplete={() => setAction("complete")} /> : null}
 
         {message ? <Text style={styles.message}>{message}</Text> : null}
         {isCompleted && role === "sender" ? review ? (
@@ -420,18 +417,8 @@ export default function DeliveryDetailScreen() {
       </ScrollView>
       )}
 
-      {actionConfig ? <FinancialConfirmationModal visible title={actionConfig.title} description={actionConfig.description} amount={actionConfig.amount} confirmLabel={actionConfig.label} irreversible={actionConfig.irreversible} loading={processing} onCancel={() => { setAction(null); setSelectedCandidate(null); }} onConfirm={() => void confirmAction()} /> : null}
+      {actionConfig ? <FinancialConfirmationModal visible title={actionConfig.title} description={actionConfig.description} amount={actionConfig.amount} confirmLabel={actionConfig.label} irreversible={actionConfig.irreversible} allowCounterOffer={action === "apply"} loading={processing} onCancel={() => { setAction(null); setSelectedCandidate(null); }} onConfirm={(counterOffer) => void confirmAction(counterOffer)} /> : null}
       {senderActionConfig ? <DeliveryActionConfirmationModal visible title={senderActionConfig.title} description={senderActionConfig.description} confirmLabel={senderActionConfig.confirmLabel} tone={senderActionConfig.tone} loading={senderProcessing} onCancel={() => !senderProcessing && setSenderAction(null)} onConfirm={() => void confirmSenderAction()} /> : null}
-      <Modal visible={counterVisible} transparent animationType="fade" onRequestClose={() => !counterLoading && setCounterVisible(false)}>
-        <View style={styles.counterOverlay}><View style={styles.counterDialog}>
-          <View style={styles.counterIcon}><MaterialIcons name="price-change" size={24} color="#9A6201" /></View>
-          <Text style={styles.counterTitle}>{ownCandidate ? "Modifier votre contre-proposition" : "Faire une contre-proposition"}</Text>
-          <Text style={styles.counterText}>Proposez le montant que vous souhaitez percevoir. La commission Tikis sera ajustée sur ce prix si l’expéditeur vous retient.</Text>
-          <View style={styles.counterInputWrap}><TextInput value={counterInput} onChangeText={(value) => setCounterInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} autoFocus style={styles.counterInput} placeholder="Ex. 6 500" placeholderTextColor="#9AA5B6" /><Text style={styles.counterCurrency}>FCFA</Text></View>
-          {counterError ? <Text style={styles.counterError}>{counterError}</Text> : <Text style={styles.counterHint}>Prix client : {formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</Text>}
-          <View style={styles.counterActions}><TikisButton label="Annuler" variant="secondary" onPress={() => setCounterVisible(false)} disabled={counterLoading} style={styles.counterAction} /><TikisButton label="Envoyer" icon="send" onPress={() => void submitCounterOffer()} loading={counterLoading} style={styles.counterAction} /></View>
-        </View></View>
-      </Modal>
       <CandidatesSheet
         visible={candidatesSheetOpen}
         candidates={candidates}
@@ -465,8 +452,8 @@ function DeliveryActionConfirmationModal({ visible, title, description, confirmL
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}><View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={onCancel} /><View style={styles.actionSheet}><View style={styles.actionHandle} /><View style={[styles.actionIcon, { backgroundColor: background }]}><MaterialIcons name={tone === "danger" ? "warning-amber" : tone === "warning" ? "pause-circle" : "play-circle"} size={24} color={color} /></View><Text style={styles.actionTitle}>{title}</Text><Text style={styles.actionDescription}>{description}</Text><TikisButton label={confirmLabel} variant={tone === "danger" ? "danger" : tone === "warning" ? "secondary" : "primary"} onPress={onConfirm} loading={loading} style={styles.actionConfirm} /><TikisButton label="Conserver la livraison" variant="ghost" onPress={onCancel} disabled={loading} style={styles.actionCancel} /></View></View></Modal>;
 }
 
-function DriverActions({ deliveryStatus, ownCandidateStatus, loading, onApply, onCounterOffer, onWithdraw, onConfirm, onComplete }: { deliveryStatus: string; ownCandidateStatus?: string; loading: boolean; onApply: () => void; onCounterOffer: () => void; onWithdraw: () => void; onConfirm: () => void; onComplete: () => void }) {
-  if (deliveryStatus === "open") return <View style={styles.driverAction}>{ownCandidateStatus === "applied" ? <TikisButton label="Renoncer" variant="ghost" icon="undo" onPress={onWithdraw} loading={loading} disabled={loading} /> : <><TikisButton label="Se proposer" icon="add-circle" onPress={onApply} loading={loading} disabled={loading} /><TikisButton label="Faire une contre-proposition" variant="secondary" icon="price-change" onPress={onCounterOffer} disabled={loading} style={styles.secondaryDriverAction} /></>}<Text style={styles.driverHint}>{ownCandidateStatus === "applied" ? "Votre candidature est enregistrée. Vous pouvez la retirer tant que vous n’êtes pas sélectionné." : "Vous pouvez candidater au prix client ou proposer un montant différent."}</Text></View>;
+function DriverActions({ deliveryStatus, ownCandidateStatus, loading, onApply, onWithdraw, onConfirm, onComplete }: { deliveryStatus: string; ownCandidateStatus?: string; loading: boolean; onApply: () => void; onWithdraw: () => void; onConfirm: () => void; onComplete: () => void }) {
+  if (deliveryStatus === "open") return <View style={styles.driverAction}>{ownCandidateStatus === "applied" ? <TikisButton label="Renoncer" variant="ghost" icon="undo" onPress={onWithdraw} loading={loading} disabled={loading} /> : <TikisButton label="Se proposer" icon="add-circle" onPress={onApply} loading={loading} disabled={loading} />}<Text style={styles.driverHint}>{ownCandidateStatus === "applied" ? "Votre candidature est enregistrée. Vous pouvez la retirer tant que vous n’êtes pas sélectionné." : "Postulez au prix client ou proposez votre prix via la modale de confirmation."}</Text></View>;
   if (deliveryStatus === "pending_confirmation" && ownCandidateStatus === "selected") return <View style={styles.driverAction}><TikisButton label="Confirmer la course" icon="check-circle" onPress={onConfirm} loading={loading} disabled={loading} /><Text style={styles.driverHint}>Après confirmation, vos coordonnées seront partagées avec l’expéditeur.</Text></View>;
   if (deliveryStatus === "active" && ownCandidateStatus === "confirmed") return <View style={styles.driverAction}><TikisButton label="Marquer comme terminée" icon="task-alt" onPress={onComplete} loading={loading} disabled={loading} /><Text style={styles.driverHint}>À utiliser après remise et paiement direct avec l’expéditeur.</Text></View>;
   return null;
@@ -487,6 +474,8 @@ const styles = StyleSheet.create({
   heroMapMarkerStart: { top: "30%", left: "18%", backgroundColor: "#9A6201" },
   heroMapMarkerEnd: { top: "60%", right: "22%", backgroundColor: "#FFFFFF", borderColor: "#B4232D" },
   heroMapStatus: { position: "absolute", top: 12, left: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 7 },
+  heroMapRouteLoading: { position: "absolute", top: 12, right: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 7 },
+  heroMapRouteLoadingText: { color: "#555555", fontSize: 10, fontWeight: "600" },
   heroMapDot: { width: 7, height: 7, borderRadius: 4 },
   heroMapStatusText: { color: "#111111", fontSize: 10, fontWeight: "600" },
 
@@ -583,19 +572,6 @@ const styles = StyleSheet.create({
   actionDescription: { color: "#666666", fontSize: 13, lineHeight: 19, marginTop: 6, textAlign: "center" },
   actionConfirm: { marginTop: 18 },
   actionCancel: { marginTop: 6 },
-
-  counterOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.42)", alignItems: "center", justifyContent: "center", padding: 16 },
-  counterDialog: { width: "100%", maxWidth: 400, backgroundColor: "#FFFFFF", borderRadius: 12, padding: 16 },
-  counterIcon: { width: 44, height: 44, borderRadius: 9, backgroundColor: "#F8F0E5", alignSelf: "center", alignItems: "center", justifyContent: "center", marginBottom: 10 },
-  counterTitle: { color: "#111111", fontSize: 16, fontWeight: "600", textAlign: "center" },
-  counterText: { color: "#666666", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 6 },
-  counterInputWrap: { flexDirection: "row", alignItems: "center", minHeight: 48, backgroundColor: "#EEEDF3", borderRadius: 9, paddingHorizontal: 14, marginTop: 14 },
-  counterInput: { flex: 1, color: "#111111", fontSize: 15, fontWeight: "500", minHeight: 42 },
-  counterCurrency: { color: "#666666", fontSize: 11, fontWeight: "600", marginLeft: 8 },
-  counterHint: { color: "#666666", fontSize: 11, lineHeight: 16, textAlign: "center", marginTop: 6 },
-  counterError: { color: "#B4232D", fontSize: 11, fontWeight: "600", lineHeight: 16, textAlign: "center", marginTop: 6 },
-  counterActions: { flexDirection: "row", gap: 8, marginTop: 16 },
-  counterAction: { flex: 1, minHeight: 42 },
 
   message: { color: "#B4232D", textAlign: "center", fontSize: 13, fontWeight: "600", marginTop: 8 },
 

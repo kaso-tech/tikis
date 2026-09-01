@@ -118,10 +118,16 @@ export function HomeScreen() {
 
   const [filter, setFilter] = useState<FilterKey>("open");
   const [searchQuery, setSearchQuery] = useState("");
+  const [nowTick, setNowTick] = useState(0);
 
   useEffect(() => {
     setFilter("open");
   }, [role]);
+
+  useEffect(() => {
+    const id = setInterval(() => setNowTick((t) => t + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [driverOnline, setDriverOnline] = useState(true);
   const [actioningId, setActioningId] = useState<string | null>(null);
@@ -309,7 +315,7 @@ export function HomeScreen() {
     if (action === "start") void executeDriverAction(delivery);
   }
 
-  async function executeDriverAction(delivery: Delivery) {
+  async function executeDriverAction(delivery: Delivery, counterOffer?: { amount: number | null }) {
     setActioningId(delivery.id);
     try {
       if (delivery.ownCandidateStatus === "applied") {
@@ -332,7 +338,7 @@ export function HomeScreen() {
       } else {
         const confirmedCommission = applicationCommission(delivery);
         if (confirmedCommission === null) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
-        const result = await applyMutation.mutateAsync({ deliveryId: delivery.id, confirmedCommission });
+        const result = await applyMutation.mutateAsync({ deliveryId: delivery.id, confirmedCommission, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
         utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
         setApplicationDelivery(null);
       }
@@ -593,19 +599,23 @@ export function HomeScreen() {
               ))}
             </View>
           ) : (
-            <DeliveryRow
-              key={selected.id}
-              delivery={selected}
-              role={role}
-              selected
-              driverDistance={null}
-              driverLocationStatus={null}
-              compassRotation={0}
-              applying={actioningId === selected.id}
-              onPress={() => {}}
-              onDetails={() => router.push(`/delivery/${selected.id}` as any)}
-              onApply={() => handleSenderAction(selected)}
-            />
+            <View style={styles.listSection}>
+              {filteredList.map((delivery) => (
+                <DeliveryRow
+                  key={delivery.id}
+                  delivery={delivery}
+                  role={role}
+                  selected={delivery.id === selected.id}
+                  driverDistance={null}
+                  driverLocationStatus={null}
+                  compassRotation={0}
+                  applying={actioningId === delivery.id}
+                  onPress={() => setSelectedId(delivery.id)}
+                  onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
+                  onApply={() => handleSenderAction(delivery)}
+                />
+              ))}
+            </View>
           )}
 
           {!isDriver && otherDeliveries.length > 0 ? (
@@ -650,9 +660,10 @@ export function HomeScreen() {
           description="La commission Tikis sera temporairement réservée sur votre Wallet. Elle ne sera prélevée qu’après votre sélection et votre confirmation."
           amount={applicationCommission(applicationDelivery) ?? 0}
           confirmLabel="Confirmer ma candidature"
+          allowCounterOffer
           loading={actioningId === applicationDelivery.id}
           onCancel={() => !actioningId && setApplicationDelivery(null)}
-          onConfirm={() => void executeDriverAction(applicationDelivery)}
+          onConfirm={(counterOffer) => void executeDriverAction(applicationDelivery, counterOffer)}
         />
       ) : null}
       {pendingAction?.kind === "withdraw" ? (
@@ -931,7 +942,7 @@ function DeliveryRow({
         <View style={styles.rowMain}>
           <View style={styles.rowTitleLine}>
             <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
-            {isDriver ? <View accessibilityLabel={`Direction du point de collecte, à ${driverDistText}`} style={styles.rowDriverDistance}><Pressable onPress={() => setShowPickupTooltip((visible) => !visible)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Afficher les lieux de collecte et destination : ${pickupTitle}, ${pickupDistrict}; destination ${dropoffTitle}, ${dropoffDistrict}`} style={({ pressed }) => [styles.directionButton, pressed && styles.pressed]}><MaterialIcons accessible={false} name="navigation" size={17} color="#007B8B" style={{ transform: [{ rotate: `${compassRotation}deg` }] }} /></Pressable><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text>{showPickupTooltip ? <View style={styles.pickupTooltip}><Text style={styles.pickupTooltipLabel}>COLLECTE</Text><Text style={styles.pickupTooltipText} numberOfLines={1}>{pickupTitle}</Text><Text style={styles.pickupTooltipDistrict} numberOfLines={1}>{pickupDistrict}</Text><View style={styles.pickupTooltipDivider} /><Text style={styles.pickupTooltipLabel}>DESTINATION</Text><Text style={styles.pickupTooltipText} numberOfLines={1}>{dropoffTitle}</Text><Text style={styles.pickupTooltipDistrict} numberOfLines={1}>{dropoffDistrict}</Text></View> : null}</View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text></View> : null}
+            {isDriver ? <View accessibilityLabel={`Direction du point de collecte, à ${driverDistText}`} style={styles.rowDriverDistance}><Pressable onPress={() => setShowPickupTooltip((visible) => !visible)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Afficher les lieux de collecte et destination : ${pickupTitle}, ${pickupDistrict}; destination ${dropoffTitle}, ${dropoffDistrict}`} style={({ pressed }) => [styles.directionButton, pressed && styles.pressed]}><MaterialIcons accessible={false} name="navigation" size={17} color="#9A6201" style={{ transform: [{ rotate: `${compassRotation}deg` }] }} /></Pressable><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text>{showPickupTooltip ? <View style={styles.pickupTooltip}><Text style={styles.pickupTooltipLabel}>COLLECTE</Text><Text style={styles.pickupTooltipText} numberOfLines={1}>{pickupTitle}</Text><Text style={styles.pickupTooltipDistrict} numberOfLines={1}>{pickupDistrict}</Text><View style={styles.pickupTooltipDivider} /><Text style={styles.pickupTooltipLabel}>DESTINATION</Text><Text style={styles.pickupTooltipText} numberOfLines={1}>{dropoffTitle}</Text><Text style={styles.pickupTooltipDistrict} numberOfLines={1}>{dropoffDistrict}</Text></View> : null}</View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text></View> : null}
           </View>
           <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff}</Text>
         </View>
@@ -1061,8 +1072,8 @@ const styles = StyleSheet.create({
   urgentBtnWhiteText: { color: "#9A6201", fontSize: 12, fontWeight: "700" },
 
   listSection: { marginTop: 4, gap: 8 },
-  row: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 11, borderWidth: 0, borderColor: "transparent" },
-  rowSelected: { borderColor: "transparent", backgroundColor: "#FFFFFF" },
+  row: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 11, borderWidth: 1, borderColor: "#ECECEC" },
+  rowSelected: { borderColor: "#9A6201", backgroundColor: "#FAF6F0", borderWidth: 1.5 },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 9 },
   rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
   rowThumbDriver: { backgroundColor: "#9A6201" },

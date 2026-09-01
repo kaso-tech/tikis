@@ -294,12 +294,12 @@ export function HomeScreen() {
     if (action === "apply") requestApply(delivery);
   }
 
-  async function handleApply(delivery: Delivery) {
+  async function handleApply(delivery: Delivery, counterOffer?: { amount: number | null }) {
     setApplyingId(delivery.id);
     try {
       const confirmedCommission = applicationCommission(delivery);
       if (confirmedCommission === null) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
-      const result = await applyMutation.mutateAsync({ deliveryId: delivery.id, confirmedCommission });
+      const result = await applyMutation.mutateAsync({ deliveryId: delivery.id, confirmedCommission, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
       utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
       await Promise.all([
         utilities.deliveries.list.invalidate(),
@@ -622,9 +622,10 @@ export function HomeScreen() {
           description="La commission Tikis sera temporairement réservée sur votre Wallet. Elle ne sera prélevée qu’après votre sélection et votre confirmation."
           amount={applicationCommission(applicationDelivery) ?? 0}
           confirmLabel="Confirmer ma candidature"
+          allowCounterOffer
           loading={applyingId === applicationDelivery.id}
           onCancel={() => !applyingId && setApplicationDelivery(null)}
-          onConfirm={() => void handleApply(applicationDelivery)}
+          onConfirm={(counterOffer) => void handleApply(applicationDelivery, counterOffer)}
         />
       ) : null}
       {pendingAction?.kind === "cancel" ? (
