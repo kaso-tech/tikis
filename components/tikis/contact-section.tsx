@@ -12,7 +12,7 @@ type ContactKind = "phone" | "email";
 
 const PHONE_REGEX = /^\+?[0-9 ]{8,20}$/;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const DEMO_OTP = "123456";
+const DEMO_OTP = "730512";
 const OTP_LENGTH = 6;
 
 export function ContactSection() {
@@ -72,7 +72,8 @@ export function ContactSection() {
     setError("");
     setSending(true);
     try {
-      await requestOtp.mutateAsync({ kind: active, value: draft.trim() });
+      if (!profile?.phone) throw new Error("Profil indisponible. Réessayez après vous être reconnecté.");
+      await requestOtp.mutateAsync({ kind: active, value: draft.trim(), phone: profile.phone });
       haptic.success();
       setStage("otp");
       setResendIn(45);
@@ -98,7 +99,8 @@ export function ContactSection() {
     setStage("verifying");
     setError("");
     try {
-      const saved = await updateContact.mutateAsync({ kind: active, value: draft.trim(), otp: otp.trim() });
+      if (!profile?.phone) throw new Error("Profil indisponible. Réessayez après vous être reconnecté.");
+      const saved = await updateContact.mutateAsync({ kind: active, value: draft.trim(), otp: otp.trim(), phone: profile.phone, sessionOtp: DEMO_OTP });
       updateProfile(saved as any);
       haptic.success();
       Alert.alert(active === "phone" ? "Téléphone mis à jour" : "E-mail mis à jour", active === "phone" ? "Votre numéro a été mis à jour. Les livreurs et expéditeurs vous contacteront sur ce numéro." : "Votre e-mail a été enregistré. Il vous servira pour la récupération du compte et les notifications.");

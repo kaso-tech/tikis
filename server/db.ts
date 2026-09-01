@@ -57,6 +57,9 @@ export type PersistedTikisProfile = {
   accountType: "sender" | "driver";
   vehicles: string;
   photoKey?: string | null;
+  email?: string | null;
+  phoneVerified?: boolean;
+  emailVerified?: boolean;
   referralCode?: string | null;
   supabaseUserId?: string | null;
 };
@@ -87,7 +90,7 @@ export async function createTikisProfile(input: PersistedTikisProfile) {
   return created;
 }
 
-export async function updateTikisProfile(phone: string, changes: Pick<PersistedTikisProfile, "fullName" | "photoKey">) {
+export async function updateTikisProfile(phone: string, changes: Partial<Pick<PersistedTikisProfile, "fullName" | "photoKey" | "email" | "phoneVerified" | "emailVerified">>) {
   const db = await getDb();
   if (!db) throw new Error("La base de données sécurisée est temporairement indisponible.");
   await db.update(tikisProfiles).set({ ...changes, updatedAt: new Date() }).where(eq(tikisProfiles.phone, phone));

@@ -450,3 +450,10 @@
 - [x] Valider la compilation, les tests et la disponibilité des services après synchronisation.
 - [x] Corriger la régression du contrat d’historique qui doit conserver les livraisons non terminées.
 - [x] Revalider compilation, tests et services après la correction de la synchronisation.
+- [x] Synchroniser la dernière branche main Tikis et vérifier les dépendances distantes.
+- [x] Valider la compilation, les tests et la disponibilité des services après synchronisation.
+- [x] Corriger les incompatibilités TypeScript des nouveaux écrans de contact, vérification et création de livraison.
+- [x] Aligner de façon cohérente le contrat OTP de contact client et serveur.
+- [x] Valider la compilation, les tests et les services après les correctifs de synchronisation.
+- [x] Corriger les incompatibilités TypeScript des nouveaux écrans de contact, vérification et création de livraison.
+- [x] Valider la compilation, les tests et les services après les correctifs de synchronisation.

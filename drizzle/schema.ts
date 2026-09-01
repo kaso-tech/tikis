@@ -1,4 +1,4 @@
-import { decimal, index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { boolean, decimal, index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 /** Core Manus user table kept for the template OAuth layer. */
 export const users = mysqlTable("users", {
@@ -24,6 +24,9 @@ export const tikisProfiles = mysqlTable("tikis_profiles", {
   accountType: mysqlEnum("accountType", ["sender", "driver"]).notNull(),
   vehicles: text("vehicles").notNull(),
   photoKey: varchar("photoKey", { length: 512 }),
+  email: varchar("email", { length: 320 }),
+  phoneVerified: boolean("phoneVerified").notNull().default(true),
+  emailVerified: boolean("emailVerified").notNull().default(false),
   referralCode: varchar("referralCode", { length: 8 }).unique(),
   supabaseUserId: varchar("supabaseUserId", { length: 64 }).unique(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

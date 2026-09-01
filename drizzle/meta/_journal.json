@@ -134,6 +134,13 @@
       "when": 1788131136926,
       "tag": "0018_left_scarecrow",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "5",
+      "when": 1788242009249,
+      "tag": "0019_gorgeous_wallop",
+      "breakpoints": true
     }
   ]
 }

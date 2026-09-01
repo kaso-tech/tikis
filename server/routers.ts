@@ -55,13 +55,13 @@ async function verifySupabasePhoneSession(phone: string, accessToken: string) {
   } finally { clearTimeout(timeout); }
 }
 
-function toPublicProfile(profile: { phone: string; fullName: string; accountType: "sender" | "driver"; vehicles: string; photoKey?: string | null; referralCode?: string | null }) {
+function toPublicProfile(profile: { phone: string; fullName: string; accountType: "sender" | "driver"; vehicles: string; photoKey?: string | null; email?: string | null; phoneVerified?: boolean; emailVerified?: boolean; referralCode?: string | null }) {
   let vehicles: ValidVehicle[] = [];
   try {
     const parsed = JSON.parse(profile.vehicles) as unknown;
     if (Array.isArray(parsed)) vehicles = parsed.filter((item): item is ValidVehicle => vehicleSchema.safeParse(item).success);
   } catch { vehicles = []; }
-  return { phone: profile.phone, fullName: profile.fullName, countryCode: findCountryForPhone(profile.phone).id, role: profile.accountType, vehicles, roleLocked: true as const, photoUrl: profile.photoKey ? `/manus-storage/${profile.photoKey}` : undefined, referralCode: profile.accountType === "driver" ? profile.referralCode ?? undefined : undefined };
+  return { phone: profile.phone, fullName: profile.fullName, countryCode: findCountryForPhone(profile.phone).id, role: profile.accountType, vehicles, roleLocked: true as const, photoUrl: profile.photoKey ? `/manus-storage/${profile.photoKey}` : undefined, email: profile.email ?? undefined, phoneVerified: profile.phoneVerified ?? true, emailVerified: profile.emailVerified ?? false, referralCode: profile.accountType === "driver" ? profile.referralCode ?? undefined : undefined };
 }
 
 function sessionCountryCode(profilePhone: string) {
@@ -255,14 +255,13 @@ export const appRouter = router({
       kind: z.enum(["phone", "email"]),
       value: z.string().min(3).max(180),
       phone: phoneSchema,
-      otp: simulationOtpSchema,
     })).mutation(async ({ input }) => {
       if (input.kind === "phone") {
         if (!/^\+?[0-9 ]{8,20}$/.test(input.value.trim())) throw new Error("Numéro de téléphone invalide.");
       } else {
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.value.trim())) throw new Error("Adresse e-mail invalide.");
       }
-      return { ok: true, demoOtp: "123456" };
+      return { ok: true, demoOtp: "730512" };
     }),
     updateContact: publicProcedure.input(z.object({
       kind: z.enum(["phone", "email"]),
@@ -276,10 +275,12 @@ export const appRouter = router({
       if (!current) throw new Error("Profil introuvable.");
       if (input.kind === "phone") {
         if (!/^\+?[0-9 ]{8,20}$/.test(input.value.trim())) throw new Error("Numéro de téléphone invalide.");
-        return { phone: input.value.trim(), phoneVerified: true, email: current.email ?? undefined, emailVerified: current.emailVerified ?? false };
+        if (input.value.trim() !== current.phone) throw new Error("La modification du numéro de connexion nécessite une vérification d’identité. Contactez l’assistance Tikis.");
+        return toPublicProfile(current);
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.value.trim())) throw new Error("Adresse e-mail invalide.");
-      return { phone: current.phone, phoneVerified: true, email: input.value.trim(), emailVerified: true };
+      const updated = await db.updateTikisProfile(input.phone, { email: input.value.trim().toLocaleLowerCase("fr-FR"), emailVerified: true, phoneVerified: true });
+      return toPublicProfile(updated);
     }),
   }),
   geography: router({

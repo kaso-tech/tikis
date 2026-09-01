@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { haptic } from "@/lib/haptics";
 
@@ -48,7 +48,7 @@ export function TikisIconButton({ icon, label, onPress, accent = "#111111" }: { 
   return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => { haptic.light(); onPress(); }} style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}><MaterialIcons name={icon} size={21} color={accent} /></Pressable>;
 }
 
-export function SurfaceCard({ children, style }: { children: React.ReactNode; style?: ViewStyle }) {
+export function SurfaceCard({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
