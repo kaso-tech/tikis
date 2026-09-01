@@ -457,3 +457,8 @@
 - [x] Valider la compilation, les tests et les services après les correctifs de synchronisation.
 - [x] Corriger les incompatibilités TypeScript des nouveaux écrans de contact, vérification et création de livraison.
 - [x] Valider la compilation, les tests et les services après les correctifs de synchronisation.
+- [x] Corriger l’import manquant de `Alert` dans la page de détail après synchronisation du commit a631094.
+- [x] Revalider compilation, tests et services après ce correctif de synchronisation.
+- [x] Enregistrer et livrer la dernière version corrigée.
+- [x] Corriger la régression de contrôle d’accès de candidature révélée par `delivery-access.test.ts`.
+- [x] Revalider la compilation, les tests et les services après le correctif d’accès.

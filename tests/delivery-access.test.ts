@@ -40,7 +40,7 @@ vi.mock("../server/db", () => dbMock);
 import { appRouter } from "../server/routers";
 
 const sender = { phone: "+22670000000", fullName: "Aïcha Traoré", accountType: "sender" as const, vehicles: "[]" };
-const driver = { phone: "+22676000000", fullName: "Moussa Kaboré", accountType: "driver" as const, vehicles: '["Moto"]' };
+const driver = { phone: "+22676000000", fullName: "Moussa Kaboré", accountType: "driver" as const, vehicles: '["Moto"]', photoKey: "driver-photo-key" };
 const deliveryId = "2d487499-19e9-4f5e-a9c8-8777af588997";
 const place = { id: 4 };
 const input = {
