@@ -198,8 +198,6 @@ export function HomeScreen() {
   const publishLivePositionMutation = trpc.deliveries.updateLivePosition.useMutation();
   const publishLivePositionRef = useRef(publishLivePositionMutation.mutateAsync);
   publishLivePositionRef.current = publishLivePositionMutation.mutateAsync;
-  const lastPublishedPosition = useRef<{ deliveryId: string; latitude: number; longitude: number; at: number } | null>(null);
-
   useEffect(() => {
     if (role !== "driver" || selected?.status !== "active" || !driverLocation.location) return;
     const previous = lastPublishedPosition.current;

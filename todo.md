@@ -470,3 +470,9 @@
 - [x] Installer les dépendances si `package.json` ou le verrouillage ont changé, puis valider compilation et tests.
 - [x] Relancer Expo et l’API, puis vérifier leur disponibilité.
 - [x] Enregistrer et livrer la dernière version synchronisée.
+- [x] Synchroniser la dernière branche `main` depuis GitHub et inspecter les changements distants.
+- [x] Installer les dépendances si `package.json` ou le verrouillage ont changé, puis valider compilation et tests.
+- [x] Relancer Expo et l’API, puis vérifier leur disponibilité.
+- [x] Enregistrer et livrer la dernière version synchronisée.
+- [x] Corriger la double déclaration de `lastPublishedPosition` introduite dans l’accueil livreur après le pull c2ea9b8.
+- [x] Revalider compilation, tests et services après ce correctif.
