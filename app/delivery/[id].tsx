@@ -7,6 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
+import { LiveTrackingView } from "@/components/tikis/live-tracking";
 import { SectionHeading, TikisButton } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
 import { deliveryRemainingMs, formatDeliveryCountdown } from "@/lib/delivery-countdown";
@@ -119,7 +120,7 @@ export default function DeliveryDetailScreen() {
   const canEdit = role === "sender" && (delivery.status === "open" || delivery.status === "disabled");
   const canDisable = role === "sender" && delivery.status === "open";
   const canReactivate = role === "sender" && delivery.status === "disabled";
-  const canCancel = role === "sender" && (delivery.status === "open" || delivery.status === "disabled" || delivery.status === "pending_confirmation");
+  const canCancel = role === "sender" && (delivery.status === "open" || delivery.status === "disabled");
   const isActive = delivery.status === "active";
   const isCompleted = delivery.status === "completed";
   const pickupPresentation = formatDeliveryDetailPlace(delivery.pickup);
@@ -209,8 +210,33 @@ export default function DeliveryDetailScreen() {
     } finally { setCounterLoading(false); }
   }
 
+  const isLiveTracking = delivery.status === "pending_confirmation" || delivery.status === "active";
+  const pickupTime = isLiveTracking && delivery.status === "active" ? formatRelativeDate(delivery.scheduledAt ?? delivery.createdAt) : undefined;
+  const liveContent = isLiveTracking ? (
+    <LiveTrackingView
+      deliveryId={deliveryId}
+      status={delivery.status}
+      driverName={delivery.driverName}
+      driverPhone={delivery.driverPhone}
+      pickupName={pickupPresentation.title}
+      pickupAddress={pickupPresentation.subtitle}
+      pickupTime={pickupTime}
+      dropoffName={dropoffPresentation.title}
+      dropoffAddress={dropoffPresentation.subtitle}
+      offeredPrice={delivery.offeredPrice ?? delivery.estimatedPrice}
+      senderName={delivery.senderName}
+      senderPhone={delivery.senderPhone}
+      onOpenMap={() => router.push(`/delivery/${deliveryId}/map` as any)}
+      onReport={() => router.push(`/report/${deliveryId}` as any)}
+    >
+      {role === "driver" ? <DriverActions deliveryStatus={delivery.status} ownCandidateStatus={ownCandidate?.status} loading={processing} onApply={() => setAction("apply")} onCounterOffer={openCounterOffer} onWithdraw={() => setAction("withdraw")} onConfirm={() => setAction("confirm")} onComplete={() => setAction("complete")} /> : null}
+      {message ? <Text style={styles.message}>{message}</Text> : null}
+    </LiveTrackingView>
+  ) : null;
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
+      {isLiveTracking ? liveContent : (
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Retour">
@@ -392,6 +418,7 @@ export default function DeliveryDetailScreen() {
           <TikisButton label="Noter le livreur" variant="ghost" icon="star-outline" onPress={() => router.push(`/review/${deliveryId}` as any)} style={styles.rateButton} />
         ) : null}
       </ScrollView>
+      )}
 
       {actionConfig ? <FinancialConfirmationModal visible title={actionConfig.title} description={actionConfig.description} amount={actionConfig.amount} confirmLabel={actionConfig.label} irreversible={actionConfig.irreversible} loading={processing} onCancel={() => { setAction(null); setSelectedCandidate(null); }} onConfirm={() => void confirmAction()} /> : null}
       {senderActionConfig ? <DeliveryActionConfirmationModal visible title={senderActionConfig.title} description={senderActionConfig.description} confirmLabel={senderActionConfig.confirmLabel} tone={senderActionConfig.tone} loading={senderProcessing} onCancel={() => !senderProcessing && setSenderAction(null)} onConfirm={() => void confirmSenderAction()} /> : null}

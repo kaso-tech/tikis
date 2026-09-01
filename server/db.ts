@@ -815,7 +815,7 @@ export async function cancelTikisDeliveryFromSender(deliveryId: string, senderPh
   if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
   await db.transaction(async (tx) => {
     const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.senderPhone, senderPhone))).limit(1).for("update"))[0];
-    if (!delivery || !["open", "disabled", "pending_confirmation"].includes(delivery.status)) throw new Error("Cette livraison ne peut plus être annulée.");
+    if (!delivery || !["open", "disabled"].includes(delivery.status)) throw new Error("Cette livraison ne peut plus être annulée : un livreur a déjà été sélectionné.");
     await releaseAppliedCandidatesForSenderAction(tx, delivery, "cancelled");
     if (delivery.status === "pending_confirmation" && delivery.driverPhone) {
       const selectedCandidate = (await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, delivery.driverPhone), eq(tikisDeliveryCandidates.status, "selected"))).limit(1).for("update"))[0];
