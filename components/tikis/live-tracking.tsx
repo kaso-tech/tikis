@@ -23,6 +23,24 @@ function estimateEtaMinutes(distanceKm: number): number {
   return Math.max(1, Math.round((distanceKm / avgSpeedKmh) * 60));
 }
 
+const MAP_INSET = 0.18;
+
+function projectToMapPercent(
+  point: { lat: number; lng: number },
+  bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number },
+): { left: number; top: number } {
+  const latRange = bounds.maxLat - bounds.minLat || 0.0001;
+  const lngRange = bounds.maxLng - bounds.minLng || 0.0001;
+  const yRatio = (bounds.maxLat - point.lat) / latRange;
+  const xRatio = (point.lng - bounds.minLng) / lngRange;
+  const leftPct = MAP_INSET + xRatio * (1 - 2 * MAP_INSET) * 100;
+  const topPct = MAP_INSET + yRatio * (1 - 2 * MAP_INSET) * 100;
+  return {
+    left: Math.max(0, Math.min(100, leftPct)),
+    top: Math.max(0, Math.min(100, topPct)),
+  };
+}
+
 type LiveStep = "published" | "selected" | "pickup" | "delivered";
 
 const TIMELINE_STEPS: { key: LiveStep; label: string; icon: ComponentProps<typeof MaterialIcons>["name"] }[] = [
@@ -65,6 +83,7 @@ type Props = {
   dropoffLng?: number;
   driverLat?: number | null;
   driverLng?: number | null;
+  driverHeading?: number | null;
   recentEvents?: { id: string; title: string; time: string; tone?: "live" | "past" }[];
   onOpenMap: () => void;
   onReport?: () => void;
@@ -95,6 +114,7 @@ export function LiveTrackingView({
   dropoffLng,
   driverLat,
   driverLng,
+  driverHeading,
   recentEvents,
   onOpenMap,
   onReport,
@@ -123,6 +143,48 @@ export function LiveTrackingView({
     }
     return null;
   }, [pickupLat, pickupLng, dropoffLat, dropoffLng, driverLat, driverLng]);
+
+  const markerPositions = useMemo(() => {
+    if (typeof pickupLat !== "number" || typeof pickupLng !== "number" || typeof dropoffLat !== "number" || typeof dropoffLng !== "number") {
+      return null;
+    }
+    const points: { lat: number; lng: number }[] = [
+      { lat: pickupLat, lng: pickupLng },
+      { lat: dropoffLat, lng: dropoffLng },
+    ];
+    if (typeof driverLat === "number" && typeof driverLng === "number") {
+      points.push({ lat: driverLat, lng: driverLng });
+    }
+    const lats = points.map((p) => p.lat);
+    const lngs = points.map((p) => p.lng);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs);
+    const maxLng = Math.max(...lngs);
+    const latPad = (maxLat - minLat) * 0.25 || 0.005;
+    const lngPad = (maxLng - minLng) * 0.25 || 0.005;
+    const bounds = {
+      minLat: minLat - latPad,
+      maxLat: maxLat + latPad,
+      minLng: minLng - lngPad,
+      maxLng: maxLng + lngPad,
+    };
+    const pickupPos = projectToMapPercent({ lat: pickupLat, lng: pickupLng }, bounds);
+    const dropoffPos = projectToMapPercent({ lat: dropoffLat, lng: dropoffLng }, bounds);
+    const driverPos = typeof driverLat === "number" && typeof driverLng === "number"
+      ? projectToMapPercent({ lat: driverLat, lng: driverLng }, bounds)
+      : null;
+    return { pickup: pickupPos, dropoff: dropoffPos, driver: driverPos };
+  }, [pickupLat, pickupLng, dropoffLat, dropoffLng, driverLat, driverLng]);
+
+  const driverTrail = useMemo(() => {
+    if (!markerPositions?.driver) return null;
+    const dxPct = markerPositions.dropoff.left - markerPositions.driver.left;
+    const dyPct = markerPositions.dropoff.top - markerPositions.driver.top;
+    const lengthPct = Math.sqrt(dxPct * dxPct + dyPct * dyPct);
+    const angleDeg = Math.atan2(dyPct, dxPct) * (180 / Math.PI);
+    return { lengthPct, angleDeg, left: markerPositions.driver.left, top: markerPositions.driver.top };
+  }, [markerPositions]);
 
   const [etaTick, setEtaTick] = useState(0);
   const pulseAnim = useRef(new Animated.Value(0)).current;
@@ -194,25 +256,70 @@ export function LiveTrackingView({
 
               {isLive ? (
                 <>
-                  <View style={[styles.markerWrap, { top: 32, left: "32%" }]}>
-                    <View style={[styles.markerShadow]} />
-                    <View style={[styles.markerPickup, { backgroundColor: theme.success, borderColor: theme.surface }]}>
-                      <MaterialIcons name="check" size={14} color="#FFFFFF" />
-                    </View>
-                  </View>
-                  <View style={[styles.markerWrap, { top: "50%", left: "55%" }]}>
-                    <View style={[styles.markerShadow]} />
-                    <Animated.View style={[styles.markerPulse, { backgroundColor: theme.primary, transform: [{ scale: ringScale }], opacity: ringOpacity }]} />
-                    <View style={[styles.markerDriver, { backgroundColor: theme.primary, borderColor: theme.surface }]}>
-                      <MaterialIcons name="two-wheeler" size={18} color="#FFFFFF" />
-                    </View>
-                  </View>
-                  <View style={[styles.markerWrap, { top: "82%", left: "65%" }]}>
-                    <View style={[styles.markerShadow]} />
-                    <View style={[styles.markerDest, { backgroundColor: theme.error, borderColor: theme.surface }]}>
-                      <MaterialIcons name="place" size={16} color="#FFFFFF" />
-                    </View>
-                  </View>
+                  {markerPositions ? (
+                    <>
+                      <View style={[styles.markerWrap, { top: `${markerPositions.pickup.top}%`, left: `${markerPositions.pickup.left}%` }]}>
+                        <View style={[styles.markerShadow]} />
+                        <View style={[styles.markerPickup, { backgroundColor: theme.success, borderColor: theme.surface }]}>
+                          <MaterialIcons name="check" size={14} color="#FFFFFF" />
+                        </View>
+                      </View>
+                      <View style={[styles.markerWrap, { top: `${markerPositions.dropoff.top}%`, left: `${markerPositions.dropoff.left}%` }]}>
+                        <View style={[styles.markerShadow]} />
+                        <View style={[styles.markerDest, { backgroundColor: theme.error, borderColor: theme.surface }]}>
+                          <MaterialIcons name="place" size={16} color="#FFFFFF" />
+                        </View>
+                      </View>
+                      {markerPositions.driver ? (
+                        <>
+                          {driverTrail ? (
+                            <View
+                              pointerEvents="none"
+                              style={[
+                                styles.driverTrail,
+                                {
+                                  top: `${driverTrail.top}%`,
+                                  left: `${driverTrail.left}%`,
+                                  width: `${driverTrail.lengthPct}%`,
+                                  backgroundColor: theme.primary,
+                                  transform: [{ translateY: -1 }, { rotate: `${driverTrail.angleDeg}deg` }, { translateX: 0 }],
+                                },
+                              ]}
+                            />
+                          ) : null}
+                          <View style={[styles.markerWrap, { top: `${markerPositions.driver.top}%`, left: `${markerPositions.driver.left}%` }]}>
+                            <View style={[styles.markerShadow]} />
+                            <Animated.View style={[styles.markerPulse, { backgroundColor: theme.primary, transform: [{ scale: ringScale }], opacity: ringOpacity }]} />
+                            <View style={[styles.markerDriver, { backgroundColor: theme.primary, borderColor: theme.surface, transform: [{ rotate: typeof driverHeading === "number" ? `${driverHeading}deg` : "0deg" }] }]}>
+                              <MaterialIcons name="navigation" size={18} color="#FFFFFF" />
+                            </View>
+                          </View>
+                        </>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      <View style={[styles.markerWrap, { top: 32, left: "32%" }]}>
+                        <View style={[styles.markerShadow]} />
+                        <View style={[styles.markerPickup, { backgroundColor: theme.success, borderColor: theme.surface }]}>
+                          <MaterialIcons name="check" size={14} color="#FFFFFF" />
+                        </View>
+                      </View>
+                      <View style={[styles.markerWrap, { top: "50%", left: "55%" }]}>
+                        <View style={[styles.markerShadow]} />
+                        <Animated.View style={[styles.markerPulse, { backgroundColor: theme.primary, transform: [{ scale: ringScale }], opacity: ringOpacity }]} />
+                        <View style={[styles.markerDriver, { backgroundColor: theme.primary, borderColor: theme.surface }]}>
+                          <MaterialIcons name="two-wheeler" size={18} color="#FFFFFF" />
+                        </View>
+                      </View>
+                      <View style={[styles.markerWrap, { top: "82%", left: "65%" }]}>
+                        <View style={[styles.markerShadow]} />
+                        <View style={[styles.markerDest, { backgroundColor: theme.error, borderColor: theme.surface }]}>
+                          <MaterialIcons name="place" size={16} color="#FFFFFF" />
+                        </View>
+                      </View>
+                    </>
+                  )}
                 </>
               ) : isWaiting ? (
                 <View style={[styles.markerWrap, { top: "50%", left: "50%" }]}>
@@ -224,18 +331,37 @@ export function LiveTrackingView({
                 </View>
               ) : (
                 <>
-                  <View style={[styles.markerWrap, { top: "32%", left: "32%" }]}>
-                    <View style={[styles.markerShadow]} />
-                    <View style={[styles.markerPickup, { backgroundColor: theme.success, borderColor: theme.surface }]}>
-                      <MaterialIcons name="check" size={14} color="#FFFFFF" />
-                    </View>
-                  </View>
-                  <View style={[styles.markerWrap, { top: "82%", left: "65%" }]}>
-                    <View style={[styles.markerShadow]} />
-                    <View style={[styles.markerDest, { backgroundColor: theme.success, borderColor: theme.surface }]}>
-                      <MaterialIcons name="check" size={16} color="#FFFFFF" />
-                    </View>
-                  </View>
+                  {markerPositions ? (
+                    <>
+                      <View style={[styles.markerWrap, { top: `${markerPositions.pickup.top}%`, left: `${markerPositions.pickup.left}%` }]}>
+                        <View style={[styles.markerShadow]} />
+                        <View style={[styles.markerPickup, { backgroundColor: theme.success, borderColor: theme.surface }]}>
+                          <MaterialIcons name="check" size={14} color="#FFFFFF" />
+                        </View>
+                      </View>
+                      <View style={[styles.markerWrap, { top: `${markerPositions.dropoff.top}%`, left: `${markerPositions.dropoff.left}%` }]}>
+                        <View style={[styles.markerShadow]} />
+                        <View style={[styles.markerDest, { backgroundColor: theme.success, borderColor: theme.surface }]}>
+                          <MaterialIcons name="check" size={16} color="#FFFFFF" />
+                        </View>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <View style={[styles.markerWrap, { top: "32%", left: "32%" }]}>
+                        <View style={[styles.markerShadow]} />
+                        <View style={[styles.markerPickup, { backgroundColor: theme.success, borderColor: theme.surface }]}>
+                          <MaterialIcons name="check" size={14} color="#FFFFFF" />
+                        </View>
+                      </View>
+                      <View style={[styles.markerWrap, { top: "82%", left: "65%" }]}>
+                        <View style={[styles.markerShadow]} />
+                        <View style={[styles.markerDest, { backgroundColor: theme.success, borderColor: theme.surface }]}>
+                          <MaterialIcons name="check" size={16} color="#FFFFFF" />
+                        </View>
+                      </View>
+                    </>
+                  )}
                 </>
               )}
 
@@ -499,6 +625,8 @@ const styles = StyleSheet.create({
   waitingEmoji: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   waitingTitle: { fontSize: 13, fontWeight: "600" },
   waitingDesc: { fontSize: 11, marginTop: 1 },
+
+  driverTrail: { position: "absolute", height: 2, borderRadius: 1, opacity: 0.65, transformOrigin: "left center" as const },
 
   timelineCard: { flexDirection: "row", alignItems: "stretch", position: "relative", padding: 12, borderRadius: 14, borderWidth: 1, height: 64 },
   timelineBar: { position: "absolute", top: 28, left: 36, right: 36, height: 2, borderRadius: 1 },

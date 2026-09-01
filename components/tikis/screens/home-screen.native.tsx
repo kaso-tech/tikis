@@ -178,7 +178,6 @@ export function HomeScreen() {
   }, [filteredList, selectedId, role]);
   const liveDeliveryId = role === "sender" && selected?.status === "active" ? selected.id : null;
   const senderLivePosition = useLiveDeliveryPosition(liveDeliveryId, role === "sender");
-  const publishLivePositionMutation = trpc.deliveries.updateLivePosition.useMutation();
   const lastPublishedPosition = useRef<{ deliveryId: string; latitude: number; longitude: number; at: number } | null>(null);
 
   useEffect(() => {
@@ -196,25 +195,34 @@ export function HomeScreen() {
     }
   }, [filteredList, selectedId, role]);
 
+  const publishLivePositionMutation = trpc.deliveries.updateLivePosition.useMutation();
+  const publishLivePositionRef = useRef(publishLivePositionMutation.mutateAsync);
+  publishLivePositionRef.current = publishLivePositionMutation.mutateAsync;
+  const lastPublishedPosition = useRef<{ deliveryId: string; latitude: number; longitude: number; at: number } | null>(null);
+
   useEffect(() => {
     if (role !== "driver" || selected?.status !== "active" || !driverLocation.location) return;
     const previous = lastPublishedPosition.current;
     const elapsed = Date.now() - (previous?.at ?? 0);
-    const movedMeters = previous?.deliveryId === selected.id
+    const movedMeters = previous?.deliveryId === selected?.id
       ? geodesicDistanceKm(previous, driverLocation.location) * 1_000
       : Infinity;
-    if (previous?.deliveryId === selected.id && movedMeters < 4 && elapsed < 5_000) return;
+    if (previous?.deliveryId === selected?.id && movedMeters < 4 && elapsed < 5_000) return;
     const position = driverLocation.location;
-    lastPublishedPosition.current = { deliveryId: selected.id, ...position, at: Date.now() };
-    void publishLivePositionMutation.mutateAsync({
-      deliveryId: selected.id,
+    const deliveryId = selected?.id;
+    if (!deliveryId) return;
+    lastPublishedPosition.current = { deliveryId, ...position, at: Date.now() };
+    void publishLivePositionRef.current({
+      deliveryId,
       latitude: position.latitude,
       longitude: position.longitude,
       heading: typeof deviceHeading === "number" && Number.isFinite(deviceHeading) ? deviceHeading : 0,
     }).catch(() => {
-      lastPublishedPosition.current = null;
+      if (lastPublishedPosition.current?.deliveryId === deliveryId) {
+        lastPublishedPosition.current = null;
+      }
     });
-  }, [deviceHeading, driverLocation.location, publishLivePositionMutation, role, selected?.id, selected?.status]);
+  }, [deviceHeading, driverLocation.location, role, selected?.id, selected?.status]);
 
   const otherDeliveries = useMemo(() => filteredList.filter((d) => d.id !== selected?.id).slice(0, 5), [filteredList, selected?.id]);
 

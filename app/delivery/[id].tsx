@@ -1,6 +1,6 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, useLocalSearchParams } from "expo-router";
-import { type ComponentProps, useEffect, useMemo, useState } from "react";
+import { type ComponentProps, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -9,6 +9,7 @@ import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { LiveTrackingView } from "@/components/tikis/live-tracking";
 import { SectionHeading, TikisButton } from "@/components/tikis/ui";
+import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { haptic } from "@/lib/haptics";
 import { deliveryRemainingMs, formatDeliveryCountdown } from "@/lib/delivery-countdown";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
@@ -39,7 +40,23 @@ export default function DeliveryDetailScreen() {
   const candidatesQuery = trpc.deliveries.candidates.useQuery({ deliveryId: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
   const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
   const requestRouteMutation = trpc.geography.route.useMutation();
+  const requestRouteRef = useRef(requestRouteMutation.mutateAsync);
+  requestRouteRef.current = requestRouteMutation.mutateAsync;
   const delivery = deliveryQuery.data;
+  const fallbackRouteCoordinates = useMemo(
+    () => {
+      if (!delivery) return [] as { latitude: number; longitude: number }[];
+      return [
+        { latitude: delivery.pickup.latitude, longitude: delivery.pickup.longitude },
+        { latitude: delivery.dropoff.latitude, longitude: delivery.dropoff.longitude },
+      ];
+    },
+    [delivery?.pickup.latitude, delivery?.pickup.longitude, delivery?.dropoff.latitude, delivery?.dropoff.longitude],
+  );
+  const mapCoordinates = useMemo(
+    () => (routeCoordinates.length >= 2 ? routeCoordinates : fallbackRouteCoordinates),
+    [routeCoordinates, fallbackRouteCoordinates],
+  );
   useEffect(() => {
     if (!delivery) return;
     const pickup = delivery.pickup;
@@ -47,7 +64,7 @@ export default function DeliveryDetailScreen() {
     if (typeof pickup.latitude !== "number" || typeof dropoff.latitude !== "number") return;
     let cancelled = false;
     setRouteCoordinates([]);
-    void requestRouteMutation.mutateAsync({ origin: pickup, destination: dropoff }).then((route) => {
+    void requestRouteRef.current({ origin: pickup, destination: dropoff }).then((route) => {
       if (cancelled) return;
       setRouteCoordinates(route.coordinates ?? []);
     }).catch((cause) => {
@@ -58,7 +75,7 @@ export default function DeliveryDetailScreen() {
     return () => {
       cancelled = true;
     };
-  }, [delivery, requestRouteMutation]);
+  }, [delivery]);
   const applyMutation = trpc.deliveries.submitApplication.useMutation();
   const withdrawMutation = trpc.deliveries.withdraw.useMutation();
   const selectMutation = trpc.deliveries.selectCandidate.useMutation();
@@ -204,12 +221,23 @@ export default function DeliveryDetailScreen() {
 
   const isLiveTracking = delivery.status === "pending_confirmation" || delivery.status === "active";
   const pickupTime = isLiveTracking && delivery.status === "active" ? formatRelativeDate(delivery.scheduledAt ?? delivery.createdAt) : undefined;
+  const livePositionQuery = useLiveDeliveryPosition(
+    isLiveTracking ? deliveryId : null,
+    isLiveTracking && role === "sender",
+  );
   const liveContent = isLiveTracking ? (
     <LiveTrackingView
       deliveryId={deliveryId}
       status={delivery.status}
       driverName={delivery.driverName}
       driverPhone={delivery.driverPhone}
+      pickupLat={delivery.pickup.latitude}
+      pickupLng={delivery.pickup.longitude}
+      dropoffLat={delivery.dropoff.latitude}
+      dropoffLng={delivery.dropoff.longitude}
+      driverLat={livePositionQuery?.latitude ?? null}
+      driverLng={livePositionQuery?.longitude ?? null}
+      driverHeading={livePositionQuery?.heading ?? null}
       pickupName={pickupPresentation.title}
       pickupAddress={pickupPresentation.subtitle}
       pickupTime={pickupTime}
@@ -244,10 +272,7 @@ export default function DeliveryDetailScreen() {
             pickup={delivery.pickup}
             dropoff={delivery.dropoff}
             routeSource={delivery.routeSource}
-            coordinates={routeCoordinates.length >= 2 ? routeCoordinates : [
-              { latitude: delivery.pickup.latitude, longitude: delivery.pickup.longitude },
-              { latitude: delivery.dropoff.latitude, longitude: delivery.dropoff.longitude },
-            ]}
+            coordinates={mapCoordinates}
           />
           <View style={styles.heroMapStatus}>
             <View style={[styles.heroMapDot, { backgroundColor: statusBadgeColor }]} />
