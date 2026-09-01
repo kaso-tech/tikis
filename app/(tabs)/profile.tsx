@@ -394,30 +394,34 @@ function CoverAction({ icon, label, onPress, primary }: { icon: React.ComponentP
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const { colors: theme } = useThemeColors();
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      <View style={styles.sectionCard}>{children}</View>
+      <Text style={[styles.sectionTitle, { color: theme.muted }]}>{title}</Text>
+      <View style={[styles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>{children}</View>
     </View>
   );
 }
 
 function MenuRow({ icon, iconBg, label, sub, badge, onPress, last }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; iconBg: "primary" | "amber" | "dark"; label: string; sub?: string; badge?: { label: string; tone: "danger" | "success" }; onPress: () => void; last?: boolean }) {
+  const { colors: theme } = useThemeColors();
+  const iconBgColor = iconBg === "amber" ? theme.warning + "22" : iconBg === "dark" ? "#111111" : theme.primary + "22";
+  const iconColor = iconBg === "primary" ? theme.primary : iconBg === "amber" ? theme.warning : "#FFFFFF";
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.menuRow, last && styles.menuRowLast, pressed && styles.pressed]}>
-      <View style={[styles.menuIcon, iconBg === "amber" ? styles.menuIconAmber : iconBg === "dark" ? styles.menuIconDark : null]}>
-        <MaterialIcons name={icon} size={16} color={iconBg === "primary" ? "#9A6201" : iconBg === "amber" ? "#9A6200" : "#FFFFFF"} />
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.menuRow, !last && { borderBottomColor: theme.border }, pressed && { backgroundColor: theme.pressed }]}>
+      <View style={[styles.menuIcon, { backgroundColor: iconBgColor }]}>
+        <MaterialIcons name={icon} size={16} color={iconColor} />
       </View>
       <View style={styles.menuBody}>
-        <Text style={styles.menuLabel}>{label}</Text>
-        {sub ? <Text style={styles.menuSub}>{sub}</Text> : null}
+        <Text style={[styles.menuLabel, { color: theme.foreground }]}>{label}</Text>
+        {sub ? <Text style={[styles.menuSub, { color: theme.muted }]}>{sub}</Text> : null}
       </View>
       {badge ? (
-        <View style={[styles.menuBadge, badge.tone === "success" ? styles.menuBadgeSuccess : null]}>
-          <Text style={[styles.menuBadgeText, badge.tone === "success" ? styles.menuBadgeTextSuccess : null]}>{badge.label}</Text>
+        <View style={[styles.menuBadge, { backgroundColor: badge.tone === "success" ? theme.success + "22" : theme.error }, badge.tone === "danger" && { backgroundColor: theme.error }]}>
+          <Text style={[styles.menuBadgeText, { color: badge.tone === "success" ? theme.success : "#FFFFFF" }]}>{badge.label}</Text>
         </View>
       ) : (
-        <MaterialIcons name="chevron-right" size={16} color="#747474" />
+        <MaterialIcons name="chevron-right" size={16} color={theme.muted} />
       )}
     </Pressable>
   );
@@ -482,16 +486,16 @@ const styles = StyleSheet.create({
 
   section: { gap: 6, paddingHorizontal: 14 },
   sectionTitle: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", paddingHorizontal: 2 },
-  sectionCard: { backgroundColor: "#FFFFFF", borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: "#ECECEC" },
-  menuRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: "#ECECEC" },
+  sectionCard: { borderRadius: 12, overflow: "hidden", borderWidth: 1 },
+  menuRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11, paddingHorizontal: 12, borderBottomWidth: 1 },
   menuRowLast: { borderBottomWidth: 0 },
-  menuIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#F8F0E5", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  menuIconAmber: { backgroundColor: "#FEF6E2" },
-  menuIconDark: { backgroundColor: "#111111" },
+  menuIcon: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  menuIconAmber: {},
+  menuIconDark: {},
   menuBody: { flex: 1, minWidth: 0 },
-  menuLabel: { color: "#111111", fontSize: 13, fontWeight: "600" },
-  menuSub: { color: "#666666", fontSize: 10, marginTop: 1 },
-  menuBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 99, backgroundColor: "#B4232D" },
+  menuLabel: { fontSize: 13, fontWeight: "600" },
+  menuSub: { fontSize: 10, marginTop: 1 },
+  menuBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 99 },
   menuBadgeSuccess: { backgroundColor: "#F8F0E5" },
   menuBadgeText: { color: "#FFFFFF", fontSize: 9, fontWeight: "700" },
   menuBadgeTextSuccess: { color: "#167A55" },

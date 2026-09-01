@@ -399,7 +399,15 @@ export function HomeScreen() {
   const filterTranslateY = filterTransition.interpolate({ inputRange: [0, 1], outputRange: [6, 0] });
   const firstNameDisplay = isDriver ? firstName : "à vous";
   const todaysEarnings = useMemo(() => isDriver ? deliveryMetricsForDay(driverJournal).earnings : 0, [driverJournal, isDriver]);
-  const countLabel = isDriver ? `Gains du jour : ${formatMoney(todaysEarnings)}` : `${filteredList.length} livraison${filteredList.length > 1 ? "s" : ""} affichée${filteredList.length > 1 ? "s" : ""}`;
+  const availableOpportunities = useMemo(() => {
+    if (!isDriver) return 0;
+    return deliveries.filter((delivery) => {
+      if (isOpenDeliveryStale(delivery)) return false;
+      const own = delivery.ownCandidateStatus;
+      return (delivery.status === "open" || delivery.status === "pending_confirmation") && own !== "applied" && own !== "selected" && own !== "confirmed";
+    }).length;
+  }, [deliveries, isDriver]);
+  const countLabel = isDriver ? `${availableOpportunities} opportunité${availableOpportunities > 1 ? "s" : ""} à proximité` : `${filteredList.length} livraison${filteredList.length > 1 ? "s" : ""} affichée${filteredList.length > 1 ? "s" : ""}`;
 
   function pulseBadge(filterKey: FilterKey) {
     const badgeScale = badgeScales[filterKey];
@@ -452,7 +460,7 @@ export function HomeScreen() {
               ) : (
                 <Text style={styles.sheetTitle}>{`Bonjour ${firstNameDisplay} 👋`}</Text>
               )}
-              <Text style={styles.sheetSubtitle}>{isDriver ? `${filteredList.length} opportunité${filteredList.length > 1 ? "s" : ""} à proximité` : countLabel}</Text>
+              <Text style={styles.sheetSubtitle}>{countLabel}</Text>
             </View>
             {isDriver ? (
               <Pressable

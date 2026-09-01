@@ -921,6 +921,19 @@ export async function completeTikisDeliveryWithEvents(deliveryId: string, profil
     const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.status, "active"), or(eq(tikisDeliveries.senderPhone, profilePhone), eq(tikisDeliveries.driverPhone, profilePhone)))).limit(1).for("update"))[0];
     if (!delivery || !delivery.driverPhone) throw new Error("Cette livraison ne peut pas être terminée.");
     const earning = Math.round(delivery.offeredPrice ?? delivery.estimatedPrice);
+    const candidate = (await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, delivery.driverPhone), eq(tikisDeliveryCandidates.status, "confirmed"))).limit(1).for("update"))[0];
+    if (candidate && candidate.commissionBlocked > 0) {
+      await applyWalletMovement(tx, {
+        profilePhone: delivery.driverPhone,
+        deliveryId,
+        operation: "debit",
+        amount: candidate.commissionBlocked,
+        availableDelta: 0,
+        heldDelta: -candidate.commissionBlocked,
+        reason: "Commission Tikis transférée à la plateforme (course terminée)",
+        idempotencyKey: `${deliveryId}:commission-release-on-complete:${candidate.id}`,
+      });
+    }
     await applyWalletMovement(tx, {
       profilePhone: delivery.driverPhone,
       deliveryId,

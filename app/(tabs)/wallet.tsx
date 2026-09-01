@@ -149,27 +149,27 @@ export default function WalletScreen() {
         </View>
 
         <View style={styles.actionsRow}>
-          <Pressable onPress={() => openRequest("deposit")} style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}>
-            <View style={styles.actionIcon}><MaterialIcons name="add-card" size={15} color="#9A6201" /></View>
+          <Pressable onPress={() => openRequest("deposit")} style={({ pressed }) => [styles.actionCard, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]}>
+            <View style={[styles.actionIcon, { backgroundColor: theme.background }]}><MaterialIcons name="add-card" size={15} color={theme.primary} /></View>
             <View style={styles.actionText}>
-              <Text style={styles.actionLabel}>Dépôt</Text>
-              <Text style={styles.actionSub}>YengaPay · test</Text>
+              <Text style={[styles.actionLabel, { color: theme.foreground }]}>Dépôt</Text>
+              <Text style={[styles.actionSub, { color: theme.muted }]}>YengaPay · test</Text>
             </View>
           </Pressable>
-          <Pressable onPress={() => openRequest("withdrawal")} style={({ pressed }) => [styles.actionCard, pressed && styles.pressed]}>
-            <View style={[styles.actionIcon, styles.actionIconAlt]}><MaterialIcons name="account-balance-wallet" size={15} color="#9A6201" /></View>
+          <Pressable onPress={() => openRequest("withdrawal")} style={({ pressed }) => [styles.actionCard, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]}>
+            <View style={[styles.actionIcon, { backgroundColor: theme.background }]}><MaterialIcons name="account-balance-wallet" size={15} color={theme.primary} /></View>
             <View style={styles.actionText}>
-              <Text style={styles.actionLabel}>Retrait</Text>
-              <Text style={styles.actionSub}>Mobile Money</Text>
+              <Text style={[styles.actionLabel, { color: theme.foreground }]}>Retrait</Text>
+              <Text style={[styles.actionSub, { color: theme.muted }]}>Mobile Money</Text>
             </View>
           </Pressable>
         </View>
 
         {isDriver ? null : (
-          <View style={styles.senderInfo}>
-            <View style={styles.senderInfoIcon}><MaterialIcons name="handshake" size={16} color="#FFFFFF" /></View>
-            <Text style={styles.senderInfoText}>
-              <Text style={styles.senderInfoTextBold}>Paiement direct au livreur. </Text>
+          <View style={[styles.senderInfo, { backgroundColor: theme.background, borderColor: theme.border }]}>
+            <View style={[styles.senderInfoIcon, { backgroundColor: theme.primary }]}><MaterialIcons name="handshake" size={16} color="#FFFFFF" /></View>
+            <Text style={[styles.senderInfoText, { color: theme.foreground }]}>
+              <Text style={[styles.senderInfoTextBold, { color: theme.foreground }]}>Paiement direct au livreur. </Text>
               Le règlement de la course se fait à la remise. Les mouvements Tikis sont réservés aux règles de mise en relation.
             </Text>
           </View>
@@ -181,9 +181,9 @@ export default function WalletScreen() {
         </View>
 
         {walletQuery.isLoading ? (
-          <View style={styles.listCard}><Text style={styles.emptyText}>Chargement sécurisé de vos opérations…</Text></View>
+          <View style={[styles.listCard, { backgroundColor: theme.surface }]}><Text style={[styles.emptyText, { color: theme.muted }]}>Chargement sécurisé de vos opérations…</Text></View>
         ) : walletQuery.error ? (
-          <View style={styles.listCard}><Text style={styles.emptyText}>Le journal financier est momentanément indisponible.</Text></View>
+          <View style={[styles.listCard, { backgroundColor: theme.surface }]}><Text style={[styles.emptyText, { color: theme.muted }]}>Le journal financier est momentanément indisponible.</Text></View>
         ) : recentJournal.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}><MaterialIcons name="savings" size={26} color="#747474" /></View>
@@ -191,25 +191,25 @@ export default function WalletScreen() {
             <Text style={styles.emptySub}>Vos premières opérations apparaîtront ici après votre premier dépôt ou votre première course.</Text>
           </View>
         ) : (
-          <View style={styles.listCard}>
+          <View style={[styles.listCard, { backgroundColor: theme.surface }]}>
             {recentJournal.map((entry, idx) => {
               const meta = operationMeta[entry.operation];
               const isLast = idx === recentJournal.length - 1;
               const isCredit = entry.operation === "credit" || entry.operation === "refund" || entry.operation === "unblock" || entry.operation === "compensation";
               const isPending = entry.operation === "block" || entry.operation === "deposit_request" || entry.operation === "withdrawal_request";
-              const amountColor = isCredit ? styles.amountCredit : isPending ? styles.amountPending : styles.amountDebit;
+              const amountColor = isCredit ? { color: theme.success } : isPending ? { color: theme.warning } : { color: theme.error };
               const amountPrefix = isCredit ? "+" : isPending ? "" : "-";
               return (
-                <View key={entry.id} style={[styles.txRow, !isLast && styles.txRowDivider]}>
-                  <View style={[styles.txIcon, iconBgForTone(meta.tone)]}>
+                <View key={entry.id} style={[styles.txRow, !isLast && { borderBottomColor: theme.border }]}>
+                  <View style={[styles.txIcon, iconBgForTone(meta.tone, theme)]}>
                     <MaterialIcons name={meta.icon} size={16} color={TONE_COLOR[meta.tone]} />
                   </View>
                   <View style={styles.txBody}>
                     <View style={styles.txLine1}>
-                      <Text style={styles.txLabel} numberOfLines={1}>{meta.label}</Text>
-                      <Text style={styles.txTime}>{formatRelativeDate(entry.createdAt)}</Text>
+                      <Text style={[styles.txLabel, { color: theme.foreground }]} numberOfLines={1}>{meta.label}</Text>
+                      <Text style={[styles.txTime, { color: theme.muted }]}>{formatRelativeDate(entry.createdAt)}</Text>
                     </View>
-                    <Text style={styles.txReason} numberOfLines={2}>{entry.reason} · Solde après opération : {formatMoney(entry.balanceAfter)}</Text>
+                    <Text style={[styles.txReason, { color: theme.muted }]} numberOfLines={2}>{entry.reason} · Solde après opération : {formatMoney(entry.balanceAfter)}</Text>
                   </View>
                   <Text style={[styles.txAmount, amountColor]}>{amountPrefix}{formatMoney(entry.amount)}</Text>
                 </View>
@@ -262,12 +262,12 @@ export default function WalletScreen() {
   );
 }
 
-function iconBgForTone(tone: Tone) {
-  if (tone === "success") return styles.iconBgSuccess;
-  if (tone === "warning") return styles.iconBgWarning;
-  if (tone === "error") return styles.iconBgError;
-  if (tone === "primary") return styles.iconBgPrimary;
-  return styles.iconBgNeutral;
+function iconBgForTone(tone: Tone, theme: any) {
+  if (tone === "success") return { backgroundColor: theme.success + "22" };
+  if (tone === "warning") return { backgroundColor: theme.warning + "22" };
+  if (tone === "error") return { backgroundColor: theme.error + "22" };
+  if (tone === "primary") return { backgroundColor: theme.primary + "22" };
+  return { backgroundColor: theme.background };
 }
 
 const styles = StyleSheet.create({
@@ -299,12 +299,12 @@ const styles = StyleSheet.create({
   balanceSubPending: { color: "#FBBF24" },
 
   actionsRow: { flexDirection: "row", gap: 8, paddingHorizontal: 8, marginTop: 6 },
-  actionCard: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8 },
-  actionIcon: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#F8F0E5", alignItems: "center", justifyContent: "center" },
-  actionIconAlt: { backgroundColor: "#FEF6E2" },
+  actionCard: { flex: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1 },
+  actionIcon: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  actionIconAlt: {},
   actionText: { flex: 1 },
-  actionLabel: { color: "#111111", fontSize: 12, fontWeight: "600" },
-  actionSub: { color: "#747474", fontSize: 9, fontWeight: "500" },
+  actionLabel: { fontSize: 12, fontWeight: "600" },
+  actionSub: { fontSize: 9, fontWeight: "500" },
 
   quickStats: { flexDirection: "row", gap: 8, paddingHorizontal: 8 },
   quickStat: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 10, paddingVertical: 10, alignItems: "center", gap: 4 },
@@ -324,24 +324,24 @@ const styles = StyleSheet.create({
   sectionTitle: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
   sectionAction: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
 
-  listCard: { backgroundColor: "#FFFFFF", borderRadius: 12, overflow: "hidden" },
+  listCard: { borderRadius: 12, overflow: "hidden" },
   txRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 12 },
-  txRowDivider: { borderBottomWidth: 1, borderBottomColor: "#ECECEC" },
+  txRowDivider: { borderBottomWidth: 1 },
   txIcon: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  iconBgPrimary: { backgroundColor: "#F8F0E5" },
-  iconBgSuccess: { backgroundColor: "#E2F3F4" },
-  iconBgWarning: { backgroundColor: "#FEF6E2" },
-  iconBgError: { backgroundColor: "#FDEBEC" },
-  iconBgNeutral: { backgroundColor: "#EEEDF3" },
+  iconBgPrimary: {},
+  iconBgSuccess: {},
+  iconBgWarning: {},
+  iconBgError: {},
+  iconBgNeutral: {},
   txBody: { flex: 1, minWidth: 0 },
   txLine1: { flexDirection: "row", alignItems: "center", gap: 6 },
-  txLabel: { color: "#111111", fontSize: 12, fontWeight: "600", flex: 1 },
-  txTime: { color: "#747474", fontSize: 10, flexShrink: 0 },
-  txReason: { color: "#666666", fontSize: 11, marginTop: 2 },
+  txLabel: { fontSize: 12, fontWeight: "600", flex: 1 },
+  txTime: { fontSize: 10, flexShrink: 0 },
+  txReason: { fontSize: 11, marginTop: 2 },
   txAmount: { fontSize: 12, fontWeight: "700", flexShrink: 0 },
-  amountCredit: { color: "#167A55" },
-  amountDebit: { color: "#B4232D" },
-  amountPending: { color: "#9A6200" },
+  amountCredit: {},
+  amountDebit: {},
+  amountPending: {},
 
   empty: { alignItems: "center", paddingVertical: 30, paddingHorizontal: 24, gap: 8 },
   emptyIcon: { width: 56, height: 56, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },

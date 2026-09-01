@@ -169,7 +169,7 @@ export default function EarningsScreen() {
           })}
         </View>
 
-        <Text style={styles.periodDescription}>{PERIOD_META[period].description}</Text>
+        <Text style={[styles.periodDescription, { color: theme.muted }]}>{PERIOD_META[period].description}</Text>
 
         <View style={styles.statsRow}>
           <StatCard icon="paid" tone="primary" label="Total" value={formatMoney(totalEarnings)} />
@@ -178,11 +178,11 @@ export default function EarningsScreen() {
         </View>
 
         {dailyBreakdown.length > 0 ? (
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Répartition par jour</Text>
+              <Text style={[styles.cardTitle, { color: theme.foreground }]}>Répartition par jour</Text>
               {bestDay ? (
-                <Text style={styles.cardSubtitle}>
+                <Text style={[styles.cardSubtitle, { color: theme.muted }]}>
                   Pic : {formatMoney(bestDay.amount)} · {new Date(bestDay.dateKey).toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "short" })}
                 </Text>
               ) : null}
@@ -192,13 +192,13 @@ export default function EarningsScreen() {
               const widthPct = max === 0 ? 0 : Math.max(8, Math.round((day.amount / max) * 100));
               const isLast = idx === dailyBreakdown.length - 1;
               return (
-                <View key={day.dateKey} style={[styles.barRow, !isLast && styles.barRowDivider]}>
+                <View key={day.dateKey} style={[styles.barRow, !isLast && { borderBottomColor: theme.border }]}>
                   <View style={styles.barLabel}>
-                    <Text style={styles.barDate}>{new Date(day.dateKey).toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" })}</Text>
-                    <Text style={styles.barValue}>{formatMoney(day.amount)}</Text>
+                    <Text style={[styles.barDate, { color: theme.foreground }]}>{new Date(day.dateKey).toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" })}</Text>
+                    <Text style={[styles.barValue, { color: theme.primary }]}>{formatMoney(day.amount)}</Text>
                   </View>
-                  <View style={styles.barTrack}>
-                    <View style={[styles.barFill, { width: `${widthPct}%` }]} />
+                  <View style={[styles.barTrack, { backgroundColor: theme.background }]}>
+                    <View style={[styles.barFill, { width: `${widthPct}%`, backgroundColor: theme.primary }]} />
                   </View>
                 </View>
               );
@@ -207,37 +207,37 @@ export default function EarningsScreen() {
         ) : null}
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Historique des gains</Text>
-          <Text style={styles.sectionAction}>{history.length} crédit{history.length > 1 ? "s" : ""}</Text>
+          <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Historique des gains</Text>
+          <Text style={[styles.sectionAction, { color: theme.muted }]}>{history.length} crédit{history.length > 1 ? "s" : ""}</Text>
         </View>
 
         {walletQuery.isLoading ? (
-          <View style={styles.card}><Text style={styles.emptyText}>Chargement sécurisé de vos gains…</Text></View>
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.emptyText, { color: theme.muted }]}>Chargement sécurisé de vos gains…</Text></View>
         ) : walletQuery.error ? (
-          <View style={styles.card}><Text style={styles.emptyText}>L'historique des gains est momentanément indisponible.</Text></View>
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.emptyText, { color: theme.muted }]}>L'historique des gains est momentanément indisponible.</Text></View>
         ) : history.length === 0 ? (
-          <View style={styles.empty}>
-            <View style={styles.emptyIcon}><MaterialIcons name="savings" size={26} color="#747474" /></View>
-            <Text style={styles.emptyTitle}>Aucun gain sur cette période</Text>
-            <Text style={styles.emptySub}>Vos crédits de course apparaîtront ici dès que vous terminez une livraison.</Text>
+          <View style={[styles.empty, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <View style={[styles.emptyIcon, { backgroundColor: theme.background }]}><MaterialIcons name="savings" size={26} color={theme.muted} /></View>
+            <Text style={[styles.emptyTitle, { color: theme.foreground }]}>Aucun gain sur cette période</Text>
+            <Text style={[styles.emptySub, { color: theme.muted }]}>Vos crédits de course apparaîtront ici dès que vous terminez une livraison.</Text>
           </View>
         ) : (
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             {history.map((entry, idx) => {
               const isLast = idx === history.length - 1;
               return (
-                <View key={entry.id} style={[styles.historyRow, !isLast && styles.historyRowDivider]}>
-                  <View style={styles.historyIcon}>
-                    <MaterialIcons name="south-west" size={15} color="#167A55" />
+                <View key={entry.id} style={[styles.historyRow, !isLast && { borderBottomColor: theme.border }]}>
+                  <View style={[styles.historyIcon, { backgroundColor: theme.success + "22" }]}>
+                    <MaterialIcons name="south-west" size={15} color={theme.success} />
                   </View>
                   <View style={styles.historyBody}>
                     <View style={styles.historyLine1}>
-                      <Text style={styles.historyLabel} numberOfLines={1}>Gain de course</Text>
-                      <Text style={styles.historyTime}>{formatRelativeDate(entry.createdAt)}</Text>
+                      <Text style={[styles.historyLabel, { color: theme.foreground }]} numberOfLines={1}>Gain de course</Text>
+                      <Text style={[styles.historyTime, { color: theme.muted }]}>{formatRelativeDate(entry.createdAt)}</Text>
                     </View>
-                    <Text style={styles.historyMeta} numberOfLines={1}>{entry.reason}</Text>
+                    <Text style={[styles.historyMeta, { color: theme.muted }]} numberOfLines={1}>{entry.reason}</Text>
                   </View>
-                  <Text style={styles.historyAmount}>+{formatMoney(entry.amount)}</Text>
+                  <Text style={[styles.historyAmount, { color: theme.success }]}>+{formatMoney(entry.amount)}</Text>
                 </View>
               );
             })}
@@ -245,8 +245,8 @@ export default function EarningsScreen() {
         )}
 
         <View style={styles.disclaimer}>
-          <MaterialIcons name="verified-user" size={14} color="#747474" />
-          <Text style={styles.disclaimerText}>Les montants affichés correspondent aux crédits de course après commission Tikis.</Text>
+          <MaterialIcons name="verified-user" size={14} color={theme.muted} />
+          <Text style={[styles.disclaimerText, { color: theme.muted }]}>Les montants affichés correspondent aux crédits de course après commission Tikis.</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -254,13 +254,15 @@ export default function EarningsScreen() {
 }
 
 function StatCard({ icon, value, label, tone }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; value: string; label: string; tone: "primary" | "amber" | "success" }) {
+  const { colors: theme } = useThemeColors();
+  const iconBg = tone === "primary" ? theme.primary + "22" : tone === "amber" ? theme.warning + "22" : theme.success + "22";
   return (
-    <View style={styles.statCard}>
-      <View style={[styles.statIcon, tone === "primary" ? styles.statIconPrimary : tone === "amber" ? styles.statIconAmber : styles.statIconSuccess]}>
-        <MaterialIcons name={icon} size={15} color="#9A6201" />
+    <View style={[styles.statCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+      <View style={[styles.statIcon, { backgroundColor: iconBg }]}>
+        <MaterialIcons name={icon} size={15} color={theme.primary} />
       </View>
-      <Text style={styles.statValue} numberOfLines={1}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={[styles.statValue, { color: theme.foreground }]} numberOfLines={1}>{value}</Text>
+      <Text style={[styles.statLabel, { color: theme.muted }]}>{label}</Text>
     </View>
   );
 }
@@ -286,21 +288,21 @@ const styles = StyleSheet.create({
   balanceSub: { color: "#FFFFFF", fontSize: 12, fontWeight: "700", marginTop: 2 },
 
   periodTabs: { flexDirection: "row", gap: 6, paddingHorizontal: 2 },
-  periodTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 9, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
+  periodTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 9, borderRadius: 9, borderWidth: 1 },
   periodTabActive: { backgroundColor: "#9A6201", borderColor: "#9A6201" },
-  periodTabText: { color: "#666666", fontSize: 11, fontWeight: "600" },
+  periodTabText: { fontSize: 11, fontWeight: "600" },
   periodTabTextActive: { color: "#FFFFFF" },
 
-  periodDescription: { color: "#747474", fontSize: 11, lineHeight: 16, paddingHorizontal: 4 },
+  periodDescription: { fontSize: 11, lineHeight: 16, paddingHorizontal: 4 },
 
   statsRow: { flexDirection: "row", gap: 8 },
-  statCard: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 10, paddingVertical: 12, paddingHorizontal: 10, alignItems: "center", gap: 4 },
+  statCard: { flex: 1, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 10, alignItems: "center", gap: 4, borderWidth: 1 },
   statIcon: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  statIconPrimary: { backgroundColor: "#F8F0E5" },
-  statIconAmber: { backgroundColor: "#FEF6E2" },
-  statIconSuccess: { backgroundColor: "#E2F3F4" },
-  statValue: { color: "#111111", fontSize: 13, fontWeight: "700" },
-  statLabel: { color: "#747474", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
+  statIconPrimary: {},
+  statIconAmber: {},
+  statIconSuccess: {},
+  statValue: { fontSize: 13, fontWeight: "700" },
+  statLabel: { fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
 
   card: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, gap: 10 },
   cardHeader: { gap: 2 },
@@ -308,33 +310,33 @@ const styles = StyleSheet.create({
   cardSubtitle: { color: "#747474", fontSize: 11, lineHeight: 16 },
 
   barRow: { gap: 6 },
-  barRowDivider: { paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: "#ECECEC", marginBottom: 8 },
+  barRowDivider: { paddingBottom: 8, borderBottomWidth: 1, marginBottom: 8 },
   barLabel: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  barDate: { color: "#111111", fontSize: 11, fontWeight: "600" },
-  barValue: { color: "#9A6201", fontSize: 11, fontWeight: "700", fontVariant: ["tabular-nums"] },
-  barTrack: { height: 6, borderRadius: 3, backgroundColor: "#F7EFE5", overflow: "hidden" },
-  barFill: { height: "100%", borderRadius: 3, backgroundColor: "#9A6201" },
+  barDate: { fontSize: 11, fontWeight: "600" },
+  barValue: { fontSize: 11, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  barTrack: { height: 6, borderRadius: 3, overflow: "hidden" },
+  barFill: { height: "100%", borderRadius: 3 },
 
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 4, marginTop: 4 },
-  sectionTitle: { color: "#111111", fontSize: 13, fontWeight: "700" },
-  sectionAction: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
+  sectionTitle: { fontSize: 13, fontWeight: "700" },
+  sectionAction: { fontSize: 11, fontWeight: "600" },
 
   historyRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  historyRowDivider: { paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: "#ECECEC", marginBottom: 10 },
-  historyIcon: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#E2F3F4", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  historyRowDivider: { paddingBottom: 10, borderBottomWidth: 1, marginBottom: 10 },
+  historyIcon: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   historyBody: { flex: 1, minWidth: 0 },
   historyLine1: { flexDirection: "row", alignItems: "center", gap: 6 },
-  historyLabel: { color: "#111111", fontSize: 12, fontWeight: "600", flex: 1 },
-  historyTime: { color: "#747474", fontSize: 10, flexShrink: 0 },
-  historyMeta: { color: "#666666", fontSize: 11, marginTop: 2 },
-  historyAmount: { color: "#167A55", fontSize: 13, fontWeight: "700", flexShrink: 0, fontVariant: ["tabular-nums"] },
+  historyLabel: { fontSize: 12, fontWeight: "600", flex: 1 },
+  historyTime: { fontSize: 10, flexShrink: 0 },
+  historyMeta: { fontSize: 11, marginTop: 2 },
+  historyAmount: { fontSize: 13, fontWeight: "700", flexShrink: 0, fontVariant: ["tabular-nums"] },
 
-  empty: { alignItems: "center", paddingVertical: 30, paddingHorizontal: 24, gap: 8, backgroundColor: "#FFFFFF", borderRadius: 12 },
-  emptyIcon: { width: 56, height: 56, borderRadius: 14, backgroundColor: "#F7EFE5", alignItems: "center", justifyContent: "center" },
-  emptyTitle: { color: "#111111", fontSize: 14, fontWeight: "600" },
-  emptySub: { color: "#666666", fontSize: 12, textAlign: "center", lineHeight: 18, maxWidth: 260 },
-  emptyText: { color: "#666666", fontSize: 12, textAlign: "center", padding: 8 },
+  empty: { alignItems: "center", paddingVertical: 30, paddingHorizontal: 24, gap: 8, borderRadius: 12 },
+  emptyIcon: { width: 56, height: 56, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  emptyTitle: { fontSize: 14, fontWeight: "600" },
+  emptySub: { fontSize: 12, textAlign: "center", lineHeight: 18, maxWidth: 260 },
+  emptyText: { fontSize: 12, textAlign: "center", padding: 8 },
 
   disclaimer: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 6, marginTop: 4 },
-  disclaimerText: { color: "#747474", fontSize: 10, lineHeight: 14, flex: 1 },
+  disclaimerText: { fontSize: 10, lineHeight: 14, flex: 1 },
 });
