@@ -1,4 +1,5 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { useRouter } from "expo-router";
 import { useMemo } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useThemeColors } from "@/lib/use-theme-colors";
@@ -39,9 +40,11 @@ function timeShort(date: Date) {
 
 export default function NotificationsScreen() {
   const { colors: theme } = useThemeColors();
+  const router = useRouter();
   const { profile } = useTikisStore();
-  const notificationsQuery = trpc.notifications.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 12_000 });
-  const markReadMutation = trpc.notifications.markRead.useMutation({ onSuccess: () => void notificationsQuery.refetch() });
+  const notificationsQuery = trpc.notifications.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 8_000 });
+  const markAllReadMutation = trpc.notifications.markRead.useMutation({ onSuccess: () => void notificationsQuery.refetch() });
+  const markOneReadMutation = trpc.notifications.markOneRead.useMutation({ onSuccess: () => void notificationsQuery.refetch() });
   const notifications = useMemo(() => notificationsQuery.data ?? [], [notificationsQuery.data]);
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -61,20 +64,34 @@ export default function NotificationsScreen() {
     return Array.from(map.values()).sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [notifications]);
 
-  const markAllRead = () => {
-    if (unreadCount === 0 || markReadMutation.isPending) return;
-    markReadMutation.mutate();
-  };
+  function handleOpen(notif: InAppNotification) {
+    if (!notif.read && !markOneReadMutation.isPending) {
+      markOneReadMutation.mutate({ notificationId: notif.id });
+    }
+    if (notif.deliveryId) {
+      router.push(`/delivery/${notif.deliveryId}` as any);
+    }
+  }
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
       <View style={styles.topBar}>
-        <Pressable onPress={() => null} style={[styles.iconBtn, { backgroundColor: theme.surface }]} accessibilityLabel="Ouvrir le menu">
-          <MaterialIcons name="menu" size={20} color={theme.foreground} />
+        <Pressable
+          onPress={() => router.back()}
+          style={({ pressed }) => [styles.iconBtn, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]}
+          accessibilityLabel="Retour"
+          accessibilityRole="button"
+        >
+          <MaterialIcons name="arrow-back" size={20} color={theme.foreground} />
         </Pressable>
         <Text style={[styles.topTitle, { color: theme.foreground }]}>Notifications</Text>
         {unreadCount > 0 ? (
-          <Pressable onPress={markAllRead} disabled={markReadMutation.isPending} style={({ pressed }) => [styles.topAction, pressed && styles.pressed]}>
+          <Pressable
+            onPress={() => { if (!markAllReadMutation.isPending) markAllReadMutation.mutate(); }}
+            disabled={markAllReadMutation.isPending}
+            style={({ pressed }) => [styles.topAction, pressed && styles.pressed]}
+            accessibilityLabel="Marquer toutes les notifications comme lues"
+          >
             <Text style={[styles.topActionText, { color: theme.primary }]}>Tout lire</Text>
           </Pressable>
         ) : (
@@ -114,9 +131,16 @@ export default function NotificationsScreen() {
                   return (
                     <Pressable
                       key={notif.id}
-                      onPress={() => { if (!notif.read) markReadMutation.mutate(); }}
-                      disabled={markReadMutation.isPending}
-                      style={({ pressed }) => [styles.notif, !notif.read && { backgroundColor: theme.pressed }, !isLast && { borderBottomColor: theme.border }, pressed && { backgroundColor: theme.pressed }]}
+                      onPress={() => handleOpen(notif)}
+                      disabled={markOneReadMutation.isPending}
+                      style={({ pressed }) => [
+                        styles.notif,
+                        !notif.read && { backgroundColor: theme.pressed + "66" },
+                        !isLast && { marginBottom: 2 },
+                        pressed && { backgroundColor: theme.pressed },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${notif.title}. ${notif.read ? "Lue" : "Non lue"}. Appuyer pour ouvrir.`}
                     >
                       <View style={[styles.notifIndicator, { backgroundColor: theme.primary }, notif.read && { backgroundColor: "transparent" }]} />
                       <View style={[styles.notifIcon, { backgroundColor: toneBg }]}>
@@ -124,12 +148,12 @@ export default function NotificationsScreen() {
                       </View>
                       <View style={styles.notifBody}>
                         <View style={styles.notifLine1}>
-                          <Text style={[styles.notifTitle, { color: theme.foreground }]} numberOfLines={1}>{notif.title}</Text>
+                          <Text style={[styles.notifTitle, { color: theme.foreground }, !notif.read && { fontWeight: "700" }]} numberOfLines={1}>{notif.title}</Text>
                           <Text style={[styles.notifTime, { color: theme.muted }]}>{sameDay(created, new Date()) ? formatRelativeDate(notif.createdAt) : timeShort(created)}</Text>
                         </View>
                         <View style={styles.notifLine2}>
                           <Text style={[styles.notifSource, { color: theme.muted }]} numberOfLines={1}>{notif.tone === "info" ? "Notification" : notif.tone === "success" ? "Validé" : "Attention"}</Text>
-                          <Text style={[styles.notifText, { color: theme.muted }]} numberOfLines={1}>{notif.body}</Text>
+                          <Text style={[styles.notifText, { color: theme.muted }]} numberOfLines={2}>{notif.body}</Text>
                         </View>
                       </View>
                       <MaterialIcons name="chevron-right" size={14} color={theme.muted} />
@@ -149,7 +173,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
 
   topBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4, gap: 8 },
-  iconBtn: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  iconBtn: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", borderWidth: 1 },
   iconBtnSpacer: { width: 36 },
   topTitle: { flex: 1, fontSize: 15, fontWeight: "600", textAlign: "center" },
   topAction: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
@@ -167,7 +191,7 @@ const styles = StyleSheet.create({
 
   list: { borderRadius: 12, overflow: "hidden", borderWidth: 1 },
 
-  notif: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11, paddingHorizontal: 12, borderBottomWidth: 1 },
+  notif: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11, paddingHorizontal: 12 },
 
   notifIndicator: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
 

@@ -90,7 +90,7 @@ export async function createTikisProfile(input: PersistedTikisProfile) {
   return created;
 }
 
-export async function updateTikisProfile(phone: string, changes: Partial<Pick<PersistedTikisProfile, "fullName" | "photoKey" | "email" | "phoneVerified" | "emailVerified">>) {
+export async function updateTikisProfile(phone: string, changes: Partial<Pick<PersistedTikisProfile, "fullName" | "photoKey" | "email" | "phoneVerified" | "emailVerified" | "vehicles">>) {
   const db = await getDb();
   if (!db) throw new Error("La base de données sécurisée est temporairement indisponible.");
   await db.update(tikisProfiles).set({ ...changes, updatedAt: new Date() }).where(eq(tikisProfiles.phone, phone));
@@ -628,6 +628,13 @@ export async function markTikisDeliveryEventsRead(profilePhone: string) {
   const db = await getDb();
   if (!db) return { success: true } as const;
   await db.update(tikisDeliveryEvents).set({ readAt: new Date() }).where(and(eq(tikisDeliveryEvents.recipientPhone, profilePhone), isNull(tikisDeliveryEvents.readAt)));
+  return { success: true } as const;
+}
+
+export async function markTikisDeliveryEventRead(notificationId: string, profilePhone: string) {
+  const db = await getDb();
+  if (!db) return { success: false } as const;
+  await db.update(tikisDeliveryEvents).set({ readAt: new Date() }).where(and(eq(tikisDeliveryEvents.id, notificationId), eq(tikisDeliveryEvents.recipientPhone, profilePhone), isNull(tikisDeliveryEvents.readAt)));
   return { success: true } as const;
 }
 

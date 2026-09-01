@@ -251,6 +251,12 @@ export const appRouter = router({
       const profile = await db.updateTikisProfile(input.phone, { fullName: input.fullName ?? current.fullName, photoKey: photoKey ?? current.photoKey });
       return toPublicProfile(profile);
     }),
+    updateVehicles: tikisProtectedProcedure.input(z.object({ vehicles: z.array(vehicleSchema).min(1).max(5) })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "driver") throw new Error("Seuls les livreurs peuvent gérer leurs engins.");
+      const updated = await db.updateTikisProfile(profile.phone, { vehicles: JSON.stringify(input.vehicles) });
+      return toPublicProfile(updated);
+    }),
     requestContactOtp: publicProcedure.input(z.object({
       kind: z.enum(["phone", "email"]),
       value: z.string().min(3).max(180),
@@ -505,6 +511,10 @@ export const appRouter = router({
     markRead: tikisProtectedProcedure.mutation(async ({ ctx }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       return db.markTikisDeliveryEventsRead(profile.phone);
+    }),
+    markOneRead: tikisProtectedProcedure.input(z.object({ notificationId: z.string().min(1).max(40) })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      return db.markTikisDeliveryEventRead(input.notificationId, profile.phone);
     }),
   }),
   reviews: router({

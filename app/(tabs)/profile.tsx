@@ -21,9 +21,18 @@ const COVER_ASPECT = [21, 9] as [number, number];
 
 export default function ProfileScreen() {
   const { colors: theme, isDark } = useThemeColors();
-  const { role, profile, notifications, markNotificationsRead, updateProfile } = useTikisStore();
+  const { role, profile, updateProfile } = useTikisStore();
   const { openLogoutConfirmation } = useTikisLogout();
   const updateMutation = trpc.profiles.update.useMutation();
+  const updateVehiclesMutation = trpc.profiles.updateVehicles.useMutation({
+    onSuccess: (saved) => {
+      updateProfile(saved as any);
+      haptic.success();
+    },
+    onError: (cause) => {
+      Alert.alert("Engins", cause.message);
+    },
+  });
   const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
   const reviewsQuery = trpc.reviews.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone) });
@@ -32,6 +41,7 @@ export default function ProfileScreen() {
   const [photoBase64, setPhotoBase64] = useState<string | undefined>();
   const [photoMime, setPhotoMime] = useState<"image/jpeg" | "image/png" | "image/webp" | undefined>();
   const [error, setError] = useState("");
+  const [vehiclesPickerOpen, setVehiclesPickerOpen] = useState(false);
   const [coverBase64, setCoverBase64] = useState<string | undefined>();
   const [coverMime, setCoverMime] = useState<"image/jpeg" | "image/png" | "image/webp" | undefined>();
 
@@ -42,7 +52,6 @@ export default function ProfileScreen() {
   const coverUri = coverBase64 ? `data:${coverMime ?? "image/jpeg"};base64,${coverBase64}` : undefined;
   const completed = (deliveriesQuery.data ?? []).filter((delivery) => delivery.status === "completed");
   const receivedReviews = useMemo(() => driver ? reviewsQuery.data ?? [] : [], [driver, reviewsQuery.data]);
-  const unread = notifications.filter((item) => !item.read).length;
   const driverWallet = walletQuery.data?.wallet;
   const availableBalance = driverWallet ? availableWalletBalance(driverWallet) : 0;
   const senderDelivered = (deliveriesQuery.data ?? []).filter((delivery) => delivery.status === "completed").length;
@@ -255,8 +264,8 @@ export default function ProfileScreen() {
               icon="two-wheeler"
               iconBg="amber"
               label="Mes engins"
-              sub={profile?.vehicles?.join(", ") ?? "À compléter"}
-              onPress={() => Alert.alert("Engins", "La gestion des engins se fait depuis votre profil livreur.")}
+              sub={profile?.vehicles?.length ? profile.vehicles.join(", ") : "Sélectionnez vos engins"}
+              onPress={() => setVehiclesPickerOpen(true)}
               last
             />
           </Section>
@@ -295,17 +304,7 @@ export default function ProfileScreen() {
               onPress={() => router.push("/(tabs)/addresses" as any)}
               last
             />
-          ) : (
-            <MenuRow
-              icon="notifications-none"
-              iconBg="primary"
-              label="Notifications"
-              sub={unread ? `${unread} nouvelle${unread > 1 ? "s" : ""}` : "À jour"}
-              badge={unread > 0 ? { label: String(unread), tone: "danger" } : undefined}
-              onPress={markNotificationsRead}
-              last
-            />
-          )}
+          ) : null}
         </Section>
 
         <Pressable onPress={openLogoutConfirmation} style={({ pressed }) => [styles.logout, pressed && styles.pressed]}>
@@ -313,6 +312,49 @@ export default function ProfileScreen() {
           <Text style={styles.logoutText}>Se déconnecter</Text>
         </Pressable>
       </ScrollView>
+
+      <Modal visible={vehiclesPickerOpen} transparent animationType="slide" onRequestClose={() => !updateVehiclesMutation.isPending && setVehiclesPickerOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => !updateVehiclesMutation.isPending && setVehiclesPickerOpen(false)} />
+          <View style={[styles.sheet, isDark && { backgroundColor: theme.surface }]}>
+            <View style={styles.sheetGrip} />
+            <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Mes engins</Text>
+            <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>Sélectionnez les engins que vous utilisez pour les livraisons (au moins un).</Text>
+            <View style={styles.vehiclesList}>
+              {(["Vélo", "Moto", "Tricycle", "Voiture"] as const).map((option) => {
+                const checked = profile?.vehicles?.includes(option) ?? false;
+                return (
+                  <Pressable
+                    key={option}
+                    onPress={() => {
+                      if (updateVehiclesMutation.isPending) return;
+                      const current = (profile?.vehicles ?? []) as Array<"Vélo" | "Moto" | "Tricycle" | "Voiture" | "Fourgonnette">;
+                      const next = current.includes(option) ? current.filter((v) => v !== option) : [...current, option];
+                      if (next.length === 0) {
+                        Alert.alert("Engins", "Sélectionnez au moins un engin pour candidater aux livraisons.");
+                        return;
+                      }
+                      updateVehiclesMutation.mutate({ vehicles: next as Array<"Vélo" | "Moto" | "Tricycle" | "Voiture" | "Fourgonnette"> });
+                    }}
+                    disabled={updateVehiclesMutation.isPending}
+                    style={({ pressed }) => [styles.vehicleRow, { borderColor: theme.border, backgroundColor: theme.background }, pressed && { backgroundColor: theme.pressed }]}
+                  >
+                    <View style={[styles.vehicleCheckbox, { borderColor: theme.border, backgroundColor: checked ? theme.primary : "transparent" }]}>
+                      {checked ? <MaterialIcons name="check" size={14} color="#FFFFFF" /> : null}
+                    </View>
+                    <Text style={[styles.vehicleLabel, { color: theme.foreground }]}>{option}</Text>
+                    <MaterialIcons name={option === "Vélo" ? "directions-bike" : option === "Moto" ? "two-wheeler" : option === "Tricycle" ? "electric-rickshaw" : "directions-car"} size={20} color={theme.muted} />
+                  </Pressable>
+                );
+              })}
+            </View>
+            {updateVehiclesMutation.isPending ? <Text style={[styles.sheetSubtitle, { color: theme.muted, textAlign: "center", marginTop: 8 }]}>Enregistrement…</Text> : null}
+            <Pressable onPress={() => setVehiclesPickerOpen(false)} style={({ pressed }) => [styles.photoPicker, pressed && styles.pressed]}>
+              <Text style={[styles.photoPickerText, { color: theme.muted }]}>Fermer</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={editorOpen} transparent animationType="slide" onRequestClose={() => setEditorOpen(false)}>
         <View style={styles.modalOverlay}>
@@ -369,7 +411,7 @@ function MenuRow({ icon, iconBg, label, sub, badge, onPress, last }: { icon: Rea
   const iconBgColor = iconBg === "amber" ? theme.warning + "22" : iconBg === "dark" ? "#111111" : theme.primary + "22";
   const iconColor = iconBg === "primary" ? theme.primary : iconBg === "amber" ? theme.warning : "#FFFFFF";
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.menuRow, !last && { borderBottomColor: theme.border }, pressed && { backgroundColor: theme.pressed }]}>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.menuRow, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border }, pressed && { backgroundColor: theme.pressed }]}>
       <View style={[styles.menuIcon, { backgroundColor: iconBgColor }]}>
         <MaterialIcons name={icon} size={16} color={iconColor} />
       </View>
@@ -439,8 +481,8 @@ const styles = StyleSheet.create({
   section: { gap: 6, paddingHorizontal: 14 },
   sectionTitle: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", paddingHorizontal: 2 },
   sectionCard: { borderRadius: 12, overflow: "hidden", borderWidth: 1 },
-  menuRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11, paddingHorizontal: 12, borderBottomWidth: 1 },
-  menuRowLast: { borderBottomWidth: 0 },
+  menuRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11, paddingHorizontal: 12 },
+  menuRowLast: {},
   menuIcon: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   menuIconAmber: {},
   menuIconDark: {},
@@ -465,6 +507,11 @@ const styles = StyleSheet.create({
   photoPickerIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
   photoPickerText: { color: "#9A6201", fontSize: 12, fontWeight: "600" },
   photoPickerSub: { color: "#747474", fontSize: 10, marginTop: 2 },
+
+  vehiclesList: { gap: 2, marginTop: 12 },
+  vehicleRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 12, borderWidth: 1, borderRadius: 10, marginBottom: 2 },
+  vehicleCheckbox: { width: 22, height: 22, borderRadius: 5, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
+  vehicleLabel: { fontSize: 14, fontWeight: "600", flex: 1 },
 
   fieldLabel: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
   input: { backgroundColor: "#F7EFE5", borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 12, paddingVertical: 12, color: "#9A6201", fontSize: 13, fontWeight: "500" },
