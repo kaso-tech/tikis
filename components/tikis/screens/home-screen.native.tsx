@@ -130,10 +130,15 @@ export function HomeScreen() {
   const [pendingAction, setPendingAction] = useState<PendingHomeAction | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [, setNow] = useState(Date.now());
+  const hasInitialData = useRef(false);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(interval);
   }, []);
+  useEffect(() => {
+    if (deliveriesQuery.data) hasInitialData.current = true;
+  }, [deliveriesQuery.data]);
   const scrollRef = useRef<ScrollView>(null);
   const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
   const sheetValue = useRef(SHEET_PEEK);
@@ -481,17 +486,22 @@ export function HomeScreen() {
           onScroll={(event) => setShowScrollTop(event.nativeEvent.contentOffset.y > 180)}
           refreshControl={
             <RefreshControl
-              refreshing={deliveriesQuery.isRefetching && !deliveriesQuery.isLoading}
+              refreshing={isManualRefreshing}
               onRefresh={async () => {
-                await Promise.all([
-                  utilities.deliveries.list.invalidate(),
-                  utilities.notifications.list.invalidate(),
-                  role === "driver" ? utilities.wallet.snapshot.invalidate() : Promise.resolve(),
-                ]);
+                setIsManualRefreshing(true);
+                try {
+                  await Promise.all([
+                    utilities.deliveries.list.invalidate(),
+                    utilities.notifications.list.invalidate(),
+                    role === "driver" ? utilities.wallet.snapshot.invalidate() : Promise.resolve(),
+                  ]);
+                } finally {
+                  setIsManualRefreshing(false);
+                }
               }}
-              tintColor="transparent"
-              colors={["transparent"]}
-              progressBackgroundColor="transparent"
+              tintColor="#9A6201"
+              colors={["#9A6201"]}
+              progressBackgroundColor="#F7EFE5"
             />
           }
         >
@@ -538,7 +548,7 @@ export function HomeScreen() {
           </ScrollView>
 
           <Animated.View style={[styles.tabContent, { opacity: filterTransition, transform: [{ translateY: filterTranslateY }] }]}>
-          {deliveriesQuery.isLoading && !deliveriesQuery.data ? (
+          {!hasInitialData.current && deliveriesQuery.isLoading ? (
             <View style={styles.loadingState}>
               <ActivityIndicator color="#9A6201" />
               <Text style={styles.loadingText}>Chargement de vos livraisons…</Text>

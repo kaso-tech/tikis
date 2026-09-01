@@ -34,6 +34,7 @@ export default function ProfileScreen() {
   const [error, setError] = useState("");
   const [coverBase64, setCoverBase64] = useState<string | undefined>();
   const [coverMime, setCoverMime] = useState<"image/jpeg" | "image/png" | "image/webp" | undefined>();
+  const [coverMenuOpen, setCoverMenuOpen] = useState(false);
 
   const driver = role === "driver";
   const name = profile?.fullName ?? (driver ? "Antoine Kaboré" : "Aïcha Traoré");
@@ -147,7 +148,12 @@ export default function ProfileScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.coverWrap}>
-          <View style={[styles.cover, isDark && styles.coverDark]}>
+          <Pressable
+            onPress={() => setCoverMenuOpen(true)}
+            style={({ pressed }) => [styles.cover, isDark && styles.coverDark, pressed && { opacity: 0.92 }]}
+            accessibilityLabel="Modifier la photo de couverture"
+            accessibilityRole="button"
+          >
             {coverUri ? (
               <Image source={{ uri: coverUri }} style={styles.coverImage} resizeMode="cover" />
             ) : (
@@ -158,13 +164,11 @@ export default function ProfileScreen() {
               </View>
             )}
             <View style={styles.coverOverlay} pointerEvents="none" />
-          </View>
-          <View style={styles.coverActions}>
-            {coverUri ? (
-              <CoverAction icon="delete-outline" label="Retirer" onPress={() => void removeCover()} />
-            ) : null}
-            <CoverAction icon="add-a-photo" label={coverUri ? "Changer" : "Ajouter une couverture"} onPress={() => void pickCover()} primary />
-          </View>
+            <View style={styles.coverHint} pointerEvents="none">
+              <MaterialIcons name="add-a-photo" size={14} color="#FFFFFF" />
+              <Text style={styles.coverHintText}>{coverUri ? "Modifier la couverture" : "Ajouter une couverture"}</Text>
+            </View>
+          </Pressable>
         </View>
 
         <View style={[styles.identityCard, isDark && { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -182,8 +186,8 @@ export default function ProfileScreen() {
               </View>
             </Pressable>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.name, isDark && { color: theme.foreground }]} numberOfLines={1}>{name}</Text>
-              <Text style={[styles.phoneText, isDark && { color: theme.muted }]} numberOfLines={1}>{profile?.phone ?? "+226 70 00 00 00"}</Text>
+              <Text style={[styles.phoneText, isDark && { color: theme.foreground }]} numberOfLines={1}>{profile?.phone ?? "+226 70 00 00 00"}</Text>
+              <Text style={[styles.name, isDark && { color: theme.muted }]} numberOfLines={1}>{name}</Text>
               <View style={[styles.rolePill, driver ? styles.rolePillDriver : styles.rolePillSender]}>
                 <MaterialIcons name={driver ? "two-wheeler" : "inventory-2"} size={11} color={driver ? "#9A6200" : "#007B8B"} />
                 <Text style={[styles.rolePillText, driver ? styles.rolePillTextDriver : styles.rolePillTextSender]}>
@@ -321,6 +325,34 @@ export default function ProfileScreen() {
         </Pressable>
       </ScrollView>
 
+      <Modal visible={coverMenuOpen} transparent animationType="fade" onRequestClose={() => setCoverMenuOpen(false)}>
+        <Pressable style={[styles.coverMenuOverlay, { backgroundColor: "rgba(0,0,0,0.45)" }]} onPress={() => setCoverMenuOpen(false)}>
+          <View style={[styles.coverMenuSheet, { backgroundColor: theme.surface, borderColor: theme.border }]} onTouchStart={(e) => e.stopPropagation()}>
+            <View style={[styles.coverMenuHandle, { backgroundColor: theme.border }]} />
+            <Text style={[styles.coverMenuTitle, { color: theme.foreground }]}>Photo de couverture</Text>
+            <Pressable onPress={() => { setCoverMenuOpen(false); void pickCover(); }} style={({ pressed }) => [styles.coverMenuItem, pressed && { backgroundColor: theme.pressed }]}>
+              <MaterialIcons name="add-a-photo" size={20} color={theme.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.coverMenuItemLabel, { color: theme.foreground }]}>{coverUri ? "Changer la photo" : "Ajouter une photo"}</Text>
+                <Text style={[styles.coverMenuItemSub, { color: theme.muted }]}>Choisir depuis la galerie (21:9)</Text>
+              </View>
+            </Pressable>
+            {coverUri ? (
+              <Pressable onPress={() => { setCoverMenuOpen(false); void removeCover(); }} style={({ pressed }) => [styles.coverMenuItem, pressed && { backgroundColor: theme.pressed }]}>
+                <MaterialIcons name="delete-outline" size={20} color={theme.error} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.coverMenuItemLabel, { color: theme.error }]}>Retirer la couverture</Text>
+                  <Text style={[styles.coverMenuItemSub, { color: theme.muted }]}>Revenir au style par défaut</Text>
+                </View>
+              </Pressable>
+            ) : null}
+            <Pressable onPress={() => setCoverMenuOpen(false)} style={({ pressed }) => [styles.coverMenuCancel, pressed && { backgroundColor: theme.pressed }]}>
+              <Text style={[styles.coverMenuCancelText, { color: theme.muted }]}>Annuler</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
       <Modal visible={editorOpen} transparent animationType="slide" onRequestClose={() => setEditorOpen(false)}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setEditorOpen(false)} />
@@ -358,12 +390,7 @@ export default function ProfileScreen() {
 }
 
 function CoverAction({ icon, label, onPress, primary }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; label: string; onPress: () => void; primary?: boolean }) {
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.coverAction, primary && styles.coverActionPrimary, pressed && styles.pressed]} accessibilityLabel={label}>
-      <MaterialIcons name={icon} size={13} color={primary ? "#FFFFFF" : "#FFFFFF"} />
-      <Text style={styles.coverActionText}>{label}</Text>
-    </Pressable>
-  );
+  return null;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -413,6 +440,17 @@ const styles = StyleSheet.create({
   coverAction: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99, backgroundColor: "rgba(0,0,0,0.35)" },
   coverActionPrimary: { backgroundColor: "#9A6201" },
   coverActionText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
+  coverHint: { position: "absolute", bottom: 12, right: 12, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99, backgroundColor: "rgba(0,0,0,0.45)" },
+  coverHintText: { color: "#FFFFFF", fontSize: 11, fontWeight: "600" },
+  coverMenuOverlay: { flex: 1, justifyContent: "flex-end" },
+  coverMenuSheet: { margin: 12, marginBottom: 24, borderRadius: 16, padding: 12, borderWidth: 1 },
+  coverMenuHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 12 },
+  coverMenuTitle: { fontSize: 14, fontWeight: "700", marginBottom: 8, paddingHorizontal: 4 },
+  coverMenuItem: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: 10 },
+  coverMenuItemLabel: { fontSize: 14, fontWeight: "600" },
+  coverMenuItemSub: { fontSize: 11, marginTop: 2 },
+  coverMenuCancel: { alignItems: "center", padding: 14, marginTop: 4, borderRadius: 10 },
+  coverMenuCancelText: { fontSize: 13, fontWeight: "700" },
 
   identityCard: { marginHorizontal: 14, backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14, paddingTop: 0, gap: 12, borderWidth: 1, borderColor: "#ECECEC" },
   avatarRow: { flexDirection: "row", alignItems: "flex-end", gap: 12, marginTop: -36 },

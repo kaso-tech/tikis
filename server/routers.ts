@@ -398,6 +398,7 @@ export const appRouter = router({
     submitApplication: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid(), confirmedCommission: z.number().int().positive().max(10_000_000), offerPrice: z.number().int().positive().max(10_000_000).optional() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("Seul un livreur peut candidater.");
+      if (!profile.photoKey) throw new Error("Votre profil doit être vérifié (photo + pièce d'identité) avant de candidater à une livraison.");
       return db.applyForTikisDelivery({ id: randomUUID(), deliveryId: input.deliveryId, driverPhone: profile.phone, confirmedCommission: input.confirmedCommission, ...(input.offerPrice ? { offerPrice: input.offerPrice } : {}) });
     }),
     update: tikisProtectedProcedure.input(deliveryInputSchema.safeExtend({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {

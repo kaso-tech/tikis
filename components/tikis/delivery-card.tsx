@@ -13,17 +13,20 @@ import { trpc } from "@/lib/trpc";
 import { availableWalletBalance, commissionFor, deliveryStatusMeta, formatMoney, formatRelativeDate, type Delivery } from "@/shared/tikis-domain";
 
 export function DeliveryCard({ delivery, onPress, onMap }: { delivery: Delivery; onPress: () => void; onMap: () => void }) {
-  const { role } = useTikisStore();
+  const { role, profile } = useTikisStore();
   const { colors: theme } = useThemeColors();
   const utilities = trpc.useUtils();
   const application = trpc.deliveries.submitApplication.useMutation();
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver", refetchOnMount: "always", refetchOnWindowFocus: true });
+  const reviewsQuery = trpc.reviews.list.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone) });
   const status = deliveryStatusMeta[delivery.status];
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const isApplying = application.isPending;
   const [openingMap, setOpeningMap] = useState(false);
   const [confirmationVisible, setConfirmationVisible] = useState(false);
-  const mayApply = role === "driver" && delivery.status === "open" && !["applied", "selected", "confirmed"].includes(delivery.ownCandidateStatus ?? "");
+  const receivedReviews = (reviewsQuery.data ?? []).length;
+  const isDriverVerified = Boolean(profile?.photoUrl) || receivedReviews > 0;
+  const mayApply = role === "driver" && delivery.status === "open" && isDriverVerified && !["applied", "selected", "confirmed"].includes(delivery.ownCandidateStatus ?? "");
   const driverDistance = useDriverPickupDistance(role === "driver" ? delivery.pickup : null);
   const commission = commissionFor(delivery.offeredPrice ?? delivery.estimatedPrice, { rate: walletQuery.data?.commissionRate ?? 0, currency: "FCFA" });
 
@@ -34,12 +37,17 @@ export function DeliveryCard({ delivery, onPress, onMap }: { delivery: Delivery;
       await Promise.all([utilities.deliveries.list.invalidate(), utilities.deliveries.candidates.invalidate({ deliveryId: delivery.id }), utilities.wallet.snapshot.invalidate(), utilities.notifications.list.invalidate()]);
       setConfirmationVisible(false);
       haptic.success();
-    } catch {
-      Alert.alert("Candidature indisponible", "Votre candidature n'a pas pu être enregistrée. Vérifiez votre solde Wallet puis réessayez.");
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Votre candidature n'a pas pu être enregistrée.";
+      Alert.alert("Candidature indisponible", `${message} Vérifiez votre solde Wallet puis réessayez.`);
     }
   }
 
   function confirmApplication() {
+    if (!isDriverVerified) {
+      Alert.alert("Profil à vérifier", "Complétez votre photo de profil et la vérification d'identité avant de candidater à une livraison.");
+      return;
+    }
     if (!mayApply || isApplying) return;
     const wallet = walletQuery.data?.wallet;
     if (!wallet || !Number.isFinite(walletQuery.data?.commissionRate) || !walletQuery.data?.commissionRate) {

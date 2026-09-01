@@ -46,7 +46,10 @@ export default function DeliveryDetailScreen() {
   const reactivateMutation = trpc.deliveries.reactivate.useMutation();
   const cancelMutation = trpc.deliveries.cancel.useMutation();
   const reviewQuery = trpc.reviews.getForDelivery.useQuery({ deliveryId: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
+  const driverReviewsQuery = trpc.reviews.list.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone) });
   const delivery = deliveryQuery.data;
+  const receivedReviewsCount = (driverReviewsQuery.data ?? []).length;
+  const isDriverVerified = Boolean(profile?.photoUrl) || receivedReviewsCount > 0;
   const candidates = candidatesQuery.data ?? [];
   const ownCandidate = candidates.find((candidate) => candidate.driverId === profile?.phone);
   const [action, setAction] = useState<FinancialAction>(null);
@@ -128,6 +131,11 @@ export default function DeliveryDetailScreen() {
   const countdownLabel = isActive ? "Clôture automatique dans" : "Expiration automatique dans";
 
   async function confirmAction() {
+    if (action === "apply" && role === "driver" && !isDriverVerified) {
+      Alert.alert("Profil à vérifier", "Complétez votre photo de profil et la vérification d'identité avant de candidater à une livraison.");
+      setAction(null);
+      return;
+    }
     setProcessing(true);
     try {
       if (action === "apply") {

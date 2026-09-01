@@ -251,8 +251,9 @@ export default function CreateDeliveryScreen() {
           message = `${message} (${snippet})`;
         } catch {}
       }
-      if (message.includes("JSON Parse") || message.includes("Unexpected character")) {
-        message = "Le serveur Tikis ne répond pas. Vérifiez que le serveur dev est bien démarré puis réessayez.";
+      const errorString = `${error?.toString?.() ?? ""} ${message}`.toLowerCase();
+      if (errorString.includes("json parse") || errorString.includes("unexpected character") || errorString.includes("failed to fetch") || errorString.includes("network request failed")) {
+        message = "Le serveur Tikis ne répond pas. Vérifiez que le serveur dev est bien démarré (npm run dev:server) puis réessayez.";
       }
       const reason = isEditing ? "Modification indisponible" : "Publication indisponible";
       setPublicationStage(`${reason} : ${message}`);
