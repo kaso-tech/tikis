@@ -50,8 +50,9 @@ export default function DeliveryDetailScreen() {
     void requestRouteMutation.mutateAsync({ origin: pickup, destination: dropoff }).then((route) => {
       if (cancelled) return;
       setRouteCoordinates(route.coordinates ?? []);
-    }).catch(() => {
+    }).catch((cause) => {
       if (cancelled) return;
+      console.warn("[delivery-detail] Itinéraire indisponible, fallback polyline locale", cause instanceof Error ? cause.message : cause);
       setRouteCoordinates([]);
     });
     return () => {
@@ -242,6 +243,7 @@ export default function DeliveryDetailScreen() {
           <DeliveryRouteMap
             pickup={delivery.pickup}
             dropoff={delivery.dropoff}
+            routeSource={delivery.routeSource}
             coordinates={routeCoordinates.length >= 2 ? routeCoordinates : [
               { latitude: delivery.pickup.latitude, longitude: delivery.pickup.longitude },
               { latitude: delivery.dropoff.latitude, longitude: delivery.dropoff.longitude },

@@ -83,14 +83,6 @@ function badgeFilterForDelivery(delivery: Delivery, isDriver: boolean): FilterKe
   return null;
 }
 
-function driverSortPriority(d: Delivery): number {
-  if (d.ownCandidateStatus === "confirmed" || d.status === "active") return 0;
-  if (d.ownCandidateStatus === "selected" || d.status === "pending_confirmation") return 1;
-  if (d.ownCandidateStatus === "applied") return 2;
-  if (d.status === "open") return 3;
-  return 4;
-}
-
 function fitRegionFor(pickup: { latitude: number; longitude: number }, dropoff: { latitude: number; longitude: number }): Region {
   const midLat = (pickup.latitude + dropoff.latitude) / 2;
   const midLng = (pickup.longitude + dropoff.longitude) / 2;
@@ -119,7 +111,7 @@ export function HomeScreen() {
   const [filter, setFilter] = useState<FilterKey>("open");
   const [searchQuery, setSearchQuery] = useState("");
   const [nowTick, setNowTick] = useState(0);
-
+  const now = Date.now() + nowTick;
   useEffect(() => {
     setFilter("open");
   }, [role]);
@@ -170,9 +162,6 @@ export function HomeScreen() {
       const haystack = [d.title, d.type, route.pickup, route.dropoff, (d.vehicleTypes ?? []).join(" ")].join(" ").toLowerCase();
       return haystack.includes(q);
     };
-    if (role === "driver") {
-      return [...deliveries].filter(matches).sort((a, b) => driverSortPriority(a) - driverSortPriority(b) || a.distanceKm - b.distanceKm);
-    }
     return deliveries.filter(matches);
   }, [deliveries, filter, role, searchQuery]);
 
@@ -592,6 +581,7 @@ export function HomeScreen() {
                   driverLocationStatus={driverLocation.status}
                   compassRotation={compassRotationToTarget(driverLocation.location, delivery.pickup, deviceHeading)}
                   applying={actioningId === delivery.id}
+                  now={now}
                   onPress={() => setSelectedId(delivery.id)}
                   onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
                   onApply={() => requestDriverAction(delivery)}
@@ -610,6 +600,7 @@ export function HomeScreen() {
                   driverLocationStatus={null}
                   compassRotation={0}
                   applying={actioningId === delivery.id}
+                  now={now}
                   onPress={() => setSelectedId(delivery.id)}
                   onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
                   onApply={() => handleSenderAction(delivery)}
@@ -630,6 +621,7 @@ export function HomeScreen() {
                   driverLocationStatus={isDriver ? driverLocation.status : null}
                   compassRotation={isDriver ? compassRotationToTarget(driverLocation.location, delivery.pickup, deviceHeading) : 0}
                   applying={actioningId === delivery.id}
+                  now={now}
                   onPress={() => setSelectedId(delivery.id)}
                   onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
                   onApply={() => handleSenderAction(delivery)}
@@ -878,6 +870,7 @@ function DeliveryRow({
   driverLocationStatus,
   compassRotation,
   applying,
+  now,
   onPress,
   onDetails,
   onApply,
@@ -889,11 +882,13 @@ function DeliveryRow({
   driverLocationStatus: "idle" | "loading" | "ready" | "denied" | "unavailable" | null;
   compassRotation: number;
   applying: boolean;
+  now: number;
   onPress: () => void;
   onDetails: () => void;
   onApply: () => void;
 }) {
   const [showPickupTooltip, setShowPickupTooltip] = useState(false);
+  const { colors: theme } = useThemeColors();
   const isSender = role === "sender";
   const isDriver = role === "driver";
   const driverAction = delivery.status === "completed"
@@ -910,7 +905,7 @@ function DeliveryRow({
     ? `${delivery.dimensions.lengthCm}×${delivery.dimensions.widthCm}×${delivery.dimensions.heightCm} cm`
     : null;
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
-  const dateInfo = formatDeliveryCreationDate(delivery.createdAt);
+  const dateInfo = formatDeliveryCreationDate(delivery.createdAt, now);
   const dateColor = dateInfo.tone === "primary" ? "#9A6201" : "#747474";
   const dateBg = dateInfo.tone === "primary" ? "#F8F0E5" : "#F0F0F2";
   const totalDistance = formatDistanceKm(delivery.distanceKm);
@@ -934,7 +929,7 @@ function DeliveryRow({
   }, [showPickupTooltip]);
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, selected && styles.rowSelected, pressed && styles.pressed]}>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, { backgroundColor: theme.surface, borderColor: theme.border }, selected && [styles.rowSelected, { borderColor: theme.primary, backgroundColor: theme.primary + "14" }], pressed && { backgroundColor: theme.pressed }]}>
       <View style={styles.rowTop}>
         <View style={[styles.rowThumb, isSender ? null : styles.rowThumbDriver]}>
           <MaterialIcons name={TYPE_ICON[delivery.type] ?? "local-shipping"} size={15} color={isSender ? "#111111" : "#FFFFFF"} />

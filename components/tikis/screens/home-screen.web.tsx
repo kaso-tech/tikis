@@ -127,11 +127,12 @@ export function HomeScreen() {
   const [candidateDelivery, setCandidateDelivery] = useState<Delivery | null>(null);
   const [applicationDelivery, setApplicationDelivery] = useState<Delivery | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingHomeAction | null>(null);
-  const [, setNow] = useState(Date.now());
+  const [nowTick, setNow] = useState(0);
+  const now = Date.now() + nowTick;
   const hasInitialData = useRef(false);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 30_000);
+    const interval = setInterval(() => setNow((t) => t + 1), 30_000);
     return () => clearInterval(interval);
   }, []);
   useEffect(() => {
@@ -568,6 +569,7 @@ export function HomeScreen() {
               driverDistance={driverLocation.distanceTo(selected.pickup)}
               driverLocationStatus={driverLocation.status}
               applying={applyingId === selected.id}
+              now={now}
               onPress={() => {}}
               onDetails={() => router.push(`/delivery/${selected.id}` as any)}
               onApply={() => requestDriverAction(selected)}
@@ -581,6 +583,7 @@ export function HomeScreen() {
               driverDistance={null}
               driverLocationStatus={null}
               applying={applyingId === selected.id}
+              now={now}
               onPress={() => {}}
               onDetails={() => router.push(`/delivery/${selected.id}` as any)}
               onApply={() => handleSenderAction(selected)}
@@ -597,6 +600,7 @@ export function HomeScreen() {
                   driverDistance={isDriver ? driverLocation.distanceTo(delivery.pickup) : null}
                   driverLocationStatus={isDriver ? driverLocation.status : null}
                   applying={applyingId === delivery.id}
+                  now={now}
                   onPress={() => setSelectedId(delivery.id)}
                   onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
                   onApply={() => isDriver ? requestDriverAction(delivery) : handleSenderAction(delivery)}
@@ -768,11 +772,13 @@ function UrgentCard({
   delivery,
   role,
   applying,
+  now,
   onAction,
 }: {
   delivery: Delivery;
   role: "sender" | "driver";
   applying: boolean;
+  now: number;
   onAction: () => void;
 }) {
   const isSender = role === "sender";
@@ -821,6 +827,7 @@ function DeliveryRow({
   driverDistance,
   driverLocationStatus,
   applying,
+  now,
   onPress,
   onDetails,
   onApply,
@@ -831,6 +838,7 @@ function DeliveryRow({
   driverDistance: { value: string; unit: "m" | "km"; km: number } | null;
   driverLocationStatus: "idle" | "loading" | "ready" | "denied" | "unavailable" | null;
   applying: boolean;
+  now: number;
   onPress: () => void;
   onDetails: () => void;
   onApply: () => void;
@@ -848,7 +856,7 @@ function DeliveryRow({
           : "Postuler";
   const vehicleLabel = (delivery.vehicleTypes ?? []).join(" · ") || "Moto";
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
-  const dateInfo = formatDeliveryCreationDate(delivery.createdAt);
+  const dateInfo = formatDeliveryCreationDate(delivery.createdAt, now);
   const dateColor = dateInfo.tone === "primary" ? "#9A6201" : "#747474";
   const dateBg = dateInfo.tone === "primary" ? "#F8F0E5" : "#F0F0F2";
   const totalDistance = formatDistanceKm(delivery.distanceKm);
@@ -869,7 +877,7 @@ function DeliveryRow({
         <View style={styles.rowMain}>
           <View style={styles.rowTitleLine}>
             <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
-            {isDriver ? <View style={styles.rowDriverDistance}><MaterialIcons name="explore" size={15} color="#007B8B" /><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text></View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text></View> : null}
+            {isDriver ? <View style={styles.rowDriverDistance}><MaterialIcons name="explore" size={15} color="#9A6201" /><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text></View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text></View> : null}
           </View>
           <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff} · {vehicleLabel}</Text>
         </View>

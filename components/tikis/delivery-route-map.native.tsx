@@ -6,9 +6,30 @@ import type { LocationLabel } from "@/shared/tikis-domain";
 
 type Coordinate = { latitude: number; longitude: number };
 
-export function DeliveryRouteMap({ pickup, dropoff, coordinates }: { pickup: LocationLabel; dropoff: LocationLabel; coordinates: Coordinate[] }) {
+const FALLBACK_SEGMENTS = 12;
+
+function buildInterpolatedRoute(pickup: Coordinate, dropoff: Coordinate): Coordinate[] {
+  const points: Coordinate[] = [];
+  for (let i = 0; i <= FALLBACK_SEGMENTS; i += 1) {
+    const ratio = i / FALLBACK_SEGMENTS;
+    points.push({
+      latitude: pickup.latitude + (dropoff.latitude - pickup.latitude) * ratio,
+      longitude: pickup.longitude + (dropoff.longitude - pickup.longitude) * ratio,
+    });
+  }
+  return points;
+}
+
+export function DeliveryRouteMap({ pickup, dropoff, coordinates, routeSource }: { pickup: LocationLabel; dropoff: LocationLabel; coordinates: Coordinate[]; routeSource?: "routes" | "provisional" }) {
   const mapRef = useRef<MapView>(null);
-  const route = useMemo(() => coordinates.length >= 2 ? coordinates : [{ latitude: pickup.latitude, longitude: pickup.longitude }, { latitude: dropoff.latitude, longitude: dropoff.longitude }], [coordinates, dropoff.latitude, dropoff.longitude, pickup.latitude, pickup.longitude]);
+  const route = useMemo<Coordinate[]>(() => {
+    if (coordinates.length >= 2) return coordinates;
+    return buildInterpolatedRoute(
+      { latitude: pickup.latitude, longitude: pickup.longitude },
+      { latitude: dropoff.latitude, longitude: dropoff.longitude },
+    );
+  }, [coordinates, dropoff.latitude, dropoff.longitude, pickup.latitude, pickup.longitude]);
+  const isFallback = routeSource === "provisional" || coordinates.length < 2;
 
   useEffect(() => {
     const timer = setTimeout(() => mapRef.current?.fitToCoordinates(route, { edgePadding: { top: 72, right: 52, bottom: 82, left: 52 }, animated: true }), 180);
@@ -18,7 +39,7 @@ export function DeliveryRouteMap({ pickup, dropoff, coordinates }: { pickup: Loc
   return (
     <View style={styles.container}>
       <MapView ref={mapRef} style={styles.map} initialRegion={{ latitude: pickup.latitude, longitude: pickup.longitude, latitudeDelta: 0.08, longitudeDelta: 0.08 }} showsCompass={false} rotateEnabled={false} toolbarEnabled={false}>
-        <Polyline coordinates={route} strokeColor="#9A6201" strokeWidth={5} lineCap="round" lineJoin="round" />
+        <Polyline coordinates={route} strokeColor={isFallback ? "#9A6200" : "#9A6201"} strokeWidth={5} lineCap="round" lineJoin="round" lineDashPattern={isFallback ? [10, 6] : undefined} />
         <Marker coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }} anchor={{ x: 0.5, y: 0.5 }}><View style={styles.startMarker}><MaterialIcons name="inventory-2" size={15} color="#FFFFFF" /></View></Marker>
         <Marker coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }} anchor={{ x: 0.5, y: 0.85 }}><View style={styles.destinationMarker}><MaterialIcons name="location-on" size={26} color="#B4232D" /></View></Marker>
       </MapView>

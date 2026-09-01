@@ -5,10 +5,10 @@ import type { LocationLabel } from "@/shared/tikis-domain";
 
 type Coordinate = { latitude: number; longitude: number };
 
-export function DeliveryRouteMap({ pickup, dropoff, coordinates }: { pickup: LocationLabel; dropoff: LocationLabel; coordinates: Coordinate[] }) {
+export function DeliveryRouteMap({ pickup, dropoff, coordinates, routeSource }: { pickup: LocationLabel; dropoff: LocationLabel; coordinates: Coordinate[]; routeSource?: "routes" | "provisional" }) {
   return Platform.OS === "web" ? (
-    <WebDeliveryRouteMap pickup={pickup} dropoff={dropoff} coordinates={coordinates} />
+    <WebDeliveryRouteMap pickup={pickup} dropoff={dropoff} coordinates={coordinates} routeSource={routeSource} />
   ) : (
-    <NativeDeliveryRouteMap pickup={pickup} dropoff={dropoff} coordinates={coordinates} />
+    <NativeDeliveryRouteMap pickup={pickup} dropoff={dropoff} coordinates={coordinates} routeSource={routeSource} />
   );
 }
