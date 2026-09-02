@@ -508,3 +508,8 @@
 - [x] Vérifier les dépendances, compiler, tester et construire la console admin.
 - [x] Nettoyer les caches, relancer Expo et l’API, puis vérifier les services.
 - [x] Enregistrer, pousser et livrer la dernière version validée.
+
+- [x] Refaire le pull de la branche `main` et vérifier le dernier commit.
+- [x] Vérifier les dépendances, compiler, tester et construire la console admin.
+- [x] Relancer Expo et l’API, puis vérifier les services.
+- [x] Enregistrer, pousser et livrer la dernière version validée.
