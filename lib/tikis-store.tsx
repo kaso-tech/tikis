@@ -1,9 +1,8 @@
 import { createContext, useContext, useMemo, useState } from "react";
-import type { CommissionPolicy, FinancialRecord, InAppNotification, RegisteredProfile, ReferralRecord, UserRole, WalletSnapshot } from "../shared/tikis-domain";
+import type { FinancialRecord, InAppNotification, RegisteredProfile, ReferralRecord, UserRole, WalletSnapshot } from "../shared/tikis-domain";
 import { formatMoney } from "../shared/tikis-domain";
 import { REFERRAL_REWARD_AMOUNT, canClaimReferralReward } from "./referral-rules";
 
-const POLICY: CommissionPolicy = { rate: 0.1, currency: "FCFA" };
 const INITIAL_WALLET: WalletSnapshot = { total: 45000, blocked: 0 };
 const INITIAL_JOURNAL: FinancialRecord[] = [];
 const INITIAL_NOTIFICATIONS: InAppNotification[] = [];
@@ -20,7 +19,6 @@ type Store = {
   registerProfile: (profile: RegisteredProfile) => void;
   updateProfile: (changes: Partial<Pick<RegisteredProfile, "fullName" | "photoUrl">>) => void;
   logout: () => void;
-  policy: CommissionPolicy;
   wallet: WalletSnapshot;
   journal: FinancialRecord[];
   notifications: InAppNotification[];
@@ -85,7 +83,7 @@ export function TikisStoreProvider({ children }: { children: React.ReactNode }) 
   };
 
   const value = useMemo<Store>(() => ({
-    role, setRole: setRoleSafely, profile, signInProfile, registerProfile, updateProfile, logout, policy: POLICY, wallet, journal, notifications, referrals, claimReferralReward,
+    role, setRole: setRoleSafely, profile, signInProfile, registerProfile, updateProfile, logout, wallet, journal, notifications, referrals, claimReferralReward,
     addNotification: (notification) => setNotifications((items) => [makeNotification(notification.title, notification.body, notification.tone), ...items]),
     markNotificationsRead: () => setNotifications((items) => items.map((item) => ({ ...item, read: true }))),
   }), [role, profile, wallet, journal, notifications, referrals]);

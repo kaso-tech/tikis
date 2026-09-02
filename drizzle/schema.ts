@@ -216,6 +216,60 @@ export const tikisDeliveryEvents = mysqlTable("tikis_delivery_events", {
   index("tikis_delivery_events_delivery_created_index").on(table.deliveryId, table.createdAt),
 ]);
 
+/** Signalements (CAS N°9) : envoyés par le Sender ou le Livreur à l'administration. */
+export const tikisDeliveryReports = mysqlTable("tikis_delivery_reports", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  deliveryId: varchar("deliveryId", { length: 40 }).notNull(),
+  reporterPhone: varchar("reporterPhone", { length: 20 }).notNull(),
+  reporterRole: mysqlEnum("reporterRole", ["sender", "driver"]).notNull(),
+  reason: varchar("reason", { length: 80 }).notNull(),
+  description: varchar("description", { length: 1000 }).notNull(),
+  attachmentKey: varchar("attachmentKey", { length: 255 }),
+  status: mysqlEnum("status", ["open", "reviewing", "resolved", "dismissed"]).notNull().default("open"),
+  resolutionNotes: varchar("resolutionNotes", { length: 1000 }),
+  resolvedByAdminId: int("resolvedByAdminId"),
+  resolvedAt: timestamp("resolvedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("tikis_delivery_reports_status_created_index").on(table.status, table.createdAt),
+  index("tikis_delivery_reports_delivery_index").on(table.deliveryId),
+  index("tikis_delivery_reports_reporter_index").on(table.reporterPhone),
+]);
+
+/** Comptes d'administration Tikis, totalement distincts de l'authentification des Senders/Livreurs. */
+export const tikisAdminUsers = mysqlTable("tikis_admin_users", {
+  id: int("id").autoincrement().primaryKey(),
+  email: varchar("email", { length: 180 }).notNull().unique(),
+  passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+  fullName: varchar("fullName", { length: 120 }).notNull(),
+  role: mysqlEnum("role", ["super_admin", "support", "finance"]).notNull().default("support"),
+  active: boolean("active").notNull().default(true),
+  lastLoginAt: timestamp("lastLoginAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+/** Journal d'audit immuable de toute action d'administration (CAS N°10 — décisions tracées). */
+export const tikisAdminAuditLog = mysqlTable("tikis_admin_audit_log", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  adminId: int("adminId").notNull(),
+  adminEmail: varchar("adminEmail", { length: 180 }).notNull(),
+  action: varchar("action", { length: 80 }).notNull(),
+  targetType: varchar("targetType", { length: 40 }).notNull(),
+  targetId: varchar("targetId", { length: 80 }).notNull(),
+  details: text("details"),
+  ipAddress: varchar("ipAddress", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("tikis_admin_audit_log_target_index").on(table.targetType, table.targetId),
+  index("tikis_admin_audit_log_admin_created_index").on(table.adminId, table.createdAt),
+]);
+
+export type TikisDeliveryReport = typeof tikisDeliveryReports.$inferSelect;
+export type TikisAdminUser = typeof tikisAdminUsers.$inferSelect;
+export type TikisAdminAuditLog = typeof tikisAdminAuditLog.$inferSelect;
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type TikisProfile = typeof tikisProfiles.$inferSelect;

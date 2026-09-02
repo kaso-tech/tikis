@@ -198,7 +198,7 @@ export const commissionFor = (price: number, policy: CommissionPolicy) =>
 
 export const availableWalletBalance = (wallet: WalletSnapshot) => wallet.total - wallet.blocked;
 
-export type LocationPresentation = Pick<LocationLabel, "name" | "district" | "city" | "formattedAddress" | "street" | "province" | "country">;
+export type LocationPresentation = Pick<LocationLabel, "name" | "district" | "city" | "formattedAddress" | "street" | "province" | "country" | "featureType">;
 
 export { displayLocation, locationSubtitle, locationTitle } from "../lib/geo-rules";
 

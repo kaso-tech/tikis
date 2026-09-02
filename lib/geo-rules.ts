@@ -64,9 +64,20 @@ function isGenericName(location: LocationPresentation) {
   return !location.name || samePart(location.name, location.city) || location.name.localeCompare("Point sélectionné", "fr", { sensitivity: "base" }) === 0;
 }
 
+/**
+ * Un nom de lieu ne prime sur le quartier que s'il s'agit d'un lieu public susceptible d'être
+ * connu de tous (ex. « Maison du Peuple »), identifié ici par featureType "poi". Les anciens
+ * enregistrements sans featureType conservent leur nom pour ne pas dégrader leur affichage.
+ * Une adresse explicitement classée rue/adresse ne prime pas sur le quartier.
+ */
+function isPublicPlaceName(location: LocationPresentation) {
+  return !isGenericName(location) && (location.featureType === "poi" || !location.featureType);
+}
+
 function localPart(location: LocationPresentation) {
-  if (!isGenericName(location)) return location.name;
-  return location.street || location.district || location.city || location.province || location.formattedAddress || "Lieu sélectionné";
+  if (isPublicPlaceName(location)) return location.name;
+  // Une rue constitue un repère plus précis qu’un quartier pour une adresse explicitement classée.
+  return location.street || location.district || (!isGenericName(location) ? location.name : undefined) || location.city || location.province || location.formattedAddress || "Lieu sélectionné";
 }
 
 export function locationTitle(location: LocationPresentation) {

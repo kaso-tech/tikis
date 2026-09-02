@@ -36,6 +36,25 @@ const requireTikisProfile = t.middleware(async (opts) => {
 
 export const tikisProtectedProcedure = t.procedure.use(requireTikisProfile);
 
+const requireTikisAdmin = t.middleware(async (opts) => {
+  if (!opts.ctx.tikisAdmin) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Session d’administration Tikis invalide ou expirée." });
+  }
+  return opts.next({ ctx: { ...opts.ctx, tikisAdmin: opts.ctx.tikisAdmin } });
+});
+
+/** Procédure pour la console d'administration Tikis — distincte de `adminProcedure` (plateforme interne). */
+export const tikisAdminProcedure = t.procedure.use(requireTikisAdmin);
+
+export function requireTikisAdminRole(...roles: Array<"super_admin" | "support" | "finance">) {
+  return t.middleware(async (opts) => {
+    if (!opts.ctx.tikisAdmin || !roles.includes(opts.ctx.tikisAdmin.role)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Votre rôle d’administration ne permet pas cette action." });
+    }
+    return opts.next({ ctx: { ...opts.ctx, tikisAdmin: opts.ctx.tikisAdmin } });
+  });
+}
+
 export const adminProcedure = t.procedure.use(
   t.middleware(async (opts) => {
     const { ctx, next } = opts;

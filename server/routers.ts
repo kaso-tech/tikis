@@ -13,6 +13,11 @@ import { createTikisProfileSession } from "./tikis-session";
 import { recordGeographicMetric } from "./geography-observability";
 import { isAllowedDeliveryText, sanitizeDeliveryText } from "../lib/tikis-engine";
 import { isValidReviewText, sanitizeReviewText } from "../lib/review-rules";
+import { tikisAdminRouter } from "./admin-router";
+import * as adminDb from "./admin-db";
+
+const reportReasonSchema = z.enum(["comportement", "sécurité", "paiement", "objet_endommagé", "retard", "autre"]);
+const reportDescriptionSchema = z.string().trim().min(10, "Décrivez le problème en quelques mots (10 caractères minimum).").max(1000);
 
 const phoneSchema = z.string().regex(/^\+[1-9]\d{7,14}$/, "Numéro de téléphone international invalide.");
 const simulationOtpSchema = z.literal("730512", { error: "Code OTP de simulation invalide." });
@@ -194,6 +199,7 @@ function deliveryForProfile(delivery: ResolvedDelivery, profile: Awaited<ReturnT
 
 export const appRouter = router({
   system: systemRouter,
+  adminConsole: tikisAdminRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -540,6 +546,27 @@ export const appRouter = router({
       const review = await db.saveTikisDeliveryReview({ id: randomUUID(), deliveryId: delivery.id, reviewerPhone: profile.phone, driverPhone: delivery.driverPhone, rating: input.rating, ...(input.comment?.trim() ? { comment: sanitizeReviewText(input.comment) } : {}) });
       if (!review) throw new Error("L’avis n’a pas pu être enregistré.");
       return db.deliveryReviewToView(review);
+    }),
+  }),
+  reports: router({
+    create: tikisProtectedProcedure.input(z.object({
+      deliveryId: z.string().uuid(),
+      reason: reportReasonSchema,
+      description: reportDescriptionSchema,
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      const delivery = await db.getTikisDeliveryRecordById(input.deliveryId);
+      if (!delivery) throw new Error("Livraison introuvable.");
+      const isSender = delivery.senderPhone === profile.phone;
+      const isDriver = delivery.driverPhone === profile.phone;
+      if (!isSender && !isDriver) throw new Error("Vous ne pouvez signaler qu’une livraison à laquelle vous participez.");
+      return adminDb.createDeliveryReport({
+        deliveryId: input.deliveryId,
+        reporterPhone: profile.phone,
+        reporterRole: isSender ? "sender" : "driver",
+        reason: input.reason,
+        description: sanitizeDeliveryText(input.description),
+      });
     }),
   }),
 });

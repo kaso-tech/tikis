@@ -2,6 +2,8 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import path from "node:path";
+import fs from "node:fs";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
@@ -43,7 +45,7 @@ async function startServer() {
     res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
     res.header(
       "Access-Control-Allow-Headers",
-      "Origin, X-Requested-With, Content-Type, Accept, Authorization",
+      "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Tikis-Admin-Session",
     );
     res.header("Access-Control-Allow-Credentials", "true");
 
@@ -83,6 +85,16 @@ async function startServer() {
       return res.status(500).json({ error: message, timestamp: new Date().toISOString() });
     }
   });
+
+  // Console d'administration Tikis : SPA statique compilée séparément (voir admin/README.md),
+  // servie par ce même serveur ("même infra") mais sous son propre chemin, isolée du bundle mobile.
+  const adminDistPath = path.join(__dirname, "../../admin/dist");
+  if (fs.existsSync(adminDistPath)) {
+    app.use("/admin", express.static(adminDistPath));
+    app.get("/admin/*", (_req, res) => res.sendFile(path.join(adminDistPath, "index.html")));
+  } else {
+    app.get("/admin", (_req, res) => res.status(503).send("Console d’administration non compilée. Voir admin/README.md pour la builder (npm run build dans le dossier admin/)."));
+  }
 
   app.use(
     "/api/trpc",

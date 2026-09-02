@@ -476,3 +476,10 @@
 - [x] Enregistrer et livrer la dernière version synchronisée.
 - [x] Corriger la double déclaration de `lastPublishedPosition` introduite dans l’accueil livreur après le pull c2ea9b8.
 - [x] Revalider compilation, tests et services après ce correctif.
+- [x] Sauvegarder l’état actuel et inventorier l’archive de mise à jour administrateur.
+- [x] Remplacer le contenu du dépôt par l’archive en conservant `.git`, puis contrôler les fichiers modifiés, ajoutés et supprimés.
+- [x] Installer les dépendances et corriger les erreurs TypeScript d’intégration avant publication.
+- [x] Configurer, construire et servir la console administrateur avec son secret de session dédié.
+- [x] Appliquer la migration non destructive des tables admin et signalements, puis vérifier la protection du journal d’audit (triggers TiDB non pris en charge, limite et mitigation documentées).
+- [x] Corriger le repli de libellé géographique qui remplace à tort les points d’intérêt existants par leur quartier.
+- [x] Relancer les services, valider l’application et la console, puis enregistrer et pousser la version.
