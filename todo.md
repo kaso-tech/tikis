@@ -487,3 +487,7 @@
 - [x] Créer le premier super-administrateur avec le script serveur fourni.
 - [x] Valider la connexion et les autorisations super-administrateur sur la console.
 - [x] Enregistrer et pousser la configuration administrateur validée.
+- [x] Synchroniser intégralement la branche `main` et vérifier les dépendances après les changements collaboratifs.
+- [x] Auditer la recherche et l’affichage des utilisateurs dans la console administrateur.
+- [x] Corriger le chargement des utilisateurs et ajouter une régression ciblée.
+- [x] Valider la console, la compilation, les tests et les services, puis enregistrer et pousser la correction.

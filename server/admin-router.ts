@@ -68,7 +68,7 @@ export const tikisAdminRouter = router({
   }),
 
   users: router({
-    search: tikisAdminProcedure.input(z.object({ query: z.string().min(2).max(120) })).query(({ input }) => adminDb.adminSearchProfiles(input)),
+    search: tikisAdminProcedure.input(z.object({ query: z.string().trim().min(2).max(120).optional(), limit: z.number().int().min(1).max(100).optional() })).query(({ input }) => adminDb.adminSearchProfiles(input)),
     detail: tikisAdminProcedure.input(z.object({ phone: z.string() })).query(async ({ ctx, input }) => {
       const detail = await adminDb.adminGetProfileDetail(input.phone);
       await audit(ctx, "profile_viewed", "profile", input.phone);

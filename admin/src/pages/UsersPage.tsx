@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "../lib/trpc";
 
 type Profile = { phone: string; fullName: string; accountType: "sender" | "driver"; email: string | null; phoneVerified: boolean; emailVerified: boolean };
@@ -20,19 +20,31 @@ export default function UsersPage() {
   const [detail, setDetail] = useState<Detail | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
-  async function search() {
-    if (query.trim().length < 2) { setError("Saisissez au moins 2 caractères."); return; }
+  async function loadUsers(searchQuery?: string) {
     setError("");
     setLoading(true);
     try {
-      const rows = await trpc.adminConsole.users.search.query({ query: query.trim() });
+      const rows = await trpc.adminConsole.users.search.query(searchQuery ? { query: searchQuery } : {});
       setResults(rows as Profile[]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Recherche impossible.");
     } finally {
       setLoading(false);
+      setLoaded(true);
     }
+  }
+
+  useEffect(() => {
+    void loadUsers();
+  }, []);
+
+  function search() {
+    const searchQuery = query.trim();
+    if (searchQuery && searchQuery.length < 2) { setError("Saisissez au moins 2 caractères pour rechercher."); return; }
+    setDetail(null);
+    void loadUsers(searchQuery || undefined);
   }
 
   async function openDetail(phone: string) {
@@ -46,17 +58,18 @@ export default function UsersPage() {
   }
 
   return (
-    <div>
-      <h1 className="page-title">Utilisateurs</h1>
-      <p className="page-subtitle">Recherchez un profil par téléphone, nom ou e-mail pour consulter son Wallet et son journal financier.</p>
+      <div>
+        <h1 className="page-title">Utilisateurs</h1>
       {error ? <div className="error-banner">{error}</div> : null}
       <div className="card">
         <div style={{ display: "flex", gap: 8 }}>
-          <input className="input" placeholder="Téléphone, nom, e-mail…" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void search()} />
-          <button className="btn btn-primary" onClick={() => void search()} disabled={loading}>{loading ? "Recherche…" : "Rechercher"}</button>
+          <input className="input" placeholder="Téléphone, nom, e-mail…" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && search()} />
+          <button className="btn btn-primary" onClick={search} disabled={loading}>{loading ? "Chargement…" : "Rechercher"}</button>
         </div>
       </div>
 
+      {loading && !loaded ? <div className="empty-state">Chargement des utilisateurs…</div> : null}
+      {loaded && results.length === 0 && !error ? <div className="empty-state">Aucun utilisateur ne correspond à cette recherche.</div> : null}
       {results.length > 0 ? (
         <div className="card" style={{ padding: 0 }}>
           <table>

@@ -173,11 +173,14 @@ export async function adminGetDeliveryTimeline(deliveryId: string) {
 // Utilisateurs et Wallets (support niveau 1, lecture + actions encadrées)
 // ————————————————————————————————————————————————————————————————————————
 
-export async function adminSearchProfiles(input: { query: string; limit?: number }) {
+export async function adminSearchProfiles(input: { query?: string; limit?: number }) {
   const db = await getDb();
   if (!db) return [];
-  const term = `%${input.query.trim()}%`;
-  return db.select().from(tikisProfiles).where(or(like(tikisProfiles.phone, term), like(tikisProfiles.fullName, term), like(tikisProfiles.email, term))).limit(Math.min(input.limit ?? 30, 100));
+  const limit = Math.min(input.limit ?? 30, 100);
+  const query = input.query?.trim();
+  if (!query) return db.select().from(tikisProfiles).orderBy(desc(tikisProfiles.createdAt)).limit(limit);
+  const term = `%${query}%`;
+  return db.select().from(tikisProfiles).where(or(like(tikisProfiles.phone, term), like(tikisProfiles.fullName, term), like(tikisProfiles.email, term))).orderBy(desc(tikisProfiles.createdAt)).limit(limit);
 }
 
 export async function adminGetProfileDetail(phone: string) {
