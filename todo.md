@@ -498,3 +498,8 @@
 - [x] Corriger les incompatibilités TypeScript introduites par la console administrateur mobile et son routeur synchronisés.
 - [x] Revalider compilation, tests, build admin et services après correction.
 - [x] Enregistrer et pousser la version synchronisée validée.
+
+- [x] Refaire le pull de la branche `main` et inspecter les changements distants.
+- [x] Vérifier les changements de dépendances, puis compiler et tester la version synchronisée.
+- [x] Relancer Expo et l’API, puis vérifier Metro, l’API et la console administrateur.
+- [x] Enregistrer et livrer la dernière version validée.
