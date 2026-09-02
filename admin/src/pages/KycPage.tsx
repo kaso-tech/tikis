@@ -4,7 +4,7 @@ import { useAdminAuth } from "../lib/auth";
 
 type Submission = {
   id: string; driverPhone: string; idFrontKey: string; idBackKey: string; selfieKey: string;
-  status: "submitted" | "approved" | "rejected"; rejectionReason: string | null; submittedAt: string;
+  status: "submitted" | "approved" | "rejected"; rejectionReason: string | null; submittedAt: Date | string;
 };
 type Row = { submission: Submission; driverName: string };
 

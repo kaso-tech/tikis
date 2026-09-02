@@ -5,6 +5,7 @@ import { useAdminAuth } from "../lib/auth";
 type PricingConfig = {
   vehicles: Record<string, { minimum: number; perKm: number }>;
   typeAdjustment: { plis: number; personnePerPassenger: number };
+  cargo: { base: number; perKg: number; perKgCap: number; perM3: number; perM3Cap: number };
 };
 
 export default function PricingPage() {

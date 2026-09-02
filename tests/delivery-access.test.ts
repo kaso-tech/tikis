@@ -189,11 +189,10 @@ describe("livraisons persistées Tikis", () => {
     expect(dbMock.listTikisWalletLedger).toHaveBeenCalledWith(driver.phone);
   });
 
-  it("enregistre une demande Wallet pour le profil connecté uniquement", async () => {
+  it("refuse les retraits Wallet devenus indisponibles sans créer de mouvement", async () => {
     dbMock.getTikisProfileByPhone.mockResolvedValue(driver);
-    dbMock.requestTikisWalletOperation.mockResolvedValue({ success: true });
     const caller = appRouter.createCaller(contextFor(driver.phone));
-    await expect(caller.wallet.requestOperation({ type: "withdrawal", amount: 1_500 })).resolves.toEqual({ success: true });
-    expect(dbMock.requestTikisWalletOperation).toHaveBeenCalledWith(driver.phone, "withdrawal", 1_500);
+    await expect(caller.wallet.requestOperation({ type: "withdrawal", amount: 1_500 })).rejects.toThrow("Les retraits ne sont plus proposés");
+    expect(dbMock.requestTikisWalletOperation).not.toHaveBeenCalled();
   });
 });

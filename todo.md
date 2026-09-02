@@ -525,3 +525,10 @@
 - [x] Contrôler et appliquer de façon non destructive les migrations avancées manquantes du schéma Tikis.
 - [x] Revalider le test géographique, TypeScript, les tests complets et le build admin après migration.
 - [x] Relancer les services, enregistrer, pousser et livrer la version synchronisée validée.
+- [x] Refaire le pull de la branche `main` et vérifier le dernier commit.
+- [x] Vérifier les dépendances, compiler, tester et construire la console admin.
+- [x] Relancer Expo et l’API, puis vérifier les services.
+- [x] Enregistrer, pousser et livrer la dernière version validée.
+- [x] Corriger les types du parcours KYC et du suivi de parrainage introduits par le dernier pull.
+- [x] Revalider TypeScript, les tests, le build admin et les services après les corrections KYC.
+- [x] Aligner le test Wallet sur la désactivation métier des retraits synchronisée depuis GitHub.

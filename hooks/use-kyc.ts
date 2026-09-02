@@ -56,10 +56,11 @@ export function useKyc() {
   const submitMutation = trpc.kyc.submit.useMutation();
 
   useEffect(() => {
-    if (!statusQuery.data) return;
+    const submission = statusQuery.data;
+    if (!submission) return;
     setState((current) => ({
       ...current,
-      submission: { status: statusQuery.data.status, submittedAt: statusQuery.data.submittedAt, rejectionReason: statusQuery.data.rejectionReason ?? null },
+      submission: { status: submission.status, submittedAt: submission.submittedAt, rejectionReason: submission.rejectionReason ?? null },
     }));
   }, [statusQuery.data]);
 
