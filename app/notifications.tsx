@@ -41,7 +41,7 @@ function timeShort(date: Date) {
 export default function NotificationsScreen() {
   const { colors: theme } = useThemeColors();
   const router = useRouter();
-  const { profile } = useTikisStore();
+  const { profile, role } = useTikisStore();
   const notificationsQuery = trpc.notifications.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 8_000 });
   const markAllReadMutation = trpc.notifications.markRead.useMutation({ onSuccess: () => void notificationsQuery.refetch() });
   const markOneReadMutation = trpc.notifications.markOneRead.useMutation({ onSuccess: () => void notificationsQuery.refetch() });
@@ -68,7 +68,12 @@ export default function NotificationsScreen() {
     if (!notif.read && !markOneReadMutation.isPending) {
       markOneReadMutation.mutate({ notificationId: notif.id });
     }
-    if (notif.deliveryId) {
+    if (!notif.deliveryId) return;
+    // Les livreurs n'ont jamais accès au suivi en direct : toujours la page de détails.
+    // Pour les expéditeurs, seul le suivi d'une livraison "En cours" ouvre la carte en direct.
+    if (role === "sender" && notif.deliveryStatus === "active") {
+      router.push(`/delivery/${notif.deliveryId}/map` as any);
+    } else {
       router.push(`/delivery/${notif.deliveryId}` as any);
     }
   }

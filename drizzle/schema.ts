@@ -167,6 +167,7 @@ export const tikisPlatformSettings = mysqlTable("tikis_platform_settings", {
   commissionRate: decimal("commissionRate", { precision: 6, scale: 5 }).notNull().default("0.10000"),
   referralRewardAmount: int("referralRewardAmount").notNull().default(1000),
   referralEnabled: boolean("referralEnabled").notNull().default(true),
+  referralRequiredDeliveries: int("referralRequiredDeliveries").notNull().default(1),
   minWithdrawal: int("minWithdrawal").notNull().default(500),
   maxWithdrawal: int("maxWithdrawal").notNull().default(500000),
   pricingConfig: text("pricingConfig"),
@@ -335,4 +336,22 @@ export type TikisWalletLedger = typeof tikisWalletLedger.$inferSelect;
 export type TikisPaymentTransaction = typeof tikisPaymentTransactions.$inferSelect;
 export type TikisDeliveryEvent = typeof tikisDeliveryEvents.$inferSelect;
 export type TikisReferral = typeof tikisReferrals.$inferSelect;
+/** Vérification d'identité (KYC) des livreurs : documents envoyés, examinés par l'administration. */
+export const tikisKycSubmissions = mysqlTable("tikis_kyc_submissions", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  driverPhone: varchar("driverPhone", { length: 20 }).notNull(),
+  idFrontKey: varchar("idFrontKey", { length: 255 }).notNull(),
+  idBackKey: varchar("idBackKey", { length: 255 }).notNull(),
+  selfieKey: varchar("selfieKey", { length: 255 }).notNull(),
+  status: mysqlEnum("status", ["submitted", "approved", "rejected"]).notNull().default("submitted"),
+  rejectionReason: varchar("rejectionReason", { length: 500 }),
+  submittedAt: timestamp("submittedAt").defaultNow().notNull(),
+  reviewedAt: timestamp("reviewedAt"),
+  reviewedByAdminId: int("reviewedByAdminId"),
+}, (table) => [
+  index("tikis_kyc_submissions_driver_index").on(table.driverPhone, table.submittedAt),
+  index("tikis_kyc_submissions_status_index").on(table.status),
+]);
+
 export type TikisSupportedCountry = typeof tikisSupportedCountries.$inferSelect;
+export type TikisKycSubmission = typeof tikisKycSubmissions.$inferSelect;

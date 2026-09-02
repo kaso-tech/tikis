@@ -329,7 +329,7 @@ export function HomeScreen() {
       ]);
       setPendingAction(null);
     } catch (cause) {
-      Alert.alert("Action indisponible", cause instanceof Error ? cause.message : "Réessayez dans un instant.");
+      Alert.alert("Action impossible", cause instanceof Error ? cause.message : "Réessayez dans un instant.");
     } finally {
       setApplyingId(null);
     }

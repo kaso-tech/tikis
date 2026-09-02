@@ -123,10 +123,6 @@ export default function WalletScreen() {
                   <Text style={styles.balanceSub}>{displayWalletAmount(wallet?.total ?? null)}</Text>
                 </View>
                 <View style={styles.balanceCol}>
-                  <Text style={[styles.balanceLabel, isDriver && styles.balanceLabelLight]}>Bonus</Text>
-                  <Text style={styles.balanceSub}>0 F</Text>
-                </View>
-                <View style={styles.balanceCol}>
                   <Text style={[styles.balanceLabel, isDriver && styles.balanceLabelLight]}>Bloquée</Text>
                   <Text style={styles.balanceSub}>{displayWalletAmount(wallet?.blocked ?? null)}</Text>
                 </View>
@@ -151,18 +147,11 @@ export default function WalletScreen() {
         </View>
 
         <View style={styles.actionsRow}>
-          <Pressable onPress={() => openRequest("deposit")} style={({ pressed }) => [styles.actionCard, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]}>
+          <Pressable onPress={() => openRequest("deposit")} style={({ pressed }) => [styles.actionCardFull, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]}>
             <View style={[styles.actionIcon, { backgroundColor: theme.background }]}><MaterialIcons name="add-card" size={15} color={theme.primary} /></View>
             <View style={styles.actionText}>
-              <Text style={[styles.actionLabel, { color: theme.foreground }]}>Dépôt</Text>
+              <Text style={[styles.actionLabel, { color: theme.foreground }]}>Recharger mon compte</Text>
               <Text style={[styles.actionSub, { color: theme.muted }]}>YengaPay · test</Text>
-            </View>
-          </Pressable>
-          <Pressable onPress={() => openRequest("withdrawal")} style={({ pressed }) => [styles.actionCard, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]}>
-            <View style={[styles.actionIcon, { backgroundColor: theme.background }]}><MaterialIcons name="account-balance-wallet" size={15} color={theme.primary} /></View>
-            <View style={styles.actionText}>
-              <Text style={[styles.actionLabel, { color: theme.foreground }]}>Retrait</Text>
-              <Text style={[styles.actionSub, { color: theme.muted }]}>Mobile Money</Text>
             </View>
           </Pressable>
         </View>
@@ -244,7 +233,7 @@ export default function WalletScreen() {
             ) : (
               <>
                 <View style={styles.modalIcon}><MaterialIcons name={requestType === "deposit" ? "add-card" : "account-balance-wallet"} size={22} color="#9A6201" /></View>
-                <Text style={styles.modalTitle}>{requestType === "deposit" ? "Dépôt YengaPay" : "Retrait YengaPay"}</Text>
+                <Text style={styles.modalTitle}>Recharger mon compte</Text>
                 <Text style={styles.modalSub}>{requestType === "deposit" ? "Initialisez un dépôt de test. Le solde ne sera crédité qu'après la confirmation suivante." : "Initialisez un retrait de test. Le solde ne sera débité qu'après la confirmation suivante."}</Text>
                 <View style={styles.amountWrap}>
                   <TextInput value={amountInput} onChangeText={(value) => setAmountInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} autoFocus style={styles.amountInput} placeholder="Montant" placeholderTextColor="#B48753" />
@@ -302,6 +291,7 @@ const styles = StyleSheet.create({
 
   actionsRow: { flexDirection: "row", gap: 8, paddingHorizontal: 8, marginTop: 6 },
   actionCard: { flex: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1 },
+  actionCardFull: { flex: 1, borderRadius: 12, paddingVertical: 13, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1 },
   actionIcon: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   actionIconAlt: {},
   actionText: { flex: 1 },

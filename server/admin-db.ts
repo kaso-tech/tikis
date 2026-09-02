@@ -9,6 +9,7 @@ import {
   tikisDeliveryCandidates,
   tikisDeliveryEvents,
   tikisDeliveryReports,
+  tikisKycSubmissions,
   tikisPaymentTransactions,
   tikisPlatformSettings,
   tikisProfiles,
@@ -376,14 +377,15 @@ export async function adminGetReferralSettings() {
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   await dbc.insert(tikisPlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
   const settings = (await dbc.select().from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
-  return { rewardAmount: settings?.referralRewardAmount ?? 1000, enabled: settings?.referralEnabled ?? true };
+  return { rewardAmount: settings?.referralRewardAmount ?? 1000, enabled: settings?.referralEnabled ?? true, requiredDeliveries: settings?.referralRequiredDeliveries ?? 1 };
 }
 
-export async function adminUpdateReferralSettings(input: { rewardAmount: number; enabled: boolean }) {
+export async function adminUpdateReferralSettings(input: { rewardAmount: number; enabled: boolean; requiredDeliveries: number }) {
   if (!Number.isSafeInteger(input.rewardAmount) || input.rewardAmount < 0 || input.rewardAmount > 100_000) throw new Error("Montant de récompense invalide.");
+  if (!Number.isSafeInteger(input.requiredDeliveries) || input.requiredDeliveries < 1 || input.requiredDeliveries > 100) throw new Error("Le nombre de courses requis doit être compris entre 1 et 100.");
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  await dbc.insert(tikisPlatformSettings).values({ id: 1, referralRewardAmount: input.rewardAmount, referralEnabled: input.enabled }).onDuplicateKeyUpdate({ set: { referralRewardAmount: input.rewardAmount, referralEnabled: input.enabled } });
+  await dbc.insert(tikisPlatformSettings).values({ id: 1, referralRewardAmount: input.rewardAmount, referralEnabled: input.enabled, referralRequiredDeliveries: input.requiredDeliveries }).onDuplicateKeyUpdate({ set: { referralRewardAmount: input.rewardAmount, referralEnabled: input.enabled, referralRequiredDeliveries: input.requiredDeliveries } });
   return input;
 }
 
@@ -429,6 +431,7 @@ export async function adminListPaymentTransactions(input: { type?: "deposit" | "
 export type PricingConfig = {
   vehicles: Record<string, { minimum: number; perKm: number }>;
   typeAdjustment: { plis: number; personnePerPassenger: number };
+  cargo: { base: number; perKg: number; perKgCap: number; perM3: number; perM3Cap: number };
 };
 
 const DEFAULT_PRICING_CONFIG: PricingConfig = {
@@ -439,6 +442,7 @@ const DEFAULT_PRICING_CONFIG: PricingConfig = {
     "Voiture": { minimum: 1600, perKm: 290 },
   },
   typeAdjustment: { plis: 180, personnePerPassenger: 240 },
+  cargo: { base: 280, perKg: 22, perKgCap: 1800, perM3: 5200, perM3Cap: 2600 },
 };
 
 export async function adminGetPricingConfig(): Promise<PricingConfig> {
@@ -449,7 +453,7 @@ export async function adminGetPricingConfig(): Promise<PricingConfig> {
   if (!settings?.pricingConfig) return DEFAULT_PRICING_CONFIG;
   try {
     const parsed = JSON.parse(settings.pricingConfig) as Partial<PricingConfig>;
-    return { vehicles: { ...DEFAULT_PRICING_CONFIG.vehicles, ...parsed.vehicles }, typeAdjustment: { ...DEFAULT_PRICING_CONFIG.typeAdjustment, ...parsed.typeAdjustment } };
+    return { vehicles: { ...DEFAULT_PRICING_CONFIG.vehicles, ...parsed.vehicles }, typeAdjustment: { ...DEFAULT_PRICING_CONFIG.typeAdjustment, ...parsed.typeAdjustment }, cargo: { ...DEFAULT_PRICING_CONFIG.cargo, ...parsed.cargo } };
   } catch {
     return DEFAULT_PRICING_CONFIG;
   }
@@ -459,6 +463,9 @@ export async function adminUpdatePricingConfig(config: PricingConfig) {
   for (const [vehicle, rate] of Object.entries(config.vehicles)) {
     if (!Number.isFinite(rate.minimum) || rate.minimum < 0 || rate.minimum > 100_000) throw new Error(`Tarif minimum invalide pour ${vehicle}.`);
     if (!Number.isFinite(rate.perKm) || rate.perKm < 0 || rate.perKm > 10_000) throw new Error(`Tarif au kilomètre invalide pour ${vehicle}.`);
+  }
+  for (const [key, value] of Object.entries(config.cargo)) {
+    if (!Number.isFinite(value) || value < 0 || value > 100_000) throw new Error(`Valeur invalide pour le paramètre poids/volume « ${key} ».`);
   }
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
@@ -526,4 +533,31 @@ export async function adminListPendingDeletions() {
   const dbc = await getDb();
   if (!dbc) return [];
   return dbc.select({ phone: tikisProfiles.phone, fullName: tikisProfiles.fullName, accountType: tikisProfiles.accountType, deletionRequestedAt: tikisProfiles.deletionRequestedAt }).from(tikisProfiles).where(sql`${tikisProfiles.deletionRequestedAt} is not null and ${tikisProfiles.deletedAt} is null`).orderBy(desc(tikisProfiles.deletionRequestedAt));
+}
+
+// ————————————————————————————————————————————————————————————————————————
+// Vérification d'identité (KYC)
+// ————————————————————————————————————————————————————————————————————————
+
+export async function adminListKycSubmissions(status?: "submitted" | "approved" | "rejected") {
+  const dbc = await getDb();
+  if (!dbc) return [];
+  const base = dbc.select({
+    submission: tikisKycSubmissions,
+    driverName: tikisProfiles.fullName,
+  }).from(tikisKycSubmissions).innerJoin(tikisProfiles, eq(tikisKycSubmissions.driverPhone, tikisProfiles.phone));
+  const filtered = status ? base.where(eq(tikisKycSubmissions.status, status)) : base;
+  return filtered.orderBy(desc(tikisKycSubmissions.submittedAt));
+}
+
+export async function adminReviewKyc(input: { submissionId: string; decision: "approved" | "rejected"; rejectionReason?: string; adminId: number }) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  const submission = (await dbc.select().from(tikisKycSubmissions).where(eq(tikisKycSubmissions.id, input.submissionId)).limit(1))[0];
+  if (!submission) throw new Error("Dossier introuvable.");
+  await dbc.update(tikisKycSubmissions).set({
+    status: input.decision, rejectionReason: input.decision === "rejected" ? (input.rejectionReason?.trim() || "Documents non conformes.") : null,
+    reviewedAt: new Date(), reviewedByAdminId: input.adminId,
+  }).where(eq(tikisKycSubmissions.id, input.submissionId));
+  return { id: input.submissionId, status: input.decision };
 }

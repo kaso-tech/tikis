@@ -46,10 +46,42 @@ export default function ReportsPage() {
     }
   }
 
-  const counts = {
-    all: rows.length,
-    open: rows.filter((r) => r.report.status === "open").length,
-  };
+  // ———— Vue détail : page dédiée, remplace la liste ————
+  if (selected) {
+    return (
+      <div>
+        <div className="page-head">
+          <div>
+            <button className="btn btn-secondary btn-sm" onClick={() => { setSelected(null); setNotes(""); }} style={{ marginBottom: 10 }}>← Retour à la liste</button>
+            <h1 className="page-title">{selected.delivery.title}</h1>
+            <p className="page-sub" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>Livraison {selected.report.deliveryId}</p>
+          </div>
+        </div>
+        {error ? <div className="banner-error">{error}</div> : null}
+        <div className="card">
+          <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <span className="field-label">Signalé par</span>
+              <p style={{ fontSize: 13, margin: 0 }}>{selected.report.reporterPhone} ({selected.report.reporterRole === "sender" ? "Expéditeur" : "Livreur"}) — motif : {selected.report.reason}</p>
+            </div>
+            <div>
+              <span className="field-label">Description</span>
+              <p style={{ fontSize: 13, lineHeight: 1.5, margin: 0 }}>{selected.report.description}</p>
+            </div>
+            <div>
+              <label className="field-label" htmlFor="notes">Notes de résolution</label>
+              <textarea id="notes" className="textarea" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Décision prise, actions menées, communication à l'utilisateur…" />
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn btn-secondary" disabled={busy} onClick={() => void resolve("reviewing")}>Marquer « en cours »</button>
+              <button className="btn btn-primary" disabled={busy} onClick={() => void resolve("resolved")}>Résoudre</button>
+              <button className="btn btn-danger" disabled={busy} onClick={() => void resolve("dismissed")}>Classer sans suite</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -118,33 +150,6 @@ export default function ReportsPage() {
           </table>
         )}
       </div>
-
-      {selected ? (
-        <div className="card" style={{ marginTop: 12 }}>
-          <div className="card-head">
-            <div>
-              <div className="card-title">Signalement — {selected.delivery.title}</div>
-              <div className="card-sub" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>Livraison {selected.report.deliveryId}</div>
-            </div>
-            <button className="btn btn-ghost btn-sm" onClick={() => setSelected(null)}>Fermer</button>
-          </div>
-          <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div>
-              <span className="field-label">Description</span>
-              <p style={{ fontSize: 13, lineHeight: 1.5, margin: 0 }}>{selected.report.description}</p>
-            </div>
-            <div>
-              <label className="field-label" htmlFor="notes">Notes de résolution</label>
-              <textarea id="notes" className="textarea" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Décision prise, actions menées, communication à l'utilisateur…" />
-            </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button className="btn btn-secondary" disabled={busy} onClick={() => void resolve("reviewing")}>Marquer « en cours »</button>
-              <button className="btn btn-primary" disabled={busy} onClick={() => void resolve("resolved")}>Résoudre</button>
-              <button className="btn btn-danger" disabled={busy} onClick={() => void resolve("dismissed")}>Classer sans suite</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

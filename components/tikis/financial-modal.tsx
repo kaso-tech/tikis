@@ -34,11 +34,13 @@ export function FinancialConfirmationModal({
   const { colors: theme } = useThemeColors();
   const [counterInput, setCounterInput] = useState("");
   const [counterError, setCounterError] = useState<string | null>(null);
+  const [counterFieldOpen, setCounterFieldOpen] = useState(false);
 
   useEffect(() => {
     if (!visible) {
       setCounterInput("");
       setCounterError(null);
+      setCounterFieldOpen(false);
     }
   }, [visible]);
 
@@ -61,31 +63,39 @@ export function FinancialConfirmationModal({
           </View>
 
           {allowCounterOffer ? (
-            <View style={[styles.counterBlock, { borderColor: theme.border, backgroundColor: theme.background }]}>
-              <View style={styles.counterHeader}>
+            counterFieldOpen ? (
+              <View style={[styles.counterBlock, { borderColor: theme.border, backgroundColor: theme.background }]}>
+                <View style={styles.counterHeader}>
+                  <MaterialIcons name="edit" size={14} color={theme.primary} />
+                  <Text style={[styles.counterTitle, { color: theme.foreground }]}>Votre prix (optionnel)</Text>
+                  <Text style={[styles.counterSub, { color: theme.muted }]}>Prix client {formatMoney(amount)}</Text>
+                </View>
+                <View style={styles.counterInputWrap}>
+                  <Text style={[styles.counterInputPrefix, { color: theme.muted }]}>FCFA</Text>
+                  <TextInput
+                    autoFocus
+                    value={counterInput}
+                    onChangeText={(value) => {
+                      const sanitized = sanitizeOfferedPriceInput(value);
+                      setCounterInput(sanitized);
+                      const err = offeredPriceError(sanitized);
+                      setCounterError(err ?? null);
+                    }}
+                    placeholder="Ex : 2 000"
+                    placeholderTextColor={theme.muted}
+                    keyboardType="numeric"
+                    style={[styles.counterInput, { color: theme.foreground, borderColor: counterError ? theme.error : theme.border, backgroundColor: theme.surface }]}
+                    accessibilityLabel="Montant de votre proposition"
+                  />
+                </View>
+                {counterError ? <Text style={[styles.counterError, { color: theme.error }]}>{counterError}</Text> : null}
+              </View>
+            ) : (
+              <Pressable accessibilityRole="button" onPress={() => setCounterFieldOpen(true)} style={({ pressed }) => [styles.counterToggle, { borderColor: theme.border, backgroundColor: theme.background }, pressed && styles.pressed]}>
                 <MaterialIcons name="edit" size={14} color={theme.primary} />
-                <Text style={[styles.counterTitle, { color: theme.foreground }]}>Votre prix (optionnel)</Text>
-                <Text style={[styles.counterSub, { color: theme.muted }]}>Prix client {formatMoney(amount)}</Text>
-              </View>
-              <View style={styles.counterInputWrap}>
-                <Text style={[styles.counterInputPrefix, { color: theme.muted }]}>FCFA</Text>
-                <TextInput
-                  value={counterInput}
-                  onChangeText={(value) => {
-                    const sanitized = sanitizeOfferedPriceInput(value);
-                    setCounterInput(sanitized);
-                    const err = offeredPriceError(sanitized);
-                    setCounterError(err ?? null);
-                  }}
-                  placeholder="Ex : 2 000"
-                  placeholderTextColor={theme.muted}
-                  keyboardType="numeric"
-                  style={[styles.counterInput, { color: theme.foreground, borderColor: counterError ? theme.error : theme.border, backgroundColor: theme.surface }]}
-                  accessibilityLabel="Montant de votre proposition"
-                />
-              </View>
-              {counterError ? <Text style={[styles.counterError, { color: theme.error }]}>{counterError}</Text> : null}
-            </View>
+                <Text style={[styles.counterToggleText, { color: theme.primary }]}>Proposer un prix différent</Text>
+              </Pressable>
+            )
           ) : null}
 
           <View style={styles.note}>
@@ -116,6 +126,8 @@ const styles = StyleSheet.create({
   amountLabel: { fontSize: 13, fontWeight: "500" },
   amount: { fontSize: 16, fontWeight: "600" },
   counterBlock: { marginTop: 12, borderRadius: 10, borderWidth: 1, padding: 12, gap: 8 },
+  counterToggle: { marginTop: 12, borderRadius: 10, borderWidth: 1, paddingVertical: 11, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8 },
+  counterToggleText: { fontSize: 13, fontWeight: "700" },
   counterHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   counterTitle: { fontSize: 12, fontWeight: "600", flex: 1 },
   counterSub: { fontSize: 10, fontWeight: "500" },

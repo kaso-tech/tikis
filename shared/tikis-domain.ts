@@ -49,7 +49,7 @@ export interface DeliveryReview {
   createdAt: string;
 }
 
-export type ReferralStatus = "invited" | "qualified" | "rewarded";
+export type ReferralStatus = "invited" | "qualified" | "rewarded" | "voided";
 
 export interface ReferralRecord {
   id: string;
@@ -190,6 +190,7 @@ export interface FinancialRecord {
 export interface InAppNotification {
   id: string;
   deliveryId?: string;
+  deliveryStatus?: string;
   title: string;
   body: string;
   createdAt: string;

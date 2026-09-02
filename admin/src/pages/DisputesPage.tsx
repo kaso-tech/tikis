@@ -51,66 +51,21 @@ export default function DisputesPage() {
     }
   }
 
-  return (
-    <div>
-      <div className="page-head">
-        <div>
-          <h1 className="page-title">Litiges</h1>
-          <p className="page-sub">Recherchez une livraison pour consulter sa chronologie complète (candidatures, finance, notifications, signalements)</p>
-        </div>
-      </div>
-
-      {error ? <div className="banner-error">{error}</div> : null}
-
-      <div className="card">
-        <div className="card-head">
+  if (timeline) {
+    return (
+      <div>
+        <div className="page-head">
           <div>
-            <div className="card-title">Recherche de livraison</div>
-            <div className="card-sub">ID, titre, téléphone expéditeur ou livreur</div>
+            <button className="btn btn-secondary btn-sm" onClick={() => setTimeline(null)} style={{ marginBottom: 10 }}>← Retour à la liste</button>
+            <h1 className="page-title">{timeline.delivery.title}</h1>
           </div>
         </div>
-        <div className="filters-row">
-          <input className="input" placeholder="Ex. DLV-1234, +237 6XX…" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void search()} style={{ minWidth: 320 }} />
-          <button className="btn btn-primary" onClick={() => void search()} disabled={loading}>{loading ? "Recherche…" : "Rechercher"}</button>
-        </div>
-
-        {searched && results.length === 0 && !loading ? <div className="empty-state">Aucune livraison ne correspond.</div> : null}
-
-        {results.length > 0 ? (
-          <table className="table">
-            <thead><tr><th>Titre</th><th>Statut</th><th>Expéditeur</th><th>Livreur</th><th>Prix</th></tr></thead>
-            <tbody>
-              {results.map((delivery) => (
-                <tr key={delivery.id} className="clickable" onClick={() => void openTimeline(delivery.id)}>
-                  <td>
-                    <div className="user-name">{delivery.title}</div>
-                    <div className="user-meta" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{delivery.id.slice(0, 16)}</div>
-                  </td>
-                  <td><span className={`pill ${STATUS_PILL[delivery.status] ?? "pill-neutral"}`}><span className="dot" />{delivery.status}</span></td>
-                  <td style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11.5 }}>{delivery.senderPhone}</td>
-                  <td style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11.5 }}>{delivery.driverPhone ?? <span className="muted">—</span>}</td>
-                  <td className="price">{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : null}
-      </div>
-
-      {timeline ? (
-        <>
-          <div className="card">
-            <div className="card-head">
-              <div>
-                <div className="card-title">{timeline.delivery.title}</div>
-                <div className="card-sub">
-                  <span className={`pill ${STATUS_PILL[timeline.delivery.status] ?? "pill-neutral"}`}><span className="dot" />{timeline.delivery.status}</span>
-                  {" · "}Prix {formatMoney(timeline.delivery.offeredPrice ?? timeline.delivery.estimatedPrice)}
-                  {" · "}Expéditeur {timeline.delivery.senderPhone}
-                  {" · "}Livreur {timeline.delivery.driverPhone ?? "—"}
-                </div>
-              </div>
-              <button className="btn btn-ghost btn-sm" onClick={() => setTimeline(null)}>Fermer</button>
+                <div className="card">
+            <div className="card-sub">
+              <span className={`pill ${STATUS_PILL[timeline.delivery.status] ?? "pill-neutral"}`}><span className="dot" />{timeline.delivery.status}</span>
+              {" · "}Prix {formatMoney(timeline.delivery.offeredPrice ?? timeline.delivery.estimatedPrice)}
+              {" · "}Expéditeur {timeline.delivery.senderPhone}
+              {" · "}Livreur {timeline.delivery.driverPhone ?? "—"}
             </div>
           </div>
 
@@ -210,8 +165,56 @@ export default function DisputesPage() {
               </div>
             </div>
           ) : null}
-        </>
-      ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">Litiges</h1>
+          <p className="page-sub">Recherchez une livraison pour consulter sa chronologie complète (candidatures, finance, notifications, signalements)</p>
+        </div>
+      </div>
+
+      {error ? <div className="banner-error">{error}</div> : null}
+
+      <div className="card">
+        <div className="card-head">
+          <div>
+            <div className="card-title">Recherche de livraison</div>
+            <div className="card-sub">ID, titre, téléphone expéditeur ou livreur</div>
+          </div>
+        </div>
+        <div className="filters-row">
+          <input className="input" placeholder="Ex. DLV-1234, +237 6XX…" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void search()} style={{ minWidth: 320 }} />
+          <button className="btn btn-primary" onClick={() => void search()} disabled={loading}>{loading ? "Recherche…" : "Rechercher"}</button>
+        </div>
+
+        {searched && results.length === 0 && !loading ? <div className="empty-state">Aucune livraison ne correspond.</div> : null}
+
+        {results.length > 0 ? (
+          <table className="table">
+            <thead><tr><th>Titre</th><th>Statut</th><th>Expéditeur</th><th>Livreur</th><th>Prix</th></tr></thead>
+            <tbody>
+              {results.map((delivery) => (
+                <tr key={delivery.id} className="clickable" onClick={() => void openTimeline(delivery.id)}>
+                  <td>
+                    <div className="user-name">{delivery.title}</div>
+                    <div className="user-meta" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{delivery.id.slice(0, 16)}</div>
+                  </td>
+                  <td><span className={`pill ${STATUS_PILL[delivery.status] ?? "pill-neutral"}`}><span className="dot" />{delivery.status}</span></td>
+                  <td style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11.5 }}>{delivery.senderPhone}</td>
+                  <td style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace", fontSize: 11.5 }}>{delivery.driverPhone ?? <span className="muted">—</span>}</td>
+                  <td className="price">{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : null}
+      </div>
+
     </div>
   );
 }

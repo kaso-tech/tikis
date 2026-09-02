@@ -345,6 +345,7 @@ export const appRouter = router({
     route: protectedGeographyProcedure.input(z.object({ origin: placeSchema, destination: placeSchema })).mutation(async ({ input }) => geography.computeRoute(input.origin, input.destination)),
     pricingConfig: tikisProtectedProcedure.query(() => adminDb.adminGetPricingConfig()),
     countries: publicProcedure.query(() => db.listSupportedCountries()),
+    searchCities: tikisProtectedProcedure.input(z.object({ query: z.string().min(2).max(80), countryCode: z.string().length(2) })).query(({ input }) => geography.searchCities(input.query, input.countryCode)),
     savePlace: protectedGeographyProcedure.input(placeSchema).mutation(async ({ input }) => db.saveTikisPlace({ googlePlaceId: input.googlePlaceId, mapboxPlaceId: input.mapboxId, latitude: String(input.latitude), longitude: String(input.longitude), formattedAddress: input.formattedAddress ?? input.name, placeName: input.name, street: input.street, district: input.district, city: input.city, province: input.province, country: input.country, provider: input.mapboxId ? "mapbox" : "manual", source: input.mapboxId ? "retrieve" : "manual", featureType: "unknown", precision: "unknown" })),
     favorites: router({
       list: tikisProtectedProcedure.query(({ ctx }) => db.listFavoritePlaces(ctx.tikisProfilePhone)),
@@ -541,10 +542,12 @@ export const appRouter = router({
       return { wallet, journal, commissionRate };
     }),
     requestOperation: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000) })).mutation(async ({ ctx, input }) => {
+      if (input.type === "withdrawal") throw new Error("Les retraits ne sont plus proposés : le Wallet sert uniquement à recharger votre compte pour effectuer des livraisons.");
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       return db.requestTikisWalletOperation(profile.phone, input.type, input.amount);
     }),
     initiateYengaPayTest: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000), idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{16,96}$/) })).mutation(async ({ ctx, input }) => {
+      if (input.type === "withdrawal") throw new Error("Les retraits ne sont plus proposés : le Wallet sert uniquement à recharger votre compte pour effectuer des livraisons.");
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       return db.initiateYengaPayTestPayment({ ...input, profilePhone: profile.phone });
     }),
@@ -592,6 +595,51 @@ export const appRouter = router({
       return db.deliveryReviewToView(review);
     }),
   }),
+  referrals: router({
+    myCode: tikisProtectedProcedure.query(async ({ ctx }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      return { code: profile.accountType === "driver" ? profile.referralCode ?? null : null };
+    }),
+    mine: tikisProtectedProcedure.query(async ({ ctx }) => {
+      const rows = await db.listReferralsForReferrer(ctx.tikisProfilePhone);
+      return rows.map((row) => ({
+        id: row.referral.id, fullName: row.refereeName, status: row.referral.status,
+        rewardAmount: row.referral.rewardAmount, joinedAt: row.referral.createdAt.toISOString(),
+      }));
+    }),
+    settings: publicProcedure.query(() => db.getReferralPublicSettings()),
+  }),
+
+  kyc: router({
+    status: tikisProtectedProcedure.query(async ({ ctx }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "driver") return null;
+      const submission = await db.getLatestKycSubmission(profile.phone);
+      if (!submission) return null;
+      return { status: submission.status, submittedAt: submission.submittedAt.toISOString(), rejectionReason: submission.rejectionReason ?? undefined };
+    }),
+    submit: tikisProtectedProcedure.input(z.object({
+      idFront: z.object({ base64: base64ImageSchema, mime: photoMimeSchema }),
+      idBack: z.object({ base64: base64ImageSchema, mime: photoMimeSchema }),
+      selfie: z.object({ base64: base64ImageSchema, mime: photoMimeSchema }),
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "driver") throw new Error("La vérification d’identité concerne uniquement les comptes livreurs.");
+      const existing = await db.getLatestKycSubmission(profile.phone);
+      if (existing?.status === "submitted") throw new Error("Un dossier est déjà en cours d’examen.");
+      if (existing?.status === "approved") throw new Error("Votre identité est déjà vérifiée.");
+      const safePhone = profile.phone.replace(/[^0-9]/g, "");
+      const stamp = Date.now();
+      const extensionOf = (mime: string) => (mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg");
+      const [idFront, idBack, selfie] = await Promise.all([
+        storagePut(`tikis-kyc/${safePhone}/${stamp}-id-front.${extensionOf(input.idFront.mime)}`, Buffer.from(input.idFront.base64, "base64"), input.idFront.mime),
+        storagePut(`tikis-kyc/${safePhone}/${stamp}-id-back.${extensionOf(input.idBack.mime)}`, Buffer.from(input.idBack.base64, "base64"), input.idBack.mime),
+        storagePut(`tikis-kyc/${safePhone}/${stamp}-selfie.${extensionOf(input.selfie.mime)}`, Buffer.from(input.selfie.base64, "base64"), input.selfie.mime),
+      ]);
+      return db.createKycSubmission({ driverPhone: profile.phone, idFrontKey: idFront.key, idBackKey: idBack.key, selfieKey: selfie.key });
+    }),
+  }),
+
   reports: router({
     create: tikisProtectedProcedure.input(z.object({
       deliveryId: z.string().uuid(),

@@ -340,7 +340,7 @@ export function HomeScreen() {
       await Promise.all([utilities.deliveries.list.invalidate(), utilities.wallet.snapshot.invalidate(), utilities.notifications.list.invalidate()]);
       if (delivery.ownCandidateStatus === "applied" || delivery.ownCandidateStatus === "selected") setPendingAction(null);
     } catch (cause) {
-      Alert.alert("Action indisponible", cause instanceof Error ? cause.message : "Réessayez dans un instant.");
+      Alert.alert("Action impossible", cause instanceof Error ? cause.message : "Réessayez dans un instant.");
     } finally {
       setActioningId(null);
     }

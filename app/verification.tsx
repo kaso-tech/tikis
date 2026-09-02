@@ -53,6 +53,7 @@ export default function VerificationScreen() {
 
   const submitted = state.submission.status === "submitted";
   const approved = state.submission.status === "approved";
+  const rejected = state.submission.status === "rejected";
 
   async function handleSubmit() {
     if (submitting) return;
@@ -94,8 +95,22 @@ export default function VerificationScreen() {
               <Text style={[styles.approvedTitle, { color: theme.foreground }]}>Profil validé</Text>
               <Text style={[styles.approvedText, { color: theme.muted }]}>Vous pouvez désormais postuler aux livraisons. La communauté Tikis vous fait confiance.</Text>
             </SurfaceCard>
+          ) : submitted ? (
+            <SurfaceCard style={[styles.submittedCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={[styles.submittedIcon, { backgroundColor: theme.pressed }]}><MaterialIcons name="hourglass-top" size={26} color={theme.warning} /></View>
+              <Text style={[styles.submittedTitle, { color: theme.foreground }]}>Vérification en cours</Text>
+              <Text style={[styles.submittedText, { color: theme.muted }]}>Votre compte est en cours de vérification par les administrateurs. Délai habituel : 24 heures ouvrées. Vous serez notifié dès la validation.</Text>
+            </SurfaceCard>
           ) : (
             <>
+              {rejected ? (
+                <SurfaceCard style={[styles.rejectedCard, { backgroundColor: theme.surface, borderColor: theme.error }]}>
+                  <View style={[styles.submittedIcon, { backgroundColor: theme.pressed }]}><MaterialIcons name="report-problem" size={24} color={theme.error} /></View>
+                  <Text style={[styles.submittedTitle, { color: theme.foreground }]}>Documents refusés</Text>
+                  <Text style={[styles.submittedText, { color: theme.muted }]}>{state.submission.rejectionReason || "Vos documents ne respectaient pas nos critères."} Vous pouvez renvoyer un nouveau dossier ci-dessous.</Text>
+                </SurfaceCard>
+              ) : null}
+
               <SurfaceCard style={[styles.summary, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                 <View style={styles.summaryRow}>
                   <MaterialIcons name="privacy-tip" size={20} color={theme.primary} />
@@ -123,15 +138,7 @@ export default function VerificationScreen() {
 
               {error ? <Text style={[styles.error, { color: theme.error }]}>{error}</Text> : null}
 
-              {submitted ? (
-                <SurfaceCard style={[styles.submittedCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                  <View style={[styles.submittedIcon, { backgroundColor: theme.pressed }]}><MaterialIcons name="hourglass-top" size={26} color={theme.warning} /></View>
-                  <Text style={[styles.submittedTitle, { color: theme.foreground }]}>Vérification en cours</Text>
-                  <Text style={[styles.submittedText, { color: theme.muted }]}>Votre dossier est entre les mains de notre équipe. Délai habituel : 24 heures ouvrées.</Text>
-                </SurfaceCard>
-              ) : (
-                <TikisButton label="Envoyer la vérification" icon="send" onPress={() => void handleSubmit()} loading={submitting} loadingLabel="Envoi en cours…" disabled={!progress.complete || submitting} />
-              )}
+              <TikisButton label={rejected ? "Renvoyer le dossier" : "Envoyer la vérification"} icon="send" onPress={() => void handleSubmit()} loading={submitting} loadingLabel="Envoi en cours…" disabled={!progress.complete || submitting} />
 
               <Text style={[styles.disclaimer, { color: theme.muted }]}>En soumettant, vous certifiez que les documents vous appartiennent. Toute falsification entraîne la suspension immédiate du compte.</Text>
             </>
@@ -168,6 +175,7 @@ const styles = StyleSheet.create({
   approvedTitle: { fontSize: 16, fontWeight: "600" },
   approvedText: { fontSize: 12, lineHeight: 18, textAlign: "center" },
   submittedCard: { padding: 14, alignItems: "center", gap: 7, borderWidth: 1 },
+  rejectedCard: { padding: 14, alignItems: "center", gap: 7, borderWidth: 1.5 },
   submittedIcon: { width: 48, height: 48, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   submittedTitle: { fontSize: 14, fontWeight: "600" },
   submittedText: { fontSize: 12, lineHeight: 17, textAlign: "center" },

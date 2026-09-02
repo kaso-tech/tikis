@@ -9,15 +9,13 @@ import { TikisButton } from "@/components/tikis/ui";
 import { ContactSection } from "@/components/tikis/contact-section";
 import { haptic } from "@/lib/haptics";
 import { useTikisLogout } from "@/lib/tikis-logout";
-import { sanitizeFullName, validateFullName } from "@/lib/registration-rules";
-import { clearProfileCover, loadProfileCover, saveProfileCover } from "@/lib/profile-cover";
+import { countryFlagEmoji, sanitizeFullName, validateFullName } from "@/lib/registration-rules";
 import { getApiBaseUrl } from "@/constants/oauth";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { availableWalletBalance, formatMoney } from "@/shared/tikis-domain";
 
 const COVER_HEIGHT = 200;
-const COVER_ASPECT = [21, 9] as [number, number];
 
 export default function ProfileScreen() {
   const { colors: theme, isDark } = useThemeColors();
@@ -38,26 +36,28 @@ export default function ProfileScreen() {
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone) });
   const [editorOpen, setEditorOpen] = useState(false);
   const [fullName, setFullName] = useState(profile?.fullName ?? "");
-  const [locationEditorOpen, setLocationEditorOpen] = useState(false);
-  const [countryDraft, setCountryDraft] = useState(profile?.country ?? "");
-  const [cityDraft, setCityDraft] = useState(profile?.city ?? "");
+  const [countryEditorOpen, setCountryEditorOpen] = useState(false);
+  const [cityEditorOpen, setCityEditorOpen] = useState(false);
+  const [citySearch, setCitySearch] = useState("");
   const [locationError, setLocationError] = useState("");
+  const [locationSaving, setLocationSaving] = useState<"country" | "city" | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const countriesQuery = trpc.geography.countries.useQuery();
+  const citySearchQuery = trpc.geography.searchCities.useQuery(
+    { query: citySearch, countryCode: profile?.country ?? "" },
+    { enabled: cityEditorOpen && citySearch.trim().length >= 2 && Boolean(profile?.country) },
+  );
   const requestDeletionMutation = trpc.profiles.requestDeletion.useMutation();
   const [photoBase64, setPhotoBase64] = useState<string | undefined>();
   const [photoMime, setPhotoMime] = useState<"image/jpeg" | "image/png" | "image/webp" | undefined>();
   const [error, setError] = useState("");
   const [vehiclesPickerOpen, setVehiclesPickerOpen] = useState(false);
-  const [coverBase64, setCoverBase64] = useState<string | undefined>();
-  const [coverMime, setCoverMime] = useState<"image/jpeg" | "image/png" | "image/webp" | undefined>();
 
   const driver = role === "driver";
   const name = profile?.fullName ?? (driver ? "Antoine Kaboré" : "Aïcha Traoré");
   const initials = name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
   const photoUri = profile?.photoUrl ? `${getApiBaseUrl()}${profile.photoUrl}` : undefined;
-  const coverUri = coverBase64 ? `data:${coverMime ?? "image/jpeg"};base64,${coverBase64}` : undefined;
   const completed = (deliveriesQuery.data ?? []).filter((delivery) => delivery.status === "completed");
   const receivedReviews = useMemo(() => driver ? reviewsQuery.data ?? [] : [], [driver, reviewsQuery.data]);
   const driverWallet = walletQuery.data?.wallet;
@@ -79,20 +79,6 @@ export default function ProfileScreen() {
     return Number((sum / receivedReviews.length).toFixed(1));
   }, [driver, receivedReviews]);
 
-  useEffect(() => {
-    if (!profile?.phone) return;
-    let active = true;
-    (async () => {
-      const stored = await loadProfileCover(profile.phone);
-      if (!active) return;
-      if (stored) {
-        setCoverBase64(stored.base64);
-        setCoverMime(stored.mime);
-      }
-    })();
-    return () => { active = false; };
-  }, [profile?.phone]);
-
   async function pickPhoto() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.45, base64: true });
     if (result.canceled || !result.assets[0]?.base64) return;
@@ -105,34 +91,6 @@ export default function ProfileScreen() {
     setPhotoMime(mime);
     setError("");
     haptic.success();
-  }
-
-  async function pickCover() {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: COVER_ASPECT, quality: 0.6, base64: true });
-    if (result.canceled || !result.assets[0]?.base64) return;
-    const mime = result.assets[0].mimeType;
-    if (mime !== "image/jpeg" && mime !== "image/png" && mime !== "image/webp") {
-      Alert.alert("Format non supporté", "Choisissez une image JPEG, PNG ou WebP pour la couverture.");
-      return;
-    }
-    if (!profile?.phone) return;
-    setCoverBase64(result.assets[0].base64);
-    setCoverMime(mime);
-    await saveProfileCover(profile.phone, { base64: result.assets[0].base64, mime, updatedAt: new Date().toISOString() });
-    haptic.success();
-  }
-
-  async function removeCover() {
-    if (!profile?.phone) return;
-    Alert.alert("Retirer la couverture ?", "La bannière reviendra au style par défaut Tikis.", [
-      { text: "Annuler", style: "cancel" },
-      { text: "Retirer", style: "destructive", onPress: async () => {
-        await clearProfileCover(profile.phone);
-        setCoverBase64(undefined);
-        setCoverMime(undefined);
-        haptic.success();
-      } },
-    ]);
   }
 
   function openEditor() {
@@ -160,18 +118,38 @@ export default function ProfileScreen() {
     }
   }
 
-  async function saveLocation() {
+  async function selectCountry(countryId: string) {
     if (!profile) return;
-    if (!countryDraft) { setLocationError("Sélectionnez un pays."); return; }
     setLocationError("");
+    setLocationSaving("country");
     try {
-      const saved = await updateMutation.mutateAsync({ phone: profile.phone, otp: "730512", country: countryDraft, city: cityDraft.trim() || undefined });
-      updateProfile({ country: saved.country, city: saved.city });
-      setLocationEditorOpen(false);
+      const saved = await updateMutation.mutateAsync({ phone: profile.phone, otp: "730512", country: countryId });
+      updateProfile({ country: saved.country });
+      setCountryEditorOpen(false);
       haptic.success();
     } catch (cause) {
       setLocationError(cause instanceof Error ? cause.message : "La mise à jour a échoué.");
       haptic.error();
+    } finally {
+      setLocationSaving(null);
+    }
+  }
+
+  async function selectCity(city: string) {
+    if (!profile) return;
+    setLocationError("");
+    setLocationSaving("city");
+    try {
+      const saved = await updateMutation.mutateAsync({ phone: profile.phone, otp: "730512", city });
+      updateProfile({ city: saved.city });
+      setCityEditorOpen(false);
+      setCitySearch("");
+      haptic.success();
+    } catch (cause) {
+      setLocationError(cause instanceof Error ? cause.message : "La mise à jour a échoué.");
+      haptic.error();
+    } finally {
+      setLocationSaving(null);
     }
   }
 
@@ -192,16 +170,12 @@ export default function ProfileScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.coverWrap}>
-          <View style={[styles.cover, isDark && styles.coverDark]} accessibilityLabel="Photo de couverture">
-            {coverUri ? (
-              <Image source={{ uri: coverUri }} style={styles.coverImage} resizeMode="cover" />
-            ) : (
-              <View style={styles.coverPattern}>
-                <View style={styles.coverOrbPrimary} />
-                <View style={styles.coverOrbSecondary} />
-                <View style={styles.coverOrbTertiary} />
-              </View>
-            )}
+          <View style={[styles.cover, isDark && styles.coverDark]}>
+            <View style={styles.coverPattern}>
+              <View style={styles.coverOrbPrimary} />
+              <View style={styles.coverOrbSecondary} />
+              <View style={styles.coverOrbTertiary} />
+            </View>
             <View style={styles.coverOverlay} pointerEvents="none" />
           </View>
         </View>
@@ -292,14 +266,17 @@ export default function ProfileScreen() {
             iconBg="primary"
             label="Pays"
             sub={countriesQuery.data?.find((c) => c.id === profile?.country)?.name ?? "Non renseigné"}
-            onPress={() => { setCountryDraft(profile?.country ?? ""); setCityDraft(profile?.city ?? ""); setLocationError(""); setLocationEditorOpen(true); }}
+            onPress={() => { setLocationError(""); setCountryEditorOpen(true); }}
           />
           <MenuRow
             icon="location-city"
             iconBg="primary"
             label="Ville"
             sub={profile?.city || "Non renseignée"}
-            onPress={() => { setCountryDraft(profile?.country ?? ""); setCityDraft(profile?.city ?? ""); setLocationError(""); setLocationEditorOpen(true); }}
+            onPress={() => {
+              if (!profile?.country) { Alert.alert("Sélectionnez d’abord un pays", "Le pays doit être renseigné avant de choisir une ville."); return; }
+              setLocationError(""); setCitySearch(""); setCityEditorOpen(true);
+            }}
             last
           />
         </Section>
@@ -422,32 +399,54 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      <Modal visible={locationEditorOpen} transparent animationType="slide" onRequestClose={() => !updateMutation.isPending && setLocationEditorOpen(false)}>
-        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => !updateMutation.isPending && setLocationEditorOpen(false)} />
+      <Modal visible={countryEditorOpen} transparent animationType="slide" onRequestClose={() => !locationSaving && setCountryEditorOpen(false)}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => !locationSaving && setCountryEditorOpen(false)} />
           <View style={[styles.sheet, isDark && { backgroundColor: theme.surface }]}>
             <View style={styles.sheetGrip} />
-            <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Pays et ville</Text>
-            <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>Ces informations aident à mieux estimer vos livraisons.</Text>
-            <Text style={styles.fieldLabel}>PAYS</Text>
-            <View style={styles.countryOptions}>
+            <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Choisir un pays</Text>
+            <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>Votre pays reste inchangé jusqu’à ce que vous en choisissiez un autre ici.</Text>
+            {locationError ? <Text style={styles.error}>{locationError}</Text> : null}
+            <ScrollView style={{ maxHeight: 380, marginTop: 8 }}>
               {(countriesQuery.data ?? []).map((c) => (
-                <Pressable key={c.id} onPress={() => setCountryDraft(c.id)} style={({ pressed }) => [styles.countryOption, { borderColor: theme.border }, countryDraft === c.id && { borderColor: theme.primary, backgroundColor: isDark ? theme.pressed : "#E5F6F7" }, pressed && { opacity: 0.8 }]}>
-                  <Text style={[styles.countryOptionText, { color: theme.foreground }, countryDraft === c.id && { color: theme.primary, fontWeight: "800" }]}>{c.name}</Text>
+                <Pressable key={c.id} onPress={() => void selectCountry(c.id)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, c.id === profile?.country && { borderColor: theme.primary, backgroundColor: isDark ? theme.pressed : "#E5F6F7" }, pressed && { opacity: 0.8 }]}>
+                  <Text style={styles.countryRowFlag}>{countryFlagEmoji(c.id)}</Text>
+                  <Text style={[styles.countryOptionText, { color: theme.foreground, flex: 1 }, c.id === profile?.country && { color: theme.primary, fontWeight: "800" }]}>{c.name}</Text>
+                  {locationSaving === "country" ? null : c.id === profile?.country ? <MaterialIcons name="check-circle" size={20} color={theme.primary} /> : null}
                 </Pressable>
               ))}
-            </View>
-            <Text style={styles.fieldLabel}>VILLE</Text>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={cityEditorOpen} transparent animationType="slide" onRequestClose={() => !locationSaving && setCityEditorOpen(false)}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => !locationSaving && setCityEditorOpen(false)} />
+          <View style={[styles.sheet, isDark && { backgroundColor: theme.surface }]}>
+            <View style={styles.sheetGrip} />
+            <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Choisir une ville</Text>
+            <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>Résultats limités à {countriesQuery.data?.find((c) => c.id === profile?.country)?.name ?? "votre pays"}.</Text>
             <TextInput
-              value={cityDraft}
-              onChangeText={setCityDraft}
+              autoFocus
+              value={citySearch}
+              onChangeText={setCitySearch}
               maxLength={80}
-              placeholder="Ex. Ouagadougou"
+              placeholder="Rechercher une ville…"
               placeholderTextColor={theme.muted}
-              style={[styles.input, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.background }]}
+              style={[styles.input, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.background, marginTop: 8 }]}
             />
             {locationError ? <Text style={styles.error}>{locationError}</Text> : null}
-            <TikisButton label="Enregistrer" icon="save" onPress={() => void saveLocation()} loading={updateMutation.isPending} style={styles.saveButton} />
+            <ScrollView style={{ maxHeight: 320, marginTop: 8 }} keyboardShouldPersistTaps="handled">
+              {citySearchQuery.isFetching ? <Text style={[styles.helper, { textAlign: "center", marginTop: 10 }]}>Recherche…</Text> : null}
+              {!citySearchQuery.isFetching && citySearch.trim().length >= 2 && (citySearchQuery.data ?? []).length === 0 ? <Text style={[styles.helper, { textAlign: "center", marginTop: 10 }]}>Aucune ville trouvée.</Text> : null}
+              {(citySearchQuery.data ?? []).map((cityName) => (
+                <Pressable key={cityName} onPress={() => void selectCity(cityName)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, pressed && { opacity: 0.8 }]}>
+                  <MaterialIcons name="location-city" size={18} color={theme.muted} />
+                  <Text style={[styles.countryOptionText, { color: theme.foreground, flex: 1 }]}>{cityName}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -552,18 +551,11 @@ const styles = StyleSheet.create({
   coverWrap: { position: "relative", marginBottom: -36 },
   cover: { width: "100%", height: COVER_HEIGHT, backgroundColor: "#9A6201", overflow: "hidden", position: "relative" },
   coverDark: { backgroundColor: "#1F1206" },
-  coverImage: { width: "100%", height: "100%" },
   coverPattern: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#9A6201" },
   coverOrbPrimary: { position: "absolute", width: 260, height: 260, borderRadius: 130, top: -90, right: -60, backgroundColor: "#D7A447", opacity: 0.45 },
   coverOrbSecondary: { position: "absolute", width: 180, height: 180, borderRadius: 90, bottom: -50, left: -40, backgroundColor: "#007B8B", opacity: 0.25 },
   coverOrbTertiary: { position: "absolute", width: 120, height: 120, borderRadius: 60, top: 60, left: 80, backgroundColor: "#FFFFFF", opacity: 0.08 },
   coverOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.10)" },
-  coverActions: { position: "absolute", bottom: 12, right: 12, flexDirection: "row", gap: 6 },
-  coverAction: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99, backgroundColor: "rgba(0,0,0,0.35)" },
-  coverActionPrimary: { backgroundColor: "#9A6201" },
-  coverActionText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
-  coverHint: { position: "absolute", bottom: 12, right: 12, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 99, backgroundColor: "rgba(0,0,0,0.45)" },
-  coverHintText: { color: "#FFFFFF", fontSize: 11, fontWeight: "600" },
 
   identityCard: { marginHorizontal: 14, backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14, paddingTop: 0, gap: 12, borderWidth: 1, borderColor: "#ECECEC" },
   avatarRow: { flexDirection: "row", alignItems: "flex-end", gap: 12, marginTop: -36 },
@@ -630,9 +622,9 @@ const styles = StyleSheet.create({
 
   fieldLabel: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
   input: { backgroundColor: "#F7EFE5", borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 12, paddingVertical: 12, color: "#9A6201", fontSize: 13, fontWeight: "500" },
-  countryOptions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  countryOption: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, borderWidth: 1 },
   countryOptionText: { fontSize: 13, fontWeight: "600" },
+  countryRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 10, borderWidth: 1, marginBottom: 8 },
+  countryRowFlag: { fontSize: 20 },
   deleteIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: "#FDECEA", alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 4 },
   inputError: { borderWidth: 1, borderColor: "#B4232D" },
   helper: { color: "#747474", fontSize: 10, marginTop: 4 },

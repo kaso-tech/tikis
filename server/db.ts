@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, count, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, tikisFavoritePlaces, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, users } from "../drizzle/schema";
+import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, tikisFavoritePlaces, tikisKycSubmissions, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppNotification, LocationLabel, SelectableVehicleType, WalletOperation, WalletSnapshot } from "../shared/tikis-domain";
 import { candidateMovementVersion } from "../shared/wallet-commission";
@@ -152,6 +152,39 @@ export async function getMaintenanceStatus() {
   await dbc.insert(tikisPlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
   const settings = (await dbc.select().from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
   return { enabled: settings?.maintenanceEnabled ?? false, message: settings?.maintenanceMessage ?? undefined };
+}
+
+export async function createKycSubmission(input: { driverPhone: string; idFrontKey: string; idBackKey: string; selfieKey: string }) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La vérification d’identité est temporairement indisponible.");
+  const id = randomUUID();
+  await dbc.insert(tikisKycSubmissions).values({ id, ...input, status: "submitted" });
+  return { id, status: "submitted" as const };
+}
+
+export async function getLatestKycSubmission(driverPhone: string) {
+  const dbc = await getDb();
+  if (!dbc) return undefined;
+  const rows = await dbc.select().from(tikisKycSubmissions).where(eq(tikisKycSubmissions.driverPhone, driverPhone)).orderBy(desc(tikisKycSubmissions.submittedAt)).limit(1);
+  return rows[0];
+}
+
+export async function listReferralsForReferrer(referrerPhone: string) {
+  const dbc = await getDb();
+  if (!dbc) return [];
+  const rows = await dbc.select({
+    referral: tikisReferrals,
+    refereeName: tikisProfiles.fullName,
+  }).from(tikisReferrals).innerJoin(tikisProfiles, eq(tikisReferrals.refereePhone, tikisProfiles.phone)).where(eq(tikisReferrals.referrerPhone, referrerPhone)).orderBy(desc(tikisReferrals.createdAt));
+  return rows;
+}
+
+export async function getReferralPublicSettings() {
+  const dbc = await getDb();
+  if (!dbc) return { rewardAmount: 1000, requiredDeliveries: 1, enabled: true };
+  await dbc.insert(tikisPlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  const settings = (await dbc.select().from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
+  return { rewardAmount: settings?.referralRewardAmount ?? 1000, requiredDeliveries: settings?.referralRequiredDeliveries ?? 1, enabled: settings?.referralEnabled ?? true };
 }
 
 export async function linkTikisProfileToSupabaseUser(phone: string, supabaseUserId: string) {
@@ -734,8 +767,12 @@ export async function adminSettlePaymentTransaction(input: { paymentId: string; 
 export async function listTikisDeliveryEvents(profilePhone: string): Promise<InAppNotification[]> {
   const db = await getDb();
   if (!db) return [];
-  const events = await db.select().from(tikisDeliveryEvents).where(eq(tikisDeliveryEvents.recipientPhone, profilePhone)).orderBy(desc(tikisDeliveryEvents.createdAt));
-  return events.map((event) => ({ id: event.id, deliveryId: event.deliveryId, title: event.title, body: event.body, createdAt: event.createdAt.toISOString(), read: Boolean(event.readAt), tone: event.tone }));
+  const events = await db.select({
+    id: tikisDeliveryEvents.id, deliveryId: tikisDeliveryEvents.deliveryId, title: tikisDeliveryEvents.title,
+    body: tikisDeliveryEvents.body, createdAt: tikisDeliveryEvents.createdAt, readAt: tikisDeliveryEvents.readAt, tone: tikisDeliveryEvents.tone,
+    deliveryStatus: tikisDeliveries.status,
+  }).from(tikisDeliveryEvents).leftJoin(tikisDeliveries, eq(tikisDeliveryEvents.deliveryId, tikisDeliveries.id)).where(eq(tikisDeliveryEvents.recipientPhone, profilePhone)).orderBy(desc(tikisDeliveryEvents.createdAt));
+  return events.map((event) => ({ id: event.id, deliveryId: event.deliveryId, deliveryStatus: event.deliveryStatus ?? undefined, title: event.title, body: event.body, createdAt: event.createdAt.toISOString(), read: Boolean(event.readAt), tone: event.tone }));
 }
 
 export async function markTikisDeliveryEventsRead(profilePhone: string) {
@@ -766,7 +803,12 @@ export async function applyForTikisDelivery(input: { id: string; deliveryId: str
     if (!Number.isFinite(rate) || rate <= 0 || rate >= 1) throw new Error("Le taux de commission configuré est invalide.");
     const price = input.offerPrice ?? delivery.offeredPrice ?? delivery.estimatedPrice;
     const commission = Math.round(price * rate);
-    if (input.confirmedCommission !== commission) throw new Error("La commission a changé. Vérifiez le montant puis confirmez à nouveau votre candidature.");
+    const walletBefore = await ensureTikisWallet(tx, input.driverPhone);
+    const existingBlocked = (await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, input.deliveryId), eq(tikisDeliveryCandidates.driverPhone, input.driverPhone), eq(tikisDeliveryCandidates.status, "applied"))).limit(1))[0]?.commissionBlocked ?? 0;
+    // Solde qui serait réellement disponible pour cette candidature : le disponible actuel + ce qui est déjà bloqué pour cette même candidature (remplacée, pas cumulée).
+    if (walletBefore.availableBalance + existingBlocked < commission) {
+      throw new Error("Vous n’avez pas assez de crédit pour proposer ce montant. Veuillez saisir un montant inférieur.");
+    }
     const candidates = await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, input.deliveryId), eq(tikisDeliveryCandidates.driverPhone, input.driverPhone))).limit(1).for("update");
     const existing = candidates[0];
     if (existing && (existing.status === "selected" || existing.status === "confirmed")) throw new Error("Cette candidature ne peut plus être modifiée.");
@@ -1069,8 +1111,10 @@ async function qualifyReferralIfEligible(tx: any, phone: string | null, delivery
   if (!phone) return;
   const referral = (await tx.select().from(tikisReferrals).where(and(eq(tikisReferrals.refereePhone, phone), eq(tikisReferrals.status, "invited"))).limit(1).for("update"))[0];
   if (!referral) return;
-  const priorCompleted = await tx.select({ count: sql<number>`count(*)` }).from(tikisDeliveries).where(and(or(eq(tikisDeliveries.senderPhone, phone), eq(tikisDeliveries.driverPhone, phone)), eq(tikisDeliveries.status, "completed")));
-  if (Number(priorCompleted[0]?.count ?? 0) > 1) return; // already had a completed delivery before this one
+  const settings = (await tx.select().from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
+  const requiredDeliveries = settings?.referralRequiredDeliveries ?? 1;
+  const totalCompleted = await tx.select({ count: sql<number>`count(*)` }).from(tikisDeliveries).where(and(or(eq(tikisDeliveries.senderPhone, phone), eq(tikisDeliveries.driverPhone, phone)), eq(tikisDeliveries.status, "completed")));
+  if (Number(totalCompleted[0]?.count ?? 0) < requiredDeliveries) return; // seuil de courses terminées pas encore atteint
   await tx.update(tikisReferrals).set({ status: "qualified", qualifiedAt: new Date(), qualifyingDeliveryId: deliveryId }).where(eq(tikisReferrals.id, referral.id));
 }
 

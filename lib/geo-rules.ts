@@ -162,7 +162,10 @@ export type EstimationInput = {
 export type PricingRateConfig = {
   vehicles: Record<string, { minimum: number; perKm: number }>;
   typeAdjustment: { plis: number; personnePerPassenger: number };
+  cargo: { base: number; perKg: number; perKgCap: number; perM3: number; perM3Cap: number };
 };
+
+const DEFAULT_CARGO_RATE = { base: 280, perKg: 22, perKgCap: 1800, perM3: 5200, perM3Cap: 2600 };
 
 const DEFAULT_VEHICLE_RATE: Record<SelectableVehicleType, { minimum: number; perKm: number }> = {
   "Vélo": { minimum: 500, perKm: 115 },
@@ -178,14 +181,15 @@ export function estimateDeliveryPrice(input: EstimationInput, config?: PricingRa
   const durationAdjustment = input.durationMinutes ? Math.min(1200, Math.max(0, input.durationMinutes - distance * 2) * 18) : 0;
   const plisAdjustment = config?.typeAdjustment.plis ?? 180;
   const personnePerPassenger = config?.typeAdjustment.personnePerPassenger ?? 240;
-  const typeAdjustment = input.type === "Plis" ? plisAdjustment : input.type === "Personne" ? Math.max(1, Math.min(4, input.passengers ?? 1)) * personnePerPassenger : cargoAdjustment(input.weightKg, input.dimensions);
+  const typeAdjustment = input.type === "Plis" ? plisAdjustment : input.type === "Personne" ? Math.max(1, Math.min(4, input.passengers ?? 1)) * personnePerPassenger : cargoAdjustment(input.weightKg, input.dimensions, config?.cargo);
   return Math.ceil((routeBase + durationAdjustment + typeAdjustment) / 50) * 50;
 }
 
-function cargoAdjustment(weightKg = 0, dimensions?: { lengthCm?: number; widthCm?: number; heightCm?: number }) {
+function cargoAdjustment(weightKg = 0, dimensions?: { lengthCm?: number; widthCm?: number; heightCm?: number }, cargo?: PricingRateConfig["cargo"]) {
+  const rate = cargo ?? DEFAULT_CARGO_RATE;
   const safeWeight = Math.max(0, Math.min(weightKg, 500));
   const volumeM3 = dimensions?.lengthCm && dimensions?.widthCm && dimensions?.heightCm ? (dimensions.lengthCm * dimensions.widthCm * dimensions.heightCm) / 1_000_000 : 0;
-  return 280 + Math.min(1800, safeWeight * 22) + Math.min(2600, volumeM3 * 5200);
+  return rate.base + Math.min(rate.perKgCap, safeWeight * rate.perKg) + Math.min(rate.perM3Cap, volumeM3 * rate.perM3);
 }
 
 export function validateDeliveryMeasurement(type: DeliveryType, input: { weightKg?: number; passengers?: number; dimensions?: { lengthCm?: number; widthCm?: number; heightCm?: number } }) {

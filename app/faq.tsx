@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { useThemeColors } from "@/lib/use-theme-colors";
 
 type FaqEntry = { id: string; category: string; question: string; answer: string };
 
@@ -59,7 +60,7 @@ const FAQ: FaqEntry[] = [
     id: "account-2",
     category: "Compte & rôles",
     question: "Comment supprimer mon compte ?",
-    answer: "Depuis la rubrique Profil, contactez l’assistance. Nous procédons à la suppression des données conformément à notre politique de confidentialité.",
+    answer: "Depuis votre Profil, section « Zone sensible », demandez la suppression de votre compte. Vous disposez ensuite de 30 jours pour changer d’avis et annuler ; passé ce délai, vos données personnelles sont définitivement supprimées.",
   },
   {
     id: "security-1",
@@ -72,49 +73,50 @@ const FAQ: FaqEntry[] = [
 const CATEGORIES = Array.from(new Set(FAQ.map((entry) => entry.category)));
 
 export default function FaqScreen() {
+  const { colors: theme } = useThemeColors();
   const [openId, setOpenId] = useState<string | null>(null);
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <View style={styles.header}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Retour" onPress={() => router.back()} style={({ pressed }) => [styles.back, pressed && styles.pressed]}>
-          <MaterialIcons name="arrow-back" size={22} color="#111111" />
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
+      <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Retour" onPress={() => router.back()} style={({ pressed }) => [styles.back, { backgroundColor: theme.background }, pressed && styles.pressed]}>
+          <MaterialIcons name="arrow-back" size={22} color={theme.foreground} />
         </Pressable>
         <View>
-          <Text style={styles.title}>Foire aux questions</Text>
-          <Text style={styles.subtitle}>Réponses aux questions les plus fréquentes sur Tikis.</Text>
+          <Text style={[styles.title, { color: theme.foreground }]}>Foire aux questions</Text>
+          <Text style={[styles.subtitle, { color: theme.muted }]}>Réponses aux questions les plus fréquentes sur Tikis.</Text>
         </View>
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         {CATEGORIES.map((category) => (
           <View key={category} style={styles.section}>
-            <Text style={styles.category}>{category}</Text>
-            <View style={styles.list}>
+            <Text style={[styles.category, { color: theme.muted }]}>{category}</Text>
+            <View style={[styles.list, { backgroundColor: theme.surface }]}>
               {FAQ.filter((entry) => entry.category === category).map((entry) => {
                 const open = openId === entry.id;
                 return (
-                  <View key={entry.id} style={[styles.item, open && styles.itemOpen]}>
+                  <View key={entry.id} style={[styles.item, open && { backgroundColor: theme.background }]}>
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={open ? `Replier ${entry.question}` : `Déplier ${entry.question}`}
                       onPress={() => setOpenId(open ? null : entry.id)}
                       style={({ pressed }) => [styles.itemHeader, pressed && styles.pressed]}
                     >
-                      <Text style={styles.itemQuestion}>{entry.question}</Text>
-                      <MaterialIcons name={open ? "remove" : "add"} size={20} color="#111111" />
+                      <Text style={[styles.itemQuestion, { color: theme.foreground }]}>{entry.question}</Text>
+                      <MaterialIcons name={open ? "remove" : "add"} size={20} color={theme.foreground} />
                     </Pressable>
-                    {open ? <Text style={styles.itemAnswer}>{entry.answer}</Text> : null}
+                    {open ? <Text style={[styles.itemAnswer, { color: theme.muted }]}>{entry.answer}</Text> : null}
                   </View>
                 );
               })}
             </View>
           </View>
         ))}
-        <View style={styles.contactCard}>
-          <MaterialIcons name="support-agent" size={22} color="#007B8B" />
+        <View style={[styles.contactCard, { backgroundColor: theme.surface }]}>
+          <MaterialIcons name="support-agent" size={22} color={theme.primary} />
           <View style={styles.contactCopy}>
-            <Text style={styles.contactTitle}>Vous n’avez pas trouvé votre réponse ?</Text>
-            <Text style={styles.contactText}>Notre équipe est joignable depuis la page Contact.</Text>
+            <Text style={[styles.contactTitle, { color: theme.foreground }]}>Vous n’avez pas trouvé votre réponse ?</Text>
+            <Text style={[styles.contactText, { color: theme.muted }]}>Notre équipe est joignable depuis la page Contact.</Text>
           </View>
         </View>
       </ScrollView>
@@ -123,23 +125,22 @@ export default function FaqScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#EEEDF3" },
-  header: { minHeight: 64, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12, backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", gap: 10 },
-  back: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
-  title: { color: "#111111", fontSize: 17, fontWeight: "600" },
-  subtitle: { color: "#666666", fontSize: 12, marginTop: 2 },
+  safe: { flex: 1 },
+  header: { minHeight: 64, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 10 },
+  back: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  title: { fontSize: 17, fontWeight: "600" },
+  subtitle: { fontSize: 12, marginTop: 2 },
   content: { padding: 14, paddingBottom: 36, gap: 14 },
   section: { gap: 8 },
-  category: { color: "#747474", fontSize: 10, fontWeight: "600", letterSpacing: 0.6, textTransform: "uppercase", marginLeft: 2 },
-  list: { backgroundColor: "#FFFFFF", borderRadius: 10, overflow: "hidden" },
+  category: { fontSize: 10, fontWeight: "600", letterSpacing: 0.6, textTransform: "uppercase", marginLeft: 2 },
+  list: { borderRadius: 10, overflow: "hidden" },
   item: { paddingHorizontal: 12, borderBottomWidth: 0 },
-  itemOpen: { backgroundColor: "#EEEDF3" },
   itemHeader: { flexDirection: "row", alignItems: "center", gap: 10, minHeight: 56 },
-  itemQuestion: { flex: 1, color: "#111111", fontSize: 13, fontWeight: "600" },
-  itemAnswer: { color: "#444444", fontSize: 12, lineHeight: 18, paddingBottom: 12, paddingRight: 4 },
-  contactCard: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
+  itemQuestion: { flex: 1, fontSize: 13, fontWeight: "600" },
+  itemAnswer: { fontSize: 12, lineHeight: 18, paddingBottom: 12, paddingRight: 4 },
+  contactCard: { borderRadius: 10, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
   contactCopy: { flex: 1 },
-  contactTitle: { color: "#111111", fontSize: 12, fontWeight: "600" },
-  contactText: { color: "#666666", fontSize: 11, marginTop: 2 },
+  contactTitle: { fontSize: 12, fontWeight: "600" },
+  contactText: { fontSize: 11, marginTop: 2 },
   pressed: { opacity: 0.67 },
 });

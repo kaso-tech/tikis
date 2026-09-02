@@ -125,7 +125,7 @@ export const tikisAdminRouter = router({
     }),
     settings: router({
       get: tikisAdminProcedure.query(() => adminDb.adminGetReferralSettings()),
-      update: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ rewardAmount: z.number().int().min(0).max(100000), enabled: z.boolean() })).mutation(async ({ ctx, input }) => {
+      update: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ rewardAmount: z.number().int().min(0).max(100000), enabled: z.boolean(), requiredDeliveries: z.number().int().min(1).max(100) })).mutation(async ({ ctx, input }) => {
         const result = await adminDb.adminUpdateReferralSettings(input);
         await audit(ctx, "referral_settings_updated", "platform_settings", "referral", input);
         return result;
@@ -162,6 +162,7 @@ export const tikisAdminRouter = router({
     update: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({
       vehicles: z.record(z.string(), z.object({ minimum: z.number().min(0).max(100000), perKm: z.number().min(0).max(10000) })),
       typeAdjustment: z.object({ plis: z.number().min(0).max(100000), personnePerPassenger: z.number().min(0).max(100000) }),
+      cargo: z.object({ base: z.number().min(0).max(100000), perKg: z.number().min(0).max(100000), perKgCap: z.number().min(0).max(100000), perM3: z.number().min(0).max(100000), perM3Cap: z.number().min(0).max(100000) }),
     })).mutation(async ({ ctx, input }) => {
       const result = await adminDb.adminUpdatePricingConfig(input);
       await audit(ctx, "pricing_config_updated", "platform_settings", "pricing", input);
@@ -198,6 +199,16 @@ export const tikisAdminRouter = router({
 
   accountDeletions: router({
     list: tikisAdminProcedure.query(() => adminDb.adminListPendingDeletions()),
+  }),
+
+  kyc: router({
+    list: tikisAdminProcedure.input(z.object({ status: z.enum(["submitted", "approved", "rejected"]).optional() })).query(({ input }) => adminDb.adminListKycSubmissions(input.status)),
+    review: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ submissionId: z.string(), decision: z.enum(["approved", "rejected"]), rejectionReason: z.string().max(500).optional() })).mutation(async ({ ctx, input }) => {
+      if (!ctx.tikisAdmin) throw new Error("Session invalide.");
+      const result = await adminDb.adminReviewKyc({ ...input, adminId: ctx.tikisAdmin.adminId });
+      await audit(ctx, "kyc_reviewed", "kyc_submission", input.submissionId, { decision: input.decision, rejectionReason: input.rejectionReason });
+      return result;
+    }),
   }),
 
   admins: router({

@@ -340,6 +340,35 @@ async function mapboxJson(url: URL, service: "Search" | "Directions") {
   }
 }
 
+/** Recherche de villes uniquement (pour le champ Ville du profil), explicitement bornée au pays
+ *  donné plutôt qu'au pays déduit du téléphone — pays et ville sont deux réglages indépendants. */
+export async function searchCities(query: string, countryCode: string) {
+  const textQuery = sanitizePlaceText(query, 80);
+  if (textQuery.length < 2 || !/^[A-Z]{2}$/.test(countryCode)) return [];
+  const sessionToken = randomUUID();
+  const url = new URL("https://api.mapbox.com/search/searchbox/v1/suggest");
+  url.searchParams.set("q", textQuery);
+  url.searchParams.set("language", "fr");
+  url.searchParams.set("limit", "8");
+  url.searchParams.set("types", "place,locality");
+  url.searchParams.set("country", countryCode);
+  url.searchParams.set("session_token", sessionToken);
+  try {
+    const payload = await mapboxJson(url, "Search") as { suggestions?: MapboxSuggestion[] };
+    const seen = new Set<string>();
+    const names: string[] = [];
+    for (const suggestion of payload.suggestions ?? []) {
+      const name = suggestion.name_preferred || suggestion.name;
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      names.push(name);
+    }
+    return names;
+  } catch {
+    return [];
+  }
+}
+
 export async function searchPlaces(query: string, bias?: { latitude: number; longitude: number }, countryCode?: string, includeCommunityFallback = false) {
   const textQuery = sanitizePlaceText(query, 120);
   if (textQuery.length < 2) return [];

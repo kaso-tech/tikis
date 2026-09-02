@@ -1,13 +1,15 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Redirect, Tabs } from "expo-router";
-import { Platform } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TikisHeader } from "@/components/tikis/app-chrome";
+import { useThemeColors } from "@/lib/use-theme-colors";
 import { useTikisStore } from "@/lib/tikis-store";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { profile } = useTikisStore();
+  const { colors: theme } = useThemeColors();
   const bottomPadding = Platform.OS === "web" ? 8 : Math.max(8, insets.bottom);
 
   if (!profile) return <Redirect href="/auth" />;
@@ -18,12 +20,13 @@ export default function TabLayout() {
         headerShown: true,
         header: () => <TikisHeader />,
         tabBarActiveTintColor: "#9A6201",
-        tabBarInactiveTintColor: "#8A7A66",
+        tabBarInactiveTintColor: theme.muted,
         tabBarLabelStyle: { fontSize: 10, fontWeight: "600", marginTop: 1 },
-        tabBarStyle: { height: 54 + bottomPadding, paddingTop: 5, paddingBottom: bottomPadding, borderTopWidth: 0, backgroundColor: "#FFFFFF" },
+        tabBarStyle: { height: 54 + bottomPadding, paddingTop: 5, paddingBottom: bottomPadding, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border, backgroundColor: theme.surface },
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Accueil", tabBarIcon: ({ color, size }) => <MaterialIcons name="home-filled" size={size} color={color} /> }} />
+      <Tabs.Screen name="live-tracking" options={{ href: profile.role === "sender" ? undefined : null, title: "Suivi", tabBarIcon: ({ color, size }) => <MaterialIcons name="local-shipping" size={size} color={color} /> }} />
       <Tabs.Screen name="earnings" options={{ href: profile.role === "driver" ? undefined : null, title: "Gains", tabBarIcon: ({ color, size }) => <MaterialIcons name="trending-up" size={size} color={color} /> }} />
       <Tabs.Screen name="wallet" options={{ href: profile.role === "driver" ? undefined : null, title: "Wallet", tabBarIcon: ({ color, size }) => <MaterialIcons name="account-balance-wallet" size={size} color={color} /> }} />
       <Tabs.Screen name="addresses" options={{ href: profile.role === "sender" ? undefined : null, title: "Adresses", tabBarIcon: ({ color, size }) => <MaterialIcons name="location-on" size={size} color={color} /> }} />

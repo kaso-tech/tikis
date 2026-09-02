@@ -126,6 +126,102 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
     }
   }
 
+  // ———— Vue détail : page dédiée, remplace la liste ————
+  if (detail) {
+    return (
+      <div>
+        <div className="page-head">
+          <div>
+            <button className="btn btn-secondary btn-sm" onClick={() => { setDetail(null); setActionError(""); }} style={{ marginBottom: 10 }}>← Retour à la liste</button>
+            <h1 className="page-title">{detail.profile.fullName}</h1>
+            <p className="page-sub">
+              {detail.profile.accountType === "sender" ? "Expéditeur" : "Livreur"} ·
+              {" "}{detail.deliveriesAsSenderCount} livraison(s) en tant qu’expéditeur ·
+              {" "}{detail.deliveriesAsDriverCount} en tant que livreur
+              {detail.profile.status && detail.profile.status !== "active" ? <> · <span className={`pill ${detail.profile.status === "banned" ? "pill-error" : "pill-warning"}`}><span className="dot" />{detail.profile.status === "banned" ? "Banni" : "Suspendu"}{detail.profile.statusReason ? ` — ${detail.profile.statusReason}` : ""}</span></> : null}
+            </p>
+          </div>
+        </div>
+
+        <div className="card">
+          {detail.wallet ? (
+            <div className="kpi-grid" style={{ marginBottom: 0 }}>
+              <div className="kpi"><div className="kpi-label">Solde disponible</div><div className="kpi-value">{formatMoney(detail.wallet.availableBalance)}</div></div>
+              <div className="kpi"><div className="kpi-label">Solde bloqué</div><div className="kpi-value">{formatMoney(detail.wallet.heldBalance)}</div></div>
+              <div className="kpi"><div className="kpi-label">Téléphone</div><div className="kpi-value" style={{ fontSize: 14 }}>{detail.profile.phone}</div></div>
+              <div className="kpi"><div className="kpi-label">E-mail</div><div className="kpi-value" style={{ fontSize: 14 }}>{detail.profile.email ?? "—"}</div></div>
+            </div>
+          ) : <div className="empty-state">Aucun Wallet initialisé.</div>}
+        </div>
+
+        <div className="card">
+          <div className="card-head"><div><div className="card-title">Actions administrateur</div><div className="card-sub">Chaque action est tracée dans le journal d’audit</div></div></div>
+          {actionError ? <div className="banner-error">{actionError}</div> : null}
+          <div className="grid grid-4">
+            <div className="action-block">
+              <div className="action-block-title">Statut du compte</div>
+              <input className="input" placeholder="Motif (optionnel)" value={statusReasonDraft} onChange={(e) => setStatusReasonDraft(e.target.value)} style={{ marginBottom: 8 }} />
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {detail.profile.status !== "active" ? <button className="btn btn-sm" disabled={actionBusy} onClick={() => void setStatus("active")}>Réactiver</button> : null}
+                {detail.profile.status !== "suspended" ? <button className="btn btn-sm" disabled={actionBusy} onClick={() => void setStatus("suspended")}>Suspendre</button> : null}
+                {detail.profile.status !== "banned" ? <button className="btn btn-sm btn-danger" disabled={actionBusy} onClick={() => void setStatus("banned")}>Bannir</button> : null}
+              </div>
+            </div>
+
+            <div className="action-block">
+              <div className="action-block-title">Rôle</div>
+              <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 8 }}>Actuel : {detail.profile.accountType === "sender" ? "Expéditeur" : "Livreur"}. Impossible si une livraison est en cours.</div>
+              <button className="btn btn-sm" disabled={actionBusy} onClick={() => void changeRole(detail.profile.accountType === "sender" ? "driver" : "sender")}>
+                Basculer en {detail.profile.accountType === "sender" ? "Livreur" : "Expéditeur"}
+              </button>
+            </div>
+
+            <div className="action-block">
+              <div className="action-block-title">Bonus / récompense</div>
+              <input className="input" placeholder="Montant FCFA" inputMode="numeric" value={rewardDraft.amount} onChange={(e) => setRewardDraft((s) => ({ ...s, amount: e.target.value.replace(/[^0-9]/g, "") }))} style={{ marginBottom: 6 }} />
+              <input className="input" placeholder="Motif" value={rewardDraft.reason} onChange={(e) => setRewardDraft((s) => ({ ...s, reason: e.target.value }))} style={{ marginBottom: 8 }} />
+              <button className="btn btn-sm btn-primary" disabled={actionBusy} onClick={() => void sendReward()}>Créditer</button>
+            </div>
+
+            <div className="action-block">
+              <div className="action-block-title">Pénalité</div>
+              <input className="input" placeholder="Montant FCFA" inputMode="numeric" value={penaltyDraft.amount} onChange={(e) => setPenaltyDraft((s) => ({ ...s, amount: e.target.value.replace(/[^0-9]/g, "") }))} style={{ marginBottom: 6 }} />
+              <input className="input" placeholder="Motif" value={penaltyDraft.reason} onChange={(e) => setPenaltyDraft((s) => ({ ...s, reason: e.target.value }))} style={{ marginBottom: 8 }} />
+              <button className="btn btn-sm btn-danger" disabled={actionBusy} onClick={() => void sendPenalty()}>Débiter</button>
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <div className="card-title">Journal financier</div>
+              <div className="card-sub">100 dernières écritures</div>
+            </div>
+          </div>
+          <div className="card-body tight">
+            {detail.ledger.length === 0 ? (
+              <div className="empty-state">Aucune écriture pour ce profil.</div>
+            ) : (
+              <table className="table">
+                <thead><tr><th>Date</th><th>Opération</th><th>Montant</th><th>Motif</th></tr></thead>
+                <tbody>
+                  {detail.ledger.map((entry) => (
+                    <tr key={entry.id}>
+                      <td style={{ fontVariantNumeric: "tabular-nums", color: "var(--muted)", fontSize: 11.5 }}>{new Date(entry.createdAt).toLocaleString("fr-FR")}</td>
+                      <td><span className="pill pill-neutral" style={{ background: "var(--surface-2)", color: "var(--muted-strong)" }}>{entry.operation}</span></td>
+                      <td className="price">{formatMoney(entry.amount)}</td>
+                      <td>{entry.reason}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const total = results.length;
   const senderCount = results.filter((p) => p.accountType === "sender").length;
   const driverCount = results.filter((p) => p.accountType === "driver").length;
@@ -205,100 +301,6 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
           </table>
         ) : null}
       </div>
-
-      {detail ? (
-        <>
-          <div className="card">
-            <div className="card-head">
-              <div>
-                <div className="card-title">{detail.profile.fullName}</div>
-                <div className="card-sub">
-                  {detail.profile.accountType === "sender" ? "Expéditeur" : "Livreur"} ·
-                  {" "}{detail.deliveriesAsSenderCount} livraison(s) en tant qu’expéditeur ·
-                  {" "}{detail.deliveriesAsDriverCount} en tant que livreur
-                  {detail.profile.status && detail.profile.status !== "active" ? <> · <span className={`pill ${detail.profile.status === "banned" ? "pill-error" : "pill-warning"}`}><span className="dot" />{detail.profile.status === "banned" ? "Banni" : "Suspendu"}{detail.profile.statusReason ? ` — ${detail.profile.statusReason}` : ""}</span></> : null}
-                </div>
-              </div>
-              <div className="row-actions">
-                <button className="btn btn-ghost btn-sm" onClick={() => setDetail(null)}>Fermer</button>
-              </div>
-            </div>
-            {detail.wallet ? (
-              <div className="kpi-grid" style={{ marginBottom: 0 }}>
-                <div className="kpi"><div className="kpi-label">Solde disponible</div><div className="kpi-value">{formatMoney(detail.wallet.availableBalance)}</div></div>
-                <div className="kpi"><div className="kpi-label">Solde bloqué</div><div className="kpi-value">{formatMoney(detail.wallet.heldBalance)}</div></div>
-                <div className="kpi"><div className="kpi-label">Téléphone</div><div className="kpi-value" style={{ fontSize: 14 }}>{detail.profile.phone}</div></div>
-                <div className="kpi"><div className="kpi-label">E-mail</div><div className="kpi-value" style={{ fontSize: 14 }}>{detail.profile.email ?? "—"}</div></div>
-              </div>
-            ) : <div className="empty-state">Aucun Wallet initialisé.</div>}
-          </div>
-
-          <div className="card">
-            <div className="card-head"><div><div className="card-title">Actions administrateur</div><div className="card-sub">Chaque action est tracée dans le journal d’audit</div></div></div>
-            {actionError ? <div className="banner-error">{actionError}</div> : null}
-            <div className="grid grid-4">
-              <div className="action-block">
-                <div className="action-block-title">Statut du compte</div>
-                <input className="input" placeholder="Motif (optionnel)" value={statusReasonDraft} onChange={(e) => setStatusReasonDraft(e.target.value)} style={{ marginBottom: 8 }} />
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {detail.profile.status !== "active" ? <button className="btn btn-sm" disabled={actionBusy} onClick={() => void setStatus("active")}>Réactiver</button> : null}
-                  {detail.profile.status !== "suspended" ? <button className="btn btn-sm" disabled={actionBusy} onClick={() => void setStatus("suspended")}>Suspendre</button> : null}
-                  {detail.profile.status !== "banned" ? <button className="btn btn-sm btn-danger" disabled={actionBusy} onClick={() => void setStatus("banned")}>Bannir</button> : null}
-                </div>
-              </div>
-
-              <div className="action-block">
-                <div className="action-block-title">Rôle</div>
-                <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 8 }}>Actuel : {detail.profile.accountType === "sender" ? "Expéditeur" : "Livreur"}. Impossible si une livraison est en cours.</div>
-                <button className="btn btn-sm" disabled={actionBusy} onClick={() => void changeRole(detail.profile.accountType === "sender" ? "driver" : "sender")}>
-                  Basculer en {detail.profile.accountType === "sender" ? "Livreur" : "Expéditeur"}
-                </button>
-              </div>
-
-              <div className="action-block">
-                <div className="action-block-title">Bonus / récompense</div>
-                <input className="input" placeholder="Montant FCFA" inputMode="numeric" value={rewardDraft.amount} onChange={(e) => setRewardDraft((s) => ({ ...s, amount: e.target.value.replace(/[^0-9]/g, "") }))} style={{ marginBottom: 6 }} />
-                <input className="input" placeholder="Motif" value={rewardDraft.reason} onChange={(e) => setRewardDraft((s) => ({ ...s, reason: e.target.value }))} style={{ marginBottom: 8 }} />
-                <button className="btn btn-sm btn-primary" disabled={actionBusy} onClick={() => void sendReward()}>Créditer</button>
-              </div>
-
-              <div className="action-block">
-                <div className="action-block-title">Pénalité</div>
-                <input className="input" placeholder="Montant FCFA" inputMode="numeric" value={penaltyDraft.amount} onChange={(e) => setPenaltyDraft((s) => ({ ...s, amount: e.target.value.replace(/[^0-9]/g, "") }))} style={{ marginBottom: 6 }} />
-                <input className="input" placeholder="Motif" value={penaltyDraft.reason} onChange={(e) => setPenaltyDraft((s) => ({ ...s, reason: e.target.value }))} style={{ marginBottom: 8 }} />
-                <button className="btn btn-sm btn-danger" disabled={actionBusy} onClick={() => void sendPenalty()}>Débiter</button>
-              </div>
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-head">
-              <div>
-                <div className="card-title">Journal financier</div>
-                <div className="card-sub">100 dernières écritures</div>
-              </div>
-            </div>
-            <div className="card-body tight">
-              {detail.ledger.length === 0 ? (
-                <div className="empty-state">Aucune écriture pour ce profil.</div>
-              ) : (
-                <table className="table">
-                  <thead><tr><th>Date</th><th>Opération</th><th>Montant</th><th>Motif</th></tr></thead>
-                  <tbody>
-                    {detail.ledger.map((entry) => (
-                      <tr key={entry.id}>
-                        <td style={{ fontVariantNumeric: "tabular-nums", color: "var(--muted)", fontSize: 11.5 }}>{new Date(entry.createdAt).toLocaleString("fr-FR")}</td>
-                        <td><span className="pill pill-neutral" style={{ background: "var(--surface-2)", color: "var(--muted-strong)" }}>{entry.operation}</span></td>
-                        <td className="price">{formatMoney(entry.amount)}</td>
-                        <td>{entry.reason}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
-        </>
-      ) : null}
     </div>
   );
 }

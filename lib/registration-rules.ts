@@ -22,6 +22,13 @@ export const COUNTRIES: CountrySpec[] = [
 
 export const DEFAULT_COUNTRY = COUNTRIES[0];
 
+/** Convertit un code pays ISO (ex. "BF") en emoji drapeau, sans dépendre d'une donnée par pays :
+ *  chaque lettre est mappée sur son "regional indicator symbol" Unicode. */
+export function countryFlagEmoji(isoCode: string) {
+  if (!/^[A-Za-z]{2}$/.test(isoCode)) return "🏳️";
+  return isoCode.toUpperCase().replace(/./g, (letter) => String.fromCodePoint(127397 + letter.charCodeAt(0)));
+}
+
 export function detectCountry(timeZone?: string) {
   const zone = timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   return COUNTRIES.find((country) => country.timeZones.includes(zone)) ?? DEFAULT_COUNTRY;

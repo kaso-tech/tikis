@@ -1,8 +1,9 @@
 import * as ImagePicker from "expo-image-picker";
 import { Alert, Platform } from "react-native";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { KycCapture, KycDocumentKind } from "@/components/tikis/kyc-uploader";
+import { trpc } from "@/lib/trpc";
 
 export type KycStatus = "not_started" | "in_progress" | "submitted" | "approved" | "rejected";
 
@@ -51,6 +52,16 @@ async function launchSource(source: PickSource, kind: KycDocumentKind): Promise<
 export function useKyc() {
   const [state, setState] = useState<KycState>(INITIAL);
   const [loadingKind, setLoadingKind] = useState<KycDocumentKind | null>(null);
+  const statusQuery = trpc.kyc.status.useQuery();
+  const submitMutation = trpc.kyc.submit.useMutation();
+
+  useEffect(() => {
+    if (!statusQuery.data) return;
+    setState((current) => ({
+      ...current,
+      submission: { status: statusQuery.data.status, submittedAt: statusQuery.data.submittedAt, rejectionReason: statusQuery.data.rejectionReason ?? null },
+    }));
+  }, [statusQuery.data]);
 
   const captureFromSource = useCallback(async (kind: KycDocumentKind, source: PickSource) => {
     setLoadingKind(kind);
@@ -110,9 +121,20 @@ export function useKyc() {
     if (!documents["id-front"] || !documents["id-back"] || !documents.selfie) {
       return { ok: false, error: "Ajoutez les trois documents (recto, verso, selfie) avant de soumettre." };
     }
-    setState((current) => ({ ...current, submission: { ...current.submission, status: "submitted", submittedAt: new Date().toISOString() } }));
-    return { ok: true, submission: { status: "submitted", submittedAt: new Date().toISOString(), rejectionReason: null } };
-  }, [state.documents]);
+    try {
+      await submitMutation.mutateAsync({
+        idFront: { base64: documents["id-front"].base64, mime: documents["id-front"].mime },
+        idBack: { base64: documents["id-back"].base64, mime: documents["id-back"].mime },
+        selfie: { base64: documents.selfie.base64, mime: documents.selfie.mime },
+      });
+    } catch (cause) {
+      return { ok: false, error: cause instanceof Error ? cause.message : "L’envoi a échoué. Réessayez." };
+    }
+    const submittedAt = new Date().toISOString();
+    setState((current) => ({ ...current, submission: { status: "submitted", submittedAt, rejectionReason: null } }));
+    await statusQuery.refetch();
+    return { ok: true, submission: { status: "submitted", submittedAt, rejectionReason: null } };
+  }, [state.documents, submitMutation, statusQuery]);
 
   const progress = useMemo(() => {
     const total = 3;
@@ -127,5 +149,6 @@ export function useKyc() {
     pickDocument,
     clearDocument,
     submit,
+    statusLoading: statusQuery.isLoading,
   };
 }

@@ -20,7 +20,7 @@ function buildInterpolatedRoute(pickup: Coordinate, dropoff: Coordinate): Coordi
   return points;
 }
 
-export function DeliveryRouteMap({ pickup, dropoff, coordinates, routeSource }: { pickup: LocationLabel; dropoff: LocationLabel; coordinates: Coordinate[]; routeSource?: "routes" | "provisional" }) {
+export function DeliveryRouteMap({ pickup, dropoff, coordinates, routeSource, driverPosition }: { pickup: LocationLabel; dropoff: LocationLabel; coordinates: Coordinate[]; routeSource?: "routes" | "provisional"; driverPosition?: { latitude: number; longitude: number; heading?: number | null } | null }) {
   const mapRef = useRef<MapView>(null);
   const route = useMemo<Coordinate[]>(() => {
     if (coordinates.length >= 2) return coordinates;
@@ -32,9 +32,10 @@ export function DeliveryRouteMap({ pickup, dropoff, coordinates, routeSource }: 
   const isFallback = routeSource === "provisional" || coordinates.length < 2;
 
   useEffect(() => {
-    const timer = setTimeout(() => mapRef.current?.fitToCoordinates(route, { edgePadding: { top: 72, right: 52, bottom: 82, left: 52 }, animated: true }), 180);
+    const points = driverPosition ? [...route, { latitude: driverPosition.latitude, longitude: driverPosition.longitude }] : route;
+    const timer = setTimeout(() => mapRef.current?.fitToCoordinates(points, { edgePadding: { top: 72, right: 52, bottom: 82, left: 52 }, animated: true }), 180);
     return () => clearTimeout(timer);
-  }, [route]);
+  }, [route, driverPosition]);
 
   return (
     <View style={styles.container}>
@@ -42,11 +43,16 @@ export function DeliveryRouteMap({ pickup, dropoff, coordinates, routeSource }: 
         <Polyline coordinates={route} strokeColor={isFallback ? "#9A6200" : "#9A6201"} strokeWidth={5} lineCap="round" lineJoin="round" lineDashPattern={isFallback ? [10, 6] : undefined} />
         <Marker coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }} anchor={{ x: 0.5, y: 0.5 }}><View style={styles.startMarker}><MaterialIcons name="inventory-2" size={15} color="#FFFFFF" /></View></Marker>
         <Marker coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }} anchor={{ x: 0.5, y: 0.85 }}><View style={styles.destinationMarker}><MaterialIcons name="location-on" size={26} color="#B4232D" /></View></Marker>
+        {driverPosition ? (
+          <Marker coordinate={{ latitude: driverPosition.latitude, longitude: driverPosition.longitude }} anchor={{ x: 0.5, y: 0.5 }} rotation={driverPosition.heading ?? 0} flat>
+            <View style={styles.driverMarker}><MaterialIcons name="navigation" size={18} color="#FFFFFF" /></View>
+          </Marker>
+        ) : null}
       </MapView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#EEEDF3" }, map: { ...StyleSheet.absoluteFillObject }, startMarker: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 0, shadowOpacity: 0, shadowRadius: 0, elevation: 0 }, destinationMarker: { width: 34, height: 34, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowOpacity: 0, shadowRadius: 0, elevation: 0 },
+  container: { flex: 1, backgroundColor: "#EEEDF3" }, map: { ...StyleSheet.absoluteFillObject }, startMarker: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 0, shadowOpacity: 0, shadowRadius: 0, elevation: 0 }, destinationMarker: { width: 34, height: 34, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowOpacity: 0, shadowRadius: 0, elevation: 0 }, driverMarker: { width: 34, height: 34, borderRadius: 17, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
 });

@@ -6,9 +6,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
 import { useThemeContext } from "@/lib/theme-provider";
+import { useThemeColors } from "@/lib/use-theme-colors";
 import { useTikisNavigation } from "@/lib/tikis-navigation";
 import { useTikisLogout } from "@/lib/tikis-logout";
 import { useTikisStore } from "@/lib/tikis-store";
+import { trpc } from "@/lib/trpc";
 
 type DrawerItem = { key: string; label: string; caption?: string; icon: React.ComponentProps<typeof MaterialIcons>["name"]; route: string; badge?: number };
 
@@ -24,19 +26,21 @@ function unreadLabel(count: number) { return count > 9 ? "9+" : String(count); }
 export function TikisHeader() {
   const { openDrawer } = useTikisNavigation();
   const insets = useSafeAreaInsets();
-  const { notifications } = useTikisStore();
-  const unread = notifications.filter((item) => !item.read).length;
+  const { profile } = useTikisStore();
+  const { colors: theme } = useThemeColors();
+  const notificationsQuery = trpc.notifications.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 8_000 });
+  const unread = (notificationsQuery.data ?? []).filter((item) => !item.read).length;
 
   return (
-    <View style={[styles.header, { height: 58 + Math.max(insets.top, 8), paddingTop: Math.max(insets.top, 8) }]}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir le menu" onPress={() => { haptic.light(); openDrawer(); }} style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}>
-        <MaterialIcons name="menu" size={24} color="#111111" />
+    <View style={[styles.header, { backgroundColor: theme.surface, height: 58 + Math.max(insets.top, 8), paddingTop: Math.max(insets.top, 8) }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir le menu" onPress={() => { haptic.light(); openDrawer(); }} style={({ pressed }) => [styles.headerIcon, { backgroundColor: theme.background }, pressed && styles.pressed]}>
+        <MaterialIcons name="menu" size={24} color={theme.foreground} />
       </Pressable>
       <View style={styles.brand}>
-        <Text style={styles.brandName}>Tikis</Text>
+        <Text style={[styles.brandName, { color: theme.foreground }]}>Tikis</Text>
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir les notifications" onPress={() => { haptic.light(); router.push("/notifications" as any); }} style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}>
-        <MaterialIcons name="notifications-none" size={23} color="#111111" />
+      <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir les notifications" onPress={() => { haptic.light(); router.push("/notifications" as any); }} style={({ pressed }) => [styles.headerIcon, { backgroundColor: theme.background }, pressed && styles.pressed]}>
+        <MaterialIcons name="notifications-none" size={23} color={theme.foreground} />
         {unread > 0 ? <View style={styles.headerBadge}><Text style={styles.headerBadgeText}>{unreadLabel(unread)}</Text></View> : null}
       </Pressable>
     </View>

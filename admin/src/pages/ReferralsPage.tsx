@@ -16,8 +16,8 @@ export default function ReferralsPage() {
   const canEdit = admin?.role === "super_admin" || admin?.role === "finance";
   const [statusFilter, setStatusFilter] = useState<"invited" | "qualified" | "rewarded" | "voided" | "">("");
   const [rows, setRows] = useState<Referral[]>([]);
-  const [settings, setSettings] = useState<{ rewardAmount: number; enabled: boolean } | null>(null);
-  const [draft, setDraft] = useState({ rewardAmount: "", enabled: true });
+  const [settings, setSettings] = useState<{ rewardAmount: number; enabled: boolean; requiredDeliveries: number } | null>(null);
+  const [draft, setDraft] = useState({ rewardAmount: "", enabled: true, requiredDeliveries: "1" });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export default function ReferralsPage() {
 
   useEffect(() => {
     trpc.adminConsole.referrals.settings.get.query()
-      .then((data) => { setSettings(data); setDraft({ rewardAmount: String(data.rewardAmount), enabled: data.enabled }); })
+      .then((data) => { setSettings(data); setDraft({ rewardAmount: String(data.rewardAmount), enabled: data.enabled, requiredDeliveries: String(data.requiredDeliveries) }); })
       .catch(() => {});
   }, []);
 
@@ -42,7 +42,9 @@ export default function ReferralsPage() {
     if (!Number.isFinite(amount) || amount < 0) { setError("Montant de récompense invalide."); return; }
     setSaving(true);
     try {
-      const result = await trpc.adminConsole.referrals.settings.update.mutate({ rewardAmount: amount, enabled: draft.enabled });
+      const requiredDeliveries = Number(draft.requiredDeliveries);
+    if (!Number.isFinite(requiredDeliveries) || requiredDeliveries < 1) { setError("Nombre de courses requis invalide (minimum 1)."); return; }
+    const result = await trpc.adminConsole.referrals.settings.update.mutate({ rewardAmount: amount, enabled: draft.enabled, requiredDeliveries });
       setSettings(result);
       setSuccess("Réglages de parrainage enregistrés.");
     } catch (cause) {
@@ -79,11 +81,15 @@ export default function ReferralsPage() {
 
       <div className="card">
         <div className="card-head"><div><div className="card-title">Réglages</div><div className="card-sub">Montant de récompense et activation du programme</div></div></div>
-        {!canEdit ? <div style={{ fontSize: 13, color: "var(--muted)" }}>Réservé aux rôles Super-admin et Finance. Valeur actuelle : {settings ? formatMoney(settings.rewardAmount) : "…"}, programme {settings?.enabled ? "activé" : "désactivé"}.</div> : (
+        {!canEdit ? <div style={{ fontSize: 13, color: "var(--muted)" }}>Réservé aux rôles Super-admin et Finance. Valeur actuelle : {settings ? formatMoney(settings.rewardAmount) : "…"} après {settings?.requiredDeliveries ?? "…"} course(s) terminée(s), programme {settings?.enabled ? "activé" : "désactivé"}.</div> : (
           <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
             <div>
               <label className="field-label">Récompense (FCFA)</label>
               <input className="input" inputMode="numeric" value={draft.rewardAmount} onChange={(e) => setDraft((s) => ({ ...s, rewardAmount: e.target.value.replace(/[^0-9]/g, "") }))} style={{ width: 160 }} />
+            </div>
+            <div>
+              <label className="field-label">Courses requises</label>
+              <input className="input" inputMode="numeric" value={draft.requiredDeliveries} onChange={(e) => setDraft((s) => ({ ...s, requiredDeliveries: e.target.value.replace(/[^0-9]/g, "") }))} style={{ width: 100 }} />
             </div>
             <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, marginBottom: 10 }}>
               <input type="checkbox" checked={draft.enabled} onChange={(e) => setDraft((s) => ({ ...s, enabled: e.target.checked }))} />

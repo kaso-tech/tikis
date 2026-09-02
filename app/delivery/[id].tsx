@@ -249,7 +249,7 @@ export default function DeliveryDetailScreen() {
       offeredPrice={delivery.offeredPrice ?? delivery.estimatedPrice}
       senderName={delivery.senderName}
       senderPhone={delivery.senderPhone}
-      onOpenMap={() => router.push(`/delivery/${deliveryId}/map` as any)}
+      onOpenMap={role === "sender" ? () => router.push(`/delivery/${deliveryId}/map` as any) : () => {}}
       onReport={() => router.push(`/report/${deliveryId}` as any)}
     >
       {role === "driver" ? <DriverActions deliveryStatus={delivery.status} ownCandidateStatus={ownCandidate?.status} loading={processing} onApply={() => setAction("apply")} onWithdraw={() => setAction("withdraw")} onConfirm={() => setAction("confirm")} onComplete={() => setAction("complete")} /> : null}
