@@ -5,6 +5,7 @@ import type { AppRouter } from "@/server/routers";
 import { getApiBaseUrl } from "@/constants/oauth";
 import * as Auth from "@/lib/_core/auth";
 import { getTikisSessionToken } from "@/lib/tikis-session";
+import { getAdminSessionToken } from "@/lib/admin-session";
 
 /**
  * tRPC React client for type-safe API calls.
@@ -29,7 +30,8 @@ export function createTRPCClient() {
         async headers() {
           const token = await Auth.getSessionToken();
           const tikisSessionToken = await getTikisSessionToken();
-          return { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(tikisSessionToken ? { "x-tikis-session": tikisSessionToken } : {}) };
+          const adminSessionToken = await getAdminSessionToken();
+          return { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(tikisSessionToken ? { "x-tikis-session": tikisSessionToken } : {}), ...(adminSessionToken ? { "x-tikis-admin-session": adminSessionToken } : {}) };
         },
         // Custom fetch to include credentials for cookie-based auth
         fetch(url, options) {

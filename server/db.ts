@@ -1050,3 +1050,153 @@ export async function listTikisDeliveryReviewsForProfile(profilePhone: string, r
   const reviews = await db.select().from(tikisDeliveryReviews).where(condition).orderBy(desc(tikisDeliveryReviews.createdAt));
   return Promise.all(reviews.map((review) => deliveryReviewToView(review)));
 }
+
+
+// ---------------------------------------------------------------------------
+// Admin UI helpers (server/admin-router-ui.ts).
+// These complement the auth + reports workflows in server/admin-db.ts.
+// ---------------------------------------------------------------------------
+
+export type AdminDeliveryRow = {
+  id: string;
+  status: TikisDelivery["status"];
+  vehicle: string | null;
+  offeredPrice: number | null;
+  estimatedPrice: number | null;
+  senderPhone: string;
+  driverPhone: string | null;
+  driverName: string | null;
+  senderName: string | null;
+  pickupLabel: string;
+  dropoffLabel: string;
+  pickupLat: number;
+  pickupLng: number;
+  dropoffLat: number;
+  dropoffLng: number;
+  driverLocation: { latitude: number; longitude: number; heading: number; recordedAt: string } | null;
+  candidatesCount: number;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+};
+
+export async function listAllTikisDeliveriesForAdmin(_opts: { sinceMs?: number; status?: string } = {}): Promise<AdminDeliveryRow[]> {
+  const conn = await getDb();
+  if (!conn) return [];
+  const rows = await conn.select().from(tikisDeliveries).orderBy(desc(tikisDeliveries.createdAt)).limit(1_000);
+  let filtered = rows;
+  if (_opts.sinceMs) filtered = filtered.filter((r) => r.createdAt.getTime() >= _opts.sinceMs!);
+  if (_opts.status) filtered = filtered.filter((r) => r.status === _opts.status);
+  const enriched = await Promise.all(filtered.map(enrichAdminDeliveryRow));
+  return enriched;
+}
+
+async function enrichAdminDeliveryRow(row: TikisDelivery): Promise<AdminDeliveryRow> {
+  const placeIds = [row.pickupPlaceId, row.dropoffPlaceId];
+  const profilePhones = row.driverPhone ? [row.senderPhone, row.driverPhone] : [row.senderPhone];
+  const conn = await getDb();
+  if (!conn) {
+    return {
+      id: row.id, status: row.status, vehicle: row.vehicleTypes?.split(",")[0]?.trim() ?? null,
+      offeredPrice: row.offeredPrice ?? null, estimatedPrice: row.estimatedPrice ?? null,
+      senderPhone: row.senderPhone, driverPhone: row.driverPhone, driverName: null, senderName: null,
+      pickupLabel: `Place #${row.pickupPlaceId}`, dropoffLabel: `Place #${row.dropoffPlaceId}`,
+      pickupLat: Number(row.pickupLatitude), pickupLng: Number(row.pickupLongitude),
+      dropoffLat: Number(row.dropoffLatitude), dropoffLng: Number(row.dropoffLongitude),
+      driverLocation: null, candidatesCount: 0,
+      createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
+      completedAt: row.completedAt ? row.completedAt.toISOString() : null,
+    };
+  }
+  const [places, profiles, live, candidates] = await Promise.all([
+    conn.select().from(tikisPlaces).where(inArray(tikisPlaces.id, placeIds)),
+    conn.select().from(tikisProfiles).where(inArray(tikisProfiles.phone, profilePhones)),
+    getTikisDeliveryLiveLocation(row.id),
+    listTikisDeliveryCandidates(row.id),
+  ]);
+  const placeById = new Map(places.map((p) => [p.id, p]));
+  const nameByPhone = new Map(profiles.map((p) => [p.phone, p.fullName]));
+  const pickup = placeById.get(row.pickupPlaceId);
+  const dropoff = placeById.get(row.dropoffPlaceId);
+  return {
+    id: row.id,
+    status: row.status,
+    vehicle: row.vehicleTypes?.split(",")[0]?.trim() ?? null,
+    offeredPrice: row.offeredPrice ?? null,
+    estimatedPrice: row.estimatedPrice ?? null,
+    senderPhone: row.senderPhone,
+    driverPhone: row.driverPhone,
+    driverName: row.driverPhone ? (nameByPhone.get(row.driverPhone) ?? null) : null,
+    senderName: nameByPhone.get(row.senderPhone) ?? null,
+    pickupLabel: pickup?.placeName ?? pickup?.formattedAddress ?? `Place #${row.pickupPlaceId}`,
+    dropoffLabel: dropoff?.placeName ?? dropoff?.formattedAddress ?? `Place #${row.dropoffPlaceId}`,
+    pickupLat: Number(row.pickupLatitude),
+    pickupLng: Number(row.pickupLongitude),
+    dropoffLat: Number(row.dropoffLatitude),
+    dropoffLng: Number(row.dropoffLongitude),
+    driverLocation: live ? { latitude: live.latitude, longitude: live.longitude, heading: live.heading, recordedAt: live.recordedAt } : null,
+    candidatesCount: candidates.length,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    completedAt: row.completedAt ? row.completedAt.toISOString() : null,
+  };
+}
+
+export type AdminProfileRow = {
+  phone: string;
+  fullName: string;
+  accountType: "sender" | "driver";
+  vehicles: string;
+  email: string | null;
+  createdAt: string;
+};
+
+export async function listAllTikisProfilesForAdmin(_opts: { role?: string } = {}): Promise<AdminProfileRow[]> {
+  const conn = await getDb();
+  if (!conn) return [];
+  const rows = await conn.select().from(tikisProfiles).orderBy(desc(tikisProfiles.createdAt)).limit(2_000);
+  return rows
+    .filter((r) => !_opts.role || r.accountType === _opts.role)
+    .map((r) => ({
+      phone: r.phone,
+      fullName: r.fullName,
+      accountType: r.accountType as "sender" | "driver",
+      vehicles: r.vehicles,
+      email: r.email ?? null,
+      createdAt: r.createdAt.toISOString(),
+    }));
+}
+
+export type AdminLedgerRow = {
+  id: string;
+  profilePhone: string;
+  operation: string;
+  type: "commission" | "deposit" | "withdrawal" | "payout" | "refund";
+  amount: number;
+  description: string;
+  createdAt: string;
+};
+
+function ledgerOperationToType(operation: string): AdminLedgerRow["type"] {
+  if (operation === "debit" || operation === "credit") return "commission";
+  if (operation === "deposit_request") return "deposit";
+  if (operation === "withdrawal_request") return "withdrawal";
+  if (operation === "refund") return "refund";
+  if (operation === "compensation") return "payout";
+  return "commission";
+}
+
+export async function listAllTikisWalletLedger({ limit = 500 }: { limit?: number } = {}): Promise<AdminLedgerRow[]> {
+  const conn = await getDb();
+  if (!conn) return [];
+  const rows = await conn.select().from(tikisWalletLedger).orderBy(desc(tikisWalletLedger.createdAt)).limit(limit);
+  return rows.map((r) => ({
+    id: r.id,
+    profilePhone: r.profilePhone,
+    operation: r.operation,
+    type: ledgerOperationToType(r.operation),
+    amount: r.amount,
+    description: r.reason,
+    createdAt: r.createdAt.toISOString(),
+  }));
+}
