@@ -137,6 +137,14 @@ export default function DeliveryDetailScreen() {
     return null;
   }, [senderAction]);
 
+  // Doit rester AVANT les `return` conditionnels ci-dessous : un hook ne peut jamais être appelé
+  // après un retour anticipé, sous peine de "Rendered more hooks than during the previous render".
+  const isLiveTracking = delivery?.status === "pending_confirmation" || delivery?.status === "active";
+  const livePositionQuery = useLiveDeliveryPosition(
+    isLiveTracking && delivery ? delivery.id : null,
+    Boolean(isLiveTracking && role === "sender"),
+  );
+
   if (deliveryQuery.isLoading) {
     return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.notFound}><ActivityIndicator color="#9A6201" /><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
   }
@@ -219,12 +227,7 @@ export default function DeliveryDetailScreen() {
     setAction("select");
   }
 
-  const isLiveTracking = delivery.status === "pending_confirmation" || delivery.status === "active";
   const pickupTime = isLiveTracking && delivery.status === "active" ? formatRelativeDate(delivery.scheduledAt ?? delivery.createdAt) : undefined;
-  const livePositionQuery = useLiveDeliveryPosition(
-    isLiveTracking ? deliveryId : null,
-    isLiveTracking && role === "sender",
-  );
   const liveContent = isLiveTracking ? (
     <LiveTrackingView
       deliveryId={deliveryId}
