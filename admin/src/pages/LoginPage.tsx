@@ -24,16 +24,27 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <form className="login-card" onSubmit={handleSubmit}>
-        <p className="login-title">Tikis — Administration</p>
-        <p className="login-subtitle">Accès réservé à l’équipe Tikis.</p>
-        {error ? <div className="error-banner">{error}</div> : null}
-        <label className="field-label" htmlFor="email">E-mail</label>
-        <input id="email" className="input" type="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} style={{ marginBottom: 14 }} />
-        <label className="field-label" htmlFor="password">Mot de passe</label>
-        <input id="password" className="input" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} style={{ marginBottom: 20 }} />
-        <button className="btn btn-primary" type="submit" disabled={loading} style={{ width: "100%" }}>
-          {loading ? "Connexion…" : "Se connecter"}
-        </button>
+        <div className="login-icon">⚙</div>
+        <p className="login-title">Console opérateur</p>
+        <p className="login-subtitle">Accès réservé aux administrateurs Tikis. Authentification par email et mot de passe.</p>
+        {error ? <div className="banner-error">{error}</div> : null}
+        <div className="login-form">
+          <div>
+            <label className="field-label" htmlFor="email">Email</label>
+            <input id="email" className="input" type="email" required autoFocus value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@tikis.app" />
+          </div>
+          <div>
+            <label className="field-label" htmlFor="password">Mot de passe</label>
+            <input id="password" className="input" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mot de passe" />
+          </div>
+          <button className="btn btn-primary" type="submit" disabled={loading} style={{ width: "100%", justifyContent: "center", padding: "10px" }}>
+            {loading ? "Connexion…" : "Se connecter"}
+          </button>
+        </div>
+        <div className="login-hint">
+          Première utilisation ? Le bootstrap admin se fait via la CLI :<br />
+          <code style={{ background: "var(--surface-2)", padding: "1px 6px", borderRadius: 4 }}>pnpm admin:bootstrap email@tikis.app</code>
+        </div>
       </form>
     </div>
   );

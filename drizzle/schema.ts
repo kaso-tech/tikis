@@ -157,17 +157,6 @@ export const tikisWallets = mysqlTable("tikis_wallets", {
 export const tikisPlatformSettings = mysqlTable("tikis_platform_settings", {
   id: int("id").primaryKey(),
   commissionRate: decimal("commissionRate", { precision: 6, scale: 5 }).notNull().default("0.10000"),
-  commissionRateBp: int("commissionRateBp").notNull().default(1500),
-  expirationHours: int("expirationHours").notNull().default(24),
-  maxDistanceKm: int("maxDistanceKm").notNull().default(50),
-  apiLatencyMsP95: int("apiLatencyMsP95").notNull().default(120),
-  errorRateBp: int("errorRateBp").notNull().default(5),
-  acceptanceRateBp: int("acceptanceRateBp").notNull().default(8200),
-  cancellationRateBp: int("cancellationRateBp").notNull().default(1400),
-  openDisputes: int("openDisputes").notNull().default(0),
-  npsDriver: int("npsDriver").notNull().default(58),
-  npsSender: int("npsSender").notNull().default(62),
-  eventBacklog: int("eventBacklog").notNull().default(0),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 

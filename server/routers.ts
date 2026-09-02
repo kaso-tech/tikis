@@ -14,7 +14,6 @@ import { recordGeographicMetric } from "./geography-observability";
 import { isAllowedDeliveryText, sanitizeDeliveryText } from "../lib/tikis-engine";
 import { isValidReviewText, sanitizeReviewText } from "../lib/review-rules";
 import { tikisAdminRouter } from "./admin-router";
-import { adminUiRouter } from "./admin-router-ui";
 import * as adminDb from "./admin-db";
 
 const reportReasonSchema = z.enum(["comportement", "sécurité", "paiement", "objet_endommagé", "retard", "autre"]);
@@ -200,7 +199,6 @@ function deliveryForProfile(delivery: ResolvedDelivery, profile: Awaited<ReturnT
 
 const adminConsoleRouter = router({
   core: tikisAdminRouter,
-  ui: adminUiRouter,
 });
 
 export const appRouter = router({

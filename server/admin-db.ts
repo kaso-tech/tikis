@@ -203,13 +203,42 @@ export async function adminDashboardMetrics(sinceDays = 30) {
   const db = await getDb();
   if (!db) return null;
   const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
-  const [deliveriesTotal, deliveriesCompleted, openReports, activeDrivers, commissionRevenue] = await Promise.all([
+  const [deliveriesTotal, deliveriesCompleted, openReports, activeDrivers, commissionRevenue, recentDeliveries] = await Promise.all([
     db.select({ count: count() }).from(tikisDeliveries).where(gte(tikisDeliveries.createdAt, since)),
     db.select({ count: count() }).from(tikisDeliveries).where(and(eq(tikisDeliveries.status, "completed"), gte(tikisDeliveries.createdAt, since))),
     db.select({ count: count() }).from(tikisDeliveryReports).where(eq(tikisDeliveryReports.status, "open")),
     db.select({ count: sql<number>`count(distinct ${tikisDeliveries.driverPhone})` }).from(tikisDeliveries).where(and(gte(tikisDeliveries.createdAt, since), eq(tikisDeliveries.status, "completed"))),
     db.select({ total: sql<number>`coalesce(sum(${tikisWalletLedger.amount}), 0)` }).from(tikisWalletLedger).where(and(eq(tikisWalletLedger.operation, "debit"), gte(tikisWalletLedger.createdAt, since), lte(tikisWalletLedger.createdAt, new Date()))),
+    db.select({ createdAt: tikisDeliveries.createdAt, status: tikisDeliveries.status, vehicleTypes: tikisDeliveries.vehicleTypes }).from(tikisDeliveries).where(gte(tikisDeliveries.createdAt, since)),
   ]);
+
+  // Timeseries par jour
+  const byDay = new Map<string, { published: number; completed: number }>();
+  for (let i = 0; i < sinceDays; i += 1) {
+    const d = new Date(Date.now() - (sinceDays - 1 - i) * 24 * 60 * 60 * 1000);
+    byDay.set(d.toISOString().slice(0, 10), { published: 0, completed: 0 });
+  }
+  for (const d of recentDeliveries) {
+    const day = d.createdAt.toISOString().slice(0, 10);
+    const slot = byDay.get(day);
+    if (slot) {
+      slot.published += 1;
+      if (d.status === "completed") slot.completed += 1;
+    }
+  }
+  const timeseries = Array.from(byDay.entries()).map(([date, slot]) => ({ date, ...slot }));
+
+  // Vehicle breakdown
+  const vehicleCounts = new Map<string, number>();
+  for (const d of recentDeliveries) {
+    const first = d.vehicleTypes?.split(",")[0]?.trim();
+    if (!first) continue;
+    vehicleCounts.set(first, (vehicleCounts.get(first) ?? 0) + 1);
+  }
+  const vehicleBreakdown = Array.from(vehicleCounts.entries())
+    .map(([vehicle, count]) => ({ vehicle, count }))
+    .sort((a, b) => b.count - a.count);
+
   return {
     periodDays: sinceDays,
     deliveriesTotal: Number(deliveriesTotal[0]?.count ?? 0),
@@ -217,5 +246,7 @@ export async function adminDashboardMetrics(sinceDays = 30) {
     openReports: Number(openReports[0]?.count ?? 0),
     activeDrivers: Number(activeDrivers[0]?.count ?? 0),
     commissionRevenue: Number(commissionRevenue[0]?.total ?? 0),
+    timeseries,
+    vehicleBreakdown,
   };
 }
