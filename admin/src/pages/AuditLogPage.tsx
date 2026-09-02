@@ -8,9 +8,9 @@ export default function AuditLogPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    trpc.adminConsole.auditLog.list.query({})
+    trpc.adminConsole.core.auditLog.list.query({})
       .then((data) => setRows(data as AuditRow[]))
-      .catch((cause) => setError(cause instanceof Error ? cause.message : "Accès réservé aux super-administrateurs."));
+      .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Accès réservé aux super-administrateurs."));
   }, []);
 
   return (

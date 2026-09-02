@@ -12,9 +12,9 @@ export default function CommissionPage() {
   const [saving, setSaving] = useState(false);
 
   function load() {
-    trpc.adminConsole.commission.get.query()
-      .then((rate) => { setCurrentRate(rate); setDraft((rate * 100).toString()); })
-      .catch((cause) => setError(cause instanceof Error ? cause.message : "Impossible de charger le taux de commission."));
+    trpc.adminConsole.core.commission.get.query()
+      .then((rate: number) => { setCurrentRate(rate); setDraft((rate * 100).toString()); })
+      .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Impossible de charger le taux de commission."));
   }
 
   useEffect(load, []);
@@ -25,7 +25,7 @@ export default function CommissionPage() {
     if (!Number.isFinite(percent) || percent <= 0 || percent >= 90) { setError("Indiquez un pourcentage valide, entre 0 et 90."); return; }
     setSaving(true);
     try {
-      await trpc.adminConsole.commission.update.mutate({ rate: percent / 100 });
+      await trpc.adminConsole.core.commission.update.mutate({ rate: percent / 100 });
       setSuccess("Taux de commission mis à jour. Il s’applique immédiatement à toute nouvelle candidature.");
       load();
     } catch (cause) {

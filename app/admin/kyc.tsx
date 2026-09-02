@@ -7,11 +7,11 @@ import { trpc } from "@/lib/trpc";
 export default function AdminKyc() {
   const { colors: theme } = useThemeColors();
   const utils = trpc.useUtils();
-  const query = trpc.adminConsole.kycList.useQuery({ page: 1, pageSize: 50 });
-  const decideMutation = trpc.adminConsole.kycDecide.useMutation({
+  const query = trpc.adminConsole.ui.kycList.useQuery({ page: 1, pageSize: 50 });
+  const decideMutation = trpc.adminConsole.ui.kycDecide.useMutation({
     onSuccess: () => {
-      utils.admin.kycList.invalidate();
-      utils.admin.overview.invalidate();
+      utils.adminConsole.ui.kycList.invalidate();
+      utils.adminConsole.ui.overview.invalidate();
     },
   });
 
@@ -38,7 +38,7 @@ export default function AdminKyc() {
             </View>
           ) : (
             <View>
-              {query.data?.items.map((u) => (
+              {query.data?.items.map((u: { phone: string; fullName: string }) => (
                 <View key={u.phone} style={[styles.row, { borderBottomColor: theme.border }]}>
                   <View style={[styles.avatar, { backgroundColor: theme.primary + "22" }]}>
                     <Text style={{ color: theme.primary, fontSize: 11, fontWeight: "600" }}>{(u.fullName[0] ?? "?").toUpperCase()}</Text>

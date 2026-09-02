@@ -21,9 +21,9 @@ export default function ReportsPage() {
   const [busy, setBusy] = useState(false);
 
   function load() {
-    trpc.adminConsole.reports.list.query({ status: statusFilter })
+    trpc.adminConsole.core.reports.list.query({ status: statusFilter })
       .then((data) => setRows(data as ReportRow[]))
-      .catch((cause) => setError(cause instanceof Error ? cause.message : "Impossible de charger les signalements."));
+      .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Impossible de charger les signalements."));
   }
 
   useEffect(load, [statusFilter]);
@@ -33,7 +33,7 @@ export default function ReportsPage() {
     setBusy(true);
     setError("");
     try {
-      await trpc.adminConsole.reports.resolve.mutate({ reportId: selected.report.id, status, resolutionNotes: notes.trim() || undefined });
+      await trpc.adminConsole.core.reports.resolve.mutate({ reportId: selected.report.id, status, resolutionNotes: notes.trim() || undefined });
       setSelected(null);
       setNotes("");
       load();

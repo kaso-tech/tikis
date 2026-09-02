@@ -7,11 +7,11 @@ import { trpc } from "@/lib/trpc";
 export default function AdminDisputes() {
   const { colors: theme } = useThemeColors();
   const utils = trpc.useUtils();
-  const query = trpc.adminConsole.disputes.useQuery({ page: 1, pageSize: 50 });
-  const resolveMutation = trpc.adminConsole.disputeResolve.useMutation({
+  const query = trpc.adminConsole.ui.disputes.useQuery({ page: 1, pageSize: 50 });
+  const resolveMutation = trpc.adminConsole.ui.disputeResolve.useMutation({
     onSuccess: () => {
-      utils.admin.disputes.invalidate();
-      utils.admin.overview.invalidate();
+      utils.adminConsole.ui.disputes.invalidate();
+      utils.adminConsole.ui.overview.invalidate();
     },
   });
 

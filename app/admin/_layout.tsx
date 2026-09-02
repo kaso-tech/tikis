@@ -34,7 +34,7 @@ export default function AdminLayout() {
   const pathname = usePathname();
   const segments = useSegments();
   const router = useRouter();
-  const meQuery = trpc.adminConsole.auth.me.useQuery(undefined, { retry: false });
+  const meQuery = trpc.adminConsole.core.auth.me.useQuery(undefined, { retry: false });
 
   const isLoginPage = pathname === "/admin/login" || segments[segments.length - 1] === "login";
 
@@ -68,8 +68,8 @@ export default function AdminLayout() {
     );
   }
 
-  const overviewQuery = trpc.adminConsole.overview.useQuery({ rangeDays: 30 }, { refetchInterval: 30_000 });
-  const reportsQuery = trpc.adminConsole.reports.useQuery({ page: 1, pageSize: 1 });
+  const overviewQuery = trpc.adminConsole.ui.overview.useQuery({ rangeDays: 30 }, { refetchInterval: 30_000 });
+  const reportsQuery = trpc.adminConsole.ui.disputes.useQuery({ page: 1, pageSize: 1 });
 
   const badges = useMemo(() => ({
     kyc: overviewQuery.data?.kpis.kycPending ?? 0,
@@ -137,7 +137,8 @@ export default function AdminLayout() {
               }
             }}
             style={({ pressed }) => [styles.icoBtn, { borderColor: theme.border }, pressed && { opacity: 0.7 }]}
-            title="Se déconnecter"
+            accessibilityLabel="Se déconnecter"
+            accessibilityHint="Ferme la session administrateur"
           >
             <MaterialIcons name="logout" size={14} color={theme.muted} />
           </Pressable>

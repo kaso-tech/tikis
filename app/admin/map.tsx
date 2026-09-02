@@ -7,7 +7,7 @@ import { formatMoney } from "@/shared/tikis-domain";
 
 export default function AdminLiveMap() {
   const { colors: theme } = useThemeColors();
-  const query = trpc.adminConsole.liveMap.useQuery(undefined, { refetchInterval: 10_000 });
+  const query = trpc.adminConsole.ui.liveMap.useQuery(undefined, { refetchInterval: 10_000 });
   const isWeb = Platform.OS === "web";
 
   if (isWeb && query.data) {
@@ -21,7 +21,7 @@ export default function AdminLiveMap() {
             <MapView deliveries={query.data.deliveries} theme={theme} />
           </View>
           <View style={{ marginTop: 12, gap: 8 }}>
-            {query.data.deliveries.map((d) => (
+            {query.data.deliveries.map((d: { id: string; pickup: { label: string }; dropoff: { label: string }; status: string; driverName: string | null; vehicle: string | null; offeredPrice: number | null }) => (
               <View key={d.id} style={[styles.row, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                 <View style={[styles.statusDot, { backgroundColor: d.status === "active" ? theme.success : theme.primary }]} />
                 <View style={{ flex: 1, minWidth: 0 }}>

@@ -19,9 +19,9 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    trpc.adminConsole.dashboard.metrics.query({ periodDays: 30 })
-      .then((data) => setMetrics(data as Metrics))
-      .catch((cause) => setError(cause instanceof Error ? cause.message : "Impossible de charger le tableau de bord."));
+    trpc.adminConsole.core.dashboard.metrics.query({ periodDays: 30 })
+      .then((data: Metrics | null) => { if (data) setMetrics(data); })
+      .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Impossible de charger le tableau de bord."));
   }, []);
 
   return (

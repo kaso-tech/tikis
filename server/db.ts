@@ -1101,8 +1101,8 @@ async function enrichAdminDeliveryRow(row: TikisDelivery): Promise<AdminDelivery
       offeredPrice: row.offeredPrice ?? null, estimatedPrice: row.estimatedPrice ?? null,
       senderPhone: row.senderPhone, driverPhone: row.driverPhone, driverName: null, senderName: null,
       pickupLabel: `Place #${row.pickupPlaceId}`, dropoffLabel: `Place #${row.dropoffPlaceId}`,
-      pickupLat: Number(row.pickupLatitude), pickupLng: Number(row.pickupLongitude),
-      dropoffLat: Number(row.dropoffLatitude), dropoffLng: Number(row.dropoffLongitude),
+      pickupLat: 0, pickupLng: 0,
+      dropoffLat: 0, dropoffLng: 0,
       driverLocation: null, candidatesCount: 0,
       createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
       completedAt: row.completedAt ? row.completedAt.toISOString() : null,
@@ -1130,10 +1130,10 @@ async function enrichAdminDeliveryRow(row: TikisDelivery): Promise<AdminDelivery
     senderName: nameByPhone.get(row.senderPhone) ?? null,
     pickupLabel: pickup?.placeName ?? pickup?.formattedAddress ?? `Place #${row.pickupPlaceId}`,
     dropoffLabel: dropoff?.placeName ?? dropoff?.formattedAddress ?? `Place #${row.dropoffPlaceId}`,
-    pickupLat: Number(row.pickupLatitude),
-    pickupLng: Number(row.pickupLongitude),
-    dropoffLat: Number(row.dropoffLatitude),
-    dropoffLng: Number(row.dropoffLongitude),
+    pickupLat: pickup ? Number(pickup.latitude) : 0,
+    pickupLng: pickup ? Number(pickup.longitude) : 0,
+    dropoffLat: dropoff ? Number(dropoff.latitude) : 0,
+    dropoffLng: dropoff ? Number(dropoff.longitude) : 0,
     driverLocation: live ? { latitude: live.latitude, longitude: live.longitude, heading: live.heading, recordedAt: live.recordedAt } : null,
     candidatesCount: candidates.length,
     createdAt: row.createdAt.toISOString(),
@@ -1149,6 +1149,8 @@ export type AdminProfileRow = {
   vehicles: string;
   email: string | null;
   createdAt: string;
+  suspended: boolean;
+  kycStatus: "not_required" | "pending" | "verified";
 };
 
 export async function listAllTikisProfilesForAdmin(_opts: { role?: string } = {}): Promise<AdminProfileRow[]> {
@@ -1164,6 +1166,8 @@ export async function listAllTikisProfilesForAdmin(_opts: { role?: string } = {}
       vehicles: r.vehicles,
       email: r.email ?? null,
       createdAt: r.createdAt.toISOString(),
+      suspended: false,
+      kycStatus: r.accountType === "driver" ? "pending" as const : "not_required" as const,
     }));
 }
 

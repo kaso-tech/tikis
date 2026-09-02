@@ -5,12 +5,11 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { trpc } from "@/lib/trpc";
 
-const ROLES = ["all", "sender", "driver", "operator"] as const;
+const ROLES = ["all", "sender", "driver"] as const;
 const ROLE_LABELS: Record<(typeof ROLES)[number], string> = {
   all: "Tous rôles",
   sender: "Expéditeur",
   driver: "Livreur",
-  operator: "Opérateur",
 };
 
 export default function AdminUsers() {
@@ -19,12 +18,12 @@ export default function AdminUsers() {
   const [role, setRole] = useState<(typeof ROLES)[number]>("all");
   const [search, setSearch] = useState("");
 
-  const query = trpc.adminConsole.users.useQuery({ page, pageSize: 25, role, search: search || undefined });
+  const query = trpc.adminConsole.ui.users.useQuery({ page, pageSize: 25, role, search: search || undefined });
   const utils = trpc.useUtils();
-  const actionMutation = trpc.adminConsole.userAction.useMutation({
+  const actionMutation = trpc.adminConsole.ui.userAction.useMutation({
     onSuccess: () => {
-      utils.admin.users.invalidate();
-      utils.admin.overview.invalidate();
+      utils.adminConsole.ui.users.invalidate();
+      utils.adminConsole.ui.overview.invalidate();
     },
   });
 
@@ -35,9 +34,15 @@ export default function AdminUsers() {
       set_kyc_verified: "Valider le KYC manuellement ?",
       clear_kyc: "Remettre le KYC en attente ?",
     };
-    const confirm = (typeof window !== "undefined" ? window.confirm : ((m: string) => Alert.alert(m)))(labels[action]);
-    if (!confirm) return;
-    actionMutation.mutate({ phone, action });
+    if (typeof window !== "undefined") {
+      if (!window.confirm(labels[action])) return;
+      actionMutation.mutate({ phone, action });
+      return;
+    }
+    Alert.alert(labels[action], undefined, [
+      { text: "Annuler", style: "cancel" },
+      { text: "Confirmer", onPress: () => actionMutation.mutate({ phone, action }) },
+    ]);
   }
 
   return (
@@ -69,7 +74,7 @@ export default function AdminUsers() {
             <View style={{ padding: 32, alignItems: "center" }}><ActivityIndicator color={theme.primary} /></View>
           ) : (
             <View>
-              {query.data?.items.map((u) => (
+              {query.data?.items.map((u: { phone: string; fullName: string; accountType: "sender" | "driver"; suspended: boolean; kycStatus: string }) => (
                 <View key={u.phone} style={[styles.row, { borderBottomColor: theme.border }]}>
                   <View style={[styles.avatar, { backgroundColor: theme.primary + "22" }]}>
                     <Text style={{ color: theme.primary, fontSize: 11, fontWeight: "600" }}>{(u.fullName[0] ?? "?").toUpperCase()}</Text>

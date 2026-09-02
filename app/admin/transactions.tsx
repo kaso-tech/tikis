@@ -19,7 +19,7 @@ export default function AdminTransactions() {
   const { colors: theme } = useThemeColors();
   const [type, setType] = useState<(typeof TYPES)[number]>("all");
   const [page, setPage] = useState(1);
-  const query = trpc.adminConsole.ledger.useQuery({ type, page, pageSize: 50 });
+  const query = trpc.adminConsole.ui.ledger.useQuery({ type, page, pageSize: 50 });
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -40,7 +40,7 @@ export default function AdminTransactions() {
             <View style={{ padding: 32, alignItems: "center" }}><ActivityIndicator color={theme.primary} /></View>
           ) : (
             <View>
-              {query.data?.items.map((r) => (
+              {query.data?.items.map((r: { id: string; description: string; profilePhone: string; operation: string; amount: number; createdAt: string }) => (
                 <View key={r.id} style={[styles.row, { borderBottomColor: theme.border }]}>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={{ fontSize: 12.5, fontWeight: "500", color: theme.foreground }} numberOfLines={1}>{r.description}</Text>

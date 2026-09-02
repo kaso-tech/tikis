@@ -6,10 +6,14 @@ import { useThemeColors } from "@/lib/use-theme-colors";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/shared/tikis-domain";
 
+type TimeseriesPoint = { date: string; published: number; completed: number };
+type ActivityItem = { id: string; reason: string; deliveryId: string; openedByPhone: string; createdAt: Date };
+type VehicleItem = { vehicle: string; count: number };
+
 export default function AdminOverview() {
   const { colors: theme, isDark } = useThemeColors();
-  const overviewQuery = trpc.adminConsole.overview.useQuery({ rangeDays: 30 }, { refetchInterval: 15_000 });
-  const healthQuery = trpc.adminConsole.health.useQuery(undefined, { refetchInterval: 30_000 });
+  const overviewQuery = trpc.adminConsole.ui.overview.useQuery({ rangeDays: 30 }, { refetchInterval: 15_000 });
+  const healthQuery = trpc.adminConsole.ui.health.useQuery(undefined, { refetchInterval: 30_000 });
 
   if (overviewQuery.isLoading) {
     return (
@@ -37,8 +41,8 @@ export default function AdminOverview() {
   const data = overviewQuery.data!;
   const kpis = data.kpis;
   const health = healthQuery.data;
-  const maxPublished = Math.max(1, ...data.timeseries.map((d) => d.published));
-  const maxCompleted = Math.max(1, ...data.timeseries.map((d) => d.completed));
+  const maxPublished = Math.max(1, ...data.timeseries.map((d: TimeseriesPoint) => d.published));
+  const maxCompleted = Math.max(1, ...data.timeseries.map((d: TimeseriesPoint) => d.completed));
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -98,7 +102,7 @@ export default function AdminOverview() {
                   <Text style={{ color: theme.muted, fontSize: 12.5 }}>Aucun événement récent.</Text>
                 </View>
               ) : (
-                data.recentDisputes.map((d) => (
+                data.recentDisputes.map((d: ActivityItem) => (
                   <View key={d.id} style={[styles.activityRow, { borderBottomColor: theme.border }]}>
                     <View style={[styles.activityIcon, { backgroundColor: theme.warning + "22" }]}>
                       <MaterialIcons name="gavel" size={14} color={theme.warning} />
@@ -109,7 +113,7 @@ export default function AdminOverview() {
                         {d.deliveryId} · {d.openedByPhone}
                       </Text>
                     </View>
-                    <Text style={[styles.activityTime, { color: theme.muted }]}>{relativeTime(d.createdAt)}</Text>
+                    <Text style={[styles.activityTime, { color: theme.muted }]}>{relativeTime(d.createdAt.toISOString())}</Text>
                   </View>
                 ))
               )}
@@ -127,8 +131,8 @@ export default function AdminOverview() {
               {data.vehicleBreakdown.length === 0 ? (
                 <Text style={{ color: theme.muted, fontSize: 12.5, textAlign: "center", padding: 16 }}>Pas encore de données.</Text>
               ) : (
-                data.vehicleBreakdown.map((v, idx) => {
-                  const total = data.vehicleBreakdown.reduce((s, x) => s + x.count, 0) || 1;
+                data.vehicleBreakdown.map((v: VehicleItem, idx: number) => {
+                  const total = data.vehicleBreakdown.reduce((s: number, x: VehicleItem) => s + x.count, 0) || 1;
                   const pct = Math.round((v.count / total) * 100);
                   const colors = [theme.primary, theme.success, "#2C5BA8", theme.warning, theme.error];
                   return (

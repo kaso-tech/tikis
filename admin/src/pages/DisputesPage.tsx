@@ -25,7 +25,7 @@ export default function DisputesPage() {
     setError("");
     setLoading(true);
     try {
-      const rows = await trpc.adminConsole.disputes.searchDeliveries.query({ query: query.trim() || undefined });
+      const rows = await trpc.adminConsole.core.disputes.searchDeliveries.query({ query: query.trim() || undefined });
       setResults(rows as Delivery[]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Recherche impossible.");
@@ -37,7 +37,7 @@ export default function DisputesPage() {
   async function openTimeline(deliveryId: string) {
     setError("");
     try {
-      const data = await trpc.adminConsole.disputes.timeline.query({ deliveryId });
+      const data = await trpc.adminConsole.core.disputes.timeline.query({ deliveryId });
       setTimeline(data as Timeline);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Chronologie indisponible.");

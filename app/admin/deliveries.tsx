@@ -6,6 +6,20 @@ import { useThemeColors } from "@/lib/use-theme-colors";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/shared/tikis-domain";
 
+type DeliveryItem = {
+  id: string;
+  status: string;
+  pickupLabel: string;
+  dropoffLabel: string;
+  senderName: string | null;
+  senderPhone: string;
+  driverName: string | null;
+  vehicle: string | null;
+  candidatesCount: number;
+  offeredPrice: number | null;
+  createdAt: string;
+};
+
 const STATUSES = ["all", "open", "pending_confirmation", "active", "completed", "cancelled", "expired", "disabled"] as const;
 const STATUS_LABELS: Record<(typeof STATUSES)[number], string> = {
   all: "Toutes",
@@ -34,7 +48,7 @@ export default function AdminDeliveries() {
   const [status, setStatus] = useState<(typeof STATUSES)[number]>("all");
   const [search, setSearch] = useState("");
 
-  const query = trpc.adminConsole.deliveries.useQuery(
+  const query = trpc.adminConsole.ui.deliveries.useQuery(
     { page, pageSize: 25, status, search: search || undefined },
     { refetchInterval: 15_000 },
   );
@@ -74,7 +88,7 @@ export default function AdminDeliveries() {
             </View>
           ) : (
             <View>
-              {query.data!.items.map((d) => {
+              {query.data!.items.map((d: DeliveryItem) => {
                 const tone = STATUS_TONES[d.status as (typeof STATUSES)[number]];
                 return (
                   <View key={d.id} style={[styles.row, { borderBottomColor: theme.border }]}>

@@ -491,3 +491,10 @@
 - [x] Auditer la recherche et l’affichage des utilisateurs dans la console administrateur.
 - [x] Corriger le chargement des utilisateurs et ajouter une régression ciblée.
 - [x] Valider la console, la compilation, les tests et les services, puis enregistrer et pousser la correction.
+- [x] Synchroniser la branche `main` et vérifier les changements de dépendances.
+- [x] Valider compilation, tests et build de la console administrateur.
+- [x] Relancer Expo et l’API, puis vérifier Metro, API et console.
+- [x] Enregistrer, pousser et livrer la dernière version synchronisée.
+- [x] Corriger les incompatibilités TypeScript introduites par la console administrateur mobile et son routeur synchronisés.
+- [x] Revalider compilation, tests, build admin et services après correction.
+- [x] Enregistrer et pousser la version synchronisée validée.

@@ -12,7 +12,7 @@ export default function AdminLogin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const loginMutation = trpc.adminConsole.auth.login.useMutation({
+  const loginMutation = trpc.adminConsole.core.auth.login.useMutation({
     onSuccess: async (data) => {
       await setAdminSessionToken(data.sessionToken);
       router.replace("/admin" as any);

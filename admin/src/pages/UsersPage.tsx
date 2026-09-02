@@ -26,7 +26,7 @@ export default function UsersPage() {
     setError("");
     setLoading(true);
     try {
-      const rows = await trpc.adminConsole.users.search.query(searchQuery ? { query: searchQuery } : {});
+      const rows = await trpc.adminConsole.core.users.search.query(searchQuery ? { query: searchQuery } : {});
       setResults(rows as Profile[]);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Recherche impossible.");
@@ -50,7 +50,7 @@ export default function UsersPage() {
   async function openDetail(phone: string) {
     setError("");
     try {
-      const data = await trpc.adminConsole.users.detail.query({ phone });
+      const data = await trpc.adminConsole.core.users.detail.query({ phone });
       setDetail(data as Detail);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Profil indisponible.");

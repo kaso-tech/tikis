@@ -8,10 +8,10 @@ import { trpc } from "@/lib/trpc";
 export default function AdminSettings() {
   const { colors: theme } = useThemeColors();
   const utils = trpc.useUtils();
-  const settingsQuery = trpc.adminConsole.settings.useQuery();
-  const healthQuery = trpc.adminConsole.health.useQuery();
-  const auditQuery = trpc.adminConsole.auditLog.useQuery({ page: 1, pageSize: 30 });
-  const updateMutation = trpc.adminConsole.updateSettings.useMutation({ onSuccess: () => utils.admin.settings.invalidate() });
+  const settingsQuery = trpc.adminConsole.ui.settings.useQuery();
+  const healthQuery = trpc.adminConsole.ui.health.useQuery();
+  const auditQuery = trpc.adminConsole.ui.auditLog.useQuery({ page: 1, pageSize: 30 });
+  const updateMutation = trpc.adminConsole.ui.updateSettings.useMutation({ onSuccess: () => utils.adminConsole.ui.settings.invalidate() });
 
   const [commissionRateBp, setCommissionRateBp] = useState("0");
   const [expirationHours, setExpirationHours] = useState("0");
@@ -62,7 +62,7 @@ export default function AdminSettings() {
             {auditQuery.isLoading ? <ActivityIndicator color={theme.primary} /> : auditQuery.data?.items.length === 0 ? (
               <Text style={{ color: theme.muted, fontSize: 12.5, padding: 16, textAlign: "center" }}>Aucune action enregistrée.</Text>
             ) : (
-              auditQuery.data?.items.map((entry) => (
+              auditQuery.data?.items.map((entry: { id: string; kind: string; targetId: string; actorPhone: string; createdAt: Date }) => (
                 <View key={entry.id} style={[styles.auditRow, { borderBottomColor: theme.border }]}>
                   <MaterialIcons name="history" size={14} color={theme.muted} />
                   <View style={{ flex: 1, minWidth: 0 }}>
