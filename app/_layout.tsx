@@ -9,6 +9,7 @@ import { Platform } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { TikisDrawer } from "@/components/tikis/app-chrome";
+import { AppStatusGate } from "@/components/tikis/app-status-gate";
 import { DeliveryRealtimeProvider } from "@/components/tikis/delivery-realtime-provider";
 import { TikisNavigationProvider } from "@/lib/tikis-navigation";
 import { TikisLogoutProvider } from "@/lib/tikis-logout";
@@ -83,12 +84,14 @@ export default function RootLayout() {
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
           <TikisLogoutProvider>
-            <DeliveryRealtimeProvider><Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="oauth/callback" />
-            </Stack>
-            <TikisDrawer /></DeliveryRealtimeProvider>
+            <AppStatusGate>
+              <DeliveryRealtimeProvider><Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="index" />
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="oauth/callback" />
+              </Stack>
+              <TikisDrawer /></DeliveryRealtimeProvider>
+            </AppStatusGate>
             <StatusBar style="auto" />
           </TikisLogoutProvider>
         </QueryClientProvider>

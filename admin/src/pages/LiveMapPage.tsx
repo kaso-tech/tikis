@@ -13,7 +13,7 @@ export default function LiveMapPage() {
             <div style={{ fontSize: 32, marginBottom: 8 }}>◎</div>
             La carte temps réel (Mapbox + projection bounding box) sera intégrée dès que le service de tracking est activé en production.
             <div style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 8 }}>
-              Endpoint backend disponible : <code>trpc.adminConsole.core.disputes.searchDeliveries</code> filtré par statut <code>active</code> / <code>pending_confirmation</code>.
+              Endpoint backend disponible : <code>trpc.adminConsole.deliveriesOps.list</code> filtré par statut <code>active</code> / <code>pending_confirmation</code>.
             </div>
           </div>
         </div>

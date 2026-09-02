@@ -129,7 +129,8 @@ export default function CreateDeliveryScreen() {
     return () => { active = false; };
   }, [pickup, dropoff, requestRoute]);
 
-  const estimate = useMemo(() => route ? estimateDeliveryPrice({ distanceKm: route.distanceKm, durationMinutes: route.durationMinutes, type: deliveryType, vehicle, ...measurement }) : 0, [route, deliveryType, vehicle, measurement]);
+  const pricingConfigQuery = trpc.geography.pricingConfig.useQuery(undefined, { staleTime: 5 * 60_000 });
+  const estimate = useMemo(() => route ? estimateDeliveryPrice({ distanceKm: route.distanceKm, durationMinutes: route.durationMinutes, type: deliveryType, vehicle, ...measurement }, pricingConfigQuery.data) : 0, [route, deliveryType, vehicle, measurement, pricingConfigQuery.data]);
   const parsedOfferedPrice = useMemo(() => parseOfferedPrice(offeredPriceInput), [offeredPriceInput]);
   const priceInputError = useMemo(() => offeredPriceError(offeredPriceInput), [offeredPriceInput]);
   const titleIssue = inputIssues.title || (touched.title ? deliveryTextInputIssue(title) : "");

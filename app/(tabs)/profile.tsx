@@ -2,7 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
@@ -38,6 +38,14 @@ export default function ProfileScreen() {
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone) });
   const [editorOpen, setEditorOpen] = useState(false);
   const [fullName, setFullName] = useState(profile?.fullName ?? "");
+  const [locationEditorOpen, setLocationEditorOpen] = useState(false);
+  const [countryDraft, setCountryDraft] = useState(profile?.country ?? "");
+  const [cityDraft, setCityDraft] = useState(profile?.city ?? "");
+  const [locationError, setLocationError] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const countriesQuery = trpc.geography.countries.useQuery();
+  const requestDeletionMutation = trpc.profiles.requestDeletion.useMutation();
   const [photoBase64, setPhotoBase64] = useState<string | undefined>();
   const [photoMime, setPhotoMime] = useState<"image/jpeg" | "image/png" | "image/webp" | undefined>();
   const [error, setError] = useState("");
@@ -152,6 +160,34 @@ export default function ProfileScreen() {
     }
   }
 
+  async function saveLocation() {
+    if (!profile) return;
+    if (!countryDraft) { setLocationError("Sélectionnez un pays."); return; }
+    setLocationError("");
+    try {
+      const saved = await updateMutation.mutateAsync({ phone: profile.phone, otp: "730512", country: countryDraft, city: cityDraft.trim() || undefined });
+      updateProfile({ country: saved.country, city: saved.city });
+      setLocationEditorOpen(false);
+      haptic.success();
+    } catch (cause) {
+      setLocationError(cause instanceof Error ? cause.message : "La mise à jour a échoué.");
+      haptic.error();
+    }
+  }
+
+  async function confirmAccountDeletion() {
+    setDeleteError("");
+    try {
+      const saved = await requestDeletionMutation.mutateAsync();
+      updateProfile({ deletionRequestedAt: saved.deletionRequestedAt, deletionScheduledAt: saved.deletionScheduledAt });
+      setDeleteConfirmOpen(false);
+      haptic.success();
+    } catch (cause) {
+      setDeleteError(cause instanceof Error ? cause.message : "La demande n’a pas pu être enregistrée.");
+      haptic.error();
+    }
+  }
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -250,6 +286,24 @@ export default function ProfileScreen() {
 
         <ContactSection />
 
+        <Section title="Localisation">
+          <MenuRow
+            icon="public"
+            iconBg="primary"
+            label="Pays"
+            sub={countriesQuery.data?.find((c) => c.id === profile?.country)?.name ?? "Non renseigné"}
+            onPress={() => { setCountryDraft(profile?.country ?? ""); setCityDraft(profile?.city ?? ""); setLocationError(""); setLocationEditorOpen(true); }}
+          />
+          <MenuRow
+            icon="location-city"
+            iconBg="primary"
+            label="Ville"
+            sub={profile?.city || "Non renseignée"}
+            onPress={() => { setCountryDraft(profile?.country ?? ""); setCityDraft(profile?.city ?? ""); setLocationError(""); setLocationEditorOpen(true); }}
+            last
+          />
+        </Section>
+
         {driver ? (
           <Section title="KYC & engins">
             <MenuRow
@@ -307,6 +361,18 @@ export default function ProfileScreen() {
           ) : null}
         </Section>
 
+        <Section title="Zone sensible">
+          <MenuRow
+            icon="delete-forever"
+            iconBg="dark"
+            label="Supprimer mon compte"
+            sub={profile?.deletionRequestedAt ? "Suppression déjà en cours" : "Suppression différée de 30 jours, annulable"}
+            badge={profile?.deletionRequestedAt ? { label: "En cours", tone: "danger" } : undefined}
+            onPress={() => { setDeleteError(""); setDeleteConfirmOpen(true); }}
+            last
+          />
+        </Section>
+
         <Pressable onPress={openLogoutConfirmation} style={({ pressed }) => [styles.logout, pressed && styles.pressed]}>
           <MaterialIcons name="logout" size={16} color="#B4232D" />
           <Text style={styles.logoutText}>Se déconnecter</Text>
@@ -356,8 +422,57 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      <Modal visible={editorOpen} transparent animationType="slide" onRequestClose={() => setEditorOpen(false)}>
+      <Modal visible={locationEditorOpen} transparent animationType="slide" onRequestClose={() => !updateMutation.isPending && setLocationEditorOpen(false)}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => !updateMutation.isPending && setLocationEditorOpen(false)} />
+          <View style={[styles.sheet, isDark && { backgroundColor: theme.surface }]}>
+            <View style={styles.sheetGrip} />
+            <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Pays et ville</Text>
+            <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>Ces informations aident à mieux estimer vos livraisons.</Text>
+            <Text style={styles.fieldLabel}>PAYS</Text>
+            <View style={styles.countryOptions}>
+              {(countriesQuery.data ?? []).map((c) => (
+                <Pressable key={c.id} onPress={() => setCountryDraft(c.id)} style={({ pressed }) => [styles.countryOption, { borderColor: theme.border }, countryDraft === c.id && { borderColor: theme.primary, backgroundColor: isDark ? theme.pressed : "#E5F6F7" }, pressed && { opacity: 0.8 }]}>
+                  <Text style={[styles.countryOptionText, { color: theme.foreground }, countryDraft === c.id && { color: theme.primary, fontWeight: "800" }]}>{c.name}</Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.fieldLabel}>VILLE</Text>
+            <TextInput
+              value={cityDraft}
+              onChangeText={setCityDraft}
+              maxLength={80}
+              placeholder="Ex. Ouagadougou"
+              placeholderTextColor={theme.muted}
+              style={[styles.input, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.background }]}
+            />
+            {locationError ? <Text style={styles.error}>{locationError}</Text> : null}
+            <TikisButton label="Enregistrer" icon="save" onPress={() => void saveLocation()} loading={updateMutation.isPending} style={styles.saveButton} />
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={deleteConfirmOpen} transparent animationType="fade" onRequestClose={() => !requestDeletionMutation.isPending && setDeleteConfirmOpen(false)}>
         <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => !requestDeletionMutation.isPending && setDeleteConfirmOpen(false)} />
+          <View style={[styles.sheet, isDark && { backgroundColor: theme.surface }]}>
+            <View style={styles.sheetGrip} />
+            <View style={styles.deleteIconWrap}><MaterialIcons name="delete-forever" size={26} color="#B4232D" /></View>
+            <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Supprimer votre compte ?</Text>
+            <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>
+              Vous aurez 30 jours pour changer d’avis. Pendant ce délai, votre compte sera bloqué et vous pourrez annuler la suppression à tout moment. Passé ce délai, vos données personnelles seront définitivement supprimées.
+            </Text>
+            {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
+            <TikisButton label="Confirmer la suppression" icon="delete-forever" variant="danger" onPress={() => void confirmAccountDeletion()} loading={requestDeletionMutation.isPending} style={styles.saveButton} />
+            <Pressable onPress={() => setDeleteConfirmOpen(false)} disabled={requestDeletionMutation.isPending} style={({ pressed }) => [styles.photoPicker, pressed && styles.pressed]}>
+              <Text style={[styles.photoPickerText, { color: theme.muted }]}>Annuler</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={editorOpen} transparent animationType="slide" onRequestClose={() => setEditorOpen(false)}>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === "ios" ? "padding" : "height"}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setEditorOpen(false)} />
           <View style={[styles.sheet, isDark && { backgroundColor: theme.surface }]}>
             <View style={styles.sheetGrip} />
@@ -386,7 +501,7 @@ export default function ProfileScreen() {
             {error ? <Text style={styles.error}>{error}</Text> : <Text style={[styles.helper, isDark && { color: theme.muted }]}>Un nom unique est accepté. Les séparateurs successifs sont retirés automatiquement.</Text>}
             <TikisButton label="Enregistrer les modifications" icon="save" onPress={() => void saveProfile()} loading={updateMutation.isPending} style={styles.saveButton} />
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -515,6 +630,10 @@ const styles = StyleSheet.create({
 
   fieldLabel: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
   input: { backgroundColor: "#F7EFE5", borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 12, paddingVertical: 12, color: "#9A6201", fontSize: 13, fontWeight: "500" },
+  countryOptions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  countryOption: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, borderWidth: 1 },
+  countryOptionText: { fontSize: 13, fontWeight: "600" },
+  deleteIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: "#FDECEA", alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 4 },
   inputError: { borderWidth: 1, borderColor: "#B4232D" },
   helper: { color: "#747474", fontSize: 10, marginTop: 4 },
   error: { color: "#B4232D", fontSize: 11, fontWeight: "600", marginTop: 4 },

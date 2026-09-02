@@ -29,6 +29,14 @@ export const tikisProfiles = mysqlTable("tikis_profiles", {
   emailVerified: boolean("emailVerified").notNull().default(false),
   referralCode: varchar("referralCode", { length: 8 }).unique(),
   supabaseUserId: varchar("supabaseUserId", { length: 64 }).unique(),
+  status: mysqlEnum("status", ["active", "suspended", "banned"]).notNull().default("active"),
+  statusReason: varchar("statusReason", { length: 500 }),
+  statusUpdatedAt: timestamp("statusUpdatedAt"),
+  statusUpdatedByAdminId: int("statusUpdatedByAdminId"),
+  country: varchar("country", { length: 2 }),
+  city: varchar("city", { length: 80 }),
+  deletionRequestedAt: timestamp("deletionRequestedAt"),
+  deletedAt: timestamp("deletedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -157,6 +165,13 @@ export const tikisWallets = mysqlTable("tikis_wallets", {
 export const tikisPlatformSettings = mysqlTable("tikis_platform_settings", {
   id: int("id").primaryKey(),
   commissionRate: decimal("commissionRate", { precision: 6, scale: 5 }).notNull().default("0.10000"),
+  referralRewardAmount: int("referralRewardAmount").notNull().default(1000),
+  referralEnabled: boolean("referralEnabled").notNull().default(true),
+  minWithdrawal: int("minWithdrawal").notNull().default(500),
+  maxWithdrawal: int("maxWithdrawal").notNull().default(500000),
+  pricingConfig: text("pricingConfig"),
+  maintenanceEnabled: boolean("maintenanceEnabled").notNull().default(false),
+  maintenanceMessage: varchar("maintenanceMessage", { length: 500 }),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
@@ -165,7 +180,7 @@ export const tikisWalletLedger = mysqlTable("tikis_wallet_ledger", {
   id: varchar("id", { length: 40 }).primaryKey(),
   profilePhone: varchar("profilePhone", { length: 20 }).notNull(),
   deliveryId: varchar("deliveryId", { length: 40 }),
-  operation: mysqlEnum("operation", ["block", "unblock", "debit", "compensation", "credit", "refund", "deposit_request", "withdrawal_request"]).notNull(),
+  operation: mysqlEnum("operation", ["block", "unblock", "debit", "compensation", "credit", "refund", "deposit_request", "withdrawal_request", "bonus", "penalty"]).notNull(),
   amount: int("amount").notNull(),
   availableBefore: int("availableBefore").notNull(),
   availableAfter: int("availableAfter").notNull(),
@@ -272,6 +287,38 @@ export type TikisAdminAuditLog = typeof tikisAdminAuditLog.$inferSelect;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+/** Parrainage : un enregistrement par filleul, créé à l'inscription si un code de parrain est fourni. */
+export const tikisReferrals = mysqlTable("tikis_referrals", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  referrerPhone: varchar("referrerPhone", { length: 20 }).notNull(),
+  refereePhone: varchar("refereePhone", { length: 20 }).notNull().unique(),
+  referralCode: varchar("referralCode", { length: 8 }).notNull(),
+  status: mysqlEnum("status", ["invited", "qualified", "rewarded", "voided"]).notNull().default("invited"),
+  rewardAmount: int("rewardAmount").notNull(),
+  qualifyingDeliveryId: varchar("qualifyingDeliveryId", { length: 40 }),
+  qualifiedAt: timestamp("qualifiedAt"),
+  rewardedAt: timestamp("rewardedAt"),
+  rewardedByAdminId: int("rewardedByAdminId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("tikis_referrals_referrer_index").on(table.referrerPhone, table.createdAt),
+  index("tikis_referrals_status_index").on(table.status),
+]);
+
+/** Pays actifs sur la plateforme (inscription, format de téléphone, filtrage géographique). */
+export const tikisSupportedCountries = mysqlTable("tikis_supported_countries", {
+  id: varchar("id", { length: 2 }).primaryKey(), // code ISO, ex. "BF"
+  name: varchar("name", { length: 80 }).notNull(),
+  dialCode: varchar("dialCode", { length: 6 }).notNull(),
+  digits: int("digits").notNull(),
+  groups: varchar("groups", { length: 40 }).notNull(), // ex. "2,2,2,2"
+  timeZones: varchar("timeZones", { length: 200 }).notNull(), // séparés par virgule
+  enabled: boolean("enabled").notNull().default(true),
+  sortOrder: int("sortOrder").notNull().default(0),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
 export type TikisProfile = typeof tikisProfiles.$inferSelect;
 export type InsertTikisProfile = typeof tikisProfiles.$inferInsert;
 export type TikisPlace = typeof tikisPlaces.$inferSelect;
@@ -287,3 +334,5 @@ export type TikisPlatformSettings = typeof tikisPlatformSettings.$inferSelect;
 export type TikisWalletLedger = typeof tikisWalletLedger.$inferSelect;
 export type TikisPaymentTransaction = typeof tikisPaymentTransactions.$inferSelect;
 export type TikisDeliveryEvent = typeof tikisDeliveryEvents.$inferSelect;
+export type TikisReferral = typeof tikisReferrals.$inferSelect;
+export type TikisSupportedCountry = typeof tikisSupportedCountries.$inferSelect;

@@ -17,7 +17,7 @@ type Store = {
   profile: RegisteredProfile | null;
   signInProfile: (profile: RegisteredProfile) => void;
   registerProfile: (profile: RegisteredProfile) => void;
-  updateProfile: (changes: Partial<Pick<RegisteredProfile, "fullName" | "photoUrl">>) => void;
+  updateProfile: (changes: Partial<Pick<RegisteredProfile, "fullName" | "photoUrl" | "country" | "city" | "deletionRequestedAt" | "deletionScheduledAt">>) => void;
   logout: () => void;
   wallet: WalletSnapshot;
   journal: FinancialRecord[];
@@ -62,7 +62,7 @@ export function TikisStoreProvider({ children }: { children: React.ReactNode }) 
     setNotifications((items) => [makeNotification("Bienvenue sur Tikis", `Votre compte ${nextProfile.role === "sender" ? "expéditeur" : "livreur"} a été créé avec succès.`, "success"), ...items]);
   };
 
-  const updateProfile = (changes: Partial<Pick<RegisteredProfile, "fullName" | "photoUrl">>) => {
+  const updateProfile = (changes: Partial<Pick<RegisteredProfile, "fullName" | "photoUrl" | "country" | "city" | "deletionRequestedAt" | "deletionScheduledAt">>) => {
     setProfile((current) => current ? { ...current, ...changes } : current);
   };
 

@@ -42,8 +42,8 @@ export default function DashboardPage(_props: { search?: string }) {
     let cancelled = false;
     setError("");
     Promise.all([
-      trpc.adminConsole.core.dashboard.metrics.query({ periodDays: period }),
-      trpc.adminConsole.core.reports.list.query({ status: "open" }).catch(() => []),
+      trpc.adminConsole.dashboard.metrics.query({ periodDays: period }),
+      trpc.adminConsole.reports.list.query({ status: "open" }).catch(() => []),
     ])
       .then(([data, list]) => {
         if (cancelled) return;

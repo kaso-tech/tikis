@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, count, desc, eq, gte, like, lte, or, sql } from "drizzle-orm";
 import { getDb } from "./db";
+import * as db from "./db";
 import {
   tikisAdminAuditLog,
   tikisAdminUsers,
@@ -8,8 +9,11 @@ import {
   tikisDeliveryCandidates,
   tikisDeliveryEvents,
   tikisDeliveryReports,
+  tikisPaymentTransactions,
   tikisPlatformSettings,
   tikisProfiles,
+  tikisReferrals,
+  tikisSupportedCountries,
   tikisWalletLedger,
   tikisWallets,
   type TikisAdminUser,
@@ -249,4 +253,277 @@ export async function adminDashboardMetrics(sinceDays = 30) {
     timeseries,
     vehicleBreakdown,
   };
+}
+
+// ————————————————————————————————————————————————————————————————————————
+// Gestion complète des utilisateurs : rôle, statut (suspension/bannissement/interdiction)
+// ————————————————————————————————————————————————————————————————————————
+
+export type ProfileStatus = "active" | "suspended" | "banned";
+
+export async function adminSetProfileStatus(input: { phone: string; status: ProfileStatus; reason?: string; adminId: number }) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  const profile = (await dbc.select().from(tikisProfiles).where(eq(tikisProfiles.phone, input.phone)).limit(1))[0];
+  if (!profile) throw new Error("Profil introuvable.");
+  await dbc.update(tikisProfiles).set({
+    status: input.status,
+    statusReason: input.status === "active" ? null : (input.reason?.trim() || null),
+    statusUpdatedAt: new Date(),
+    statusUpdatedByAdminId: input.adminId,
+  }).where(eq(tikisProfiles.phone, input.phone));
+  return { phone: input.phone, status: input.status };
+}
+
+/** Le rôle (sender/driver) est normalement immuable côté app ; ce changement est réservé aux super-admins
+ *  pour corriger une erreur d'inscription ou une demande explicite de l'utilisateur. */
+export async function adminChangeProfileRole(input: { phone: string; role: "sender" | "driver" }) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  const profile = (await dbc.select().from(tikisProfiles).where(eq(tikisProfiles.phone, input.phone)).limit(1))[0];
+  if (!profile) throw new Error("Profil introuvable.");
+  const activeDeliveries = await dbc.select({ count: count() }).from(tikisDeliveries).where(and(
+    or(eq(tikisDeliveries.senderPhone, input.phone), eq(tikisDeliveries.driverPhone, input.phone)),
+    or(eq(tikisDeliveries.status, "active"), eq(tikisDeliveries.status, "pending_confirmation")),
+  ));
+  if (Number(activeDeliveries[0]?.count ?? 0) > 0) throw new Error("Impossible de changer le rôle : ce profil a une livraison en cours.");
+  await dbc.update(tikisProfiles).set({ accountType: input.role, vehicles: input.role === "sender" ? "[]" : profile.vehicles }).where(eq(tikisProfiles.phone, input.phone));
+  return { phone: input.phone, role: input.role };
+}
+
+export async function adminRewardWallet(input: { phone: string; amount: number; reason: string; adminId: number }) {
+  if (!Number.isSafeInteger(input.amount) || input.amount <= 0 || input.amount > 1_000_000) throw new Error("Montant de récompense invalide.");
+  return db.adminAdjustWallet({ profilePhone: input.phone, amount: input.amount, direction: "credit", operation: "bonus", reason: input.reason || "Bonus accordé par l’administration", adminId: input.adminId });
+}
+
+export async function adminPenalizeWallet(input: { phone: string; amount: number; reason: string; adminId: number }) {
+  if (!Number.isSafeInteger(input.amount) || input.amount <= 0 || input.amount > 1_000_000) throw new Error("Montant de pénalité invalide.");
+  return db.adminAdjustWallet({ profilePhone: input.phone, amount: input.amount, direction: "debit", operation: "penalty", reason: input.reason || "Pénalité appliquée par l’administration", adminId: input.adminId });
+}
+
+// ————————————————————————————————————————————————————————————————————————
+// Gestion complète des livraisons
+// ————————————————————————————————————————————————————————————————————————
+
+export async function adminListDeliveries(input: { query?: string; status?: string; role?: "sender" | "driver"; from?: Date; to?: Date; limit?: number }) {
+  const dbc = await getDb();
+  if (!dbc) return [];
+  const conditions = [
+    input.query ? or(eq(tikisDeliveries.id, input.query), like(tikisDeliveries.senderPhone, `%${input.query}%`), like(tikisDeliveries.driverPhone, `%${input.query}%`), like(tikisDeliveries.title, `%${input.query}%`)) : undefined,
+    input.status ? eq(tikisDeliveries.status, input.status as TikisDelivery["status"]) : undefined,
+    input.from ? gte(tikisDeliveries.createdAt, input.from) : undefined,
+    input.to ? lte(tikisDeliveries.createdAt, input.to) : undefined,
+  ].filter((value): value is NonNullable<typeof value> => Boolean(value));
+  return dbc.select().from(tikisDeliveries).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(tikisDeliveries.createdAt)).limit(Math.min(input.limit ?? 50, 200));
+}
+
+/** Annulation forcée par l'administration : libère toute commission bloquée/prélevée, quel que soit
+ *  le statut (y compris active/pending_confirmation), contrairement à l'annulation Sender classique
+ *  qui est bloquée après mise en relation (CAS N°6). Réservé aux litiges tranchés par un admin. */
+export async function adminForceCancelDelivery(input: { deliveryId: string; reason: string; adminId: number }) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  return dbc.transaction(async (tx) => {
+    const delivery = (await tx.select().from(tikisDeliveries).where(eq(tikisDeliveries.id, input.deliveryId)).limit(1).for("update"))[0];
+    if (!delivery) throw new Error("Livraison introuvable.");
+    if (delivery.status === "completed" || delivery.status === "cancelled" || delivery.status === "expired") throw new Error("Cette livraison est déjà clôturée.");
+    // Libère la commission de tout candidat encore engagé (selected/confirmed/applied).
+    const candidates = await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, input.deliveryId), or(eq(tikisDeliveryCandidates.status, "applied"), eq(tikisDeliveryCandidates.status, "selected"), eq(tikisDeliveryCandidates.status, "confirmed"))));
+    for (const candidate of candidates) {
+      if (candidate.commissionBlocked > 0) {
+        await db.adminAdjustWallet({ profilePhone: candidate.driverPhone, amount: candidate.commissionBlocked, direction: "credit", operation: "credit", reason: `Annulation administrative de la livraison ${input.deliveryId} : commission libérée`, adminId: input.adminId });
+      }
+      await tx.update(tikisDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, candidate.id));
+    }
+    await tx.update(tikisDeliveries).set({ status: "cancelled", updatedAt: new Date() }).where(eq(tikisDeliveries.id, input.deliveryId));
+    await tx.insert(tikisDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.senderPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikis.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel:${randomUUID()}` });
+    if (delivery.driverPhone) {
+      await tx.insert(tikisDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.driverPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikis.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel-driver:${randomUUID()}` });
+    }
+    return { id: input.deliveryId, status: "cancelled" as const };
+  });
+}
+
+// ————————————————————————————————————————————————————————————————————————
+// Parrainage
+// ————————————————————————————————————————————————————————————————————————
+
+export async function adminListReferrals(input: { status?: "invited" | "qualified" | "rewarded" | "voided"; limit?: number }) {
+  const dbc = await getDb();
+  if (!dbc) return [];
+  const base = dbc.select().from(tikisReferrals);
+  const filtered = input.status ? base.where(eq(tikisReferrals.status, input.status)) : base;
+  return filtered.orderBy(desc(tikisReferrals.createdAt)).limit(Math.min(input.limit ?? 100, 500));
+}
+
+export async function adminRewardReferral(input: { referralId: string; adminId: number }) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  return dbc.transaction(async (tx) => {
+    const referral = (await tx.select().from(tikisReferrals).where(eq(tikisReferrals.id, input.referralId)).limit(1).for("update"))[0];
+    if (!referral) throw new Error("Parrainage introuvable.");
+    if (referral.status !== "qualified") throw new Error("Ce parrainage n’est pas (ou plus) éligible à une récompense.");
+    await tx.update(tikisReferrals).set({ status: "rewarded", rewardedAt: new Date(), rewardedByAdminId: input.adminId }).where(eq(tikisReferrals.id, referral.id));
+    return referral;
+  }).then(async (referral) => {
+    await db.adminAdjustWallet({ profilePhone: referral.referrerPhone, amount: referral.rewardAmount, direction: "credit", operation: "bonus", reason: `Récompense de parrainage — filleul ${referral.refereePhone}`, adminId: input.adminId });
+    return { referralId: referral.id, status: "rewarded" as const };
+  });
+}
+
+export async function adminGetReferralSettings() {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  await dbc.insert(tikisPlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  const settings = (await dbc.select().from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
+  return { rewardAmount: settings?.referralRewardAmount ?? 1000, enabled: settings?.referralEnabled ?? true };
+}
+
+export async function adminUpdateReferralSettings(input: { rewardAmount: number; enabled: boolean }) {
+  if (!Number.isSafeInteger(input.rewardAmount) || input.rewardAmount < 0 || input.rewardAmount > 100_000) throw new Error("Montant de récompense invalide.");
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  await dbc.insert(tikisPlatformSettings).values({ id: 1, referralRewardAmount: input.rewardAmount, referralEnabled: input.enabled }).onDuplicateKeyUpdate({ set: { referralRewardAmount: input.rewardAmount, referralEnabled: input.enabled } });
+  return input;
+}
+
+// ————————————————————————————————————————————————————————————————————————
+// Gestion financière complète
+// ————————————————————————————————————————————————————————————————————————
+
+export async function adminGetFinanceSettings() {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  await dbc.insert(tikisPlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  const settings = (await dbc.select().from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
+  return {
+    commissionRate: Number(settings?.commissionRate ?? "0.1"),
+    minWithdrawal: settings?.minWithdrawal ?? 500,
+    maxWithdrawal: settings?.maxWithdrawal ?? 500000,
+  };
+}
+
+export async function adminUpdateFinanceSettings(input: { minWithdrawal: number; maxWithdrawal: number }) {
+  if (!Number.isSafeInteger(input.minWithdrawal) || input.minWithdrawal < 0) throw new Error("Montant minimum de retrait invalide.");
+  if (!Number.isSafeInteger(input.maxWithdrawal) || input.maxWithdrawal <= input.minWithdrawal) throw new Error("Le montant maximum doit être supérieur au minimum.");
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  await dbc.insert(tikisPlatformSettings).values({ id: 1, minWithdrawal: input.minWithdrawal, maxWithdrawal: input.maxWithdrawal }).onDuplicateKeyUpdate({ set: { minWithdrawal: input.minWithdrawal, maxWithdrawal: input.maxWithdrawal } });
+  return input;
+}
+
+export async function adminListPaymentTransactions(input: { type?: "deposit" | "withdrawal"; status?: "pending" | "succeeded" | "failed" | "cancelled"; limit?: number }) {
+  const dbc = await getDb();
+  if (!dbc) return [];
+  const conditions = [
+    input.type ? eq(tikisPaymentTransactions.type, input.type) : undefined,
+    input.status ? eq(tikisPaymentTransactions.status, input.status) : undefined,
+  ].filter((value): value is NonNullable<typeof value> => Boolean(value));
+  return dbc.select().from(tikisPaymentTransactions).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(tikisPaymentTransactions.createdAt)).limit(Math.min(input.limit ?? 100, 500));
+}
+
+// ————————————————————————————————————————————————————————————————————————
+// Estimation intelligente des prix (paramètres par type d'engin)
+// ————————————————————————————————————————————————————————————————————————
+
+export type PricingConfig = {
+  vehicles: Record<string, { minimum: number; perKm: number }>;
+  typeAdjustment: { plis: number; personnePerPassenger: number };
+};
+
+const DEFAULT_PRICING_CONFIG: PricingConfig = {
+  vehicles: {
+    "Vélo": { minimum: 500, perKm: 115 },
+    "Moto": { minimum: 750, perKm: 165 },
+    "Tricycle": { minimum: 1100, perKm: 220 },
+    "Voiture": { minimum: 1600, perKm: 290 },
+  },
+  typeAdjustment: { plis: 180, personnePerPassenger: 240 },
+};
+
+export async function adminGetPricingConfig(): Promise<PricingConfig> {
+  const dbc = await getDb();
+  if (!dbc) return DEFAULT_PRICING_CONFIG;
+  await dbc.insert(tikisPlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  const settings = (await dbc.select().from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
+  if (!settings?.pricingConfig) return DEFAULT_PRICING_CONFIG;
+  try {
+    const parsed = JSON.parse(settings.pricingConfig) as Partial<PricingConfig>;
+    return { vehicles: { ...DEFAULT_PRICING_CONFIG.vehicles, ...parsed.vehicles }, typeAdjustment: { ...DEFAULT_PRICING_CONFIG.typeAdjustment, ...parsed.typeAdjustment } };
+  } catch {
+    return DEFAULT_PRICING_CONFIG;
+  }
+}
+
+export async function adminUpdatePricingConfig(config: PricingConfig) {
+  for (const [vehicle, rate] of Object.entries(config.vehicles)) {
+    if (!Number.isFinite(rate.minimum) || rate.minimum < 0 || rate.minimum > 100_000) throw new Error(`Tarif minimum invalide pour ${vehicle}.`);
+    if (!Number.isFinite(rate.perKm) || rate.perKm < 0 || rate.perKm > 10_000) throw new Error(`Tarif au kilomètre invalide pour ${vehicle}.`);
+  }
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  const serialized = JSON.stringify(config);
+  await dbc.insert(tikisPlatformSettings).values({ id: 1, pricingConfig: serialized }).onDuplicateKeyUpdate({ set: { pricingConfig: serialized } });
+  return config;
+}
+
+// ————————————————————————————————————————————————————————————————————————
+// Réglage des pays
+// ————————————————————————————————————————————————————————————————————————
+
+export async function adminListCountries() {
+  const dbc = await getDb();
+  if (!dbc) return [];
+  const rows = await dbc.select().from(tikisSupportedCountries);
+  return rows.sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+export async function adminUpsertCountry(input: { id: string; name: string; dialCode: string; digits: number; groups: number[]; timeZones: string[]; enabled: boolean; sortOrder: number }) {
+  if (!/^[A-Z]{2}$/.test(input.id)) throw new Error("Le code pays doit être un code ISO à 2 lettres (ex. BF).");
+  if (!/^\+\d{1,4}$/.test(input.dialCode)) throw new Error("Indicatif téléphonique invalide (ex. +226).");
+  if (!Number.isInteger(input.digits) || input.digits < 4 || input.digits > 15) throw new Error("Nombre de chiffres invalide.");
+  if (input.groups.reduce((a, b) => a + b, 0) !== input.digits) throw new Error("La somme des groupes d’affichage doit être égale au nombre de chiffres.");
+  if (input.timeZones.length === 0) throw new Error("Au moins un fuseau horaire est requis.");
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  const values = {
+    id: input.id, name: input.name.trim(), dialCode: input.dialCode, digits: input.digits,
+    groups: input.groups.join(","), timeZones: input.timeZones.join(","), enabled: input.enabled, sortOrder: input.sortOrder,
+  };
+  await dbc.insert(tikisSupportedCountries).values(values).onDuplicateKeyUpdate({ set: values });
+  return values;
+}
+
+export async function adminSetCountryEnabled(id: string, enabled: boolean) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  const country = (await dbc.select().from(tikisSupportedCountries).where(eq(tikisSupportedCountries.id, id)).limit(1))[0];
+  if (!country) throw new Error("Pays introuvable.");
+  if (!enabled) {
+    const remainingEnabled = await dbc.select({ count: count() }).from(tikisSupportedCountries).where(and(eq(tikisSupportedCountries.enabled, true), sql`${tikisSupportedCountries.id} != ${id}`));
+    if (Number(remainingEnabled[0]?.count ?? 0) === 0) throw new Error("Impossible de désactiver le dernier pays actif.");
+  }
+  await dbc.update(tikisSupportedCountries).set({ enabled }).where(eq(tikisSupportedCountries.id, id));
+  return { id, enabled };
+}
+
+// ————————————————————————————————————————————————————————————————————————
+// Mode maintenance
+// ————————————————————————————————————————————————————————————————————————
+
+export async function adminSetMaintenance(input: { enabled: boolean; message?: string }) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  await dbc.insert(tikisPlatformSettings).values({ id: 1, maintenanceEnabled: input.enabled, maintenanceMessage: input.message?.trim() || null }).onDuplicateKeyUpdate({ set: { maintenanceEnabled: input.enabled, maintenanceMessage: input.message?.trim() || null } });
+  return { enabled: input.enabled, message: input.message?.trim() || undefined };
+}
+
+// ————————————————————————————————————————————————————————————————————————
+// Suppression de compte — vue administrateur
+// ————————————————————————————————————————————————————————————————————————
+
+export async function adminListPendingDeletions() {
+  const dbc = await getDb();
+  if (!dbc) return [];
+  return dbc.select({ phone: tikisProfiles.phone, fullName: tikisProfiles.fullName, accountType: tikisProfiles.accountType, deletionRequestedAt: tikisProfiles.deletionRequestedAt }).from(tikisProfiles).where(sql`${tikisProfiles.deletionRequestedAt} is not null and ${tikisProfiles.deletedAt} is null`).orderBy(desc(tikisProfiles.deletionRequestedAt));
 }

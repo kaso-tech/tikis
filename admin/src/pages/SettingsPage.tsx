@@ -11,7 +11,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    trpc.adminConsole.core.commission.get.query()
+    trpc.adminConsole.commission.get.query()
       .then((r: number) => setRate((r * 100).toString()))
       .catch(() => {});
   }, []);
@@ -22,7 +22,7 @@ export default function SettingsPage() {
     if (!Number.isFinite(percent) || percent <= 0 || percent >= 90) { setError("Indiquez un pourcentage valide, entre 0 et 90."); return; }
     setSaving(true);
     try {
-      await trpc.adminConsole.core.commission.update.mutate({ rate: percent / 100 });
+      await trpc.adminConsole.commission.update.mutate({ rate: percent / 100 });
       setSuccess("Taux enregistré.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "La mise à jour a échoué.");

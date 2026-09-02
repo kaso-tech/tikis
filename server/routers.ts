@@ -7,7 +7,7 @@ import { storagePut } from "./storage";
 import * as geography from "./geography";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router, tikisProtectedProcedure } from "./_core/trpc";
+import { publicProcedure, router, tikisProtectedProcedure, tikisSessionProcedure } from "./_core/trpc";
 import { findCountryForPhone } from "../lib/registration-rules";
 import { createTikisProfileSession } from "./tikis-session";
 import { recordGeographicMetric } from "./geography-observability";
@@ -18,6 +18,7 @@ import * as adminDb from "./admin-db";
 
 const reportReasonSchema = z.enum(["comportement", "sécurité", "paiement", "objet_endommagé", "retard", "autre"]);
 const reportDescriptionSchema = z.string().trim().min(10, "Décrivez le problème en quelques mots (10 caractères minimum).").max(1000);
+const DELETION_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 
 const phoneSchema = z.string().regex(/^\+[1-9]\d{7,14}$/, "Numéro de téléphone international invalide.");
 const simulationOtpSchema = z.literal("730512", { error: "Code OTP de simulation invalide." });
@@ -32,6 +33,7 @@ const profileFieldsSchema = z.object({
   countryCode: countryCodeSchema,
   role: z.enum(["sender", "driver"]),
   vehicles: z.array(vehicleSchema).max(5),
+  referredByCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{4,8}$/).optional(),
 });
 
 function validateProfileRole(value: z.infer<typeof profileFieldsSchema>, ctx: z.RefinementCtx) {
@@ -60,13 +62,28 @@ async function verifySupabasePhoneSession(phone: string, accessToken: string) {
   } finally { clearTimeout(timeout); }
 }
 
-function toPublicProfile(profile: { phone: string; fullName: string; accountType: "sender" | "driver"; vehicles: string; photoKey?: string | null; email?: string | null; phoneVerified?: boolean; emailVerified?: boolean; referralCode?: string | null }) {
+/** Seul un compte définitivement supprimé bloque la connexion elle-même : un compte banni/suspendu
+ *  doit pouvoir se connecter pour voir l'écran dédié qui lui explique sa situation (voir tikisProtectedProcedure
+ *  qui bloque ensuite toutes les autres actions). */
+function assertProfileNotBlocked(profile: { deletedAt: Date | null }) {
+  if (profile.deletedAt) throw new Error("Ce compte a été supprimé.");
+}
+
+async function assertCountryEnabled(countryCode: string) {
+  const countries = await db.listSupportedCountries();
+  if (!countries.some((country) => country.id === countryCode)) {
+    throw new Error("L’inscription n’est pas encore disponible pour ce pays. Contactez le support Tikis.");
+  }
+}
+
+function toPublicProfile(profile: { phone: string; fullName: string; accountType: "sender" | "driver"; vehicles: string; photoKey?: string | null; email?: string | null; phoneVerified?: boolean; emailVerified?: boolean; referralCode?: string | null; status?: "active" | "suspended" | "banned"; statusReason?: string | null; country?: string | null; city?: string | null; deletionRequestedAt?: Date | null }) {
   let vehicles: ValidVehicle[] = [];
   try {
     const parsed = JSON.parse(profile.vehicles) as unknown;
     if (Array.isArray(parsed)) vehicles = parsed.filter((item): item is ValidVehicle => vehicleSchema.safeParse(item).success);
   } catch { vehicles = []; }
-  return { phone: profile.phone, fullName: profile.fullName, countryCode: findCountryForPhone(profile.phone).id, role: profile.accountType, vehicles, roleLocked: true as const, photoUrl: profile.photoKey ? `/manus-storage/${profile.photoKey}` : undefined, email: profile.email ?? undefined, phoneVerified: profile.phoneVerified ?? true, emailVerified: profile.emailVerified ?? false, referralCode: profile.accountType === "driver" ? profile.referralCode ?? undefined : undefined };
+  const deletionScheduledAt = profile.deletionRequestedAt ? new Date(profile.deletionRequestedAt.getTime() + DELETION_GRACE_PERIOD_MS) : undefined;
+  return { phone: profile.phone, fullName: profile.fullName, countryCode: findCountryForPhone(profile.phone).id, role: profile.accountType, vehicles, roleLocked: true as const, photoUrl: profile.photoKey ? `/manus-storage/${profile.photoKey}` : undefined, email: profile.email ?? undefined, phoneVerified: profile.phoneVerified ?? true, emailVerified: profile.emailVerified ?? false, referralCode: profile.accountType === "driver" ? profile.referralCode ?? undefined : undefined, country: profile.country ?? undefined, city: profile.city ?? undefined, accountStatus: profile.status ?? "active", accountStatusReason: profile.statusReason ?? undefined, deletionRequestedAt: profile.deletionRequestedAt?.toISOString(), deletionScheduledAt: deletionScheduledAt?.toISOString() };
 }
 
 function sessionCountryCode(profilePhone: string) {
@@ -197,13 +214,12 @@ function deliveryForProfile(delivery: ResolvedDelivery, profile: Awaited<ReturnT
   };
 }
 
-const adminConsoleRouter = router({
-  core: tikisAdminRouter,
-});
-
 export const appRouter = router({
   system: systemRouter,
-  adminConsole: adminConsoleRouter,
+  adminConsole: tikisAdminRouter,
+  platform: router({
+    maintenanceStatus: publicProcedure.query(() => db.getMaintenanceStatus()),
+  }),
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -216,16 +232,19 @@ export const appRouter = router({
     /** Called after local OTP verification in the simulation flow. A production build must verify OTP server-side before this query. */
     lookup: publicProcedure.input(z.object({ phone: phoneSchema, otp: simulationOtpSchema })).mutation(async ({ input }) => {
       const profile = await db.getTikisProfileByPhone(input.phone);
+      if (profile) assertProfileNotBlocked(profile);
       return profile ? { profile: toPublicProfile(profile), sessionToken: await createTikisProfileSession(profile.phone) } : null;
     }),
     lookupSupabase: publicProcedure.input(z.object({ phone: phoneSchema, accessToken: supabaseAccessTokenSchema })).mutation(async ({ input }) => {
       const supabaseUserId = await verifySupabasePhoneSession(input.phone, input.accessToken);
       const profile = await db.getTikisProfileByPhone(input.phone);
       if (!profile) return null;
+      assertProfileNotBlocked(profile);
       const linked = await db.linkTikisProfileToSupabaseUser(profile.phone, supabaseUserId);
       return { profile: toPublicProfile(linked), sessionToken: await createTikisProfileSession(linked.phone) };
     }),
     register: publicProcedure.input(registrationInputSchema).mutation(async ({ input }) => {
+      await assertCountryEnabled(input.countryCode);
       const referralCode = input.role === "driver" ? await generateUniqueReferralCode(input.fullName) : undefined;
       const profile = await db.createTikisProfile({
         phone: input.phone,
@@ -234,17 +253,20 @@ export const appRouter = router({
         vehicles: JSON.stringify(input.role === "driver" ? input.vehicles : []),
         referralCode,
       });
+      await db.createReferralIfCodeProvided(profile.phone, input.referredByCode);
       return { profile: toPublicProfile(profile), sessionToken: await createTikisProfileSession(profile.phone) };
     }),
     registerSupabase: publicProcedure.input(profileFieldsSchema.extend({ accessToken: supabaseAccessTokenSchema }).superRefine(validateProfileRole)).mutation(async ({ input }) => {
+      await assertCountryEnabled(input.countryCode);
       const supabaseUserId = await verifySupabasePhoneSession(input.phone, input.accessToken);
       const referralCode = input.role === "driver" ? await generateUniqueReferralCode(input.fullName) : undefined;
       const profile = await db.createTikisProfile({ phone: input.phone, fullName: input.fullName, accountType: input.role, vehicles: JSON.stringify(input.role === "driver" ? input.vehicles : []), referralCode, supabaseUserId });
       const linked = await db.linkTikisProfileToSupabaseUser(profile.phone, supabaseUserId);
+      await db.createReferralIfCodeProvided(linked.phone, input.referredByCode);
       return { profile: toPublicProfile(linked), sessionToken: await createTikisProfileSession(linked.phone) };
     }),
-    update: publicProcedure.input(z.object({ phone: phoneSchema, otp: simulationOtpSchema, fullName: fullNameSchema.optional(), photoBase64: base64ImageSchema.optional(), photoMime: photoMimeSchema.optional() }).superRefine((value, ctx) => {
-      if (!value.fullName && !value.photoBase64) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Aucune modification à enregistrer." });
+    update: publicProcedure.input(z.object({ phone: phoneSchema, otp: simulationOtpSchema, fullName: fullNameSchema.optional(), photoBase64: base64ImageSchema.optional(), photoMime: photoMimeSchema.optional(), country: z.string().length(2).optional(), city: z.string().trim().min(2).max(80).optional() }).superRefine((value, ctx) => {
+      if (!value.fullName && !value.photoBase64 && !value.country && !value.city) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Aucune modification à enregistrer." });
       if (value.photoBase64 && !value.photoMime) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["photoMime"], message: "Type d’image requis." });
     })).mutation(async ({ input }) => {
       let photoKey: string | null | undefined;
@@ -258,7 +280,8 @@ export const appRouter = router({
       }
       const current = await db.getTikisProfileByPhone(input.phone);
       if (!current) throw new Error("Profil introuvable. Connectez-vous de nouveau pour le créer.");
-      const profile = await db.updateTikisProfile(input.phone, { fullName: input.fullName ?? current.fullName, photoKey: photoKey ?? current.photoKey });
+      if (input.country) await assertCountryEnabled(input.country);
+      const profile = await db.updateTikisProfile(input.phone, { fullName: input.fullName ?? current.fullName, photoKey: photoKey ?? current.photoKey, country: input.country ?? current.country, city: input.city ?? current.city });
       return toPublicProfile(profile);
     }),
     updateVehicles: tikisProtectedProcedure.input(z.object({ vehicles: z.array(vehicleSchema).min(1).max(5) })).mutation(async ({ ctx, input }) => {
@@ -266,6 +289,21 @@ export const appRouter = router({
       if (profile.accountType !== "driver") throw new Error("Seuls les livreurs peuvent gérer leurs engins.");
       const updated = await db.updateTikisProfile(profile.phone, { vehicles: JSON.stringify(input.vehicles) });
       return toPublicProfile(updated);
+    }),
+    /** Accessible même si le compte est banni/suspendu : c'est ce qui permet à l'app de savoir
+     *  quel écran dédié afficher (banni, suppression en cours) sans passer par les routes bloquées. */
+    status: tikisSessionProcedure.query(async ({ ctx }) => {
+      const profile = await db.getTikisProfileByPhone(ctx.tikisProfilePhone);
+      if (!profile) throw new Error("Profil introuvable.");
+      return toPublicProfile(profile);
+    }),
+    requestDeletion: tikisSessionProcedure.mutation(async ({ ctx }) => {
+      const profile = await db.requestProfileDeletion(ctx.tikisProfilePhone);
+      return toPublicProfile(profile);
+    }),
+    cancelDeletion: tikisSessionProcedure.mutation(async ({ ctx }) => {
+      const profile = await db.cancelProfileDeletion(ctx.tikisProfilePhone);
+      return toPublicProfile(profile);
     }),
     requestContactOtp: publicProcedure.input(z.object({
       kind: z.enum(["phone", "email"]),
@@ -305,6 +343,8 @@ export const appRouter = router({
     geocode: protectedGeographyProcedure.input(z.object({ address: z.string().min(3).max(180) })).mutation(async ({ ctx, input }) => geography.geocodeAddress(input.address, sessionCountryCode(ctx.tikisProfilePhone))),
     reverse: protectedGeographyProcedure.input(z.object({ latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180) })).mutation(async ({ ctx, input }) => geography.reverseGeocodeLocation(input.latitude, input.longitude, sessionCountryCode(ctx.tikisProfilePhone))),
     route: protectedGeographyProcedure.input(z.object({ origin: placeSchema, destination: placeSchema })).mutation(async ({ input }) => geography.computeRoute(input.origin, input.destination)),
+    pricingConfig: tikisProtectedProcedure.query(() => adminDb.adminGetPricingConfig()),
+    countries: publicProcedure.query(() => db.listSupportedCountries()),
     savePlace: protectedGeographyProcedure.input(placeSchema).mutation(async ({ input }) => db.saveTikisPlace({ googlePlaceId: input.googlePlaceId, mapboxPlaceId: input.mapboxId, latitude: String(input.latitude), longitude: String(input.longitude), formattedAddress: input.formattedAddress ?? input.name, placeName: input.name, street: input.street, district: input.district, city: input.city, province: input.province, country: input.country, provider: input.mapboxId ? "mapbox" : "manual", source: input.mapboxId ? "retrieve" : "manual", featureType: "unknown", precision: "unknown" })),
     favorites: router({
       list: tikisProtectedProcedure.query(({ ctx }) => db.listFavoritePlaces(ctx.tikisProfilePhone)),

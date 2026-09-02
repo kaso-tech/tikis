@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { trpc } from "../lib/trpc";
 
-type Profile = { phone: string; fullName: string; accountType: "sender" | "driver"; email: string | null; phoneVerified: boolean; emailVerified: boolean };
+type Profile = { phone: string; fullName: string; accountType: "sender" | "driver"; email: string | null; phoneVerified: boolean; emailVerified: boolean; status?: "active" | "suspended" | "banned"; statusReason?: string | null };
 type Detail = {
   profile: Profile;
   wallet: { availableBalance: number; heldBalance: number } | null;
@@ -27,11 +27,17 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [statusReasonDraft, setStatusReasonDraft] = useState("");
+  const [rewardDraft, setRewardDraft] = useState({ amount: "", reason: "" });
+  const [penaltyDraft, setPenaltyDraft] = useState({ amount: "", reason: "" });
+
   async function loadUsers(searchQuery?: string) {
     setError("");
     setLoading(true);
     try {
-      const rows = await trpc.adminConsole.core.users.search.query(searchQuery ? { query: searchQuery } : {});
+      const rows = await trpc.adminConsole.users.search.query(searchQuery ? { query: searchQuery } : {});
       setResults((rows as Profile[]).filter((p) => filter === "all" || p.accountType === filter));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Recherche impossible.");
@@ -46,11 +52,77 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
 
   async function openDetail(phone: string) {
     setError("");
+    setActionError("");
     try {
-      const data = await trpc.adminConsole.core.users.detail.query({ phone });
+      const data = await trpc.adminConsole.users.detail.query({ phone });
       setDetail(data as Detail);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Profil indisponible.");
+    }
+  }
+
+  async function setStatus(status: "active" | "suspended" | "banned") {
+    if (!detail) return;
+    setActionBusy(true);
+    setActionError("");
+    try {
+      await trpc.adminConsole.users.setStatus.mutate({ phone: detail.profile.phone, status, reason: statusReasonDraft.trim() || undefined });
+      setStatusReasonDraft("");
+      await openDetail(detail.profile.phone);
+      await loadUsers(query || undefined);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : "Action impossible.");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function changeRole(role: "sender" | "driver") {
+    if (!detail) return;
+    setActionBusy(true);
+    setActionError("");
+    try {
+      await trpc.adminConsole.users.changeRole.mutate({ phone: detail.profile.phone, role });
+      await openDetail(detail.profile.phone);
+      await loadUsers(query || undefined);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : "Changement de rôle impossible.");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function sendReward() {
+    if (!detail) return;
+    const amount = Number(rewardDraft.amount);
+    if (!Number.isFinite(amount) || amount <= 0) { setActionError("Montant de récompense invalide."); return; }
+    setActionBusy(true);
+    setActionError("");
+    try {
+      await trpc.adminConsole.users.reward.mutate({ phone: detail.profile.phone, amount, reason: rewardDraft.reason.trim() || "Bonus accordé par l’administration" });
+      setRewardDraft({ amount: "", reason: "" });
+      await openDetail(detail.profile.phone);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : "Envoi du bonus impossible.");
+    } finally {
+      setActionBusy(false);
+    }
+  }
+
+  async function sendPenalty() {
+    if (!detail) return;
+    const amount = Number(penaltyDraft.amount);
+    if (!Number.isFinite(amount) || amount <= 0) { setActionError("Montant de pénalité invalide."); return; }
+    setActionBusy(true);
+    setActionError("");
+    try {
+      await trpc.adminConsole.users.penalize.mutate({ phone: detail.profile.phone, amount, reason: penaltyDraft.reason.trim() || "Pénalité appliquée par l’administration" });
+      setPenaltyDraft({ amount: "", reason: "" });
+      await openDetail(detail.profile.phone);
+    } catch (cause) {
+      setActionError(cause instanceof Error ? cause.message : "Application de la pénalité impossible.");
+    } finally {
+      setActionBusy(false);
     }
   }
 
@@ -115,6 +187,8 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
                     <span className={`pill ${profile.accountType === "driver" ? "pill-info" : "pill-primary"}`}>
                       <span className="dot" />{profile.accountType === "sender" ? "Expéditeur" : "Livreur"}
                     </span>
+                    {" "}
+                    {profile.status === "banned" ? <span className="pill pill-error"><span className="dot" />Banni</span> : profile.status === "suspended" ? <span className="pill pill-warning"><span className="dot" />Suspendu</span> : null}
                   </td>
                   <td>{profile.email ?? <span className="muted">—</span>}</td>
                   <td>
@@ -142,6 +216,7 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
                   {detail.profile.accountType === "sender" ? "Expéditeur" : "Livreur"} ·
                   {" "}{detail.deliveriesAsSenderCount} livraison(s) en tant qu’expéditeur ·
                   {" "}{detail.deliveriesAsDriverCount} en tant que livreur
+                  {detail.profile.status && detail.profile.status !== "active" ? <> · <span className={`pill ${detail.profile.status === "banned" ? "pill-error" : "pill-warning"}`}><span className="dot" />{detail.profile.status === "banned" ? "Banni" : "Suspendu"}{detail.profile.statusReason ? ` — ${detail.profile.statusReason}` : ""}</span></> : null}
                 </div>
               </div>
               <div className="row-actions">
@@ -156,6 +231,44 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
                 <div className="kpi"><div className="kpi-label">E-mail</div><div className="kpi-value" style={{ fontSize: 14 }}>{detail.profile.email ?? "—"}</div></div>
               </div>
             ) : <div className="empty-state">Aucun Wallet initialisé.</div>}
+          </div>
+
+          <div className="card">
+            <div className="card-head"><div><div className="card-title">Actions administrateur</div><div className="card-sub">Chaque action est tracée dans le journal d’audit</div></div></div>
+            {actionError ? <div className="banner-error">{actionError}</div> : null}
+            <div className="grid grid-4">
+              <div className="action-block">
+                <div className="action-block-title">Statut du compte</div>
+                <input className="input" placeholder="Motif (optionnel)" value={statusReasonDraft} onChange={(e) => setStatusReasonDraft(e.target.value)} style={{ marginBottom: 8 }} />
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {detail.profile.status !== "active" ? <button className="btn btn-sm" disabled={actionBusy} onClick={() => void setStatus("active")}>Réactiver</button> : null}
+                  {detail.profile.status !== "suspended" ? <button className="btn btn-sm" disabled={actionBusy} onClick={() => void setStatus("suspended")}>Suspendre</button> : null}
+                  {detail.profile.status !== "banned" ? <button className="btn btn-sm btn-danger" disabled={actionBusy} onClick={() => void setStatus("banned")}>Bannir</button> : null}
+                </div>
+              </div>
+
+              <div className="action-block">
+                <div className="action-block-title">Rôle</div>
+                <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 8 }}>Actuel : {detail.profile.accountType === "sender" ? "Expéditeur" : "Livreur"}. Impossible si une livraison est en cours.</div>
+                <button className="btn btn-sm" disabled={actionBusy} onClick={() => void changeRole(detail.profile.accountType === "sender" ? "driver" : "sender")}>
+                  Basculer en {detail.profile.accountType === "sender" ? "Livreur" : "Expéditeur"}
+                </button>
+              </div>
+
+              <div className="action-block">
+                <div className="action-block-title">Bonus / récompense</div>
+                <input className="input" placeholder="Montant FCFA" inputMode="numeric" value={rewardDraft.amount} onChange={(e) => setRewardDraft((s) => ({ ...s, amount: e.target.value.replace(/[^0-9]/g, "") }))} style={{ marginBottom: 6 }} />
+                <input className="input" placeholder="Motif" value={rewardDraft.reason} onChange={(e) => setRewardDraft((s) => ({ ...s, reason: e.target.value }))} style={{ marginBottom: 8 }} />
+                <button className="btn btn-sm btn-primary" disabled={actionBusy} onClick={() => void sendReward()}>Créditer</button>
+              </div>
+
+              <div className="action-block">
+                <div className="action-block-title">Pénalité</div>
+                <input className="input" placeholder="Montant FCFA" inputMode="numeric" value={penaltyDraft.amount} onChange={(e) => setPenaltyDraft((s) => ({ ...s, amount: e.target.value.replace(/[^0-9]/g, "") }))} style={{ marginBottom: 6 }} />
+                <input className="input" placeholder="Motif" value={penaltyDraft.reason} onChange={(e) => setPenaltyDraft((s) => ({ ...s, reason: e.target.value }))} style={{ marginBottom: 8 }} />
+                <button className="btn btn-sm btn-danger" disabled={actionBusy} onClick={() => void sendPenalty()}>Débiter</button>
+              </div>
+            </div>
           </div>
           <div className="card">
             <div className="card-head">

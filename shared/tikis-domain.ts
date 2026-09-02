@@ -14,7 +14,7 @@ export type DeliveryRouteVisibility = "exact" | "approximate";
 
 export type CandidateStatus = "applied" | "selected" | "confirmed" | "withdrawn" | "replaced";
 
-export type WalletOperation = "block" | "unblock" | "debit" | "compensation" | "credit" | "refund" | "deposit_request" | "withdrawal_request";
+export type WalletOperation = "block" | "unblock" | "debit" | "compensation" | "credit" | "refund" | "deposit_request" | "withdrawal_request" | "bonus" | "penalty";
 
 export type VehicleType = "Vélo" | "Moto" | "Tricycle" | "Voiture" | "Fourgonnette";
 export type SelectableVehicleType = Exclude<VehicleType, "Fourgonnette">;
@@ -32,6 +32,12 @@ export interface RegisteredProfile {
   email?: string;
   emailVerified?: boolean;
   phoneVerified?: boolean;
+  country?: string;
+  city?: string;
+  accountStatus?: "active" | "suspended" | "banned";
+  accountStatusReason?: string;
+  deletionRequestedAt?: string;
+  deletionScheduledAt?: string;
 }
 
 export interface DeliveryReview {

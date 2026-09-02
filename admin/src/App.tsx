@@ -5,24 +5,36 @@ import DashboardPage from "./pages/DashboardPage";
 import CommissionPage from "./pages/CommissionPage";
 import ReportsPage from "./pages/ReportsPage";
 import DisputesPage from "./pages/DisputesPage";
+import DeliveriesPage from "./pages/DeliveriesPage";
 import UsersPage from "./pages/UsersPage";
 import KycPage from "./pages/KycPage";
+import ReferralsPage from "./pages/ReferralsPage";
+import FinancePage from "./pages/FinancePage";
+import PricingPage from "./pages/PricingPage";
 import LiveMapPage from "./pages/LiveMapPage";
 import SettingsPage from "./pages/SettingsPage";
 import AdminsPage from "./pages/AdminsPage";
+import CountriesPage from "./pages/CountriesPage";
+import MaintenancePage from "./pages/MaintenancePage";
 import AuditLogPage from "./pages/AuditLogPage";
 
-type PageKey = "dashboard" | "map" | "reports" | "disputes" | "users" | "kyc" | "commission" | "settings" | "admins" | "auditLog";
-type GroupKey = "ops" | "people" | "trust" | "system";
+type PageKey = "dashboard" | "map" | "reports" | "disputes" | "deliveries" | "users" | "kyc" | "referrals" | "finance" | "pricing" | "commission" | "countries" | "maintenance" | "settings" | "admins" | "auditLog";
+type GroupKey = "ops" | "people" | "trust" | "finance" | "system";
 
 const NAV: { key: PageKey; label: string; href: string; icon: string; group: GroupKey; roles?: Array<"super_admin" | "support" | "finance"> }[] = [
   { key: "dashboard", label: "Vue d'ensemble", href: "/admin", icon: "▦", group: "ops" },
   { key: "map", label: "Carte temps réel", href: "/admin/map", icon: "◎", group: "ops" },
+  { key: "deliveries", label: "Livraisons", href: "/admin/deliveries", icon: "▣", group: "ops" },
   { key: "reports", label: "Signalements", href: "/admin/reports", icon: "⚐", group: "ops" },
   { key: "disputes", label: "Litiges", href: "/admin/disputes", icon: "⚖", group: "trust" },
   { key: "users", label: "Utilisateurs", href: "/admin/users", icon: "◉", group: "people" },
   { key: "kyc", label: "Validations KYC", href: "/admin/kyc", icon: "✓", group: "people" },
-  { key: "commission", label: "Commission", href: "/admin/commission", icon: "₣", group: "trust", roles: ["super_admin", "finance"] },
+  { key: "referrals", label: "Parrainage", href: "/admin/referrals", icon: "◈", group: "people" },
+  { key: "finance", label: "Finance", href: "/admin/finance", icon: "$", group: "finance", roles: ["super_admin", "finance"] },
+  { key: "commission", label: "Commission", href: "/admin/commission", icon: "₣", group: "finance", roles: ["super_admin", "finance"] },
+  { key: "pricing", label: "Estimation intelligente", href: "/admin/pricing", icon: "≈", group: "finance", roles: ["super_admin", "finance"] },
+  { key: "countries", label: "Pays", href: "/admin/countries", icon: "◍", group: "system", roles: ["super_admin"] },
+  { key: "maintenance", label: "Maintenance", href: "/admin/maintenance", icon: "⛭", group: "system", roles: ["super_admin"] },
   { key: "settings", label: "Paramètres", href: "/admin/settings", icon: "⚙", group: "system", roles: ["super_admin"] },
   { key: "admins", label: "Équipe admin", href: "/admin/admins", icon: "★", group: "system", roles: ["super_admin"] },
   { key: "auditLog", label: "Journal d'audit", href: "/admin/audit", icon: "▤", group: "system", roles: ["super_admin"] },
@@ -31,10 +43,11 @@ const NAV: { key: PageKey; label: string; href: string; icon: string; group: Gro
 const GROUP_LABELS: Record<GroupKey, string> = {
   ops: "Opérations",
   people: "Personnes",
-  trust: "Confiance & finance",
+  trust: "Confiance",
+  finance: "Finance",
   system: "Système",
 };
-const GROUP_ORDER: GroupKey[] = ["ops", "people", "trust", "system"];
+const GROUP_ORDER: GroupKey[] = ["ops", "people", "trust", "finance", "system"];
 
 function NavIcon({ glyph }: { glyph: string }) {
   return <span className="sidebar-link-icon">{glyph}</span>;
@@ -50,7 +63,7 @@ function Shell() {
   const grouped = visibleNav.reduce<Record<GroupKey, typeof visibleNav>>((acc, item) => {
     (acc[item.group] ??= []).push(item);
     return acc;
-  }, { ops: [], people: [], trust: [], system: [] });
+  }, { ops: [], people: [], trust: [], finance: [], system: [] });
 
   const currentLabel = visibleNav.find((item) => item.key === page)?.label ?? "Console";
   const currentGroup = visibleNav.find((item) => item.key === page)?.group ?? "ops";
@@ -116,11 +129,17 @@ function Shell() {
         <main className="main">
           {page === "dashboard" ? <DashboardPage search={search} /> : null}
           {page === "map" ? <LiveMapPage /> : null}
+          {page === "deliveries" ? <DeliveriesPage /> : null}
           {page === "reports" ? <ReportsPage /> : null}
           {page === "disputes" ? <DisputesPage /> : null}
           {page === "users" ? <UsersPage search={search} /> : null}
           {page === "kyc" ? <KycPage /> : null}
+          {page === "referrals" ? <ReferralsPage /> : null}
+          {page === "finance" ? <FinancePage /> : null}
+          {page === "pricing" ? <PricingPage /> : null}
           {page === "commission" ? <CommissionPage /> : null}
+          {page === "countries" ? <CountriesPage /> : null}
+          {page === "maintenance" ? <MaintenancePage /> : null}
           {page === "settings" ? <SettingsPage /> : null}
           {page === "admins" ? <AdminsPage /> : null}
           {page === "auditLog" ? <AuditLogPage /> : null}

@@ -13,7 +13,7 @@ export default function AdminsPage() {
 
   function load() {
     setError("");
-    trpc.adminConsole.core.admins.list.query()
+    trpc.adminConsole.admins.list.query()
       .then((data: AdminRow[]) => setRows((data as AdminRow[]) ?? []))
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Accès réservé aux super-administrateurs."));
   }
@@ -21,7 +21,7 @@ export default function AdminsPage() {
 
   async function toggle(adminId: number, active: boolean) {
     try {
-      await trpc.adminConsole.core.admins.setActive.mutate({ adminId, active: !active });
+      await trpc.adminConsole.admins.setActive.mutate({ adminId, active: !active });
       load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Action impossible.");

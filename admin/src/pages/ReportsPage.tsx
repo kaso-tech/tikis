@@ -23,7 +23,7 @@ export default function ReportsPage() {
 
   function load() {
     setError("");
-    trpc.adminConsole.core.reports.list.query(statusFilter === "all" ? {} : { status: statusFilter })
+    trpc.adminConsole.reports.list.query(statusFilter === "all" ? {} : { status: statusFilter })
       .then((data) => setRows((data as ReportRow[]) ?? []))
       .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Impossible de charger les signalements."));
   }
@@ -35,7 +35,7 @@ export default function ReportsPage() {
     setBusy(true);
     setError("");
     try {
-      await trpc.adminConsole.core.reports.resolve.mutate({ reportId: selected.report.id, status, resolutionNotes: notes.trim() || undefined });
+      await trpc.adminConsole.reports.resolve.mutate({ reportId: selected.report.id, status, resolutionNotes: notes.trim() || undefined });
       setSelected(null);
       setNotes("");
       load();

@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, count, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, tikisFavoritePlaces, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisWalletLedger, tikisWallets, users } from "../drizzle/schema";
+import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, tikisFavoritePlaces, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppNotification, LocationLabel, SelectableVehicleType, WalletOperation, WalletSnapshot } from "../shared/tikis-domain";
 import { candidateMovementVersion } from "../shared/wallet-commission";
@@ -62,6 +62,8 @@ export type PersistedTikisProfile = {
   emailVerified?: boolean;
   referralCode?: string | null;
   supabaseUserId?: string | null;
+  country?: string | null;
+  city?: string | null;
 };
 
 export async function getTikisProfileByPhone(phone: string) {
@@ -90,7 +92,7 @@ export async function createTikisProfile(input: PersistedTikisProfile) {
   return created;
 }
 
-export async function updateTikisProfile(phone: string, changes: Partial<Pick<PersistedTikisProfile, "fullName" | "photoKey" | "email" | "phoneVerified" | "emailVerified" | "vehicles">>) {
+export async function updateTikisProfile(phone: string, changes: Partial<Pick<PersistedTikisProfile, "fullName" | "photoKey" | "email" | "phoneVerified" | "emailVerified" | "vehicles" | "country" | "city">>) {
   const db = await getDb();
   if (!db) throw new Error("La base de données sécurisée est temporairement indisponible.");
   await db.update(tikisProfiles).set({ ...changes, updatedAt: new Date() }).where(eq(tikisProfiles.phone, phone));
@@ -100,6 +102,58 @@ export async function updateTikisProfile(phone: string, changes: Partial<Pick<Pe
 }
 
 /** Links a profile only after the server has verified the matching Supabase phone session. */
+export const ACCOUNT_DELETION_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Démarre le délai de 30 jours avant suppression définitive. Idempotent : un second appel ne
+ *  réinitialise pas le compteur si une demande est déjà en cours. */
+export async function requestProfileDeletion(phone: string) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La base de données sécurisée est temporairement indisponible.");
+  const profile = await getTikisProfileByPhone(phone);
+  if (!profile) throw new Error("Profil introuvable.");
+  if (!profile.deletionRequestedAt) {
+    await dbc.update(tikisProfiles).set({ deletionRequestedAt: new Date(), updatedAt: new Date() }).where(eq(tikisProfiles.phone, phone));
+  }
+  const updated = await getTikisProfileByPhone(phone);
+  if (!updated) throw new Error("Profil introuvable.");
+  return updated;
+}
+
+export async function cancelProfileDeletion(phone: string) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La base de données sécurisée est temporairement indisponible.");
+  const profile = await getTikisProfileByPhone(phone);
+  if (!profile) throw new Error("Profil introuvable.");
+  if (profile.deletedAt) throw new Error("Ce compte est déjà supprimé définitivement et ne peut plus être restauré ici.");
+  await dbc.update(tikisProfiles).set({ deletionRequestedAt: null, updatedAt: new Date() }).where(eq(tikisProfiles.phone, phone));
+  const updated = await getTikisProfileByPhone(phone);
+  if (!updated) throw new Error("Profil introuvable.");
+  return updated;
+}
+
+/** Vérification paresseuse (même principe que expireOpenTikisDeliveries) : finalise toute
+ *  suppression dont le délai de 30 jours est écoulé. Anonymise les données personnelles plutôt
+ *  que de supprimer la ligne, pour conserver l'intégrité référentielle de l'historique des livraisons. */
+export async function finalizeExpiredAccountDeletions(now = new Date()) {
+  const dbc = await getDb();
+  if (!dbc) return;
+  const threshold = new Date(now.getTime() - ACCOUNT_DELETION_GRACE_PERIOD_MS);
+  const due = await dbc.select({ phone: tikisProfiles.phone }).from(tikisProfiles).where(and(lt(tikisProfiles.deletionRequestedAt, threshold), isNull(tikisProfiles.deletedAt)));
+  for (const row of due) {
+    await dbc.update(tikisProfiles).set({
+      deletedAt: now, fullName: "Compte supprimé", email: null, photoKey: null, updatedAt: now,
+    }).where(eq(tikisProfiles.phone, row.phone));
+  }
+}
+
+export async function getMaintenanceStatus() {
+  const dbc = await getDb();
+  if (!dbc) return { enabled: false, message: undefined as string | undefined };
+  await dbc.insert(tikisPlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  const settings = (await dbc.select().from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
+  return { enabled: settings?.maintenanceEnabled ?? false, message: settings?.maintenanceMessage ?? undefined };
+}
+
 export async function linkTikisProfileToSupabaseUser(phone: string, supabaseUserId: string) {
   const database = await getDb();
   if (!database) throw new Error("La base de données sécurisée est temporairement indisponible.");
@@ -514,6 +568,18 @@ async function appendDeliveryEvent(tx: any, event: DeliveryEventInput) {
   }).onDuplicateKeyUpdate({ set: { idempotencyKey: event.idempotencyKey } });
 }
 
+export async function listSupportedCountries(onlyEnabled = true) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = onlyEnabled
+    ? await db.select().from(tikisSupportedCountries).where(eq(tikisSupportedCountries.enabled, true))
+    : await db.select().from(tikisSupportedCountries);
+  return rows.sort((a, b) => a.sortOrder - b.sortOrder).map((row) => ({
+    id: row.id, name: row.name, flag: row.id, dialCode: row.dialCode, digits: row.digits,
+    groups: row.groups.split(",").map(Number), timeZones: row.timeZones.split(","), enabled: row.enabled,
+  }));
+}
+
 export async function getTikisCommissionRate() {
   const db = await getDb();
   if (!db) throw new Error("La configuration de commission est temporairement indisponible.");
@@ -608,6 +674,54 @@ export async function settleYengaPayTestPayment(input: { profilePhone: string; p
       await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
     } else {
       await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "debit", amount: payment.amount, availableDelta: -payment.amount, heldDelta: 0, reason: "Retrait YengaPay en mode test confirmé", idempotencyKey: `${payment.id}:settled` });
+      await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
+    }
+    const settled = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, payment.id)).limit(1))[0];
+    if (!settled) throw new Error("La transaction n’a pas pu être finalisée.");
+    const wallet = await ensureTikisWallet(tx, payment.profilePhone);
+    return { payment: yengaPayTestPaymentToView(settled), wallet: walletSnapshotFromRecord(wallet) } satisfies YengaPayTestPaymentSettlement;
+  });
+}
+
+/** Crédit/débit manuel décidé par l'administration (récompense, bonus, pénalité, correction). */
+export async function adminAdjustWallet(input: { profilePhone: string; amount: number; direction: "credit" | "debit"; operation: "bonus" | "penalty" | "credit" | "debit"; reason: string; adminId: number }) {
+  const db = await getDb();
+  if (!db) throw new Error("Le Wallet est temporairement indisponible.");
+  const wallet = await db.transaction(async (tx) => {
+    await applyWalletMovement(tx, {
+      profilePhone: input.profilePhone,
+      operation: input.operation,
+      amount: input.amount,
+      availableDelta: input.direction === "credit" ? input.amount : -input.amount,
+      heldDelta: 0,
+      reason: input.reason,
+      idempotencyKey: `admin-adjust:${input.adminId}:${randomUUID()}`,
+    });
+    return walletSnapshotFromRecord(await ensureTikisWallet(tx, input.profilePhone));
+  });
+  return { wallet };
+}
+
+/** Traitement admin d'une demande de dépôt/retrait YengaPay en attente (validation manuelle du provider). */
+export async function adminSettlePaymentTransaction(input: { paymentId: string; outcome: "succeeded" | "failed"; adminId: number; notes?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Le paiement est temporairement indisponible.");
+  return db.transaction(async (tx) => {
+    const payment = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, input.paymentId)).limit(1).for("update"))[0];
+    if (!payment) throw new Error("Transaction introuvable.");
+    if (payment.status !== "pending") {
+      const wallet = await ensureTikisWallet(tx, payment.profilePhone);
+      return { payment: yengaPayTestPaymentToView(payment), wallet: walletSnapshotFromRecord(wallet) } satisfies YengaPayTestPaymentSettlement;
+    }
+    if (input.outcome === "failed") {
+      await tx.update(tikisPaymentTransactions).set({ status: "failed", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
+    } else if (payment.type === "deposit") {
+      await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "credit", amount: payment.amount, availableDelta: payment.amount, heldDelta: 0, reason: "Dépôt validé manuellement par l’administration", idempotencyKey: `${payment.id}:admin-settled` });
+      await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
+    } else {
+      const wallet = await ensureTikisWallet(tx, payment.profilePhone);
+      if (wallet.availableBalance < payment.amount) throw new Error("Le solde disponible de l’utilisateur est désormais insuffisant pour ce retrait.");
+      await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "debit", amount: payment.amount, availableDelta: -payment.amount, heldDelta: 0, reason: "Retrait validé manuellement par l’administration", idempotencyKey: `${payment.id}:admin-settled` });
       await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
     }
     const settled = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, payment.id)).limit(1))[0];
@@ -934,6 +1048,32 @@ export async function confirmTikisDeliveryWithEvents(deliveryId: string, driverP
   return { delivery: await getTikisDeliveryById(deliveryId), wallet };
 }
 
+/** Crée un enregistrement de parrainage « invité » si un code de parrain valide est fourni à l'inscription. */
+export async function createReferralIfCodeProvided(refereePhone: string, referredByCode?: string | null) {
+  if (!referredByCode) return;
+  const db = await getDb();
+  if (!db) return;
+  const referrer = await getTikisProfileByReferralCode(referredByCode);
+  if (!referrer || referrer.phone === refereePhone) return;
+  await db.insert(tikisPlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  const settings = (await db.select().from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
+  if (!settings?.referralEnabled) return;
+  await db.insert(tikisReferrals).values({
+    id: randomUUID(), referrerPhone: referrer.phone, refereePhone, referralCode: referredByCode,
+    status: "invited", rewardAmount: settings.referralRewardAmount,
+  }).onDuplicateKeyUpdate({ set: { refereePhone } }); // no-op update: unique(refereePhone) makes this idempotent
+}
+
+/** Qualifie un parrainage « invité » dès que le filleul termine sa première livraison (comme Sender ou Livreur). */
+async function qualifyReferralIfEligible(tx: any, phone: string | null, deliveryId: string) {
+  if (!phone) return;
+  const referral = (await tx.select().from(tikisReferrals).where(and(eq(tikisReferrals.refereePhone, phone), eq(tikisReferrals.status, "invited"))).limit(1).for("update"))[0];
+  if (!referral) return;
+  const priorCompleted = await tx.select({ count: sql<number>`count(*)` }).from(tikisDeliveries).where(and(or(eq(tikisDeliveries.senderPhone, phone), eq(tikisDeliveries.driverPhone, phone)), eq(tikisDeliveries.status, "completed")));
+  if (Number(priorCompleted[0]?.count ?? 0) > 1) return; // already had a completed delivery before this one
+  await tx.update(tikisReferrals).set({ status: "qualified", qualifiedAt: new Date(), qualifyingDeliveryId: deliveryId }).where(eq(tikisReferrals.id, referral.id));
+}
+
 export async function completeTikisDeliveryWithEvents(deliveryId: string, profilePhone: string) {
   const db = await getDb();
   if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
@@ -954,6 +1094,8 @@ export async function completeTikisDeliveryWithEvents(deliveryId: string, profil
     await tx.update(tikisDeliveries).set({ status: "completed", completedAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_completed", status: "completed", actorPhone: profilePhone, recipientPhone: delivery.senderPhone, title: "Livraison terminée", body: "Votre livraison est terminée. Vous pouvez maintenant évaluer le livreur.", tone: "success", idempotencyKey: `${deliveryId}:completed-sender` });
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_completed", status: "completed", actorPhone: profilePhone, recipientPhone: delivery.driverPhone, title: "Course terminée", body: "La course est ajoutée à votre historique.", tone: "success", idempotencyKey: `${deliveryId}:completed-driver` });
+    await qualifyReferralIfEligible(tx, delivery.driverPhone, deliveryId);
+    await qualifyReferralIfEligible(tx, delivery.senderPhone, deliveryId);
     return walletSnapshotFromRecord(await ensureTikisWallet(tx, delivery.driverPhone));
   });
   return { delivery: await getTikisDeliveryById(deliveryId), wallet };

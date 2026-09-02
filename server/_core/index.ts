@@ -10,7 +10,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { sdk } from "./sdk";
-import { expireOpenTikisDeliveries } from "../db";
+import { expireOpenTikisDeliveries, finalizeExpiredAccountDeletions } from "../db";
 import { publishDeliveryStatusBroadcast } from "../supabase-realtime";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -82,6 +82,19 @@ async function startServer() {
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erreur inconnue";
       console.error("[scheduled:expire-deliveries]", error);
+      return res.status(500).json({ error: message, timestamp: new Date().toISOString() });
+    }
+  });
+
+  app.post("/api/scheduled/finalize-account-deletions", async (req, res) => {
+    try {
+      const user = await sdk.authenticateRequest(req);
+      if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
+      await finalizeExpiredAccountDeletions();
+      return res.json({ ok: true, taskUid: user.taskUid });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Erreur inconnue";
+      console.error("[scheduled:finalize-account-deletions]", error);
       return res.status(500).json({ error: message, timestamp: new Date().toISOString() });
     }
   });

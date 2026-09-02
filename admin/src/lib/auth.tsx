@@ -20,14 +20,14 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const token = getAdminSessionToken();
     if (!token) { setLoading(false); return; }
-    trpc.adminConsole.core.auth.me.query()
+    trpc.adminConsole.auth.me.query()
       .then((identity) => setAdmin(identity as AdminIdentity | null))
       .catch(() => { setAdminSessionToken(null); setAdmin(null); })
       .finally(() => setLoading(false));
   }, []);
 
   async function login(email: string, password: string) {
-    const result = await trpc.adminConsole.core.auth.login.mutate({ email, password });
+    const result = await trpc.adminConsole.auth.login.mutate({ email, password });
     setAdminSessionToken(result.sessionToken);
     setAdmin({ adminId: result.admin.id, email: result.admin.email, role: result.admin.role as AdminRole });
   }

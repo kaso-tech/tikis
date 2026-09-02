@@ -159,19 +159,26 @@ export type EstimationInput = {
   passengers?: number;
 };
 
-const VEHICLE_RATE: Record<SelectableVehicleType, { minimum: number; perKm: number }> = {
+export type PricingRateConfig = {
+  vehicles: Record<string, { minimum: number; perKm: number }>;
+  typeAdjustment: { plis: number; personnePerPassenger: number };
+};
+
+const DEFAULT_VEHICLE_RATE: Record<SelectableVehicleType, { minimum: number; perKm: number }> = {
   "Vélo": { minimum: 500, perKm: 115 },
   "Moto": { minimum: 750, perKm: 165 },
   "Tricycle": { minimum: 1100, perKm: 220 },
   "Voiture": { minimum: 1600, perKm: 290 },
 };
 
-export function estimateDeliveryPrice(input: EstimationInput) {
-  const rate = VEHICLE_RATE[input.vehicle];
+export function estimateDeliveryPrice(input: EstimationInput, config?: PricingRateConfig) {
+  const rate = config?.vehicles[input.vehicle] ?? DEFAULT_VEHICLE_RATE[input.vehicle];
   const distance = Math.max(0, input.distanceKm);
   const routeBase = rate.minimum + Math.ceil(distance * rate.perKm);
   const durationAdjustment = input.durationMinutes ? Math.min(1200, Math.max(0, input.durationMinutes - distance * 2) * 18) : 0;
-  const typeAdjustment = input.type === "Plis" ? 180 : input.type === "Personne" ? Math.max(1, Math.min(4, input.passengers ?? 1)) * 240 : cargoAdjustment(input.weightKg, input.dimensions);
+  const plisAdjustment = config?.typeAdjustment.plis ?? 180;
+  const personnePerPassenger = config?.typeAdjustment.personnePerPassenger ?? 240;
+  const typeAdjustment = input.type === "Plis" ? plisAdjustment : input.type === "Personne" ? Math.max(1, Math.min(4, input.passengers ?? 1)) * personnePerPassenger : cargoAdjustment(input.weightKg, input.dimensions);
   return Math.ceil((routeBase + durationAdjustment + typeAdjustment) / 50) * 50;
 }
 
