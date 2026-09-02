@@ -21,6 +21,8 @@ const operationMeta: Record<WalletOperation, { label: string; icon: React.Compon
   refund: { label: "Remboursement", icon: "replay", tone: "success" },
   deposit_request: { label: "Dépôt en attente", icon: "add-card", tone: "warning" },
   withdrawal_request: { label: "Retrait en attente", icon: "account-balance-wallet", tone: "warning" },
+  bonus: { label: "Bonus", icon: "redeem", tone: "success" },
+  penalty: { label: "Pénalité", icon: "remove-circle-outline", tone: "error" },
 };
 
 const TONE_COLOR: Record<Tone, string> = {
@@ -195,7 +197,7 @@ export default function WalletScreen() {
             {recentJournal.map((entry, idx) => {
               const meta = operationMeta[entry.operation];
               const isLast = idx === recentJournal.length - 1;
-              const isCredit = entry.operation === "credit" || entry.operation === "refund" || entry.operation === "unblock" || entry.operation === "compensation";
+              const isCredit = entry.operation === "credit" || entry.operation === "refund" || entry.operation === "unblock" || entry.operation === "compensation" || entry.operation === "bonus";
               const isPending = entry.operation === "block" || entry.operation === "deposit_request" || entry.operation === "withdrawal_request";
               const amountColor = isCredit ? { color: theme.success } : isPending ? { color: theme.warning } : { color: theme.error };
               const amountPrefix = isCredit ? "+" : isPending ? "" : "-";

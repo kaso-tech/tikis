@@ -30,7 +30,7 @@ describe("accès géographique Tikis", () => {
     process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ suggestions: [] })));
     global.fetch = fetchMock as typeof fetch;
-    const caller = appRouter.createCaller(contextFor("+22670000000"));
+    const caller = appRouter.createCaller(contextFor("+22677777777"));
     await caller.geography.search({ query: "Ouagadougou", countryCode: "FR" });
     expect(new URL(String(fetchMock.mock.calls[0]?.[0])).searchParams.get("country")).toBe("BF");
   });

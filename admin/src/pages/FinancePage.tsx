@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { trpc } from "../lib/trpc";
 import { useAdminAuth } from "../lib/auth";
 
-type Transaction = { id: string; profilePhone: string; type: "deposit" | "withdrawal"; provider: string; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; createdAt: string };
+type Transaction = { id: string; profilePhone: string; type: "deposit" | "withdrawal"; provider: string; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; createdAt: Date | string };
 
 const STATUS_LABEL: Record<string, string> = { pending: "En attente", succeeded: "Validée", failed: "Échouée", cancelled: "Annulée" };
 const STATUS_PILL: Record<string, string> = { pending: "pill-warning", succeeded: "pill-success", failed: "pill-error", cancelled: "pill-neutral" };

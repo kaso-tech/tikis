@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { trpc } from "../lib/trpc";
 
-type Delivery = { id: string; title: string; status: string; senderPhone: string; driverPhone: string | null; estimatedPrice: number; offeredPrice: number | null; createdAt: string };
+type Delivery = { id: string; title: string; status: string; senderPhone: string; driverPhone: string | null; estimatedPrice: number; offeredPrice: number | null; createdAt: Date | string };
 
 const STATUS_LABEL: Record<string, string> = {
   draft: "Brouillon", open: "Ouverte", pending_confirmation: "En attente", active: "En cours",

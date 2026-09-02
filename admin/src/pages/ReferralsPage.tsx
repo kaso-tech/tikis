@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { trpc } from "../lib/trpc";
 import { useAdminAuth } from "../lib/auth";
 
-type Referral = { id: string; referrerPhone: string; refereePhone: string; referralCode: string; status: "invited" | "qualified" | "rewarded" | "voided"; rewardAmount: number; createdAt: string; qualifiedAt: string | null; rewardedAt: string | null };
+type Referral = { id: string; referrerPhone: string; refereePhone: string; referralCode: string; status: "invited" | "qualified" | "rewarded" | "voided"; rewardAmount: number; createdAt: Date | string; qualifiedAt: Date | string | null; rewardedAt: Date | string | null };
 
 const STATUS_LABEL: Record<string, string> = { invited: "Invité", qualified: "Qualifié", rewarded: "Récompensé", voided: "Annulé" };
 const STATUS_PILL: Record<string, string> = { invited: "pill-neutral", qualified: "pill-info", rewarded: "pill-success", voided: "pill-error" };
