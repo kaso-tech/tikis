@@ -483,3 +483,7 @@
 - [x] Appliquer la migration non destructive des tables admin et signalements, puis vérifier la protection du journal d’audit (triggers TiDB non pris en charge, limite et mitigation documentées).
 - [x] Corriger le repli de libellé géographique qui remplace à tort les points d’intérêt existants par leur quartier.
 - [x] Relancer les services, valider l’application et la console, puis enregistrer et pousser la version.
+- [x] Recueillir de manière sécurisée les informations nécessaires au premier compte super-administrateur.
+- [x] Créer le premier super-administrateur avec le script serveur fourni.
+- [x] Valider la connexion et les autorisations super-administrateur sur la console.
+- [x] Enregistrer et pousser la configuration administrateur validée.

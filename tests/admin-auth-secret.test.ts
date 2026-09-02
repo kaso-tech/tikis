@@ -12,4 +12,15 @@ describe("signature de session administrateur", () => {
 
     expect(session).toEqual({ adminId: 42, email: "admin@example.com", role: "super_admin" });
   });
+
+  const checkBootstrapPassword = process.env.TIKIS_ADMIN_BOOTSTRAP_PASSWORD ? it : it.skip;
+
+  checkBootstrapPassword("valide le mot de passe de bootstrap sans le révéler", async () => {
+    const { hashAdminPassword, verifyAdminPassword } = await import("../server/admin-auth");
+    const password = process.env.TIKIS_ADMIN_BOOTSTRAP_PASSWORD ?? "";
+
+    expect(password.length).toBeGreaterThanOrEqual(12);
+    const hash = await hashAdminPassword(password);
+    await expect(verifyAdminPassword(password, hash)).resolves.toBe(true);
+  });
 });
