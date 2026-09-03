@@ -3,6 +3,7 @@ import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
 import { verifyTikisProfileSession } from "../tikis-session";
 import { verifyAdminSession, type AdminRole } from "../admin-auth";
+import { TIKIS_PROFILE_COOKIE } from "./cookies";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -12,17 +13,46 @@ export type TrpcContext = {
   tikisAdmin?: { adminId: number; email: string; role: AdminRole } | null;
 };
 
+function parseCookies(header: string | undefined): Record<string, string> {
+  const result: Record<string, string> = {};
+  if (!header) return result;
+  for (const part of header.split(";")) {
+    const trimmed = part.trim();
+    const eq = trimmed.indexOf("=");
+    if (eq < 0) continue;
+    const key = trimmed.slice(0, eq).trim();
+    const value = trimmed.slice(eq + 1).trim();
+    if (key) {
+      try {
+        result[key] = decodeURIComponent(value);
+      } catch {
+        result[key] = value;
+      }
+    }
+  }
+  return result;
+}
+
+function pickTikisSessionToken(opts: CreateExpressContextOptions): string | undefined {
+  const headerValue = opts.req.headers["x-tikis-session"];
+  const headerToken = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+  if (headerToken) return headerToken;
+  const reqWithCookies = opts.req as { cookies?: Record<string, string> };
+  if (!reqWithCookies.cookies) {
+    reqWithCookies.cookies = parseCookies(opts.req.headers.cookie);
+  }
+  return reqWithCookies.cookies[TIKIS_PROFILE_COOKIE];
+}
+
 export async function createContext(opts: CreateExpressContextOptions): Promise<TrpcContext> {
   let user: User | null = null;
-  const sessionHeader = opts.req.headers["x-tikis-session"];
-  const sessionToken = Array.isArray(sessionHeader) ? sessionHeader[0] : sessionHeader;
+  const sessionToken = pickTikisSessionToken(opts);
   const adminSessionHeader = opts.req.headers["x-tikis-admin-session"];
   const adminSessionToken = Array.isArray(adminSessionHeader) ? adminSessionHeader[0] : adminSessionHeader;
 
   try {
     user = await sdk.authenticateRequest(opts.req);
   } catch (error) {
-    // Authentication is optional for public procedures.
     user = null;
   }
 

@@ -8,8 +8,11 @@ import {
   tikisDeliveries,
   tikisDeliveryCandidates,
   tikisDeliveryEvents,
+  tikisDeliveryLiveLocations,
   tikisDeliveryReports,
   tikisKycSubmissions,
+  tikisLoyaltyGrants,
+  tikisLoyaltyPrograms,
   tikisPaymentTransactions,
   tikisPlatformSettings,
   tikisProfiles,
@@ -78,14 +81,21 @@ export async function writeAdminAuditLog(entry: { adminId: number; adminEmail: s
   });
 }
 
-export async function listAdminAuditLog(input: { targetType?: string; targetId?: string; limit?: number }) {
+export async function listAdminAuditLog(input: { targetType?: string; targetId?: string; limit?: number; offset?: number }) {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) return { rows: [] as Array<{ id: string; adminEmail: string; action: string; targetType: string; targetId: string; details: string | null; createdAt: Date }>, total: 0 };
+  const limit = Math.min(input.limit ?? 50, 200);
+  const offset = Math.max(input.offset ?? 0, 0);
   const conditions = [
     input.targetType ? eq(tikisAdminAuditLog.targetType, input.targetType) : undefined,
     input.targetId ? eq(tikisAdminAuditLog.targetId, input.targetId) : undefined,
   ].filter((value): value is NonNullable<typeof value> => Boolean(value));
-  return db.select().from(tikisAdminAuditLog).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(tikisAdminAuditLog.createdAt)).limit(Math.min(input.limit ?? 100, 500));
+  const where = conditions.length ? and(...conditions) : undefined;
+  const [rows, totalResult] = await Promise.all([
+    db.select().from(tikisAdminAuditLog).where(where).orderBy(desc(tikisAdminAuditLog.createdAt)).limit(limit).offset(offset),
+    db.select({ count: count() }).from(tikisAdminAuditLog).where(where),
+  ]);
+  return { rows, total: Number(totalResult[0]?.count ?? 0) };
 }
 
 // ————————————————————————————————————————————————————————————————————————
@@ -154,7 +164,7 @@ export async function adminSearchDeliveries(input: { query?: string; status?: st
   const db = await getDb();
   if (!db) return [];
   const conditions = [
-    input.query ? or(eq(tikisDeliveries.id, input.query), like(tikisDeliveries.senderPhone, `%${input.query}%`), like(tikisDeliveries.driverPhone, `%${input.query}%`), like(tikisDeliveries.title, `%${input.query}%`)) : undefined,
+    input.query ? or(eq(tikisDeliveries.id, input.query), like(tikisDeliveries.senderPhone, `${input.query}%`), like(tikisDeliveries.driverPhone, `${input.query}%`), like(tikisDeliveries.title, `${input.query}%`)) : undefined,
     input.status ? eq(tikisDeliveries.status, input.status as TikisDelivery["status"]) : undefined,
   ].filter((value): value is NonNullable<typeof value> => Boolean(value));
   return db.select().from(tikisDeliveries).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(tikisDeliveries.createdAt)).limit(Math.min(input.limit ?? 50, 200));
@@ -178,14 +188,20 @@ export async function adminGetDeliveryTimeline(deliveryId: string) {
 // Utilisateurs et Wallets (support niveau 1, lecture + actions encadrées)
 // ————————————————————————————————————————————————————————————————————————
 
-export async function adminSearchProfiles(input: { query?: string; limit?: number }) {
+export async function adminSearchProfiles(input: { query?: string; limit?: number; offset?: number }) {
   const db = await getDb();
-  if (!db) return [];
+  if (!db) return { rows: [] as Array<{ phone: string; fullName: string; accountType: "sender" | "driver"; email: string | null; phoneVerified: boolean; emailVerified: boolean; status?: "active" | "suspended" | "banned"; statusReason?: string | null; createdAt: Date }>, total: 0 };
   const limit = Math.min(input.limit ?? 30, 100);
+  const offset = Math.max(input.offset ?? 0, 0);
   const query = input.query?.trim();
-  if (!query) return db.select().from(tikisProfiles).orderBy(desc(tikisProfiles.createdAt)).limit(limit);
-  const term = `%${query}%`;
-  return db.select().from(tikisProfiles).where(or(like(tikisProfiles.phone, term), like(tikisProfiles.fullName, term), like(tikisProfiles.email, term))).orderBy(desc(tikisProfiles.createdAt)).limit(limit);
+  const where = query
+    ? or(like(tikisProfiles.phone, `${query}%`), like(tikisProfiles.fullName, `${query}%`), like(tikisProfiles.email, `${query}%`))
+    : undefined;
+  const [rows, totalResult] = await Promise.all([
+    db.select().from(tikisProfiles).where(where).orderBy(desc(tikisProfiles.createdAt)).limit(limit).offset(offset),
+    db.select({ count: count() }).from(tikisProfiles).where(where),
+  ]);
+  return { rows, total: Number(totalResult[0]?.count ?? 0) };
 }
 
 export async function adminGetProfileDetail(phone: string) {
@@ -316,6 +332,37 @@ export async function adminListDeliveries(input: { query?: string; status?: stri
     input.to ? lte(tikisDeliveries.createdAt, input.to) : undefined,
   ].filter((value): value is NonNullable<typeof value> => Boolean(value));
   return dbc.select().from(tikisDeliveries).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(tikisDeliveries.createdAt)).limit(Math.min(input.limit ?? 50, 200));
+}
+
+/** Liste les positions GPS encore fraiches des livraisons en cours.
+ *  Utilisé par la page admin "Carte temps réel" (projection bounding box SVG). */
+export async function adminListLiveLocations(input: { maxAgeSeconds: number }) {
+  const dbc = await getDb();
+  if (!dbc) return [];
+  const minUpdatedAt = new Date(Date.now() - input.maxAgeSeconds * 1000);
+  const rows = await dbc
+    .select({
+      deliveryId: tikisDeliveryLiveLocations.deliveryId,
+      driverPhone: tikisDeliveryLiveLocations.driverPhone,
+      latitude: tikisDeliveryLiveLocations.latitude,
+      longitude: tikisDeliveryLiveLocations.longitude,
+      heading: tikisDeliveryLiveLocations.heading,
+      recordedAt: tikisDeliveryLiveLocations.recordedAt,
+      updatedAt: tikisDeliveryLiveLocations.updatedAt,
+    })
+    .from(tikisDeliveryLiveLocations)
+    .where(gte(tikisDeliveryLiveLocations.updatedAt, minUpdatedAt))
+    .orderBy(desc(tikisDeliveryLiveLocations.updatedAt))
+    .limit(200);
+  return rows.map((row) => ({
+    deliveryId: row.deliveryId,
+    driverPhone: row.driverPhone,
+    latitude: Number(row.latitude),
+    longitude: Number(row.longitude),
+    heading: Number(row.heading),
+    recordedAt: row.recordedAt instanceof Date ? row.recordedAt.toISOString() : String(row.recordedAt),
+    updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : String(row.updatedAt),
+  }));
 }
 
 /** Annulation forcée par l'administration : libère toute commission bloquée/prélevée, quel que soit
@@ -560,4 +607,94 @@ export async function adminReviewKyc(input: { submissionId: string; decision: "a
     reviewedAt: new Date(), reviewedByAdminId: input.adminId,
   }).where(eq(tikisKycSubmissions.id, input.submissionId));
   return { id: input.submissionId, status: input.decision };
+}
+
+// ————————————————————————————————————————————————————————————————————————
+// Programme de fidélité
+// ————————————————————————————————————————————————————————————————————————
+
+export async function adminListLoyaltyPrograms() {
+  const dbc = await getDb();
+  if (!dbc) return [];
+  return dbc.select().from(tikisLoyaltyPrograms).orderBy(desc(tikisLoyaltyPrograms.updatedAt));
+}
+
+export async function adminUpsertLoyaltyProgram(input: {
+  id?: string;
+  name: string;
+  description?: string;
+  role: "sender" | "driver";
+  requiredDeliveries: number;
+  bonusAmount: number;
+  windowDays: number;
+  autoCredit?: boolean;
+  autoCreditMaxAmount?: number;
+  enabled: boolean;
+  adminId: number;
+}) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  const { randomUUID } = await import("node:crypto");
+  const id = input.id ?? `prog-${randomUUID().slice(0, 12)}`;
+  const autoCredit = input.autoCredit ?? false;
+  const autoCreditMaxAmount = input.autoCreditMaxAmount ?? 0;
+  await dbc.insert(tikisLoyaltyPrograms).values({
+    id,
+    name: input.name.trim(),
+    description: input.description?.trim() || null,
+    role: input.role,
+    requiredDeliveries: input.requiredDeliveries,
+    bonusAmount: input.bonusAmount,
+    windowDays: input.windowDays,
+    autoCredit,
+    autoCreditMaxAmount,
+    enabled: input.enabled,
+  }).onDuplicateKeyUpdate({
+    set: {
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      role: input.role,
+      requiredDeliveries: input.requiredDeliveries,
+      bonusAmount: input.bonusAmount,
+      windowDays: input.windowDays,
+      autoCredit,
+      autoCreditMaxAmount,
+      enabled: input.enabled,
+    },
+  });
+  const row = (await dbc.select().from(tikisLoyaltyPrograms).where(eq(tikisLoyaltyPrograms.id, id)).limit(1))[0];
+  return row;
+}
+
+export async function adminSetLoyaltyProgramEnabled(input: { id: string; enabled: boolean }) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  await dbc.update(tikisLoyaltyPrograms).set({ enabled: input.enabled }).where(eq(tikisLoyaltyPrograms.id, input.id));
+}
+
+export async function adminListPendingLoyaltyGrants(limit: number) {
+  const dbc = await getDb();
+  if (!dbc) return [];
+  const rows = await dbc.select().from(tikisLoyaltyGrants).where(eq(tikisLoyaltyGrants.status, "pending")).orderBy(desc(tikisLoyaltyGrants.grantedAt)).limit(Math.min(limit, 200));
+  return rows;
+}
+
+export async function adminCreditLoyaltyGrant(input: { grantId: string; adminId: number }) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  const { creditLoyaltyGrantOnWallet } = await import("./loyalty");
+  const result = await creditLoyaltyGrantOnWallet(input.grantId);
+  if (!result.credited) {
+    const existing = (await dbc.select().from(tikisLoyaltyGrants).where(eq(tikisLoyaltyGrants.id, input.grantId)).limit(1))[0];
+    if (existing && existing.status !== "pending") throw new Error("Cet octroi a déjà été traité.");
+    throw new Error("Cet octroi a déjà été traité.");
+  }
+  const grant = (await dbc.select().from(tikisLoyaltyGrants).where(eq(tikisLoyaltyGrants.id, input.grantId)).limit(1))[0];
+  return { id: input.grantId, profilePhone: grant?.profilePhone ?? "", bonusAmount: grant?.bonusAmount ?? 0, wallet: result.wallet };
+}
+
+export async function adminCancelLoyaltyGrant(input: { grantId: string; reason: string; adminId: number }) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  await dbc.update(tikisLoyaltyGrants).set({ status: "cancelled" }).where(and(eq(tikisLoyaltyGrants.id, input.grantId), eq(tikisLoyaltyGrants.status, "pending")));
 }

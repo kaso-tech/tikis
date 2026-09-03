@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { trpc } from "../lib/trpc";
 import { useAdminAuth } from "../lib/auth";
+import { ConfirmDialog } from "../lib/confirm-dialog";
 
 type Transaction = { id: string; profilePhone: string; type: "deposit" | "withdrawal"; provider: string; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; createdAt: Date | string };
 
@@ -26,6 +27,7 @@ export default function FinancePage() {
 
   const [bonusDraft, setBonusDraft] = useState({ phone: "", amount: "", reason: "" });
   const [sendingBonus, setSendingBonus] = useState(false);
+  const [pendingBonus, setPendingBonus] = useState<{ phone: string; amount: number; reason: string } | null>(null);
 
   function loadTransactions(type: "deposit" | "withdrawal") {
     trpc.adminConsole.finance.transactions.query({ type, status: "pending" })
@@ -71,16 +73,22 @@ export default function FinancePage() {
     }
   }
 
-  async function sendBonus() {
+  function requestSendBonus() {
     setError(""); setSuccess("");
     const amount = Number(bonusDraft.amount);
     if (!bonusDraft.phone.trim()) { setError("Renseignez le téléphone du bénéficiaire."); return; }
     if (!Number.isFinite(amount) || amount <= 0) { setError("Montant invalide."); return; }
+    setPendingBonus({ phone: bonusDraft.phone.trim(), amount, reason: bonusDraft.reason.trim() || "Crédit bonus" });
+  }
+
+  async function confirmSendBonus() {
+    if (!pendingBonus) return;
     setSendingBonus(true);
     try {
-      await trpc.adminConsole.finance.sendBonus.mutate({ phone: bonusDraft.phone.trim(), amount, reason: bonusDraft.reason.trim() || "Crédit bonus" });
-      setSuccess(`${formatMoney(amount)} envoyés à ${bonusDraft.phone.trim()}.`);
+      await trpc.adminConsole.finance.sendBonus.mutate({ phone: pendingBonus.phone, amount: pendingBonus.amount, reason: pendingBonus.reason });
+      setSuccess(`${formatMoney(pendingBonus.amount)} envoyés à ${pendingBonus.phone}.`);
       setBonusDraft({ phone: "", amount: "", reason: "" });
+      setPendingBonus(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Envoi impossible.");
     } finally {
@@ -147,7 +155,7 @@ export default function FinancePage() {
               <input className="input" inputMode="numeric" value={bonusDraft.amount} onChange={(e) => setBonusDraft((s) => ({ ...s, amount: e.target.value.replace(/[^0-9]/g, "") }))} style={{ marginBottom: 10 }} />
               <label className="field-label">Motif</label>
               <input className="input" value={bonusDraft.reason} onChange={(e) => setBonusDraft((s) => ({ ...s, reason: e.target.value }))} style={{ marginBottom: 14 }} />
-              <button className="btn btn-primary" disabled={sendingBonus} onClick={() => void sendBonus()}>{sendingBonus ? "…" : "Envoyer le bonus"}</button>
+              <button className="btn btn-primary" disabled={sendingBonus} onClick={requestSendBonus}>{sendingBonus ? "…" : "Envoyer le bonus"}</button>
             </>
           )}
         </div>
@@ -167,6 +175,27 @@ export default function FinancePage() {
           )}
         </div>
       ) : null}
+      <ConfirmDialog
+        open={pendingBonus !== null}
+        title={pendingBonus && pendingBonus.amount >= 50_000 ? "Confirmer l'envoi d'un montant élevé" : "Confirmer l'envoi du bonus"}
+        tone={pendingBonus && pendingBonus.amount >= 50_000 ? "danger" : "primary"}
+        confirmLabel={pendingBonus && pendingBonus.amount >= 50_000 ? "Envoyer" : "Confirmer"}
+        busy={sendingBonus}
+        description={pendingBonus ? (
+          <div style={{ display: "grid", gap: 8 }}>
+            <p>Vous allez créditer le wallet d'un profil :</p>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
+              <li><strong>Bénéficiaire :</strong> {pendingBonus.phone}</li>
+              <li><strong>Montant :</strong> {formatMoney(pendingBonus.amount)}</li>
+              <li><strong>Motif :</strong> {pendingBonus.reason}</li>
+            </ul>
+            <p className="muted" style={{ fontSize: 11.5 }}>Cette action est irréversible : le wallet sera crédité et tracé dans l'audit log.</p>
+          </div>
+        ) : null}
+        {...(pendingBonus && pendingBonus.amount >= 50_000 ? { doubleCheckValue: formatMoney(pendingBonus.amount) } : {})}
+        onConfirm={confirmSendBonus}
+        onCancel={() => !sendingBonus && setPendingBonus(null)}
+      />
     </div>
   );
 }

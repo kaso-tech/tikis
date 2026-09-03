@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { trpc } from "../lib/trpc";
+import { downloadCsv, rowsToCsv } from "../lib/csv";
 
 type Delivery = { id: string; title: string; status: string; senderPhone: string; driverPhone: string | null; estimatedPrice: number; offeredPrice: number | null; createdAt: Date | string };
 
@@ -64,6 +65,33 @@ export default function DeliveriesPage() {
         <div>
           <h1 className="page-title">Livraisons</h1>
           <p className="page-sub">{rows.length} résultat(s) · gestion complète, hors litige (voir « Litiges » pour la chronologie détaillée)</p>
+        </div>
+        <div className="page-actions">
+          <button type="button" className="btn" onClick={() => {
+            const csv = rowsToCsv(
+              [
+                { key: "id", label: "ID" },
+                { key: "title", label: "Titre" },
+                { key: "status", label: "Statut" },
+                { key: "senderPhone", label: "Expéditeur" },
+                { key: "driverPhone", label: "Livreur" },
+                { key: "estimatedPrice", label: "Prix estimé" },
+                { key: "offeredPrice", label: "Prix proposé" },
+                { key: "createdAt", label: "Créée le" },
+              ],
+              rows.map((row) => ({
+                id: row.id,
+                title: row.title,
+                status: STATUS_LABEL[row.status] ?? row.status,
+                senderPhone: row.senderPhone,
+                driverPhone: row.driverPhone ?? "",
+                estimatedPrice: formatMoney(row.estimatedPrice),
+                offeredPrice: row.offeredPrice !== null ? formatMoney(row.offeredPrice) : "",
+                createdAt: typeof row.createdAt === "string" ? row.createdAt : new Date(row.createdAt).toISOString(),
+              })),
+            );
+            downloadCsv(`tikis-deliveries-${new Date().toISOString().slice(0, 10)}`, csv);
+          }} disabled={rows.length === 0}>Exporter CSV</button>
         </div>
       </div>
 

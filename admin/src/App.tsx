@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AdminAuthProvider, useAdminAuth } from "./lib/auth";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -17,8 +17,10 @@ import AdminsPage from "./pages/AdminsPage";
 import CountriesPage from "./pages/CountriesPage";
 import MaintenancePage from "./pages/MaintenancePage";
 import AuditLogPage from "./pages/AuditLogPage";
+import LoyaltyPage from "./pages/LoyaltyPage";
+import LoyaltyGrantsPage from "./pages/LoyaltyGrantsPage";
 
-type PageKey = "dashboard" | "map" | "reports" | "disputes" | "deliveries" | "users" | "kyc" | "referrals" | "finance" | "pricing" | "commission" | "countries" | "maintenance" | "settings" | "admins" | "auditLog";
+type PageKey = "dashboard" | "map" | "reports" | "disputes" | "deliveries" | "users" | "kyc" | "referrals" | "finance" | "pricing" | "commission" | "countries" | "maintenance" | "settings" | "admins" | "auditLog" | "loyalty" | "loyaltyGrants";
 type GroupKey = "ops" | "people" | "trust" | "finance" | "system";
 
 const NAV: { key: PageKey; label: string; href: string; icon: string; group: GroupKey; roles?: Array<"super_admin" | "support" | "finance"> }[] = [
@@ -38,6 +40,8 @@ const NAV: { key: PageKey; label: string; href: string; icon: string; group: Gro
   { key: "settings", label: "Paramètres", href: "/admin/settings", icon: "⚙", group: "system", roles: ["super_admin"] },
   { key: "admins", label: "Équipe admin", href: "/admin/admins", icon: "★", group: "system", roles: ["super_admin"] },
   { key: "auditLog", label: "Journal d'audit", href: "/admin/audit", icon: "▤", group: "system", roles: ["super_admin"] },
+  { key: "loyalty", label: "Fidélité", href: "/admin/loyalty", icon: "♛", group: "finance", roles: ["super_admin", "finance"] },
+  { key: "loyaltyGrants", label: "Octrois fidélité", href: "/admin/loyalty-grants", icon: "⚇", group: "finance", roles: ["super_admin", "finance"] },
 ];
 
 const GROUP_LABELS: Record<GroupKey, string> = {
@@ -57,6 +61,14 @@ function Shell() {
   const { admin, logout } = useAdminAuth();
   const [page, setPage] = useState<PageKey>("dashboard");
   const [search, setSearch] = useState("");
+  useEffect(() => {
+    function onNavigate(event: Event) {
+      const custom = event as CustomEvent<{ page: PageKey }>;
+      if (custom.detail?.page) setPage(custom.detail.page);
+    }
+    window.addEventListener("tikis:navigate", onNavigate as EventListener);
+    return () => window.removeEventListener("tikis:navigate", onNavigate as EventListener);
+  }, []);
   if (!admin) return null;
 
   const visibleNav = NAV.filter((item) => !item.roles || item.roles.includes(admin.role));
@@ -143,6 +155,8 @@ function Shell() {
           {page === "settings" ? <SettingsPage /> : null}
           {page === "admins" ? <AdminsPage /> : null}
           {page === "auditLog" ? <AuditLogPage /> : null}
+          {page === "loyalty" ? <LoyaltyPage /> : null}
+          {page === "loyaltyGrants" ? <LoyaltyGrantsPage /> : null}
         </main>
       </div>
     </div>

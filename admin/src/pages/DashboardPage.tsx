@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { trpc, isAuthError } from "../lib/trpc";
+import { SkeletonKpiGrid } from "../lib/skeleton";
 
 type Metrics = {
   periodDays: number;
@@ -65,6 +66,18 @@ export default function DashboardPage(_props: { search?: string }) {
     return Math.max(1, ...metrics.timeseries.map((d) => Math.max(d.published, d.completed)));
   }, [metrics]);
 
+  const sparklines = useMemo(() => {
+    if (!metrics?.timeseries) return { published: undefined as number[] | undefined, completed: undefined as number[] | undefined, commission: undefined as number[] | undefined, reports: undefined as number[] | undefined, drivers: undefined as number[] | undefined };
+    const published = metrics.timeseries.map((d) => d.published);
+    const completed = metrics.timeseries.map((d) => d.completed);
+    const reports = metrics.timeseries.map((d) => d.published > 0 ? Math.max(0, d.published - d.completed) : 0);
+    const commission = metrics.timeseries.map((d) => Math.round(d.completed * (metrics.commissionRevenue / Math.max(1, metrics.deliveriesCompleted))));
+    // Proxy pour 'Livreurs uniques' : un livreur actif = au moins une course terminée ce jour-là.
+    // Approximation grossière mais stable tant qu'on n'expose pas activeDriversTimeseries côté serveur.
+    const drivers = completed.map((value) => Math.min(value, metrics.activeDrivers));
+    return { published, completed, commission, reports, drivers };
+  }, [metrics]);
+
   return (
     <div>
       <div className="page-head">
@@ -87,16 +100,14 @@ export default function DashboardPage(_props: { search?: string }) {
       {error ? <div className="banner-error">{error}</div> : null}
 
       {!metrics ? (
-        <div className="kpi-grid">
-          {[0, 1, 2, 3].map((i) => <div key={i} className="kpi" style={{ height: 100 }} />)}
-        </div>
+        <SkeletonKpiGrid count={4} />
       ) : (
         <>
           <div className="kpi-grid">
-            <KpiCard label="Livraisons créées" value={metrics.deliveriesTotal.toString()} foot={`${metrics.deliveriesCompleted} terminées`} tone="primary" progress={completionRate} />
-            <KpiCard label="Commissions perçues" value={formatMoney(metrics.commissionRevenue)} foot="depuis le début de la période" tone="success" />
-            <KpiCard label="Livreurs uniques" value={metrics.activeDrivers.toString()} foot="ayant terminé au moins une course" tone="primary" />
-            <KpiCard label="Signalements ouverts" value={metrics.openReports.toString()} foot={metrics.openReports > 0 ? "à traiter en priorité" : "Aucun signalement"} tone={metrics.openReports > 0 ? "error" : "success"} />
+            <KpiCard label="Livraisons créées" value={metrics.deliveriesTotal.toString()} foot={`${metrics.deliveriesCompleted} terminées`} tone="primary" progress={completionRate} sparkline={sparklines.published} />
+            <KpiCard label="Commissions perçues" value={formatMoney(metrics.commissionRevenue)} foot="depuis le début de la période" tone="success" sparkline={sparklines.commission} />
+            <KpiCard label="Livreurs uniques" value={metrics.activeDrivers.toString()} foot="ayant terminé au moins une course" tone="primary" sparkline={sparklines.drivers} />
+            <KpiCard label="Signalements ouverts" value={metrics.openReports.toString()} foot={metrics.openReports > 0 ? "à traiter en priorité" : "Aucun signalement"} tone={metrics.openReports > 0 ? "error" : "success"} sparkline={sparklines.reports} />
           </div>
 
           <div className="grid grid-2" style={{ marginBottom: 20 }}>
@@ -253,19 +264,36 @@ export default function DashboardPage(_props: { search?: string }) {
   );
 }
 
-function KpiCard({ label, value, foot, tone, progress }: { label: string; value: string; foot: string; tone: "primary" | "success" | "error"; progress?: number }) {
+function KpiCard({ label, value, foot, tone, progress, sparkline }: { label: string; value: string; foot: string; tone: "primary" | "success" | "error"; progress?: number; sparkline?: number[] }) {
   const color = tone === "success" ? "var(--success)" : tone === "error" ? "var(--error)" : "var(--primary)";
+  const sparkPoints = (sparkline && sparkline.length > 1)
+    ? (() => {
+      const min = Math.min(...sparkline);
+      const max = Math.max(...sparkline);
+      const range = max - min || 1;
+      return sparkline.map((v, i) => {
+        const x = (i / (sparkline.length - 1)) * 100;
+        const y = 20 - ((v - min) / range) * 18 - 1;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      }).join(" ");
+    })()
+    : null;
   return (
     <div className="kpi">
       <div className="kpi-label">{label}</div>
       <div className="kpi-value">{value}</div>
       <div className="kpi-foot">{foot}</div>
+      {sparkPoints ? (
+        <svg viewBox="0 0 100 20" preserveAspectRatio="none" style={{ width: "100%", height: 22, marginTop: 6 }}>
+          <polyline points={sparkPoints} fill="none" stroke={color} strokeWidth="0.8" strokeLinejoin="round" strokeLinecap="round" />
+        </svg>
+      ) : null}
       {typeof progress === "number" ? (
-        <div className="kpi-bar" style={{ background: "var(--border)" }}>
+        <div className="kpi-bar" style={{ background: "var(--border)", marginTop: sparkPoints ? 4 : 0 }}>
           <div style={{ width: `${Math.min(100, Math.max(0, progress))}%`, height: "100%", background: color, borderRadius: 99 }} />
         </div>
       ) : (
-        <div className="kpi-bar" style={{ background: "var(--border)" }}>
+        <div className="kpi-bar" style={{ background: "var(--border)", marginTop: sparkPoints ? 4 : 0 }}>
           <div style={{ width: "62%", height: "100%", background: color, borderRadius: 99 }} />
         </div>
       )}

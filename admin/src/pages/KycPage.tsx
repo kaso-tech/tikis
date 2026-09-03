@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { trpc } from "../lib/trpc";
 import { useAdminAuth } from "../lib/auth";
+import { downloadCsv, rowsToCsv } from "../lib/csv";
 
 type Submission = {
   id: string; driverPhone: string; idFrontKey: string; idBackKey: string; selfieKey: string;
@@ -102,6 +103,22 @@ export default function KycPage() {
           <h1 className="page-title">Validations KYC</h1>
           <p className="page-sub">File d’attente des livreurs en cours de vérification d’identité</p>
         </div>
+        <button
+          className="btn btn-outline btn-sm"
+          disabled={rows.length === 0}
+          onClick={() => {
+            const csv = rowsToCsv(rows.map((row) => ({
+              driverName: row.driverName,
+              phone: row.submission.driverPhone,
+              submittedAt: new Date(row.submission.submittedAt).toISOString(),
+              status: STATUS_LABEL[row.submission.status] ?? row.submission.status,
+              rejectionReason: row.submission.rejectionReason ?? "",
+            })));
+            downloadCsv(`tikis-kyc-${statusFilter}-${new Date().toISOString().slice(0, 10)}`, csv);
+          }}
+        >
+          Exporter CSV
+        </button>
       </div>
       {error ? <div className="banner-error">{error}</div> : null}
       <div className="card" style={{ paddingBottom: 0 }}>

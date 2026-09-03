@@ -16,6 +16,8 @@ import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format"
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
+import { SenderHomeKpiCards } from "@/components/tikis/sender-home-kpi-cards";
+import { RateDeliveryDialog } from "@/components/tikis/rate-delivery-dialog";
 import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
 import { resolveDriverHomeAction } from "@/shared/delivery-home-action";
 import { isOpenDeliveryStale } from "@/shared/delivery-freshness";
@@ -111,6 +113,7 @@ export function HomeScreen() {
   const [filter, setFilter] = useState<FilterKey>("open");
   const [searchQuery, setSearchQuery] = useState("");
   const [nowTick, setNowTick] = useState(0);
+  const [rateDeliveryId, setRateDeliveryId] = useState<string | null>(null);
   const now = Date.now() + nowTick;
   useEffect(() => {
     setFilter("open");
@@ -524,6 +527,8 @@ export function HomeScreen() {
             </Pressable>
           ) : null}
 
+          {role === "sender" ? <SenderHomeKpiCards /> : null}
+
           <View style={styles.searchRow}>
             <View style={styles.searchPill}>
               <MaterialIcons name="search" size={16} color="#747474" />
@@ -675,6 +680,15 @@ export function HomeScreen() {
       ) : null}
       {pendingAction?.kind === "select" ? (
         <ActionConfirmationModal visible title="Choisir ce livreur ?" description={`${pendingAction.candidate.name} recevra votre demande de confirmation. Aucun montant ne sera débité du Wallet expéditeur.`} confirmLabel="Choisir" icon="person" tone="primary" loading={actioningId === pendingAction.candidate.id} onCancel={() => !actioningId && setPendingAction(null)} onConfirm={() => void chooseCandidate(pendingAction.candidate)} />
+      ) : null}
+      {rateDeliveryId ? (
+        <RateDeliveryDialog
+          visible={Boolean(rateDeliveryId)}
+          deliveryId={rateDeliveryId}
+          driverName="votre livreur"
+          onClose={() => setRateDeliveryId(null)}
+          onRated={() => setRateDeliveryId(null)}
+        />
       ) : null}
     </SafeAreaView>
   );
@@ -971,9 +985,18 @@ function DeliveryRow({
             </Pressable>
           ) : (() => {
             const senderAction = delivery.status === "open" ? (delivery.candidateCount ?? 0) > 0 ? "Candidats" : "Annuler" : (delivery.status === "active" || delivery.status === "pending_confirmation") ? "Suivre" : null;
-            return senderAction ? <Pressable onPress={onApply} disabled={applying} style={({ pressed }) => [styles.rowBtnFilled, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}>
-              {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.rowBtnFilledText}>{senderAction}</Text>}
-            </Pressable> : null;
+            const canRate = delivery.status === "completed" && Boolean(delivery.driverPhone);
+            if (senderAction) {
+              return <Pressable onPress={onApply} disabled={applying} style={({ pressed }) => [styles.rowBtnFilled, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}>
+                {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.rowBtnFilledText}>{senderAction}</Text>}
+              </Pressable>;
+            }
+            if (canRate) {
+              return <Pressable onPress={() => setRateDeliveryId(delivery.id)} style={({ pressed }) => [styles.rowBtnFilled, pressed && styles.pressed]}>
+                <Text style={styles.rowBtnFilledText}>Noter</Text>
+              </Pressable>;
+            }
+            return null;
           })()}
         </View>
       </View>

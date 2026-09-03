@@ -7,6 +7,8 @@ import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { ContactSection } from "@/components/tikis/contact-section";
+import { LoyaltyProgress } from "@/components/tikis/loyalty-progress";
+import { SessionsSection } from "@/components/tikis/sessions-section";
 import { haptic } from "@/lib/haptics";
 import { useTikisLogout } from "@/lib/tikis-logout";
 import { countryFlagEmoji, sanitizeFullName, validateFullName } from "@/lib/registration-rules";
@@ -257,6 +259,10 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
+
+        <LoyaltyProgress phone={profile?.phone ?? null} />
+
+        <SessionsSection />
 
         <ContactSection />
 

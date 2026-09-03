@@ -1,0 +1,51 @@
+import { logger } from "../../lib/logger";
+
+const SENTRY_DSN = process.env.SENTRY_DSN;
+const SENTRY_ENVIRONMENT = process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV ?? "development";
+const SENTRY_RELEASE = process.env.SENTRY_RELEASE ?? "tikis@unknown";
+
+let initialized = false;
+let captureException: ((error: unknown, context?: Record<string, unknown>) => void) | null = null;
+let captureMessage: ((message: string, level?: "info" | "warning" | "error", context?: Record<string, unknown>) => void) | null = null;
+
+type SentryModule = {
+  init: (options: { dsn: string; environment: string; release: string; tracesSampleRate?: number; maxBreadcrumbs?: number }) => void;
+  captureException: (error: unknown) => string;
+  captureMessage: (message: string, level?: { level: string }) => string;
+  setContext: (key: string, value: Record<string, unknown>) => void;
+};
+
+export async function initSentry() {
+  if (initialized) return;
+  initialized = true;
+  if (!SENTRY_DSN) {
+    logger.info("[sentry]", "SENTRY_DSN absent, capture désactivée");
+    return;
+  }
+  let sentryModule: SentryModule;
+  try {
+    sentryModule = (await import("@sentry/node")) as unknown as SentryModule;
+    sentryModule.init({ dsn: SENTRY_DSN, environment: SENTRY_ENVIRONMENT, release: SENTRY_RELEASE, tracesSampleRate: 0.1, maxBreadcrumbs: 50 });
+    captureException = (error, context) => {
+      if (context) sentryModule.setContext("extra", context);
+      sentryModule.captureException(error);
+    };
+    captureMessage = (message, level, context) => {
+      if (context) sentryModule.setContext("extra", context);
+      sentryModule.captureMessage(message, { level: level === "error" ? "error" : level === "warning" ? "warning" : "info" });
+    };
+    logger.info("[sentry]", `Capture initialisée (env=${SENTRY_ENVIRONMENT}, release=${SENTRY_RELEASE})`);
+  } catch (cause) {
+    logger.warn("[sentry]", "Module @sentry/node indisponible, capture désactivée", cause);
+  }
+}
+
+export function reportException(error: unknown, context?: Record<string, unknown>) {
+  if (captureException) captureException(error, context);
+  else logger.error("[sentry:fallback]", error instanceof Error ? error.message : String(error), context);
+}
+
+export function reportMessage(message: string, level: "info" | "warning" | "error" = "info", context?: Record<string, unknown>) {
+  if (captureMessage) captureMessage(message, level, context);
+  else logger[level === "warning" ? "warn" : level === "error" ? "error" : "info"]("[sentry:fallback]", message, context);
+}

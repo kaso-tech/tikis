@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { trpc } from "../lib/trpc";
+import { downloadCsv, rowsToCsv } from "../lib/csv";
 
 type ReportRow = {
   report: {
@@ -90,6 +91,26 @@ export default function ReportsPage() {
           <h1 className="page-title">Signalements</h1>
           <p className="page-sub">Cas envoyés par les expéditeurs et livreurs · décisions tracées dans le journal d'audit</p>
         </div>
+        <button
+          className="btn btn-outline btn-sm"
+          disabled={rows.length === 0}
+          onClick={() => {
+            const csv = rowsToCsv(rows.map((row) => ({
+              id: row.report.id,
+              deliveryId: row.report.deliveryId,
+              deliveryTitle: row.delivery.title,
+              reporterPhone: row.report.reporterPhone,
+              reporterRole: row.report.reporterRole === "sender" ? "Expéditeur" : "Livreur",
+              reason: row.report.reason,
+              status: STATUS_LABEL[row.report.status] ?? row.report.status,
+              createdAt: new Date(row.report.createdAt).toISOString(),
+              resolutionNotes: row.report.resolutionNotes ?? "",
+            })));
+            downloadCsv(`tikis-reports-${statusFilter}-${new Date().toISOString().slice(0, 10)}`, csv);
+          }}
+        >
+          Exporter CSV
+        </button>
       </div>
 
       {error ? <div className="banner-error">{error}</div> : null}

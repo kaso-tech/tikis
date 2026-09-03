@@ -8,6 +8,7 @@ import { useThemeColors } from "@/lib/use-theme-colors";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/shared/tikis-domain";
+import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 
 export default function LiveTrackingTabScreen() {
   const { colors: theme } = useThemeColors();
@@ -55,6 +56,8 @@ export default function LiveTrackingTabScreen() {
 
 function TrackingCard({ delivery, live, theme }: { delivery: any; live: boolean; theme: any }) {
   const dropoff = formatDeliveryDetailPlace(delivery.dropoff);
+  const positionQuery = useLiveDeliveryPosition(live ? delivery.id : null, live);
+  const hasFix = Boolean(positionQuery.position?.latitude && positionQuery.position?.longitude);
   return (
     <Pressable onPress={() => router.push(`/delivery/${delivery.id}/map` as any)} style={({ pressed }) => [styles.card, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]}>
       <View style={styles.cardTop}>
@@ -62,10 +65,14 @@ function TrackingCard({ delivery, live, theme }: { delivery: any; live: boolean;
           <Text style={[styles.cardTitle, { color: theme.foreground }]} numberOfLines={1}>{delivery.title}</Text>
           <Text style={[styles.cardSub, { color: theme.muted }]} numberOfLines={1}>Vers {dropoff.title}</Text>
         </View>
-        {live ? <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.livePillText}>En direct</Text></View> : <View style={[styles.pendingPill, { backgroundColor: theme.background }]}><Text style={[styles.pendingPillText, { color: theme.muted }]}>En attente</Text></View>}
+        {live ? (
+          hasFix ? <View style={styles.livePill}><View style={styles.liveDot} /><Text style={styles.livePillText}>En direct</Text></View> : <View style={styles.searchingPill}><Text style={styles.searchingPillText}>Recherche GPS…</Text></View>
+        ) : <View style={[styles.pendingPill, { backgroundColor: theme.background }]}><Text style={[styles.pendingPillText, { color: theme.muted }]}>En attente</Text></View>}
       </View>
       <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
-        <Text style={[styles.cardDriver, { color: theme.muted }]}>{delivery.driverName ?? "Livreur en cours d’attribution"}</Text>
+        <Text style={[styles.cardDriver, { color: theme.muted }]}>
+          {live && !hasFix ? "Position du livreur en attente de réception…" : delivery.driverName ?? "Livreur en cours d’attribution"}
+        </Text>
         <Text style={[styles.cardPrice, { color: theme.foreground }]}>{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</Text>
       </View>
     </Pressable>
@@ -85,6 +92,8 @@ const styles = StyleSheet.create({
   livePill: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "#E6F4ED", paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999 },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#167A55" },
   livePillText: { color: "#167A55", fontSize: 10.5, fontWeight: "700" },
+  searchingPill: { backgroundColor: "#FFF3E0", paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999 },
+  searchingPillText: { color: "#9A6200", fontSize: 10.5, fontWeight: "700" },
   pendingPill: { paddingHorizontal: 9, paddingVertical: 5, borderRadius: 999 },
   pendingPillText: { fontSize: 10.5, fontWeight: "700" },
   cardFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 11, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },

@@ -7,13 +7,21 @@ import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { deliveryMetricsForDay, isDeliveryEarning } from "@/lib/wallet-metrics";
 import { formatMoney, formatRelativeDate, type FinancialRecord } from "@/shared/tikis-domain";
+import { DriverEarningsProjection } from "@/components/tikis/driver-earnings-projection";
 
 type Period = "day" | "week" | "month";
+type FlowFilter = "earnings" | "bonus" | "all";
 
 const PERIOD_META: Record<Period, { label: string; icon: React.ComponentProps<typeof MaterialIcons>["name"]; description: string }> = {
   day: { label: "Aujourd'hui", icon: "wb-sunny", description: "Gains et courses sur la journée en cours." },
   week: { label: "7 derniers jours", icon: "date-range", description: "Vue d'ensemble hebdomadaire de votre activité." },
   month: { label: "Ce mois", icon: "calendar-month", description: "Bilan mensuel de vos performances livreur." },
+};
+
+const FLOW_META: Record<FlowFilter, { label: string; icon: React.ComponentProps<typeof MaterialIcons>["name"] }> = {
+  earnings: { label: "Gains", icon: "paid" },
+  bonus: { label: "Bonus", icon: "card-giftcard" },
+  all: { label: "Tout", icon: "all-inclusive" },
 };
 
 function startOfDay(date: Date): Date {
@@ -46,6 +54,7 @@ export default function EarningsScreen() {
   const { colors: theme } = useThemeColors();
   const { profile } = useTikisStore();
   const [period, setPeriod] = useState<Period>("day");
+  const [flow, setFlow] = useState<FlowFilter>("earnings");
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, {
     enabled: Boolean(profile?.phone),
     refetchInterval: 5_000,
@@ -55,15 +64,18 @@ export default function EarningsScreen() {
   const wallet = walletQuery.data?.wallet;
   const journal = walletQuery.data?.journal ?? [];
 
-  const { earningsEntries, totalEarnings, courseCount, averagePerCourse, dailyBreakdown, bestDay, comparison, history } = useMemo(() => {
+  const { earningsEntries, bonusEntries, totalEarnings, totalBonus, courseCount, averagePerCourse, dailyBreakdown, bestDay, comparison, history } = useMemo(() => {
     const start = periodStart(period, new Date());
     const inPeriod = (entry: FinancialRecord) => new Date(entry.createdAt).getTime() >= start.getTime();
     const earnings = journal.filter((entry) => inPeriod(entry) && isDeliveryEarning(entry));
+    const bonus = journal.filter((entry) => inPeriod(entry) && entry.operation === "bonus");
+    const visible = flow === "earnings" ? earnings : flow === "bonus" ? bonus : [...earnings, ...bonus];
     const earningsTotal = earnings.reduce((sum, entry) => sum + entry.amount, 0);
+    const bonusTotal = bonus.reduce((sum, entry) => sum + entry.amount, 0);
     const coursesIds = new Set(earnings.map((entry) => entry.deliveryId).filter(Boolean) as string[]);
 
     const dayMap = new Map<string, number>();
-    for (const entry of earnings) {
+    for (const entry of visible) {
       const key = new Date(entry.createdAt).toISOString().slice(0, 10);
       dayMap.set(key, (dayMap.get(key) ?? 0) + entry.amount);
     }
@@ -71,7 +83,6 @@ export default function EarningsScreen() {
       .sort(([a], [b]) => (a < b ? 1 : -1))
       .map(([dateKey, amount]) => ({ dateKey, amount }));
 
-    const dayMetrics = deliveryMetricsForDay(journal);
     const best = dayList.length === 0 ? null : dayList.reduce((acc, cur) => (cur.amount > acc.amount ? cur : acc), dayList[0]);
 
     const totalLast7 = journal
@@ -94,15 +105,17 @@ export default function EarningsScreen() {
 
     return {
       earningsEntries: earnings,
+      bonusEntries: bonus,
       totalEarnings: earningsTotal,
+      totalBonus: bonusTotal,
       courseCount: coursesIds.size,
       averagePerCourse: coursesIds.size === 0 ? 0 : Math.round(earningsTotal / coursesIds.size),
       dailyBreakdown: dayList,
       bestDay: best,
       comparison: { last7: totalLast7, prev7: totalPrev7, trend },
-      history: earnings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+      history: visible.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     };
-  }, [journal, period]);
+  }, [journal, period, flow]);
 
   const todayEarnings = useMemo(() => deliveryMetricsForDay(journal).earnings, [journal]);
   const lastEarningDate = history[0] ? new Date(history[0].createdAt) : null;
@@ -171,11 +184,39 @@ export default function EarningsScreen() {
 
         <Text style={[styles.periodDescription, { color: theme.muted }]}>{PERIOD_META[period].description}</Text>
 
+        <View style={styles.flowTabs}>
+          {(Object.keys(FLOW_META) as FlowFilter[]).map((key) => {
+            const active = flow === key;
+            return (
+              <Pressable
+                key={key}
+                onPress={() => setFlow(key)}
+                style={({ pressed }) => [styles.flowTab, active && styles.flowTabActive, pressed && styles.pressed]}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={FLOW_META[key].label}
+              >
+                <MaterialIcons name={FLOW_META[key].icon} size={13} color={active ? "#FFFFFF" : theme.muted} />
+                <Text style={[styles.flowTabText, active && styles.flowTabTextActive]}>{FLOW_META[key].label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
         <View style={styles.statsRow}>
-          <StatCard icon="paid" tone="primary" label="Total" value={formatMoney(totalEarnings)} />
+          <StatCard icon="paid" tone="primary" label={flow === "bonus" ? "Bonus" : "Gains"} value={formatMoney(flow === "bonus" ? totalBonus : totalEarnings)} />
           <StatCard icon="local-shipping" tone="amber" label="Courses" value={String(courseCount)} />
           <StatCard icon="savings" tone="success" label="Moyenne" value={formatMoney(averagePerCourse)} />
         </View>
+
+        {totalBonus > 0 && flow !== "bonus" ? (
+          <View style={[styles.bonusBanner, { backgroundColor: theme.primary + "14" }]}>
+            <MaterialIcons name="card-giftcard" size={14} color={theme.primary} />
+            <Text style={[styles.bonusBannerText, { color: theme.primary }]}>
+              {formatMoney(totalBonus)} de bonus de fidélité crédité{bonusEntries.length > 1 ? "s" : ""} sur cette période
+            </Text>
+          </View>
+        ) : null}
 
         {dailyBreakdown.length > 0 ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -207,15 +248,21 @@ export default function EarningsScreen() {
         ) : null}
 
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.foreground }]}>Historique des gains</Text>
-          <Text style={[styles.sectionAction, { color: theme.muted }]}>{history.length} crédit{history.length > 1 ? "s" : ""}</Text>
+          <Text style={[styles.sectionTitle, { color: theme.foreground }]}>{flow === "bonus" ? "Historique des bonus" : flow === "all" ? "Historique complet" : "Historique des gains"}</Text>
+          <Text style={[styles.sectionAction, { color: theme.muted }]}>{history.length} mouvement{history.length > 1 ? "s" : ""}</Text>
         </View>
 
         {walletQuery.isLoading ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.emptyText, { color: theme.muted }]}>Chargement sécurisé de vos gains…</Text></View>
         ) : walletQuery.error ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.emptyText, { color: theme.muted }]}>L'historique des gains est momentanément indisponible.</Text></View>
-        ) : history.length === 0 ? (
+        ) : (
+          <>
+            <DriverEarningsProjection phone={profile?.phone ?? null} />
+          </>
+        )}
+
+        {walletQuery.isLoading ? null : walletQuery.error ? null : history.length === 0 ? (
           <View style={[styles.empty, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View style={[styles.emptyIcon, { backgroundColor: theme.background }]}><MaterialIcons name="savings" size={26} color={theme.muted} /></View>
             <Text style={[styles.emptyTitle, { color: theme.foreground }]}>Aucun gain sur cette période</Text>
@@ -225,19 +272,23 @@ export default function EarningsScreen() {
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             {history.map((entry, idx) => {
               const isLast = idx === history.length - 1;
+              const isBonus = entry.operation === "bonus";
+              const tint = isBonus ? theme.primary : theme.success;
+              const iconName = isBonus ? "card-giftcard" : "south-west";
+              const label = isBonus ? "Bonus fidélité" : "Gain de course";
               return (
                 <View key={entry.id} style={[styles.historyRow, !isLast && { borderBottomColor: theme.border }]}>
-                  <View style={[styles.historyIcon, { backgroundColor: theme.success + "22" }]}>
-                    <MaterialIcons name="south-west" size={15} color={theme.success} />
+                  <View style={[styles.historyIcon, { backgroundColor: tint + "22" }]}>
+                    <MaterialIcons name={iconName} size={15} color={tint} />
                   </View>
                   <View style={styles.historyBody}>
                     <View style={styles.historyLine1}>
-                      <Text style={[styles.historyLabel, { color: theme.foreground }]} numberOfLines={1}>Gain de course</Text>
+                      <Text style={[styles.historyLabel, { color: theme.foreground }]} numberOfLines={1}>{label}</Text>
                       <Text style={[styles.historyTime, { color: theme.muted }]}>{formatRelativeDate(entry.createdAt)}</Text>
                     </View>
                     <Text style={[styles.historyMeta, { color: theme.muted }]} numberOfLines={1}>{entry.reason}</Text>
                   </View>
-                  <Text style={[styles.historyAmount, { color: theme.success }]}>+{formatMoney(entry.amount)}</Text>
+                  <Text style={[styles.historyAmount, { color: tint }]}>+{formatMoney(entry.amount)}</Text>
                 </View>
               );
             })}
@@ -294,6 +345,16 @@ const styles = StyleSheet.create({
   periodTabTextActive: { color: "#FFFFFF" },
 
   periodDescription: { fontSize: 11, lineHeight: 16, paddingHorizontal: 4 },
+
+  flowTabs: { flexDirection: "row", gap: 6, paddingHorizontal: 2 },
+  flowTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 8, borderRadius: 9, borderWidth: 1, borderColor: "#D7D5DE", backgroundColor: "#FFFFFF" },
+  flowTabActive: { backgroundColor: "#9A6201", borderColor: "#9A6201" },
+  flowTabText: { fontSize: 11, fontWeight: "600", color: "#747474" },
+  flowTabTextActive: { color: "#FFFFFF" },
+
+  bonusBanner: { flexDirection: "row", alignItems: "center", gap: 6, padding: 10, borderRadius: 9 },
+
+  bonusBannerText: { fontSize: 11, fontWeight: "600", flex: 1 },
 
   statsRow: { flexDirection: "row", gap: 8 },
   statCard: { flex: 1, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 10, alignItems: "center", gap: 4, borderWidth: 1 },

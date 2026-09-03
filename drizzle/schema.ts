@@ -36,6 +36,7 @@ export const tikisProfiles = mysqlTable("tikis_profiles", {
   country: varchar("country", { length: 2 }),
   city: varchar("city", { length: 80 }),
   deletionRequestedAt: timestamp("deletionRequestedAt"),
+  deletionScheduledAt: timestamp("deletionScheduledAt"),
   deletedAt: timestamp("deletedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -200,7 +201,7 @@ export const tikisPaymentTransactions = mysqlTable("tikis_payment_transactions",
   id: varchar("id", { length: 40 }).primaryKey(),
   profilePhone: varchar("profilePhone", { length: 20 }).notNull(),
   type: mysqlEnum("type", ["deposit", "withdrawal"]).notNull(),
-  provider: mysqlEnum("provider", ["ligdi_simulated", "yengapay_test"]).notNull().default("yengapay_test"),
+  provider: mysqlEnum("provider", ["ligdi_simulated", "yengapay_test", "yengapay_live"]).notNull().default("yengapay_test"),
   amount: int("amount").notNull(),
   status: mysqlEnum("status", ["pending", "succeeded", "failed", "cancelled"]).notNull().default("pending"),
   providerReference: varchar("providerReference", { length: 80 }).notNull().unique(),
@@ -355,3 +356,136 @@ export const tikisKycSubmissions = mysqlTable("tikis_kyc_submissions", {
 
 export type TikisSupportedCountry = typeof tikisSupportedCountries.$inferSelect;
 export type TikisKycSubmission = typeof tikisKycSubmissions.$inferSelect;
+
+/** Événements webhook YengaPay : log immutable des callbacks reçus.
+ *  Idempotence garantie par la contrainte unique sur (provider, providerEventId). */
+export const tikisYengapayWebhookEvents = mysqlTable("tikis_yengapay_webhook_events", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  provider: mysqlEnum("provider", ["yengapay_live"]).notNull().default("yengapay_live"),
+  providerEventId: varchar("providerEventId", { length: 120 }).notNull(),
+  eventType: varchar("eventType", { length: 60 }).notNull(),
+  paymentTransactionId: varchar("paymentTransactionId", { length: 40 }),
+  payload: text("payload").notNull(),
+  signature: varchar("signature", { length: 200 }),
+  processedAt: timestamp("processedAt"),
+  status: mysqlEnum("status", ["received", "processed", "failed", "ignored"]).notNull().default("received"),
+  failureReason: varchar("failureReason", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("tikis_yengapay_webhook_events_provider_event_unique").on(table.provider, table.providerEventId),
+  index("tikis_yengapay_webhook_events_status_index").on(table.status, table.createdAt),
+  index("tikis_yengapay_webhook_events_payment_index").on(table.paymentTransactionId),
+]);
+
+export type TikisYengapayWebhookEvent = typeof tikisYengapayWebhookEvents.$inferSelect;
+
+/** Push tokens Expo pour les notifications device-to-device.
+ *  Un profil peut avoir plusieurs tokens (plusieurs devices ou plusieurs installs). */
+export const tikisPushTokens = mysqlTable("tikis_push_tokens", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  token: varchar("token", { length: 200 }).notNull(),
+  platform: mysqlEnum("platform", ["ios", "android", "web"]).notNull().default("android"),
+  appVersion: varchar("appVersion", { length: 40 }),
+  deviceName: varchar("deviceName", { length: 120 }),
+  lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("tikis_push_tokens_phone_token_unique").on(table.phone, table.token),
+  index("tikis_push_tokens_phone_index").on(table.phone),
+  index("tikis_push_tokens_last_seen_index").on(table.lastSeenAt),
+]);
+
+export type TikisPushToken = typeof tikisPushTokens.$inferSelect;
+
+/** Programme de fidélité : règles métier (seuil livraisons, montant bonus, palier). */
+export const tikisLoyaltyPrograms = mysqlTable("tikis_loyalty_programs", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  name: varchar("name", { length: 80 }).notNull(),
+  description: varchar("description", { length: 300 }),
+  role: mysqlEnum("role", ["sender", "driver"]).notNull(),
+  /** Nombre de livraisons terminées requis pour déclencher la récompense. */
+  requiredDeliveries: int("requiredDeliveries").notNull(),
+  /** Montant du bonus crédité sur le wallet (FCFA). */
+  bonusAmount: int("bonusAmount").notNull(),
+  /** Plage de validité : la course doit avoir été terminée dans cette fenêtre. */
+  windowDays: int("windowDays").notNull().default(90),
+  /** Si true, les bonus <= autoCreditMaxAmount sont crédités automatiquement.
+   *  Sinon, ils restent en 'pending' et nécessitent une validation admin. */
+  autoCredit: boolean("autoCredit").notNull().default(false),
+  /** Plafond (FCFA) pour le crédit automatique. 0 = illimité (mais contrôlé par le booléen). */
+  autoCreditMaxAmount: int("autoCreditMaxAmount").notNull().default(0),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("tikis_loyalty_programs_role_index").on(table.role, table.enabled),
+]);
+
+/** Octroi de bonus lié à un programme. Idempotent via (programId, deliveryId). */
+export const tikisLoyaltyGrants = mysqlTable("tikis_loyalty_grants", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  programId: varchar("programId", { length: 40 }).notNull(),
+  profilePhone: varchar("profilePhone", { length: 20 }).notNull(),
+  deliveryId: varchar("deliveryId", { length: 40 }),
+  bonusAmount: int("bonusAmount").notNull(),
+  status: mysqlEnum("status", ["pending", "credited", "cancelled"]).notNull().default("pending"),
+  ledgerEntryId: varchar("ledgerEntryId", { length: 40 }),
+  grantedAt: timestamp("grantedAt").defaultNow().notNull(),
+  creditedAt: timestamp("creditedAt"),
+  expiresAt: timestamp("expiresAt"),
+  cancelledReason: varchar("cancelledReason", { length: 300 }),
+}, (table) => [
+  uniqueIndex("tikis_loyalty_grants_program_delivery_unique").on(table.programId, table.deliveryId),
+  index("tikis_loyalty_grants_profile_index").on(table.profilePhone, table.grantedAt),
+  index("tikis_loyalty_grants_status_index").on(table.status),
+  index("tikis_loyalty_grants_expires_index").on(table.expiresAt),
+]);
+
+export type TikisLoyaltyProgram = typeof tikisLoyaltyPrograms.$inferSelect;
+export type TikisLoyaltyGrant = typeof tikisLoyaltyGrants.$inferSelect;
+
+/** Sessions actives multi-device : permet la révocation granulaire.
+ *  Le token JWT complet n'est jamais stocké (security) : on garde son hash SHA-256
+ *  et les 4 derniers caractères pour affichage. */
+export const tikisProfileSessions = mysqlTable("tikis_profile_sessions", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
+  tokenLast4: varchar("tokenLast4", { length: 4 }).notNull(),
+  deviceName: varchar("deviceName", { length: 120 }),
+  platform: mysqlEnum("platform", ["ios", "android", "web", "unknown"]).notNull().default("unknown"),
+  appVersion: varchar("appVersion", { length: 40 }),
+  ipAddress: varchar("ipAddress", { length: 45 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+  revokedAt: timestamp("revokedAt"),
+}, (table) => [
+  index("tikis_profile_sessions_phone_index").on(table.phone, table.lastSeenAt),
+  uniqueIndex("tikis_profile_sessions_phone_token_unique").on(table.phone, table.tokenHash),
+]);
+
+export type TikisProfileSession = typeof tikisProfileSessions.$inferSelect;
+
+/** Métriques business quotidiennes — alimentées par le cron /api/scheduled/compute-daily-metrics.
+ *  Permet au DashboardPage d'afficher des tendances (GMV semaine dernière, etc.) sans
+ *  ré-agréger toute la table tikis_deliveries. */
+export const tikisDailyMetrics = mysqlTable("tikis_daily_metrics", {
+  date: varchar("date", { length: 10 }).primaryKey(), // "YYYY-MM-DD"
+  deliveriesCreated: int("deliveriesCreated").notNull().default(0),
+  deliveriesCompleted: int("deliveriesCompleted").notNull().default(0),
+  deliveriesCancelled: int("deliveriesCancelled").notNull().default(0),
+  gmvTotal: int("gmvTotal").notNull().default(0), // montant total facturé (FCFA)
+  commissionTotal: int("commissionTotal").notNull().default(0), // commission Tikis
+  newDrivers: int("newDrivers").notNull().default(0),
+  newSenders: int("newSenders").notNull().default(0),
+  activeDrivers: int("activeDrivers").notNull().default(0),
+  activeSenders: int("activeSenders").notNull().default(0),
+  bonusAwarded: int("bonusAwarded").notNull().default(0),
+  reportsOpened: int("reportsOpened").notNull().default(0),
+  computedAt: timestamp("computedAt").defaultNow().notNull(),
+}, (table) => [
+  index("tikis_daily_metrics_date_index").on(table.date),
+]);
+
+export type TikisDailyMetric = typeof tikisDailyMetrics.$inferSelect;

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { trpc } from "../lib/trpc";
+import { downloadCsv, rowsToCsv } from "../lib/csv";
+import { SkeletonTable } from "../lib/skeleton";
 
 type Profile = { phone: string; fullName: string; accountType: "sender" | "driver"; email: string | null; phoneVerified: boolean; emailVerified: boolean; status?: "active" | "suspended" | "banned"; statusReason?: string | null };
 type Detail = {
@@ -26,6 +28,9 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const PAGE_SIZE = 25;
 
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState("");
@@ -37,8 +42,9 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
     setError("");
     setLoading(true);
     try {
-      const rows = await trpc.adminConsole.users.search.query(searchQuery ? { query: searchQuery } : {});
-      setResults((rows as Profile[]).filter((p) => filter === "all" || p.accountType === filter));
+      const response = await trpc.adminConsole.users.search.query({ query: searchQuery, limit: PAGE_SIZE, offset: page * PAGE_SIZE }) as { rows: Profile[]; total: number };
+      setResults(response.rows.filter((p) => filter === "all" || p.accountType === filter));
+      setTotal(response.total);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Recherche impossible.");
     } finally {
@@ -48,7 +54,7 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
   }
 
   useEffect(() => { void loadUsers(); }, []);
-  useEffect(() => { if (loaded) void loadUsers(query || undefined); }, [filter, query]);
+  useEffect(() => { if (loaded) void loadUsers(query || undefined); }, [filter, query, page]);
 
   async function openDetail(phone: string) {
     setError("");
@@ -222,19 +228,50 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
     );
   }
 
-  const total = results.length;
+  const localTotal = results.length;
   const senderCount = results.filter((p) => p.accountType === "sender").length;
   const driverCount = results.filter((p) => p.accountType === "driver").length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const hasPrev = page > 0;
+  const hasNext = page + 1 < totalPages;
+
+  function goToPage(next: number) {
+    setPage(Math.max(0, Math.min(next, totalPages - 1)));
+  }
 
   return (
     <div>
       <div className="page-head">
         <div>
           <h1 className="page-title">Utilisateurs</h1>
-          <p className="page-sub">{total} profils · {senderCount} expéditeurs · {driverCount} livreurs</p>
+          <p className="page-sub">{total} profils · page {page + 1} / {totalPages} · {localTotal} résultat(s) affiché(s)</p>
         </div>
         <div className="page-actions">
-          <button className="btn">Exporter CSV</button>
+          <button type="button" className="btn" onClick={() => {
+            const csv = rowsToCsv(
+              [
+                { key: "phone", label: "Téléphone" },
+                { key: "fullName", label: "Nom" },
+                { key: "accountType", label: "Rôle" },
+                { key: "email", label: "Email" },
+                { key: "phoneVerified", label: "Téléphone vérifié" },
+                { key: "emailVerified", label: "Email vérifié" },
+                { key: "status", label: "Statut" },
+                { key: "statusReason", label: "Motif" },
+              ],
+              results.map((profile) => ({
+                phone: profile.phone,
+                fullName: profile.fullName,
+                accountType: profile.accountType,
+                email: profile.email ?? "",
+                phoneVerified: profile.phoneVerified,
+                emailVerified: profile.emailVerified,
+                status: profile.status ?? "active",
+                statusReason: profile.statusReason ?? "",
+              })),
+            );
+            downloadCsv(`tikis-users-${new Date().toISOString().slice(0, 10)}`, csv);
+          }} disabled={results.length === 0}>Exporter CSV</button>
         </div>
       </div>
 
@@ -247,12 +284,17 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
             <button className={`tab ${filter === "sender" ? "active" : ""}`} onClick={() => setFilter("sender")}>Expéditeurs <span className="count">{senderCount}</span></button>
             <button className={`tab ${filter === "driver" ? "active" : ""}`} onClick={() => setFilter("driver")}>Livreurs <span className="count">{driverCount}</span></button>
           </div>
+          <div className="pagination">
+            <button type="button" className="btn btn-sm" disabled={!hasPrev} onClick={() => goToPage(page - 1)}>← Précédent</button>
+            <span className="muted">{page + 1} / {totalPages}</span>
+            <button type="button" className="btn btn-sm" disabled={!hasNext} onClick={() => goToPage(page + 1)}>Suivant →</button>
+          </div>
         </div>
         <div className="filters-row">
           <input className="input" placeholder="Rechercher par téléphone, nom ou email…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ minWidth: 280 }} />
         </div>
 
-        {loading && !loaded ? <div className="empty-state">Chargement des utilisateurs…</div> : null}
+        {loading && !loaded ? <SkeletonTable rows={6} columns={4} /> : null}
         {loaded && results.length === 0 && !error ? <div className="empty-state">Aucun utilisateur ne correspond à cette recherche.</div> : null}
         {results.length > 0 ? (
           <table className="table">
@@ -284,7 +326,12 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
                       <span className="dot" />{profile.accountType === "sender" ? "Expéditeur" : "Livreur"}
                     </span>
                     {" "}
-                    {profile.status === "banned" ? <span className="pill pill-error"><span className="dot" />Banni</span> : profile.status === "suspended" ? <span className="pill pill-warning"><span className="dot" />Suspendu</span> : null}
+                    {profile.status === "banned" ? <span className="pill pill-error" title={profile.statusReason ?? undefined}><span className="dot" />Banni</span> : profile.status === "suspended" ? <span className="pill pill-warning" title={profile.statusReason ?? undefined}><span className="dot" />Suspendu</span> : null}
+                    {profile.statusReason && (profile.status === "banned" || profile.status === "suspended") ? (
+                      <div className="muted" style={{ fontSize: 10.5, marginTop: 4, maxWidth: 160 }} title={profile.statusReason}>
+                        Motif : {profile.statusReason.length > 30 ? `${profile.statusReason.slice(0, 30)}…` : profile.statusReason}
+                      </div>
+                    ) : null}
                   </td>
                   <td>{profile.email ?? <span className="muted">—</span>}</td>
                   <td>

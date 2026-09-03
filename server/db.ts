@@ -1,8 +1,11 @@
 import { randomUUID } from "crypto";
-import { and, count, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, tikisFavoritePlaces, tikisKycSubmissions, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, users } from "../drizzle/schema";
+import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, tikisFavoritePlaces, tikisKycSubmissions, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisPushTokens, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, tikisYengapayWebhookEvents, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
+import { createYengapayPaymentIntent, readYengapayConfig, verifyYengapayPayment } from "./yengapay";
+import { sendPushToTokens, type PushMessage } from "./push";
+import { isValidExpoPushTokenShape } from "./_test-helpers/push-token-shape";
 import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppNotification, LocationLabel, SelectableVehicleType, WalletOperation, WalletSnapshot } from "../shared/tikis-domain";
 import { candidateMovementVersion } from "../shared/wallet-commission";
 import { DELIVERY_EXPIRATION_MS, deliveryActivityTimestamp, deliveryExpirationOutcome } from "../shared/delivery-expiration";
@@ -112,7 +115,9 @@ export async function requestProfileDeletion(phone: string) {
   const profile = await getTikisProfileByPhone(phone);
   if (!profile) throw new Error("Profil introuvable.");
   if (!profile.deletionRequestedAt) {
-    await dbc.update(tikisProfiles).set({ deletionRequestedAt: new Date(), updatedAt: new Date() }).where(eq(tikisProfiles.phone, phone));
+    const requestedAt = new Date();
+    const scheduledAt = new Date(requestedAt.getTime() + ACCOUNT_DELETION_GRACE_PERIOD_MS);
+    await dbc.update(tikisProfiles).set({ deletionRequestedAt: requestedAt, deletionScheduledAt: scheduledAt, updatedAt: requestedAt }).where(eq(tikisProfiles.phone, phone));
   }
   const updated = await getTikisProfileByPhone(phone);
   if (!updated) throw new Error("Profil introuvable.");
@@ -125,7 +130,7 @@ export async function cancelProfileDeletion(phone: string) {
   const profile = await getTikisProfileByPhone(phone);
   if (!profile) throw new Error("Profil introuvable.");
   if (profile.deletedAt) throw new Error("Ce compte est déjà supprimé définitivement et ne peut plus être restauré ici.");
-  await dbc.update(tikisProfiles).set({ deletionRequestedAt: null, updatedAt: new Date() }).where(eq(tikisProfiles.phone, phone));
+  await dbc.update(tikisProfiles).set({ deletionRequestedAt: null, deletionScheduledAt: null, updatedAt: new Date() }).where(eq(tikisProfiles.phone, phone));
   const updated = await getTikisProfileByPhone(phone);
   if (!updated) throw new Error("Profil introuvable.");
   return updated;
@@ -137,8 +142,7 @@ export async function cancelProfileDeletion(phone: string) {
 export async function finalizeExpiredAccountDeletions(now = new Date()) {
   const dbc = await getDb();
   if (!dbc) return;
-  const threshold = new Date(now.getTime() - ACCOUNT_DELETION_GRACE_PERIOD_MS);
-  const due = await dbc.select({ phone: tikisProfiles.phone }).from(tikisProfiles).where(and(lt(tikisProfiles.deletionRequestedAt, threshold), isNull(tikisProfiles.deletedAt)));
+  const due = await dbc.select({ phone: tikisProfiles.phone }).from(tikisProfiles).where(and(isNotNull(tikisProfiles.deletionScheduledAt), lte(tikisProfiles.deletionScheduledAt, now), isNull(tikisProfiles.deletedAt)));
   for (const row of due) {
     await dbc.update(tikisProfiles).set({
       deletedAt: now, fullName: "Compte supprimé", email: null, photoKey: null, updatedAt: now,
@@ -412,28 +416,30 @@ export async function saveTikisDeliveryLiveLocation(input: {
 }) {
   const db = await getDb();
   if (!db) throw new Error("Le suivi en direct est temporairement indisponible.");
-  const delivery = await getTikisDeliveryRecordById(input.deliveryId);
-  if (!delivery || delivery.status !== "active" || delivery.driverPhone !== input.driverPhone) {
-    throw new Error("Cette position ne peut pas être publiée pour cette livraison.");
-  }
-  const recordedAt = new Date();
-  await db.insert(tikisDeliveryLiveLocations).values({
-    deliveryId: input.deliveryId,
-    driverPhone: input.driverPhone,
-    latitude: String(input.latitude),
-    longitude: String(input.longitude),
-    heading: String(input.heading),
-    recordedAt,
-  }).onDuplicateKeyUpdate({
-    set: {
+  return db.transaction(async (tx) => {
+    const [delivery] = await tx.select().from(tikisDeliveries).where(eq(tikisDeliveries.id, input.deliveryId)).limit(1).for("update");
+    if (!delivery || delivery.status !== "active" || delivery.driverPhone !== input.driverPhone) {
+      throw new Error("Cette position ne peut pas être publiée pour cette livraison.");
+    }
+    const recordedAt = new Date();
+    await tx.insert(tikisDeliveryLiveLocations).values({
+      deliveryId: input.deliveryId,
       driverPhone: input.driverPhone,
       latitude: String(input.latitude),
       longitude: String(input.longitude),
       heading: String(input.heading),
       recordedAt,
-    },
+    }).onDuplicateKeyUpdate({
+      set: {
+        driverPhone: input.driverPhone,
+        latitude: String(input.latitude),
+        longitude: String(input.longitude),
+        heading: String(input.heading),
+        recordedAt,
+      },
+    });
+    return { latitude: input.latitude, longitude: input.longitude, heading: input.heading, recordedAt: recordedAt.toISOString() } satisfies TikisLiveDeliveryPosition;
   });
-  return { latitude: input.latitude, longitude: input.longitude, heading: input.heading, recordedAt: recordedAt.toISOString() } satisfies TikisLiveDeliveryPosition;
 }
 
 export async function getTikisDeliveryLiveLocation(deliveryId: string): Promise<TikisLiveDeliveryPosition | null> {
@@ -599,6 +605,13 @@ async function appendDeliveryEvent(tx: any, event: DeliveryEventInput) {
     actorPhone: event.actorPhone ?? null, recipientPhone: event.recipientPhone, title: event.title, body: event.body,
     tone: event.tone, metadata: null, idempotencyKey: event.idempotencyKey,
   }).onDuplicateKeyUpdate({ set: { idempotencyKey: event.idempotencyKey } });
+  // Push best-effort après la transaction : on capture le recipient, on envoie hors-transaction.
+  // Le push est opt-in (token Expo enregistré), les in-app events sont toujours créés.
+  if (event.recipientPhone) {
+    const data: Record<string, unknown> = { deliveryId: event.deliveryId, eventType: event.eventType };
+    if (event.status) data.status = event.status;
+    void enqueuePushToPhone({ phone: event.recipientPhone, title: event.title, body: event.body, data, channelId: "tikis-delivery" });
+  }
 }
 
 export async function listSupportedCountries(onlyEnabled = true) {
@@ -672,6 +685,7 @@ export async function initiateYengaPayTestPayment(input: { profilePhone: string;
   if (!/^[A-Za-z0-9_-]{16,96}$/.test(input.idempotencyKey)) throw new Error("Référence de paiement invalide.");
   const db = await getDb();
   if (!db) throw new Error("Le paiement est temporairement indisponible.");
+  const config = readYengapayConfig();
   return db.transaction(async (tx) => {
     const existing = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.idempotencyKey, input.idempotencyKey)).limit(1).for("update"))[0];
     if (existing) {
@@ -681,9 +695,19 @@ export async function initiateYengaPayTestPayment(input: { profilePhone: string;
     const wallet = await ensureTikisWallet(tx, input.profilePhone);
     if (input.type === "withdrawal" && wallet.availableBalance < input.amount) throw new Error("Votre solde disponible est insuffisant pour ce retrait.");
     const id = randomUUID();
-    const providerReference = `YENGA-TEST-${randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
-    await tx.insert(tikisPaymentTransactions).values({ id, profilePhone: input.profilePhone, type: input.type, provider: "yengapay_test", amount: input.amount, status: "pending", providerReference, idempotencyKey: input.idempotencyKey });
-    await tx.insert(tikisWalletLedger).values({ id: randomUUID(), profilePhone: input.profilePhone, deliveryId: null, operation: input.type === "deposit" ? "deposit_request" : "withdrawal_request", amount: input.amount, availableBefore: wallet.availableBalance, availableAfter: wallet.availableBalance, heldBefore: wallet.heldBalance, heldAfter: wallet.heldBalance, reason: `Demande ${input.type === "deposit" ? "de dépôt" : "de retrait"} YengaPay en mode test`, idempotencyKey: `${id}:requested` });
+    let providerReference = `YENGA-TEST-${randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
+    let providerName: "yengapay_test" | "yengapay_live" = "yengapay_test";
+    if (config.mode === "live") {
+      try {
+        const intent = await createYengapayPaymentIntent({ paymentTransactionId: id, amount: input.amount, type: input.type, phone: input.profilePhone });
+        providerReference = intent.providerReference;
+        providerName = "yengapay_live";
+      } catch (cause) {
+        throw new Error(`YengaPay (live) indisponible : ${cause instanceof Error ? cause.message : "erreur inconnue"}`);
+      }
+    }
+    await tx.insert(tikisPaymentTransactions).values({ id, profilePhone: input.profilePhone, type: input.type, provider: providerName, amount: input.amount, status: "pending", providerReference, idempotencyKey: input.idempotencyKey });
+    await tx.insert(tikisWalletLedger).values({ id: randomUUID(), profilePhone: input.profilePhone, deliveryId: null, operation: input.type === "deposit" ? "deposit_request" : "withdrawal_request", amount: input.amount, availableBefore: wallet.availableBalance, availableAfter: wallet.availableBalance, heldBefore: wallet.heldBalance, heldAfter: wallet.heldBalance, reason: `Demande ${input.type === "deposit" ? "de dépôt" : "de retrait"} YengaPay en mode ${providerName === "yengapay_live" ? "live" : "test"}`, idempotencyKey: `${id}:requested` });
     const created = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, id)).limit(1))[0];
     if (!created) throw new Error("La demande de paiement n’a pas pu être créée.");
     return yengaPayTestPaymentToView(created);
@@ -789,9 +813,27 @@ export async function markTikisDeliveryEventRead(notificationId: string, profile
   return { success: true } as const;
 }
 
+const MAX_OPEN_APPLICATIONS_PER_DRIVER = 50;
+const MAX_APPLICATIONS_PER_DAY = 200;
+
+type DbHandle = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+
+async function enforceDriverApplicationRateLimit(driverPhone: string, db: DbHandle) {
+  const openCount = (await db.select({ count: count() }).from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.driverPhone, driverPhone), inArray(tikisDeliveryCandidates.status, ["applied", "selected"]))))[0]?.count ?? 0;
+  if (Number(openCount) >= MAX_OPEN_APPLICATIONS_PER_DRIVER) {
+    throw new Error(`Vous avez déjà ${MAX_OPEN_APPLICATIONS_PER_DRIVER} candidatures en cours. Annulez-en avant d’en proposer une nouvelle.`);
+  }
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const dayCount = (await db.select({ count: count() }).from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.driverPhone, driverPhone), gte(tikisDeliveryCandidates.createdAt, since))))[0]?.count ?? 0;
+  if (Number(dayCount) >= MAX_APPLICATIONS_PER_DAY) {
+    throw new Error(`Limite quotidienne de ${MAX_APPLICATIONS_PER_DAY} candidatures atteinte. Réessaie demain.`);
+  }
+}
+
 export async function applyForTikisDelivery(input: { id: string; deliveryId: string; driverPhone: string; confirmedCommission: number; offerPrice?: number }) {
   const db = await getDb();
   if (!db) throw new Error("Les candidatures sont temporairement indisponibles.");
+  await enforceDriverApplicationRateLimit(input.driverPhone, db);
   const wallet = await db.transaction(async (tx) => {
     const deliveries = await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, input.deliveryId), eq(tikisDeliveries.status, "open"))).limit(1).for("update");
     const delivery = deliveries[0];
@@ -1121,7 +1163,7 @@ async function qualifyReferralIfEligible(tx: any, phone: string | null, delivery
 export async function completeTikisDeliveryWithEvents(deliveryId: string, profilePhone: string) {
   const db = await getDb();
   if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
-  const wallet = await db.transaction(async (tx) => {
+  const completedDelivery = await db.transaction(async (tx) => {
     const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.status, "active"), or(eq(tikisDeliveries.senderPhone, profilePhone), eq(tikisDeliveries.driverPhone, profilePhone)))).limit(1).for("update"))[0];
     if (!delivery || !delivery.driverPhone) throw new Error("Cette livraison ne peut pas être terminée.");
     const earning = Math.round(delivery.offeredPrice ?? delivery.estimatedPrice);
@@ -1140,9 +1182,18 @@ export async function completeTikisDeliveryWithEvents(deliveryId: string, profil
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_completed", status: "completed", actorPhone: profilePhone, recipientPhone: delivery.driverPhone, title: "Course terminée", body: "La course est ajoutée à votre historique.", tone: "success", idempotencyKey: `${deliveryId}:completed-driver` });
     await qualifyReferralIfEligible(tx, delivery.driverPhone, deliveryId);
     await qualifyReferralIfEligible(tx, delivery.senderPhone, deliveryId);
-    return walletSnapshotFromRecord(await ensureTikisWallet(tx, delivery.driverPhone));
+    const wallet = walletSnapshotFromRecord(await ensureTikisWallet(tx, delivery.driverPhone));
+    return { delivery, wallet };
   });
-  return { delivery: await getTikisDeliveryById(deliveryId), wallet };
+  // Évaluation du programme de fidélité, hors transaction wallet.
+  // Best-effort : si la fonction échoue, on log mais on ne fait pas échouer la complétion.
+  try {
+    const { evaluateAndNotifyLoyaltyGrants } = await import("./loyalty");
+    await evaluateAndNotifyLoyaltyGrants({ deliveryId, driverPhone: completedDelivery.delivery.driverPhone, senderPhone: completedDelivery.delivery.senderPhone });
+  } catch (cause) {
+    console.error("[loyalty] evaluateAndNotifyLoyaltyGrants failed", cause);
+  }
+  return { delivery: await getTikisDeliveryById(deliveryId), wallet: completedDelivery.wallet };
 }
 
 export async function listTikisDeliveryCandidates(deliveryId: string): Promise<DriverCandidate[]> {
@@ -1235,4 +1286,104 @@ export async function listTikisDeliveryReviewsForProfile(profilePhone: string, r
   const condition = role === "sender" ? eq(tikisDeliveryReviews.reviewerPhone, profilePhone) : eq(tikisDeliveryReviews.driverPhone, profilePhone);
   const reviews = await db.select().from(tikisDeliveryReviews).where(condition).orderBy(desc(tikisDeliveryReviews.createdAt));
   return Promise.all(reviews.map((review) => deliveryReviewToView(review)));
+}
+
+/** YengaPay : enregistrement idempotent d'un événement webhook. */
+export async function recordYengapayWebhookEvent(input: { providerEventId: string; eventType: string; paymentTransactionId: string | null; payload: string; signature: string | null }) {
+  const db = await getDb();
+  if (!db) throw new Error("Le paiement est temporairement indisponible.");
+  const existing = (await db.select().from(tikisYengapayWebhookEvents).where(and(eq(tikisYengapayWebhookEvents.provider, "yengapay_live"), eq(tikisYengapayWebhookEvents.providerEventId, input.providerEventId))).limit(1))[0];
+  if (existing) return { duplicate: true, id: existing.id };
+  const id = randomUUID();
+  await db.insert(tikisYengapayWebhookEvents).values({ id, provider: "yengapay_live", providerEventId: input.providerEventId, eventType: input.eventType, paymentTransactionId: input.paymentTransactionId, payload: input.payload, signature: input.signature, status: "received" });
+  return { duplicate: false, id };
+}
+
+/** YengaPay : applique un événement de paiement sur le wallet (succeeded / failed / cancelled). */
+export async function settleYengapayLivePayment(input: { providerReference: string; outcome: "succeeded" | "failed" | "cancelled" }) {
+  const db = await getDb();
+  if (!db) throw new Error("Le paiement est temporairement indisponible.");
+  return db.transaction(async (tx) => {
+    const payment = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.providerReference, input.providerReference)).limit(1).for("update"))[0];
+    if (!payment) throw new Error(`Transaction YengaPay introuvable pour la référence ${input.providerReference}.`);
+    if (payment.status !== "pending") {
+      const wallet = await ensureTikisWallet(tx, payment.profilePhone);
+      return { payment: yengaPayTestPaymentToView(payment), wallet: walletSnapshotFromRecord(wallet) } satisfies YengaPayTestPaymentSettlement;
+    }
+    if (input.outcome === "failed" || input.outcome === "cancelled") {
+      await tx.update(tikisPaymentTransactions).set({ status: input.outcome, settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
+    } else if (payment.type === "deposit") {
+      await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "credit", amount: payment.amount, availableDelta: payment.amount, heldDelta: 0, reason: "Dépôt YengaPay live confirmé", idempotencyKey: `${payment.id}:settled` });
+      await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
+    } else {
+      await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "debit", amount: payment.amount, availableDelta: -payment.amount, heldDelta: 0, reason: "Retrait YengaPay live confirmé", idempotencyKey: `${payment.id}:settled` });
+      await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
+    }
+    const settled = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, payment.id)).limit(1))[0];
+    if (!settled) throw new Error("La transaction n’a pas pu être finalisée.");
+    const wallet = await ensureTikisWallet(tx, payment.profilePhone);
+    return { payment: yengaPayTestPaymentToView(settled), wallet: walletSnapshotFromRecord(wallet) } satisfies YengaPayTestPaymentSettlement;
+  });
+}
+
+/** YengaPay : réconciliation manuelle — vérifie l'état réel d'un intent en cas d'incident webhook. */
+export async function reconcileYengapayPayment(providerReference: string) {
+  const config = readYengapayConfig();
+  if (config.mode !== "live") throw new Error("La réconciliation YengaPay nécessite le mode live.");
+  const remote = await verifyYengapayPayment({ providerReference });
+  return settleYengapayLivePayment({ providerReference, outcome: remote.status });
+}
+
+/** Push tokens Expo : enregistrement idempotent. Met à jour lastSeenAt si le token existe déjà. */
+export async function registerPushToken(input: { phone: string; token: string; platform: "ios" | "android" | "web"; appVersion?: string; deviceName?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Les notifications push sont temporairement indisponibles.");
+  if (!isValidExpoPushTokenShape(input.token)) {
+    throw new Error("Format de token push invalide.");
+  }
+  const now = new Date();
+  const existing = (await db.select().from(tikisPushTokens).where(and(eq(tikisPushTokens.phone, input.phone), eq(tikisPushTokens.token, input.token))).limit(1))[0];
+  if (existing) {
+    await db.update(tikisPushTokens).set({ lastSeenAt: now, platform: input.platform, appVersion: input.appVersion ?? existing.appVersion, deviceName: input.deviceName ?? existing.deviceName }).where(eq(tikisPushTokens.id, existing.id));
+    return { id: existing.id, created: false };
+  }
+  const id = randomUUID();
+  await db.insert(tikisPushTokens).values({ id, phone: input.phone, token: input.token, platform: input.platform, appVersion: input.appVersion ?? null, deviceName: input.deviceName ?? null, lastSeenAt: now });
+  return { id, created: true };
+}
+
+export async function unregisterPushToken(input: { phone: string; token: string }) {
+  const db = await getDb();
+  if (!db) return { removed: 0 };
+  const result = await db.delete(tikisPushTokens).where(and(eq(tikisPushTokens.phone, input.phone), eq(tikisPushTokens.token, input.token)));
+  return { removed: (result as unknown as { affectedRows?: number }).affectedRows ?? 0 };
+}
+
+export async function listActivePushTokens(phone: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  return db.select().from(tikisPushTokens).where(and(eq(tikisPushTokens.phone, phone), gte(tikisPushTokens.lastSeenAt, cutoff)));
+}
+
+/** Envoie un push à tous les tokens actifs d'un phone. Best-effort : ne lève pas en cas d'échec. */
+export async function enqueuePushToPhone(input: { phone: string; title: string; body: string; data?: Record<string, unknown>; channelId?: string }) {
+  const tokens = await listActivePushTokens(input.phone);
+  if (tokens.length === 0) return { sent: 0, failed: 0, errors: [] as string[] };
+  const messages: PushMessage[] = tokens.map((token) => ({
+    to: token.token,
+    title: input.title,
+    body: input.body,
+    data: input.data,
+    channelId: input.channelId ?? "tikis-default",
+  }));
+  const result = await sendPushToTokens(messages);
+  // Si un token a renvoyé DeviceNotRegistered, on le supprime pour éviter de re-essayer.
+  for (let i = 0; i < messages.length; i += 1) {
+    const message = result.errors[i] ?? "";
+    if (message.includes("DeviceNotRegistered") || message.includes("InvalidCredentials")) {
+      await db.delete(tikisPushTokens).where(eq(tikisPushTokens.id, tokens[i]!.id));
+    }
+  }
+  return result;
 }

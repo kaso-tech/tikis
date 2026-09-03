@@ -17,22 +17,41 @@ function toneForAction(action: string): string {
   return "pill-neutral";
 }
 
+const PAGE_SIZE = 50;
+
 export default function AuditLogPage() {
   const [rows, setRows] = useState<AuditRow[]>([]);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    trpc.adminConsole.auditLog.list.query({})
-      .then((data) => setRows((data as AuditRow[]) ?? []))
-      .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Accès réservé aux super-administrateurs."));
-  }, []);
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await trpc.adminConsole.auditLog.list.query({ limit: PAGE_SIZE, offset: page * PAGE_SIZE }) as { rows: AuditRow[]; total: number };
+      setRows(response.rows);
+      setTotal(response.total);
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : "Accès réservé aux super-administrateurs.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { void load(); }, [page]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const hasPrev = page > 0;
+  const hasNext = page + 1 < totalPages;
 
   return (
     <div>
       <div className="page-head">
         <div>
           <h1 className="page-title">Journal d'audit</h1>
-          <p className="page-sub">Historique immuable de toutes les actions d'administration (200 dernières entrées)</p>
+          <p className="page-sub">Historique immuable de toutes les actions d'administration — page {page + 1} / {totalPages}</p>
         </div>
       </div>
 
@@ -42,11 +61,16 @@ export default function AuditLogPage() {
         <div className="card-head">
           <div>
             <div className="card-title">Toutes les actions</div>
-            <div className="card-sub">{rows.length} entrée(s)</div>
+            <div className="card-sub">{total} entrée(s) au total</div>
+          </div>
+          <div className="pagination">
+            <button type="button" className="btn btn-sm" disabled={!hasPrev || loading} onClick={() => setPage((p) => Math.max(0, p - 1))}>← Précédent</button>
+            <span className="muted">{page + 1} / {totalPages}</span>
+            <button type="button" className="btn btn-sm" disabled={!hasNext || loading} onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}>Suivant →</button>
           </div>
         </div>
         {rows.length === 0 ? (
-          <div className="empty-state">Aucune action enregistrée pour le moment.</div>
+          <div className="empty-state">{loading ? "Chargement…" : "Aucune action enregistrée pour le moment."}</div>
         ) : (
           <table className="table">
             <thead>

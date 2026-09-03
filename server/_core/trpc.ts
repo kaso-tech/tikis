@@ -8,6 +8,32 @@ const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
 });
 
+const PROFILE_CACHE_TTL_MS = 10_000;
+const PROFILE_CACHE_MAX_ENTRIES = 5_000;
+const profileCache = new Map<string, { profile: NonNullable<Awaited<ReturnType<typeof getTikisProfileByPhone>>>; expiresAt: number }>();
+
+async function getCachedTikisProfile(phone: string) {
+  const cached = profileCache.get(phone);
+  const now = Date.now();
+  if (cached && cached.expiresAt > now) return cached.profile;
+  const fresh = await getTikisProfileByPhone(phone);
+  if (!fresh) {
+    profileCache.delete(phone);
+    return undefined;
+  }
+  if (profileCache.size >= PROFILE_CACHE_MAX_ENTRIES) {
+    const firstKey = profileCache.keys().next().value;
+    if (firstKey) profileCache.delete(firstKey);
+  }
+  profileCache.set(phone, { profile: fresh, expiresAt: now + PROFILE_CACHE_TTL_MS });
+  return fresh;
+}
+
+export function invalidateTikisProfileCache(phone?: string) {
+  if (phone) profileCache.delete(phone);
+  else profileCache.clear();
+}
+
 export const router = t.router;
 export const mergeRouters = t.mergeRouters;
 export const publicProcedure = t.procedure;
@@ -33,9 +59,21 @@ const requireTikisProfile = t.middleware(async (opts) => {
   if (!opts.ctx.tikisProfilePhone) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Votre session Tikis a expiré. Connectez-vous de nouveau." });
   }
+  // Vérification révocation multi-device : si l'utilisateur a déconnecté cet appareil
+  // depuis un autre device, on rejette immédiatement la requête.
+  const sessionHeader = opts.ctx.req?.headers?.["x-tikis-session"];
+  const sessionToken = Array.isArray(sessionHeader) ? sessionHeader[0] : sessionHeader;
+  if (sessionToken) {
+    const { isSessionRevoked } = await import("../sessions");
+    if (await isSessionRevoked({ phone: opts.ctx.tikisProfilePhone, token: sessionToken })) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: "Cette session a été déconnectée depuis un autre appareil." });
+    }
+  }
   // Vérifié à chaque appel (pas seulement à la connexion) : une suspension/un bannissement décidé
   // par l'administration doit couper l'accès immédiatement, même si une session était déjà émise.
-  const profile = await getTikisProfileByPhone(opts.ctx.tikisProfilePhone);
+  // Cache LRU TTL 10s : on tolère 10s de latence entre une décision admin et sa prise d'effet
+  // (cf. commentaire `invalidateTikisProfileCache` à appeler après `setStatus` / `changeRole`).
+  const profile = await getCachedTikisProfile(opts.ctx.tikisProfilePhone);
   if (!profile) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Profil introuvable. Connectez-vous de nouveau." });
   }

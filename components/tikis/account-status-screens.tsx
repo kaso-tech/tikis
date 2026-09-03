@@ -7,12 +7,7 @@ import { useTikisLogout } from "@/lib/tikis-logout";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { haptic } from "@/lib/haptics";
-
-function daysRemaining(iso?: string) {
-  if (!iso) return 0;
-  const ms = new Date(iso).getTime() - Date.now();
-  return Math.max(0, Math.ceil(ms / (24 * 60 * 60 * 1000)));
-}
+import { computeDaysRemaining as daysRemaining } from "@/server/_test-helpers/deletion-flow";
 
 /** Écran plein bloquant l'ensemble de l'app quand le mode maintenance est actif. */
 export function MaintenanceScreen({ message }: { message?: string }) {

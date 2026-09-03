@@ -3,9 +3,10 @@ import { COOKIE_NAME } from "../shared/const";
 import { randomInt, randomUUID } from "node:crypto";
 import * as db from "./db";
 import { publishDeliveryPositionBroadcast, publishDeliveryStatusBroadcast, syncDeliveryRealtimeMembers } from "./supabase-realtime";
+import { isCoordinateInCountry } from "./_test-helpers/geo-fence";
 import { storagePut } from "./storage";
 import * as geography from "./geography";
-import { getSessionCookieOptions } from "./_core/cookies";
+import { getSessionCookieOptions, setTikisProfileCookie, clearTikisProfileCookie } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, tikisProtectedProcedure, tikisSessionProcedure } from "./_core/trpc";
 import { findCountryForPhone } from "../lib/registration-rules";
@@ -13,6 +14,7 @@ import { createTikisProfileSession } from "./tikis-session";
 import { recordGeographicMetric } from "./geography-observability";
 import { isAllowedDeliveryText, sanitizeDeliveryText } from "../lib/tikis-engine";
 import { isValidReviewText, sanitizeReviewText } from "../lib/review-rules";
+import { canReviewDelivery } from "./_test-helpers/review-eligibility";
 import { tikisAdminRouter } from "./admin-router";
 import * as adminDb from "./admin-db";
 
@@ -20,8 +22,28 @@ const reportReasonSchema = z.enum(["comportement", "sécurité", "paiement", "ob
 const reportDescriptionSchema = z.string().trim().min(10, "Décrivez le problème en quelques mots (10 caractères minimum).").max(1000);
 const DELETION_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 
+function haversineDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
 const phoneSchema = z.string().regex(/^\+[1-9]\d{7,14}$/, "Numéro de téléphone international invalide.");
-const simulationOtpSchema = z.literal("730512", { error: "Code OTP de simulation invalide." });
+
+const OTP_MODE = (process.env.TIKIS_OTP_MODE ?? "sim") as "sim" | "real";
+const SIMULATION_OTP = process.env.TIKIS_SIMULATION_OTP ?? "730512";
+const simulationOtpSchema = z.string().superRefine((value, ctx) => {
+  if (OTP_MODE === "real") {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Le mode simulation est désactivé. Utilisez l’authentification Supabase." });
+    return;
+  }
+  if (value !== SIMULATION_OTP) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Code OTP de simulation invalide." });
+  }
+});
 const fullNameSchema = z.string().trim().min(3).max(70).regex(/^[\p{L}]+(?:[ '-][\p{L}]+)*$/u, "Nom invalide.");
 const vehicleSchema = z.enum(["Vélo", "Moto", "Tricycle", "Voiture", "Fourgonnette"]);
 type ValidVehicle = z.infer<typeof vehicleSchema>;
@@ -76,13 +98,48 @@ async function assertCountryEnabled(countryCode: string) {
   }
 }
 
-function toPublicProfile(profile: { phone: string; fullName: string; accountType: "sender" | "driver"; vehicles: string; photoKey?: string | null; email?: string | null; phoneVerified?: boolean; emailVerified?: boolean; referralCode?: string | null; status?: "active" | "suspended" | "banned"; statusReason?: string | null; country?: string | null; city?: string | null; deletionRequestedAt?: Date | null }) {
+type PerPhoneCounter = { count: number; windowStart: number; blockedUntil: number };
+const perPhoneBuckets = new Map<string, PerPhoneCounter>();
+const PER_PHONE_WINDOW_MS = 10 * 60_000;
+const PER_PHONE_MAX = 5;
+const PER_PHONE_BLOCK_MS = 30 * 60_000;
+
+function enforcePerPhoneRateLimit(scope: string, phone: string) {
+  const key = `${scope}:${phone}`;
+  const now = Date.now();
+  const entry = perPhoneBuckets.get(key);
+  if (entry?.blockedUntil && entry.blockedUntil > now) {
+    const minutes = Math.ceil((entry.blockedUntil - now) / 60_000);
+    throw new Error(`Trop de tentatives pour ce numéro. Réessayez dans ${minutes} minute(s).`);
+  }
+  if (!entry || now - entry.windowStart > PER_PHONE_WINDOW_MS) {
+    perPhoneBuckets.set(key, { count: 1, windowStart: now, blockedUntil: 0 });
+    return;
+  }
+  entry.count += 1;
+  if (entry.count > PER_PHONE_MAX) {
+    entry.blockedUntil = now + PER_PHONE_BLOCK_MS;
+    const minutes = Math.ceil(PER_PHONE_BLOCK_MS / 60_000);
+    throw new Error(`Trop de tentatives pour ce numéro. Réessayez dans ${minutes} minute(s).`);
+  }
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of perPhoneBuckets.entries()) {
+    if (now - entry.windowStart > PER_PHONE_WINDOW_MS * 2 && (!entry.blockedUntil || entry.blockedUntil < now)) {
+      perPhoneBuckets.delete(key);
+    }
+  }
+}, PER_PHONE_WINDOW_MS).unref();
+
+function toPublicProfile(profile: { phone: string; fullName: string; accountType: "sender" | "driver"; vehicles: string; photoKey?: string | null; email?: string | null; phoneVerified?: boolean; emailVerified?: boolean; referralCode?: string | null; status?: "active" | "suspended" | "banned"; statusReason?: string | null; country?: string | null; city?: string | null; deletionRequestedAt?: Date | null; deletionScheduledAt?: Date | null }) {
   let vehicles: ValidVehicle[] = [];
   try {
     const parsed = JSON.parse(profile.vehicles) as unknown;
     if (Array.isArray(parsed)) vehicles = parsed.filter((item): item is ValidVehicle => vehicleSchema.safeParse(item).success);
   } catch { vehicles = []; }
-  const deletionScheduledAt = profile.deletionRequestedAt ? new Date(profile.deletionRequestedAt.getTime() + DELETION_GRACE_PERIOD_MS) : undefined;
+  const deletionScheduledAt = profile.deletionScheduledAt ?? (profile.deletionRequestedAt ? new Date(profile.deletionRequestedAt.getTime() + DELETION_GRACE_PERIOD_MS) : undefined);
   return { phone: profile.phone, fullName: profile.fullName, countryCode: findCountryForPhone(profile.phone).id, role: profile.accountType, vehicles, roleLocked: true as const, photoUrl: profile.photoKey ? `/manus-storage/${profile.photoKey}` : undefined, email: profile.email ?? undefined, phoneVerified: profile.phoneVerified ?? true, emailVerified: profile.emailVerified ?? false, referralCode: profile.accountType === "driver" ? profile.referralCode ?? undefined : undefined, country: profile.country ?? undefined, city: profile.city ?? undefined, accountStatus: profile.status ?? "active", accountStatusReason: profile.statusReason ?? undefined, deletionRequestedAt: profile.deletionRequestedAt?.toISOString(), deletionScheduledAt: deletionScheduledAt?.toISOString() };
 }
 
@@ -131,6 +188,9 @@ async function generateUniqueReferralCode(fullName: string) {
 
 const photoMimeSchema = z.enum(["image/jpeg", "image/png", "image/webp"]);
 const base64ImageSchema = z.string().min(32).max(1_600_000).regex(/^[A-Za-z0-9+/=]+$/, "Données d’image invalides.");
+/** Schéma d'image KYC : 5 MB binaire max ≈ 6.7 MB base64 (4/3 expansion).
+ *  3 images KYC = 20 MB max par soumission, contrôlé dans la mutation submit. */
+const kycBase64ImageSchema = z.string().min(32).max(6_700_000).regex(/^[A-Za-z0-9+/=]+$/, "Données d’image invalides.");
 const coordinateSchema = z.number().finite();
 const placeSchema = z.object({ name: z.string().max(140), district: z.string().max(120), city: z.string().max(120), latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180), googlePlaceId: z.string().max(255).optional(), mapboxId: z.string().max(255).optional(), mapboxSessionToken: z.string().uuid().optional(), formattedAddress: z.string().max(255).optional(), street: z.string().max(160).optional(), province: z.string().max(120).optional(), country: z.string().max(120).optional(), source: z.enum(["search", "retrieve", "reverse", "forward", "favorite", "manual", "legacy"]).optional() });
 const favoriteLabelSchema = z.string().trim().min(1).max(80).regex(/^[\p{L}\p{N}]+(?:[ .,'’()\-][\p{L}\p{N}]+)*$/u, "Libellé de favori invalide.");
@@ -220,30 +280,99 @@ export const appRouter = router({
   platform: router({
     maintenanceStatus: publicProcedure.query(() => db.getMaintenanceStatus()),
   }),
+  loyalty: router({
+    myProgress: tikisProtectedProcedure.query(async ({ ctx }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      const role = profile.accountType;
+      const { computeLoyaltyProgress } = await import("./loyalty");
+      const result = await computeLoyaltyProgress({ profilePhone: profile.phone, role });
+      return result.map((entry) => ({
+        programId: entry.program.id,
+        programName: entry.program.name,
+        programDescription: entry.program.description,
+        bonusAmount: entry.program.bonusAmount,
+        requiredDeliveries: entry.program.requiredDeliveries,
+        windowDays: entry.program.windowDays,
+        completedCount: entry.completedCount,
+        remaining: Math.max(0, entry.program.requiredDeliveries - entry.completedCount),
+        progressPct: Math.min(100, Math.round((entry.completedCount / entry.program.requiredDeliveries) * 100)),
+        justQualified: entry.justQualified,
+        alreadyGranted: entry.alreadyGranted,
+      }));
+    }),
+  }),
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      clearTikisProfileCookie(ctx.res, ctx.req);
       return { success: true } as const;
+    }),
+  }),
+  sessions: router({
+    registerCurrent: tikisProtectedProcedure.input(z.object({
+      deviceName: z.string().max(120).optional(),
+      platform: z.enum(["ios", "android", "web", "unknown"]).default("unknown"),
+      appVersion: z.string().max(40).optional(),
+    }).optional()).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      const sessionHeader = ctx.req.headers["x-tikis-session"];
+      const token = Array.isArray(sessionHeader) ? sessionHeader[0] : sessionHeader;
+      if (!token) return { id: null, created: false };
+      const { recordSession } = await import("./sessions");
+      const ipAddress = (ctx.req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ?? ctx.req.socket?.remoteAddress ?? undefined;
+      return recordSession({ phone: profile.phone, token, deviceName: input?.deviceName, platform: input?.platform, appVersion: input?.appVersion, ipAddress });
+    }),
+    list: tikisProtectedProcedure.query(async ({ ctx }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      const sessionHeader = ctx.req.headers["x-tikis-session"];
+      const token = Array.isArray(sessionHeader) ? sessionHeader[0] : sessionHeader;
+      if (!token) return [];
+      const { hashSessionToken, listActiveSessions } = await import("./sessions");
+      return listActiveSessions({ phone: profile.phone, currentTokenHash: hashSessionToken(token) });
+    }),
+    revoke: tikisProtectedProcedure.input(z.object({ sessionId: z.string() })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      const sessionHeader = ctx.req.headers["x-tikis-session"];
+      const token = Array.isArray(sessionHeader) ? sessionHeader[0] : sessionHeader;
+      if (!token) throw new Error("Session non identifiée.");
+      const { hashSessionToken, revokeSession } = await import("./sessions");
+      return revokeSession({ phone: profile.phone, sessionId: input.sessionId, currentTokenHash: hashSessionToken(token) });
+    }),
+    revokeAllOthers: tikisProtectedProcedure.mutation(async ({ ctx }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      const sessionHeader = ctx.req.headers["x-tikis-session"];
+      const token = Array.isArray(sessionHeader) ? sessionHeader[0] : sessionHeader;
+      if (!token) throw new Error("Session non identifiée.");
+      const { hashSessionToken, revokeAllOtherSessions } = await import("./sessions");
+      return revokeAllOtherSessions({ phone: profile.phone, currentTokenHash: hashSessionToken(token) });
     }),
   }),
   profiles: router({
     /** Called after local OTP verification in the simulation flow. A production build must verify OTP server-side before this query. */
-    lookup: publicProcedure.input(z.object({ phone: phoneSchema, otp: simulationOtpSchema })).mutation(async ({ input }) => {
+    lookup: publicProcedure.input(z.object({ phone: phoneSchema, otp: simulationOtpSchema })).mutation(async ({ input, ctx }) => {
+      enforcePerPhoneRateLimit("lookup", input.phone);
       const profile = await db.getTikisProfileByPhone(input.phone);
       if (profile) assertProfileNotBlocked(profile);
-      return profile ? { profile: toPublicProfile(profile), sessionToken: await createTikisProfileSession(profile.phone) } : null;
+      if (!profile) return null;
+      const sessionToken = await createTikisProfileSession(profile.phone);
+      setTikisProfileCookie(ctx.res, ctx.req, sessionToken);
+      return { profile: toPublicProfile(profile), sessionToken };
     }),
-    lookupSupabase: publicProcedure.input(z.object({ phone: phoneSchema, accessToken: supabaseAccessTokenSchema })).mutation(async ({ input }) => {
+    lookupSupabase: publicProcedure.input(z.object({ phone: phoneSchema, accessToken: supabaseAccessTokenSchema })).mutation(async ({ input, ctx }) => {
+      enforcePerPhoneRateLimit("lookupSupabase", input.phone);
       const supabaseUserId = await verifySupabasePhoneSession(input.phone, input.accessToken);
       const profile = await db.getTikisProfileByPhone(input.phone);
       if (!profile) return null;
       assertProfileNotBlocked(profile);
       const linked = await db.linkTikisProfileToSupabaseUser(profile.phone, supabaseUserId);
-      return { profile: toPublicProfile(linked), sessionToken: await createTikisProfileSession(linked.phone) };
+      const sessionToken = await createTikisProfileSession(linked.phone);
+      setTikisProfileCookie(ctx.res, ctx.req, sessionToken);
+      return { profile: toPublicProfile(linked), sessionToken };
     }),
-    register: publicProcedure.input(registrationInputSchema).mutation(async ({ input }) => {
+    register: publicProcedure.input(registrationInputSchema).mutation(async ({ input, ctx }) => {
+      enforcePerPhoneRateLimit("register", input.phone);
       await assertCountryEnabled(input.countryCode);
       const referralCode = input.role === "driver" ? await generateUniqueReferralCode(input.fullName) : undefined;
       const profile = await db.createTikisProfile({
@@ -254,21 +383,27 @@ export const appRouter = router({
         referralCode,
       });
       await db.createReferralIfCodeProvided(profile.phone, input.referredByCode);
-      return { profile: toPublicProfile(profile), sessionToken: await createTikisProfileSession(profile.phone) };
+      const sessionToken = await createTikisProfileSession(profile.phone);
+      setTikisProfileCookie(ctx.res, ctx.req, sessionToken);
+      return { profile: toPublicProfile(profile), sessionToken };
     }),
-    registerSupabase: publicProcedure.input(profileFieldsSchema.extend({ accessToken: supabaseAccessTokenSchema }).superRefine(validateProfileRole)).mutation(async ({ input }) => {
+    registerSupabase: publicProcedure.input(profileFieldsSchema.extend({ accessToken: supabaseAccessTokenSchema }).superRefine(validateProfileRole)).mutation(async ({ input, ctx }) => {
+      enforcePerPhoneRateLimit("registerSupabase", input.phone);
       await assertCountryEnabled(input.countryCode);
       const supabaseUserId = await verifySupabasePhoneSession(input.phone, input.accessToken);
       const referralCode = input.role === "driver" ? await generateUniqueReferralCode(input.fullName) : undefined;
       const profile = await db.createTikisProfile({ phone: input.phone, fullName: input.fullName, accountType: input.role, vehicles: JSON.stringify(input.role === "driver" ? input.vehicles : []), referralCode, supabaseUserId });
       const linked = await db.linkTikisProfileToSupabaseUser(profile.phone, supabaseUserId);
       await db.createReferralIfCodeProvided(linked.phone, input.referredByCode);
-      return { profile: toPublicProfile(linked), sessionToken: await createTikisProfileSession(linked.phone) };
+      const sessionToken = await createTikisProfileSession(linked.phone);
+      setTikisProfileCookie(ctx.res, ctx.req, sessionToken);
+      return { profile: toPublicProfile(linked), sessionToken };
     }),
     update: publicProcedure.input(z.object({ phone: phoneSchema, otp: simulationOtpSchema, fullName: fullNameSchema.optional(), photoBase64: base64ImageSchema.optional(), photoMime: photoMimeSchema.optional(), country: z.string().length(2).optional(), city: z.string().trim().min(2).max(80).optional() }).superRefine((value, ctx) => {
       if (!value.fullName && !value.photoBase64 && !value.country && !value.city) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Aucune modification à enregistrer." });
       if (value.photoBase64 && !value.photoMime) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["photoMime"], message: "Type d’image requis." });
     })).mutation(async ({ input }) => {
+      enforcePerPhoneRateLimit("update", input.phone);
       let photoKey: string | null | undefined;
       if (input.photoBase64 && input.photoMime) {
         const bytes = Buffer.from(input.photoBase64, "base64");
@@ -310,12 +445,13 @@ export const appRouter = router({
       value: z.string().min(3).max(180),
       phone: phoneSchema,
     })).mutation(async ({ input }) => {
+      enforcePerPhoneRateLimit("requestContactOtp", input.phone);
       if (input.kind === "phone") {
         if (!/^\+?[0-9 ]{8,20}$/.test(input.value.trim())) throw new Error("Numéro de téléphone invalide.");
       } else {
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.value.trim())) throw new Error("Adresse e-mail invalide.");
       }
-      return { ok: true, demoOtp: "730512" };
+      return { ok: true, demoOtp: SIMULATION_OTP };
     }),
     updateContact: publicProcedure.input(z.object({
       kind: z.enum(["phone", "email"]),
@@ -324,6 +460,7 @@ export const appRouter = router({
       phone: phoneSchema,
       sessionOtp: simulationOtpSchema,
     })).mutation(async ({ input }) => {
+      enforcePerPhoneRateLimit("updateContact", input.phone);
       if (input.otp !== input.sessionOtp) throw new Error("Code de confirmation invalide.");
       const current = await db.getTikisProfileByPhone(input.phone);
       if (!current) throw new Error("Profil introuvable.");
@@ -403,6 +540,19 @@ export const appRouter = router({
     })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("Seul le livreur assigné peut partager sa position.");
+      const countryCode = profile.country ?? "CM";
+      if (!isCoordinateInCountry(input.latitude, input.longitude, countryCode)) {
+        throw new Error("La position partagée est en dehors de la zone de service. Vérifie ton GPS.");
+      }
+      const previous = await db.getTikisDeliveryLiveLocation(input.deliveryId);
+      if (previous) {
+        const distanceKm = haversineDistanceKm(previous.latitude, previous.longitude, input.latitude, input.longitude);
+        const elapsedSec = (Date.now() - new Date(previous.recordedAt).getTime()) / 1000;
+        const maxAllowedKm = Math.max(0.05, 0.055 * Math.max(elapsedSec, 1));
+        if (distanceKm > maxAllowedKm) {
+          throw new Error("Le saut de position détecté est trop important. Vérifie ta connexion GPS et réessaie.");
+        }
+      }
       const position = await db.saveTikisDeliveryLiveLocation({ ...input, driverPhone: profile.phone });
       void publishDeliveryPositionBroadcast({ deliveryId: input.deliveryId, ...position });
       return position;
@@ -569,11 +719,46 @@ export const appRouter = router({
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       return db.markTikisDeliveryEventRead(input.notificationId, profile.phone);
     }),
+    registerPushToken: tikisProtectedProcedure.input(z.object({
+      token: z.string().min(20).max(200),
+      platform: z.enum(["ios", "android", "web"]),
+      appVersion: z.string().max(40).optional(),
+      deviceName: z.string().max(120).optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      return db.registerPushToken({ phone: profile.phone, token: input.token, platform: input.platform, appVersion: input.appVersion, deviceName: input.deviceName });
+    }),
+    unregisterPushToken: tikisProtectedProcedure.input(z.object({ token: z.string().min(20).max(200) })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      return db.unregisterPushToken({ phone: profile.phone, token: input.token });
+    }),
   }),
   reviews: router({
     list: tikisProtectedProcedure.query(async ({ ctx }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       return db.listTikisDeliveryReviewsForProfile(profile.phone, profile.accountType);
+    }),
+  }),
+  analytics: router({
+    mySenderStats: tikisProtectedProcedure.query(async ({ ctx }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "sender") {
+        return null;
+      }
+      const handle = await db.getDb();
+      if (!handle) return null;
+      const { computeSenderStats } = await import("./analytics");
+      return computeSenderStats(handle, profile.phone);
+    }),
+    myDriverEarningsProjection: tikisProtectedProcedure.query(async ({ ctx }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "driver") {
+        return null;
+      }
+      const handle = await db.getDb();
+      if (!handle) return null;
+      const { computeDriverEarningsProjection } = await import("./analytics");
+      return computeDriverEarningsProjection(handle, profile.phone);
     }),
     getForDelivery: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).query(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
@@ -586,11 +771,13 @@ export const appRouter = router({
     submit: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid(), rating: z.number().int().min(1).max(5), comment: z.string().max(500).optional() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       const delivery = await db.getTikisDeliveryRecordById(input.deliveryId);
-      if (!delivery || delivery.senderPhone !== profile.phone || profile.accountType !== "sender" || delivery.status !== "completed" || !delivery.driverPhone) throw new Error("Cette livraison ne peut pas encore être évaluée.");
+      const existing = delivery ? await db.getTikisDeliveryReview(input.deliveryId, profile.phone) : null;
+      if (!canReviewDelivery({ status: delivery?.status ?? "missing", senderPhone: delivery?.senderPhone ?? "", driverPhone: delivery?.driverPhone ?? null }, profile.phone, profile.accountType, !existing)) {
+        throw new Error("Cette livraison ne peut pas encore être évaluée.");
+      }
+      if (!delivery) throw new Error("Livraison introuvable.");
       if (input.comment && !isValidReviewText(input.comment)) throw new Error("Caractères non autorisés");
-      const existing = await db.getTikisDeliveryReview(input.deliveryId, profile.phone);
-      if (existing) throw new Error("Un avis a déjà été enregistré pour cette livraison.");
-      const review = await db.saveTikisDeliveryReview({ id: randomUUID(), deliveryId: delivery.id, reviewerPhone: profile.phone, driverPhone: delivery.driverPhone, rating: input.rating, ...(input.comment?.trim() ? { comment: sanitizeReviewText(input.comment) } : {}) });
+      const review = await db.saveTikisDeliveryReview({ id: randomUUID(), deliveryId: delivery.id, reviewerPhone: profile.phone, driverPhone: delivery.driverPhone!, rating: input.rating, ...(input.comment?.trim() ? { comment: sanitizeReviewText(input.comment) } : {}) });
       if (!review) throw new Error("L’avis n’a pas pu être enregistré.");
       return db.deliveryReviewToView(review);
     }),
@@ -619,15 +806,19 @@ export const appRouter = router({
       return { status: submission.status, submittedAt: submission.submittedAt.toISOString(), rejectionReason: submission.rejectionReason ?? undefined };
     }),
     submit: tikisProtectedProcedure.input(z.object({
-      idFront: z.object({ base64: base64ImageSchema, mime: photoMimeSchema }),
-      idBack: z.object({ base64: base64ImageSchema, mime: photoMimeSchema }),
-      selfie: z.object({ base64: base64ImageSchema, mime: photoMimeSchema }),
+      idFront: z.object({ base64: kycBase64ImageSchema, mime: photoMimeSchema }),
+      idBack: z.object({ base64: kycBase64ImageSchema, mime: photoMimeSchema }),
+      selfie: z.object({ base64: kycBase64ImageSchema, mime: photoMimeSchema }),
     })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("La vérification d’identité concerne uniquement les comptes livreurs.");
       const existing = await db.getLatestKycSubmission(profile.phone);
       if (existing?.status === "submitted") throw new Error("Un dossier est déjà en cours d’examen.");
       if (existing?.status === "approved") throw new Error("Votre identité est déjà vérifiée.");
+      const totalBytes = input.idFront.base64.length + input.idBack.base64.length + input.selfie.base64.length;
+      if (totalBytes > 18_000_000) {
+        throw new Error("Les 3 images combinées dépassent la taille maximale autorisée (15 MB). Réduis la résolution avant de renvoyer.");
+      }
       const safePhone = profile.phone.replace(/[^0-9]/g, "");
       const stamp = Date.now();
       const extensionOf = (mime: string) => (mime === "image/png" ? "png" : mime === "image/webp" ? "webp" : "jpg");
