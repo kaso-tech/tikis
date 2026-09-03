@@ -24,10 +24,10 @@ describe("liste des utilisateurs de la console", () => {
 
   it("charge les profils récents sans imposer de recherche initiale", async () => {
     const profiles = [{ phone: "+22670000000", fullName: "Aïcha Traoré", accountType: "sender", email: null }];
-    adminDbMock.adminSearchProfiles.mockResolvedValue(profiles);
+    adminDbMock.adminSearchProfiles.mockResolvedValue({ rows: profiles, total: profiles.length });
 
     const caller = tikisAdminRouter.createCaller(createAdminContext());
-    await expect(caller.users.search({})).resolves.toEqual(profiles);
-    expect(adminDbMock.adminSearchProfiles).toHaveBeenCalledWith({});
+    await expect(caller.users.search({})).resolves.toEqual({ rows: profiles, total: 1, limit: 25, offset: 0 });
+    expect(adminDbMock.adminSearchProfiles).toHaveBeenCalledWith({ query: undefined, limit: 25, offset: 0 });
   });
 });

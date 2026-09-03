@@ -9,7 +9,15 @@ function escapeCell(value: CsvCell) {
   return stringValue;
 }
 
-export function rowsToCsv<T extends Record<string, CsvCell>>(headers: Array<{ key: keyof T & string; label: string }>, rows: T[]) {
+type CsvHeaders<T extends Record<string, CsvCell>> = Array<{ key: keyof T & string; label: string }>;
+
+export function rowsToCsv<T extends Record<string, CsvCell>>(headers: CsvHeaders<T>, rows: T[]): string;
+export function rowsToCsv<T extends Record<string, CsvCell>>(rows: T[]): string;
+export function rowsToCsv<T extends Record<string, CsvCell>>(headersOrRows: CsvHeaders<T> | T[], suppliedRows?: T[]) {
+  const rows = suppliedRows ?? (headersOrRows as T[]);
+  const headers: CsvHeaders<T> = suppliedRows
+    ? headersOrRows as CsvHeaders<T>
+    : Object.keys(rows[0] ?? {}).map((key) => ({ key: key as keyof T & string, label: key }));
   const headerLine = headers.map((header) => escapeCell(header.label)).join(";");
   const dataLines = rows.map((row) => headers.map((header) => escapeCell(row[header.key])).join(";"));
   return [headerLine, ...dataLines].join("\n");

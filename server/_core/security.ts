@@ -71,6 +71,10 @@ export type RateLimitOptions = {
 
 const stores = new Map<string, Map<string, RateLimitEntry>>();
 
+function unrefTimer(timer: ReturnType<typeof setInterval>) {
+  (timer as unknown as { unref?: () => void }).unref?.();
+}
+
 export function createRateLimiter(options: RateLimitOptions) {
   const { windowMs, max, blockDurationMs = windowMs, keyBy = defaultKeyByIp, message = "Trop de requêtes, réessayez plus tard." } = options;
   const store = new Map<string, RateLimitEntry>();
@@ -79,14 +83,15 @@ export function createRateLimiter(options: RateLimitOptions) {
   if (!stores.has(storeKey)) stores.set(storeKey, store);
   const target = stores.get(storeKey)!;
 
-  setInterval(() => {
+  const cleanupTimer = setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of target.entries()) {
       if (now - entry.windowStart > windowMs * 2 && (!entry.blockedUntil || entry.blockedUntil < now)) {
         target.delete(key);
       }
     }
-  }, Math.max(60_000, windowMs)).unref();
+  }, Math.max(60_000, windowMs));
+  unrefTimer(cleanupTimer);
 
   return function rateLimit(req: Request, res: Response, next: NextFunction) {
     const key = keyBy(req);
@@ -144,14 +149,15 @@ const trpcCounters = new Map<string, { count: number; windowStart: number; block
 
 export function trpcRateLimit(options: { windowMs: number; max: number; blockDurationMs?: number; keyBy?: (input: unknown, ctx: unknown) => string | null; message?: string }) {
   const { windowMs, max, blockDurationMs = windowMs, keyBy, message = "Trop de tentatives, réessayez plus tard." } = options;
-  setInterval(() => {
+  const cleanupTimer = setInterval(() => {
     const now = Date.now();
     for (const [key, entry] of trpcCounters.entries()) {
       if (now - entry.windowStart > windowMs * 2 && (!entry.blockedUntil || entry.blockedUntil < now)) {
         trpcCounters.delete(key);
       }
     }
-  }, Math.max(60_000, windowMs)).unref();
+  }, Math.max(60_000, windowMs));
+  unrefTimer(cleanupTimer);
 
   return function rateLimitMiddleware({ ctx, next, path }: { ctx: unknown; next: () => Promise<unknown>; path: string }) {
     const trpcCtx = ctx as TrpcRateLimited;

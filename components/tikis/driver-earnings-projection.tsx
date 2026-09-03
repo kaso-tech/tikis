@@ -1,6 +1,6 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { type ThemedColors, useThemeColors } from "@/lib/use-theme-colors";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/shared/tikis-domain";
 import { computeProjection30Days, computeTrendPct, formatTopDayDate } from "@/server/_test-helpers/driver-earnings-projection";
@@ -92,7 +92,7 @@ export function DriverEarningsProjection({ phone }: { phone: string | null }) {
   );
 }
 
-function makeStyles(theme: ReturnType<typeof useThemeColors>) {
+function makeStyles(theme: ThemedColors) {
   return StyleSheet.create({
     card: { backgroundColor: theme.surface, borderRadius: 10, borderWidth: 0, padding: 14, gap: 10, marginBottom: 12 },
     header: { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -104,18 +104,18 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>) {
     row: { flexDirection: "row", alignItems: "center", backgroundColor: theme.background, borderRadius: 8, padding: 10 },
     kpi: { flex: 1, gap: 2 },
     kpiLabel: { fontSize: 10.5, color: theme.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
-    kpiValue: { fontSize: 16, fontWeight: "600", color: theme.foreground, fontVariantNumeric: "tabular-nums" },
+    kpiValue: { fontSize: 16, fontWeight: "600", color: theme.foreground },
     kpiDivider: { width: 1, height: 28, backgroundColor: theme.border, marginHorizontal: 10 },
     projectionBox: { backgroundColor: theme.background, borderRadius: 8, padding: 12, gap: 4 },
     projectionLabel: { fontSize: 10.5, color: theme.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
-    projectionValue: { fontSize: 24, fontWeight: "600", color: theme.primary, fontVariantNumeric: "tabular-nums" },
+    projectionValue: { fontSize: 24, fontWeight: "600", color: theme.primary },
     projectionFoot: { fontSize: 11, color: theme.muted, lineHeight: 16 },
     topDays: { gap: 6 },
     topDaysTitle: { fontSize: 11.5, fontWeight: "600", color: theme.muted, textTransform: "uppercase", letterSpacing: 0.5 },
     topDayRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-    topDayDate: { fontSize: 11.5, color: theme.muted, width: 56, fontVariantNumeric: "tabular-nums" },
+    topDayDate: { fontSize: 11.5, color: theme.muted, width: 56 },
     topDayBarWrap: { flex: 1, height: 6, backgroundColor: theme.border, borderRadius: 3, overflow: "hidden" },
     topDayBar: { height: "100%", borderRadius: 3 },
-    topDayAmount: { fontSize: 11.5, fontWeight: "600", color: theme.foreground, fontVariantNumeric: "tabular-nums", minWidth: 70, textAlign: "right" },
+    topDayAmount: { fontSize: 11.5, fontWeight: "600", color: theme.foreground, minWidth: 70, textAlign: "right" },
   });
 }

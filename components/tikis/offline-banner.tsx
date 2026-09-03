@@ -1,11 +1,11 @@
 import { useNetworkStatus } from "@/hooks/use-network-status";
-import { useThemeColors } from "@/lib/theme-provider";
+import { type ThemedColors, useThemeColors } from "@/lib/use-theme-colors";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Platform, StyleSheet, Text, View } from "react-native";
 
 export function OfflineBanner() {
   const status = useNetworkStatus();
-  const theme = useThemeColors();
+  const { colors: theme } = useThemeColors();
   if (status === "online" || status === "unknown") return null;
   const styles = makeStyles(theme);
   return (
@@ -22,7 +22,7 @@ export function OfflineBanner() {
   );
 }
 
-function makeStyles(theme: ReturnType<typeof useThemeColors>) {
+function makeStyles(theme: ThemedColors) {
   return StyleSheet.create({
     banner: {
       flexDirection: "row",

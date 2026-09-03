@@ -124,14 +124,15 @@ function enforcePerPhoneRateLimit(scope: string, phone: string) {
   }
 }
 
-setInterval(() => {
+const bucketCleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of perPhoneBuckets.entries()) {
     if (now - entry.windowStart > PER_PHONE_WINDOW_MS * 2 && (!entry.blockedUntil || entry.blockedUntil < now)) {
       perPhoneBuckets.delete(key);
     }
   }
-}, PER_PHONE_WINDOW_MS).unref();
+}, PER_PHONE_WINDOW_MS);
+(bucketCleanupTimer as unknown as { unref?: () => void }).unref?.();
 
 function toPublicProfile(profile: { phone: string; fullName: string; accountType: "sender" | "driver"; vehicles: string; photoKey?: string | null; email?: string | null; phoneVerified?: boolean; emailVerified?: boolean; referralCode?: string | null; status?: "active" | "suspended" | "banned"; statusReason?: string | null; country?: string | null; city?: string | null; deletionRequestedAt?: Date | null; deletionScheduledAt?: Date | null }) {
   let vehicles: ValidVehicle[] = [];
@@ -540,7 +541,7 @@ export const appRouter = router({
     })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("Seul le livreur assigné peut partager sa position.");
-      const countryCode = profile.country ?? "CM";
+      const countryCode = profile.country ?? findCountryForPhone(profile.phone).id;
       if (!isCoordinateInCountry(input.latitude, input.longitude, countryCode)) {
         throw new Error("La position partagée est en dehors de la zone de service. Vérifie ton GPS.");
       }

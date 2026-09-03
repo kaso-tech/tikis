@@ -56,8 +56,8 @@ export default function LiveTrackingTabScreen() {
 
 function TrackingCard({ delivery, live, theme }: { delivery: any; live: boolean; theme: any }) {
   const dropoff = formatDeliveryDetailPlace(delivery.dropoff);
-  const positionQuery = useLiveDeliveryPosition(live ? delivery.id : null, live);
-  const hasFix = Boolean(positionQuery.position?.latitude && positionQuery.position?.longitude);
+  const position = useLiveDeliveryPosition(live ? delivery.id : null, live);
+  const hasFix = Boolean(position?.latitude && position?.longitude);
   return (
     <Pressable onPress={() => router.push(`/delivery/${delivery.id}/map` as any)} style={({ pressed }) => [styles.card, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]}>
       <View style={styles.cardTop}>

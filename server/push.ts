@@ -9,7 +9,10 @@
  * Env : aucune obligatoire. La lib utilise l'API publique d'Expo (pas de clé).
  */
 
-import { logger } from "../lib/logger";
+function logPush(level: "info" | "warn" | "error", message: string, cause?: unknown) {
+  const output = cause === undefined ? [message] : [message, cause];
+  console[level](...output);
+}
 
 type ExpoPushClient = {
   sendPushNotificationsAsync: (messages: Array<{
@@ -33,10 +36,10 @@ async function getClient(): Promise<ExpoPushClient | null> {
   try {
     const mod = (await import("expo-server-sdk")) as unknown as { Expo: new () => ExpoPushClient };
     client = new mod.Expo();
-    logger.info("[push]", "expo-server-sdk chargé, push activé");
+    logPush("info", "[push] expo-server-sdk chargé, push activé");
     return client;
   } catch (cause) {
-    logger.warn("[push]", "expo-server-sdk indisponible, push désactivé", cause);
+    logPush("warn", "[push] expo-server-sdk indisponible, push désactivé", cause);
     return null;
   }
 }
@@ -90,7 +93,7 @@ export async function sendPushToTokens(messages: PushMessage[]): Promise<{ sent:
     return { sent, failed, errors };
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : "Erreur inconnue";
-    logger.error("[push]", "sendPushNotificationsAsync failed", cause);
+    logPush("error", "[push] sendPushNotificationsAsync failed", cause);
     return { sent: 0, failed: validMessages.length, errors: [message] };
   }
 }

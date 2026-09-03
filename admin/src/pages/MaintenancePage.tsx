@@ -49,7 +49,15 @@ export default function MaintenancePage() {
   }
   function loadHistory() {
     trpc.adminConsole.auditLog.list.query({ limit: 50 })
-      .then((rows) => setHistory((rows as AuditEntry[]).filter((row) => row.action === "maintenance_mode_changed")))
+      .then(({ rows }) => setHistory(rows.filter((row) => row.action === "maintenance_mode_changed").map((row) => ({
+        id: row.id,
+        action: row.action,
+        targetType: row.targetType,
+        targetId: row.targetId,
+        adminEmail: row.adminEmail,
+        createdAt: row.createdAt,
+        metadata: row.details,
+      }))))
       .catch(() => undefined);
   }
   useEffect(load, []);

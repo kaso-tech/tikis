@@ -615,6 +615,7 @@ export function HomeScreen() {
                   onPress={() => setSelectedId(delivery.id)}
                   onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
                   onApply={() => handleSenderAction(delivery)}
+                  onRate={() => setRateDeliveryId(delivery.id)}
                 />
               ))}
             </View>
@@ -636,6 +637,7 @@ export function HomeScreen() {
                   onPress={() => setSelectedId(delivery.id)}
                   onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
                   onApply={() => handleSenderAction(delivery)}
+                  onRate={() => setRateDeliveryId(delivery.id)}
                 />
               ))}
             </View>
@@ -894,6 +896,7 @@ function DeliveryRow({
   onPress,
   onDetails,
   onApply,
+  onRate,
 }: {
   delivery: Delivery;
   role: "sender" | "driver";
@@ -906,6 +909,7 @@ function DeliveryRow({
   onPress: () => void;
   onDetails: () => void;
   onApply: () => void;
+  onRate?: () => void;
 }) {
   const [showPickupTooltip, setShowPickupTooltip] = useState(false);
   const { colors: theme } = useThemeColors();
@@ -992,7 +996,7 @@ function DeliveryRow({
               </Pressable>;
             }
             if (canRate) {
-              return <Pressable onPress={() => setRateDeliveryId(delivery.id)} style={({ pressed }) => [styles.rowBtnFilled, pressed && styles.pressed]}>
+              return <Pressable onPress={onRate} style={({ pressed }) => [styles.rowBtnFilled, pressed && styles.pressed]}>
                 <Text style={styles.rowBtnFilledText}>Noter</Text>
               </Pressable>;
             }

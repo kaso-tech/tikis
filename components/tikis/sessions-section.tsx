@@ -1,7 +1,7 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useState } from "react";
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { type ThemedColors, useThemeColors } from "@/lib/use-theme-colors";
 import { trpc } from "@/lib/trpc";
 
 type Session = {
@@ -150,13 +150,13 @@ export function SessionsSection() {
   );
 }
 
-function makeStyles(theme: ReturnType<typeof useThemeColors>) {
+function makeStyles(theme: ThemedColors) {
   return StyleSheet.create({
     card: { backgroundColor: theme.surface, borderRadius: 10, borderWidth: 0, padding: 14, gap: 10, marginBottom: 12 },
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
     title: { fontSize: 14, fontWeight: "600", color: theme.foreground },
-    count: { fontSize: 13, fontWeight: "600", color: theme.muted, fontVariantNumeric: "tabular-nums" },
+    count: { fontSize: 13, fontWeight: "600", color: theme.muted },
     subtitle: { fontSize: 12, color: theme.muted, lineHeight: 18 },
     actions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     btnGhost: { fontSize: 12, fontWeight: "600", color: theme.primary, paddingVertical: 6, paddingHorizontal: 10, backgroundColor: theme.background, borderRadius: 6, overflow: "hidden" },

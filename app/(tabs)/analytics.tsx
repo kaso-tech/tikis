@@ -2,7 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useMemo } from "react";
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { type ThemedColors, useThemeColors } from "@/lib/use-theme-colors";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/shared/tikis-domain";
@@ -20,7 +20,7 @@ const FRENCH_MONTHS_SHORT = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "
 export default function AnalyticsTabScreen() {
   const { colors: theme } = useThemeColors();
   const styles = makeStyles(theme);
-  const profile = useTikisStore((state) => state.profile);
+  const { profile } = useTikisStore();
   const query = trpc.analytics.mySenderStats.useQuery(undefined, {
     enabled: Boolean(profile?.phone) && profile?.role === "sender",
     refetchInterval: 60_000,
@@ -135,7 +135,7 @@ export default function AnalyticsTabScreen() {
   );
 }
 
-function makeStyles(theme: ReturnType<typeof useThemeColors>) {
+function makeStyles(theme: ThemedColors) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: theme.background },
     content: { padding: 16, paddingBottom: 32, gap: 16 },
@@ -149,7 +149,7 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>) {
     kpiGrid: { gap: 10 },
     kpi: { backgroundColor: theme.surface, borderRadius: 10, padding: 14, borderWidth: 0, gap: 4 },
     kpiLabel: { fontSize: 11, fontWeight: "600", color: theme.muted, textTransform: "uppercase", letterSpacing: 0.5 },
-    kpiValue: { fontSize: 22, fontWeight: "600", color: theme.foreground, fontVariantNumeric: "tabular-nums" },
+    kpiValue: { fontSize: 22, fontWeight: "600", color: theme.foreground },
     kpiFoot: { fontSize: 12, color: theme.muted },
     section: { backgroundColor: theme.surface, borderRadius: 10, padding: 14, borderWidth: 0, gap: 12 },
     sectionTitle: { fontSize: 14, fontWeight: "600", color: theme.foreground },
@@ -157,7 +157,7 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>) {
     trendCol: { flex: 1, alignItems: "center", gap: 4 },
     trendBarWrap: { flex: 1, width: "100%", justifyContent: "flex-end" },
     trendBar: { width: "100%", borderTopLeftRadius: 4, borderTopRightRadius: 4 },
-    trendCount: { fontSize: 11, fontWeight: "600", color: theme.foreground, fontVariantNumeric: "tabular-nums" },
+    trendCount: { fontSize: 11, fontWeight: "600", color: theme.foreground },
     trendLabel: { fontSize: 10, color: theme.muted },
     driverRow: { flexDirection: "row", alignItems: "center", gap: 12 },
     driverAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },

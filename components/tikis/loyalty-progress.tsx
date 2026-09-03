@@ -1,6 +1,6 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { type ThemedColors, useThemeColors } from "@/lib/use-theme-colors";
 import { trpc } from "@/lib/trpc";
 import { computeProgressPercent, formatRemainingMessage } from "@/server/_test-helpers/loyalty-progress-format";
 
@@ -60,7 +60,7 @@ export function LoyaltyProgress({ phone }: { phone: string | null }) {
   );
 }
 
-function makeStyles(theme: ReturnType<typeof useThemeColors>) {
+function makeStyles(theme: ThemedColors) {
   return StyleSheet.create({
     card: { backgroundColor: theme.surface, borderRadius: 10, borderWidth: 0, padding: 14, gap: 10, marginBottom: 12 },
     row: { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -75,6 +75,6 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>) {
     barFill: { height: "100%", borderRadius: 3 },
     footRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
     footText: { flex: 1, fontSize: 11.5, color: theme.muted },
-    footMeta: { fontSize: 11, fontWeight: "600", color: theme.muted, fontVariantNumeric: "tabular-nums" },
+    footMeta: { fontSize: 11, fontWeight: "600", color: theme.muted },
   });
 }

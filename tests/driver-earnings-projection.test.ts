@@ -3,7 +3,7 @@ import { computeProjection30Days, computeTrendPct, formatTopDayDate } from "../s
 
 describe("projection gains driver (helpers purs)", () => {
   it("computeProjection30Days multiplie la moyenne par 30", () => {
-    expect(computeProjection30Days(21000)).toBe(90000);
+    expect(computeProjection30Days(3000)).toBe(90000);
     expect(computeProjection30Days(0)).toBe(0);
     expect(computeProjection30Days(1000)).toBe(30000);
   });

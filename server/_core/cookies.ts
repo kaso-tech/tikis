@@ -1,4 +1,4 @@
-import type { CookieOptions, Request } from "express";
+import type { CookieOptions, Request, Response } from "express";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -62,12 +62,12 @@ export function getSessionCookieOptions(
 export const TIKIS_PROFILE_COOKIE = "tikis-profile-session";
 export const TIKIS_PROFILE_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
-export function setTikisProfileCookie(res: Pick<Response, "cookie">, req: Request, token: string) {
+export function setTikisProfileCookie(res: Pick<Response, "cookie" | "clearCookie">, req: Request, token: string) {
   if (!res || typeof (res as { cookie?: unknown }).cookie !== "function") return;
   res.cookie(TIKIS_PROFILE_COOKIE, token, { ...getSessionCookieOptions(req), maxAge: TIKIS_PROFILE_COOKIE_MAX_AGE_MS });
 }
 
-export function clearTikisProfileCookie(res: Pick<Response, "cookie">, req: Request) {
+export function clearTikisProfileCookie(res: Pick<Response, "cookie" | "clearCookie">, req: Request) {
   if (!res || typeof (res as { cookie?: unknown }).cookie !== "function") return;
   res.clearCookie(TIKIS_PROFILE_COOKIE, getSessionCookieOptions(req));
 }

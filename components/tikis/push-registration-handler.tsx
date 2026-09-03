@@ -7,7 +7,7 @@ import { trpc } from "@/lib/trpc";
 
 /** Petit composant sans rendu qui déclenche le hook d'enregistrement push quand un profil Tikis est connecté. */
 export function PushRegistrationHandler() {
-  const profile = useTikisStore((state) => state.profile);
+  const { profile } = useTikisStore();
   usePushRegistration(profile?.phone ?? null);
 
   // Enregistre aussi la session courante (pour le multi-device).

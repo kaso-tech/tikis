@@ -1,7 +1,8 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useThemeColors } from "@/lib/theme-provider";
+import * as Linking from "expo-linking";
+import { type ThemedColors, useThemeColors } from "@/lib/use-theme-colors";
 import { TikisButton } from "./ui";
 import { logger } from "@/lib/logger";
 
@@ -29,7 +30,7 @@ export class TikisErrorBoundary extends Component<ErrorBoundaryProps, ErrorBound
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    logger.error("[error-boundary] crash intercepté", { error, componentStack: info.componentStack });
+    logger.error("error-boundary", "crash intercepté", { error, componentStack: info.componentStack });
   }
 
   reset = () => {
@@ -45,7 +46,7 @@ export class TikisErrorBoundary extends Component<ErrorBoundaryProps, ErrorBound
 }
 
 function ErrorFallback({ error, onReset, fallbackTitle }: { error: Error; onReset: () => void; fallbackTitle?: string }) {
-  const theme = useThemeColors();
+  const { colors: theme } = useThemeColors();
   const styles = makeStyles(theme);
   const showStack = __DEV__ && Platform.OS !== "web";
   return (
@@ -73,7 +74,7 @@ function ErrorFallback({ error, onReset, fallbackTitle }: { error: Error; onRese
               window.location.href = buildSupportMailto(error.message);
               return;
             }
-            import("expo-linking").then(({ Linking }) => Linking.openURL(buildSupportMailto(error.message))).catch(() => undefined);
+            void Linking.openURL(buildSupportMailto(error.message)).catch(() => undefined);
           }} variant="ghost" />
         </View>
       </ScrollView>
@@ -81,7 +82,7 @@ function ErrorFallback({ error, onReset, fallbackTitle }: { error: Error; onRese
   );
 }
 
-function makeStyles(theme: ReturnType<typeof useThemeColors>) {
+function makeStyles(theme: ThemedColors) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: theme.background },
     scroll: { flexGrow: 1, padding: 24, gap: 16, justifyContent: "center" },

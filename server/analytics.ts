@@ -114,7 +114,7 @@ export async function computeSenderStats(db: DbHandle, senderPhone: string, now:
     .orderBy(desc(count()), desc(sum(tikisDeliveries.offeredPrice)))
     .limit(3);
 
-  const preferredDrivers: SenderDriverPreference[] = driversRaw.map((row) => ({
+  const preferredDrivers: SenderDriverPreference[] = driversRaw.filter((row): row is typeof row & { driverPhone: string } => Boolean(row.driverPhone)).map((row) => ({
     driverPhone: row.driverPhone,
     driverName: row.fullName,
     deliveriesCount: Number(row.deliveriesCount),

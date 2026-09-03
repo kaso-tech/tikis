@@ -1,4 +1,7 @@
-import { logger } from "../../lib/logger";
+function logServer(level: "info" | "warn" | "error", scope: string, message: string, context?: unknown) {
+  const output = context === undefined ? [`${scope} ${message}`] : [`${scope} ${message}`, context];
+  console[level](...output);
+}
 
 const SENTRY_DSN = process.env.SENTRY_DSN;
 const SENTRY_ENVIRONMENT = process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV ?? "development";
@@ -19,7 +22,7 @@ export async function initSentry() {
   if (initialized) return;
   initialized = true;
   if (!SENTRY_DSN) {
-    logger.info("[sentry]", "SENTRY_DSN absent, capture désactivée");
+    logServer("info", "[sentry]", "SENTRY_DSN absent, capture désactivée");
     return;
   }
   let sentryModule: SentryModule;
@@ -34,18 +37,18 @@ export async function initSentry() {
       if (context) sentryModule.setContext("extra", context);
       sentryModule.captureMessage(message, { level: level === "error" ? "error" : level === "warning" ? "warning" : "info" });
     };
-    logger.info("[sentry]", `Capture initialisée (env=${SENTRY_ENVIRONMENT}, release=${SENTRY_RELEASE})`);
+    logServer("info", "[sentry]", `Capture initialisée (env=${SENTRY_ENVIRONMENT}, release=${SENTRY_RELEASE})`);
   } catch (cause) {
-    logger.warn("[sentry]", "Module @sentry/node indisponible, capture désactivée", cause);
+    logServer("warn", "[sentry]", "Module @sentry/node indisponible, capture désactivée", cause);
   }
 }
 
 export function reportException(error: unknown, context?: Record<string, unknown>) {
   if (captureException) captureException(error, context);
-  else logger.error("[sentry:fallback]", error instanceof Error ? error.message : String(error), context);
+  else logServer("error", "[sentry:fallback]", error instanceof Error ? error.message : String(error), context);
 }
 
 export function reportMessage(message: string, level: "info" | "warning" | "error" = "info", context?: Record<string, unknown>) {
   if (captureMessage) captureMessage(message, level, context);
-  else logger[level === "warning" ? "warn" : level === "error" ? "error" : "info"]("[sentry:fallback]", message, context);
+  else logServer(level === "warning" ? "warn" : level, "[sentry:fallback]", message, context);
 }

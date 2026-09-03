@@ -1,7 +1,7 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { type ThemedColors, useThemeColors } from "@/lib/use-theme-colors";
 import { trpc } from "@/lib/trpc";
 import { isValidReviewText, sanitizeReviewText } from "@/lib/review-rules";
 
@@ -29,10 +29,10 @@ export function RateDeliveryDialog({ visible, deliveryId, driverName, onClose, o
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const utils = trpc.useUtils();
-  const submit = trpc.reviews.submit.useMutation({
+  const submit = trpc.analytics.submit.useMutation({
     onSuccess: () => {
       utils.reviews.list.invalidate();
-      utils.reviews.getForDelivery.invalidate({ deliveryId: deliveryId ?? "" });
+      utils.analytics.getForDelivery.invalidate({ deliveryId: deliveryId ?? "" });
       onRated();
       reset();
     },
@@ -134,7 +134,7 @@ export function RateDeliveryDialog({ visible, deliveryId, driverName, onClose, o
   );
 }
 
-function makeStyles(theme: ReturnType<typeof useThemeColors>) {
+function makeStyles(theme: ThemedColors) {
   return StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: theme.overlay, justifyContent: "flex-end" },
     backdropPress: { flex: 1 },

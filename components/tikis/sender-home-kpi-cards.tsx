@@ -2,7 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router } from "expo-router";
 import { useMemo } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { type ThemedColors, useThemeColors } from "@/lib/use-theme-colors";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/shared/tikis-domain";
@@ -20,7 +20,7 @@ const TREND_BAR_HEIGHT = 38;
 export function SenderHomeKpiCards() {
   const { colors: theme } = useThemeColors();
   const styles = makeStyles(theme);
-  const profile = useTikisStore((state) => state.profile);
+  const { profile } = useTikisStore();
   const query = trpc.analytics.mySenderStats.useQuery(undefined, {
     enabled: Boolean(profile?.phone) && profile?.role === "sender",
     refetchInterval: 60_000,
@@ -135,7 +135,7 @@ export function SenderHomeKpiCards() {
   );
 }
 
-function makeStyles(theme: ReturnType<typeof useThemeColors>) {
+function makeStyles(theme: ThemedColors) {
   return StyleSheet.create({
     card: { backgroundColor: theme.surface, borderRadius: 12, borderWidth: 0, padding: 14, gap: 12, marginHorizontal: 16, marginTop: 12, marginBottom: 4 },
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
@@ -147,13 +147,13 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>) {
     kpiRow: { flexDirection: "row", gap: 10 },
     kpiMain: { flex: 1.4, backgroundColor: theme.background, borderRadius: 8, padding: 12, gap: 4 },
     kpiMainLabel: { fontSize: 10.5, color: theme.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
-    kpiMainValue: { fontSize: 22, fontWeight: "600", color: theme.foreground, fontVariantNumeric: "tabular-nums" },
+    kpiMainValue: { fontSize: 22, fontWeight: "600", color: theme.foreground },
     kpiMainFoot: { fontSize: 11.5, color: theme.muted },
     kpiSide: { flex: 1, backgroundColor: theme.background, borderRadius: 8, padding: 12, justifyContent: "space-between" },
     kpiSideItem: { gap: 2 },
     kpiSideDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border, paddingTop: 8 },
     kpiSideLabel: { fontSize: 10.5, color: theme.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
-    kpiSideValue: { fontSize: 14, fontWeight: "600", color: theme.foreground, fontVariantNumeric: "tabular-nums" },
+    kpiSideValue: { fontSize: 14, fontWeight: "600", color: theme.foreground },
     trendWrap: { gap: 8 },
     trendHeader: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
     trendTitle: { fontSize: 11, fontWeight: "600", color: theme.muted, textTransform: "uppercase", letterSpacing: 0.5 },
@@ -162,7 +162,7 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>) {
     trendCol: { flex: 1, alignItems: "center", gap: 4 },
     trendBarWrap: { flex: 1, width: "100%", justifyContent: "flex-end" },
     trendBar: { width: "100%", borderTopLeftRadius: 4, borderTopRightRadius: 4 },
-    trendCount: { fontSize: 10, fontWeight: "600", color: theme.foreground, fontVariantNumeric: "tabular-nums" },
+    trendCount: { fontSize: 10, fontWeight: "600", color: theme.foreground },
     shortcutRow: { flexDirection: "row", gap: 8 },
     shortcut: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: theme.background, padding: 10, borderRadius: 8 },
     shortcutText: { fontSize: 12, fontWeight: "600", color: theme.foreground },

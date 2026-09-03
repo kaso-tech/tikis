@@ -574,17 +574,19 @@ type DeliveryEventInput = {
   idempotencyKey: string;
 };
 
-async function ensureTikisWallet(tx: any, profilePhone: string) {
+export async function ensureTikisWallet(tx: any, profilePhone: string) {
   await tx.insert(tikisWallets).values({ profilePhone }).onDuplicateKeyUpdate({ set: { profilePhone } });
   const rows = await tx.select().from(tikisWallets).where(eq(tikisWallets.profilePhone, profilePhone)).limit(1).for("update");
   if (!rows[0]) throw new Error("Le Wallet est temporairement indisponible.");
   return rows[0];
 }
 
-async function applyWalletMovement(tx: any, movement: WalletMovement) {
+export async function applyWalletMovement(tx: any, movement: WalletMovement) {
   if (!Number.isSafeInteger(movement.amount) || movement.amount <= 0) throw new Error("Montant financier invalide.");
   const existing = await tx.select().from(tikisWalletLedger).where(eq(tikisWalletLedger.idempotencyKey, movement.idempotencyKey)).limit(1);
-  if (existing[0]) return existing[0];
+  if (existing[0]) {
+    return { availableAfter: existing[0].availableAfter, heldAfter: existing[0].heldAfter, idempotencyKey: existing[0].idempotencyKey };
+  }
   const wallet = await ensureTikisWallet(tx, movement.profilePhone);
   const availableBefore = wallet.availableBalance;
   const heldBefore = wallet.heldBalance;
@@ -596,7 +598,7 @@ async function applyWalletMovement(tx: any, movement: WalletMovement) {
     id: randomUUID(), profilePhone: movement.profilePhone, deliveryId: movement.deliveryId ?? null, operation: movement.operation,
     amount: movement.amount, availableBefore, availableAfter, heldBefore, heldAfter, reason: movement.reason, idempotencyKey: movement.idempotencyKey,
   });
-  return { availableAfter, heldAfter };
+  return { availableAfter, heldAfter, idempotencyKey: movement.idempotencyKey };
 }
 
 async function appendDeliveryEvent(tx: any, event: DeliveryEventInput) {
@@ -1189,7 +1191,9 @@ export async function completeTikisDeliveryWithEvents(deliveryId: string, profil
   // Best-effort : si la fonction échoue, on log mais on ne fait pas échouer la complétion.
   try {
     const { evaluateAndNotifyLoyaltyGrants } = await import("./loyalty");
-    await evaluateAndNotifyLoyaltyGrants({ deliveryId, driverPhone: completedDelivery.delivery.driverPhone, senderPhone: completedDelivery.delivery.senderPhone });
+    if (completedDelivery.delivery.driverPhone) {
+      await evaluateAndNotifyLoyaltyGrants({ deliveryId, driverPhone: completedDelivery.delivery.driverPhone, senderPhone: completedDelivery.delivery.senderPhone });
+    }
   } catch (cause) {
     console.error("[loyalty] evaluateAndNotifyLoyaltyGrants failed", cause);
   }
@@ -1331,6 +1335,7 @@ export async function reconcileYengapayPayment(providerReference: string) {
   const config = readYengapayConfig();
   if (config.mode !== "live") throw new Error("La réconciliation YengaPay nécessite le mode live.");
   const remote = await verifyYengapayPayment({ providerReference });
+  if (remote.status === "pending") return { pending: true, providerReference };
   return settleYengapayLivePayment({ providerReference, outcome: remote.status });
 }
 
@@ -1378,6 +1383,8 @@ export async function enqueuePushToPhone(input: { phone: string; title: string; 
     channelId: input.channelId ?? "tikis-default",
   }));
   const result = await sendPushToTokens(messages);
+  const db = await getDb();
+  if (!db) return result;
   // Si un token a renvoyé DeviceNotRegistered, on le supprime pour éviter de re-essayer.
   for (let i = 0; i < messages.length; i += 1) {
     const message = result.errors[i] ?? "";

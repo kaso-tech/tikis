@@ -18,7 +18,7 @@ describe("format du programme de fidélité (UI mobile)", () => {
 
   it("formatRemainingMessage affiche le compteur restant si non atteint", () => {
     expect(formatRemainingMessage({ remaining: 5, alreadyGranted: false, bonusAmount: 5000 })).toContain("Plus que 5 courses");
-    expect(formatRemainingMessage({ remaining: 5, alreadyGranted: false, bonusAmount: 5000 })).toContain("5 000");
+    expect(formatRemainingMessage({ remaining: 5, alreadyGranted: false, bonusAmount: 5000 })).toMatch(/5[\s\u202f]000/);
   });
 
   it("formatRemainingMessage singulier/pluriel correct", () => {

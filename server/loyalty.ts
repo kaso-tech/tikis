@@ -12,7 +12,6 @@ import { and, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { tikisDeliveries, tikisLoyaltyGrants, tikisLoyaltyPrograms } from "../drizzle/schema";
 import { computeSessionExpiry } from "./_test-helpers/session-revocation";
-import { shouldAutoCredit } from "./_test-helpers/loyalty-auto-credit";
 
 export type LoyaltyProgress = {
   program: typeof tikisLoyaltyPrograms.$inferSelect;
@@ -201,7 +200,7 @@ export async function expireLoyaltyGrants(now: Date = new Date()): Promise<{ can
 /** Crédite un grant sur le wallet du profil de manière transactionnelle.
  *  Idempotent : si le grant est déjà credited, no-op.
  *  Renvoie { credited: boolean, wallet } où wallet est le snapshot final. */
-export async function creditLoyaltyGrantOnWallet(grantId: string): Promise<{ credited: boolean; wallet: Awaited<ReturnType<typeof import("./db").ensureTikisWallet>> }> {
+export async function creditLoyaltyGrantOnWallet(grantId: string): Promise<{ credited: boolean; wallet: Awaited<ReturnType<typeof import("./db").applyWalletMovement>> }> {
   const db = await getDb();
   if (!db) throw new Error("Le Wallet est temporairement indisponible.");
   return db.transaction(async (tx) => {

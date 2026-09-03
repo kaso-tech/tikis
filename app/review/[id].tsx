@@ -14,8 +14,8 @@ export default function ReviewDeliveryScreen() {
   const { profile } = useTikisStore();
   const safeDeliveryId = id ?? "00000000-0000-4000-8000-000000000000";
   const deliveryQuery = trpc.deliveries.get.useQuery({ id: safeDeliveryId }, { enabled: Boolean(id && profile?.phone) });
-  const reviewQuery = trpc.reviews.getForDelivery.useQuery({ deliveryId: safeDeliveryId }, { enabled: Boolean(id && profile?.phone) });
-  const submitReviewMutation = trpc.reviews.submit.useMutation();
+  const reviewQuery = trpc.analytics.getForDelivery.useQuery({ deliveryId: safeDeliveryId }, { enabled: Boolean(id && profile?.phone) });
+  const submitReviewMutation = trpc.analytics.submit.useMutation();
   const delivery = deliveryQuery.data;
   const existing = reviewQuery.data;
   const [rating, setRating] = useState<1 | 2 | 3 | 4 | 5>(5);

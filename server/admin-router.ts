@@ -3,6 +3,7 @@ import { router, publicProcedure, tikisAdminProcedure, requireTikisAdminRole, in
 import { assertLoginAllowed, createAdminSession, recordLoginFailure, recordLoginSuccess, verifyAdminPassword } from "./admin-auth";
 import * as adminDb from "./admin-db";
 import * as db from "./db";
+import { publishDeliveryStatusBroadcast } from "./supabase-realtime";
 
 function clientIp(req: { headers: Record<string, unknown>; socket?: { remoteAddress?: string } }) {
   const forwarded = req.headers["x-forwarded-for"];
@@ -120,7 +121,7 @@ export const tikisAdminRouter = router({
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await adminDb.adminForceCancelDelivery({ ...input, adminId: ctx.tikisAdmin.adminId });
       await audit(ctx, "delivery_force_cancelled", "delivery", input.deliveryId, { reason: input.reason });
-      void db.publishDeliveryStatusBroadcast({
+      void publishDeliveryStatusBroadcast({
         deliveryId: input.deliveryId,
         status: "cancelled",
         title: "Livraison annulée par l’administration",

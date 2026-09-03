@@ -532,3 +532,11 @@
 - [x] Corriger les types du parcours KYC et du suivi de parrainage introduits par le dernier pull.
 - [x] Revalider TypeScript, les tests, le build admin et les services après les corrections KYC.
 - [x] Aligner le test Wallet sur la désactivation métier des retraits synchronisée depuis GitHub.
+- [x] Refaire le pull de la branche `main` et vérifier le dernier commit.
+- [x] Vérifier les dépendances, compiler, tester et construire la console admin.
+- [x] Relancer Expo et l’API, puis vérifier les services.
+- [x] Enregistrer, pousser et livrer la dernière version validée.
+- [x] Corriger les incompatibilités TypeScript de thème, gestion d’erreurs et composants ajoutés par le dernier pull.
+- [x] Revalider TypeScript, les tests, le build admin et les services après les correctifs de synchronisation.
+- [x] Corriger le scénario de test de projection de gains dont la valeur d’entrée ne correspond pas à la formule documentée.
+- [x] Ajouter de façon non destructive la colonne de suppression différée manquante au schéma actif et revalider l’accès géographique.

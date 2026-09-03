@@ -36,7 +36,7 @@ function emit(level: "info" | "warn" | "error", scope: string, message: string, 
   if (!isDev && level === "error" && Platform.OS === "web") {
     const w = typeof window !== "undefined" ? window : null;
     if (w && typeof (w as { Sentry?: { captureException: (e: Error) => void } }).Sentry?.captureException === "function") {
-      (w as { Sentry: { captureException: (e: Error) => void } }).Sentry.captureException(meta instanceof Error ? meta : new Error(message));
+      (w as unknown as { Sentry: { captureException: (e: Error) => void } }).Sentry.captureException(meta instanceof Error ? meta : new Error(message));
     }
   }
 }

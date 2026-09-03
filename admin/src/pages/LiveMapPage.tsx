@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { trpc } from "../lib/trpc";
 
 type LiveLocation = {
@@ -44,14 +44,31 @@ export default function LiveMapPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const query = trpc.adminConsole.deliveriesOps.liveLocations.useQuery({ maxAgeSeconds: maxAge }, { refetchInterval: 10_000 });
+  const [locations, setLocations] = useState<LiveLocation[]>([]);
 
   useEffect(() => {
     const timer = setInterval(() => setTick((value) => value + 1), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const locations = (query.data ?? []) as LiveLocation[];
+  const reload = useCallback(async () => {
+    setError("");
+    setLoading(true);
+    try {
+      const data = await trpc.adminConsole.deliveriesOps.liveLocations.query({ maxAgeSeconds: maxAge });
+      setLocations(data as LiveLocation[]);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Rechargement impossible.");
+    } finally {
+      setLoading(false);
+    }
+  }, [maxAge]);
+
+  useEffect(() => {
+    void reload();
+    const timer = setInterval(() => void reload(), 10_000);
+    return () => clearInterval(timer);
+  }, [reload]);
 
   const bounds = useMemo(() => {
     if (locations.length === 0) return null;
@@ -65,18 +82,6 @@ export default function LiveMapPage() {
     const lngPad = (maxLng - minLng || 0.01) * PADDING_PCT;
     return { minLat: minLat - latPad, maxLat: maxLat + latPad, minLng: minLng - lngPad, maxLng: maxLng + lngPad };
   }, [locations]);
-
-  async function reload() {
-    setError("");
-    setLoading(true);
-    try {
-      await query.refetch();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Rechargement impossible.");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   return (
     <div>

@@ -84,7 +84,7 @@ export default function DeliveryDetailScreen() {
   const disableMutation = trpc.deliveries.disable.useMutation();
   const reactivateMutation = trpc.deliveries.reactivate.useMutation();
   const cancelMutation = trpc.deliveries.cancel.useMutation();
-  const reviewQuery = trpc.reviews.getForDelivery.useQuery({ deliveryId: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
+  const reviewQuery = trpc.analytics.getForDelivery.useQuery({ deliveryId: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
   const driverReviewsQuery = trpc.reviews.list.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone) });
   const receivedReviewsCount = (driverReviewsQuery.data ?? []).length;
   const isDriverVerified = Boolean(profile?.photoUrl) || receivedReviewsCount > 0;

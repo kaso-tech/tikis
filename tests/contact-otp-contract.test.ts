@@ -14,7 +14,8 @@ describe("contrat de vérification des contacts", () => {
   });
 
   it("utilise le même code de simulation pour le client et le serveur", () => {
-    expect(routerSource).toContain('return { ok: true, demoOtp: "730512" }');
+    expect(routerSource).toContain('const SIMULATION_OTP = process.env.TIKIS_SIMULATION_OTP ?? "730512"');
+    expect(routerSource).toContain("return { ok: true, demoOtp: SIMULATION_OTP }");
     expect(contactSource).toContain('const DEMO_OTP = "730512"');
     expect(contactSource).toContain('phone: profile.phone, sessionOtp: DEMO_OTP');
   });
