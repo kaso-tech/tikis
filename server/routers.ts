@@ -672,6 +672,13 @@ export const appRouter = router({
       if (delivery) { await syncDeliveryParticipants(delivery); void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livreur sélectionné", body: "La livraison attend la confirmation du livreur.", occurredAt: new Date().toISOString() }); }
       return delivery;
     }),
+    unselectCandidate: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "sender") throw new Error("Seul l’expéditeur peut annuler son choix de livreur.");
+      const delivery = await db.unselectTikisDeliveryCandidateFromSender(input.deliveryId, profile.phone);
+      if (delivery) { await syncDeliveryParticipants(delivery); void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Choix annulé", body: "L’expéditeur a annulé son choix avant confirmation du livreur.", occurredAt: new Date().toISOString() }); }
+      return delivery;
+    }),
     confirm: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("Seul le livreur sélectionné peut confirmer.");
@@ -691,6 +698,13 @@ export const appRouter = router({
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       const [wallet, journal, commissionRate] = await Promise.all([db.getTikisWalletSnapshot(profile.phone), db.listTikisWalletLedger(profile.phone), db.getTikisCommissionRate()]);
       return { wallet, journal, commissionRate };
+    }),
+    // Historique informatif des gains de courses d'un livreur : calculé depuis les livraisons terminées, jamais
+    // depuis le Wallet (qui n'est jamais crédité par une livraison, le paiement se faisant hors application).
+    driverEarningsHistory: tikisProtectedProcedure.query(async ({ ctx }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "driver") return [];
+      return db.getDriverCompletedDeliveryEarnings(profile.phone);
     }),
     requestOperation: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000) })).mutation(async ({ ctx, input }) => {
       if (input.type === "withdrawal") throw new Error("Les retraits ne sont plus proposés : le Wallet sert uniquement à recharger votre compte pour effectuer des livraisons.");

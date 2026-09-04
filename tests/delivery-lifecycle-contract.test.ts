@@ -6,10 +6,14 @@ const databaseSource = readFileSync(join(process.cwd(), "server/db.ts"), "utf8")
 const historySource = readFileSync(join(process.cwd(), "app/history.tsx"), "utf8");
 
 describe("contrat du cycle de livraison à vingt-quatre heures", () => {
-  it("crédite le gain du livreur une seule fois à chaque livraison terminée", () => {
-    expect(databaseSource).toContain('operation: "credit"');
-    expect(databaseSource).toContain("delivery-earning");
-    expect(databaseSource).toContain("Gain de livraison crédité après confirmation de fin de course");
+  it("ne crédite jamais le Wallet du livreur avec le prix d'une livraison (paiement direct hors application)", () => {
+    expect(databaseSource).not.toContain("delivery-earning");
+    expect(databaseSource).not.toContain("Gain de livraison crédité");
+  });
+
+  it("calcule l'historique de gains informatif depuis les livraisons terminées, jamais depuis le Wallet", () => {
+    expect(databaseSource).toContain("getDriverCompletedDeliveryEarnings");
+    expect(databaseSource).toContain("non crédité au Wallet Tikis");
   });
 
   it("finalise les courses actives et expire les courses jamais démarrées", () => {

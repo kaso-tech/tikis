@@ -61,13 +61,19 @@ export default function EarningsScreen() {
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
   });
+  // Les gains de courses sont informatifs (le paiement se fait hors application) : ils sont calculés depuis les
+  // livraisons terminées, jamais depuis le Wallet, qui n'est jamais crédité par une livraison.
+  const earningsHistoryQuery = trpc.wallet.driverEarningsHistory.useQuery(undefined, { enabled: Boolean(profile?.phone) });
   const wallet = walletQuery.data?.wallet;
   const journal = walletQuery.data?.journal ?? [];
+  const earningsHistory = earningsHistoryQuery.data ?? [];
+  const isLoading = walletQuery.isLoading || earningsHistoryQuery.isLoading;
+  const hasError = walletQuery.error || earningsHistoryQuery.error;
 
   const { earningsEntries, bonusEntries, totalEarnings, totalBonus, courseCount, averagePerCourse, dailyBreakdown, bestDay, comparison, history } = useMemo(() => {
     const start = periodStart(period, new Date());
     const inPeriod = (entry: FinancialRecord) => new Date(entry.createdAt).getTime() >= start.getTime();
-    const earnings = journal.filter((entry) => inPeriod(entry) && isDeliveryEarning(entry));
+    const earnings = earningsHistory.filter((entry) => inPeriod(entry) && isDeliveryEarning(entry));
     const bonus = journal.filter((entry) => inPeriod(entry) && entry.operation === "bonus");
     const visible = flow === "earnings" ? earnings : flow === "bonus" ? bonus : [...earnings, ...bonus];
     const earningsTotal = earnings.reduce((sum, entry) => sum + entry.amount, 0);
@@ -85,7 +91,7 @@ export default function EarningsScreen() {
 
     const best = dayList.length === 0 ? null : dayList.reduce((acc, cur) => (cur.amount > acc.amount ? cur : acc), dayList[0]);
 
-    const totalLast7 = journal
+    const totalLast7 = earningsHistory
       .filter((entry) => {
         const date = new Date(entry.createdAt);
         const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
@@ -93,7 +99,7 @@ export default function EarningsScreen() {
       })
       .reduce((sum, entry) => sum + entry.amount, 0);
 
-    const totalPrev7 = journal
+    const totalPrev7 = earningsHistory
       .filter((entry) => {
         const date = new Date(entry.createdAt);
         const now = Date.now();
@@ -115,9 +121,9 @@ export default function EarningsScreen() {
       comparison: { last7: totalLast7, prev7: totalPrev7, trend },
       history: visible.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     };
-  }, [journal, period, flow]);
+  }, [journal, earningsHistory, period, flow]);
 
-  const todayEarnings = useMemo(() => deliveryMetricsForDay(journal).earnings, [journal]);
+  const todayEarnings = useMemo(() => deliveryMetricsForDay(earningsHistory).earnings, [earningsHistory]);
   const lastEarningDate = history[0] ? new Date(history[0].createdAt) : null;
 
   return (
@@ -127,7 +133,7 @@ export default function EarningsScreen() {
           <View style={styles.balanceGradient} pointerEvents="none" />
           <Text style={styles.balanceEyebrow}>GAINS · {PERIOD_META[period].label.toUpperCase()}</Text>
           <View style={styles.balanceValueRow}>
-            <Text style={styles.balanceValue}>{walletQuery.isLoading ? "Chargement…" : formatMoney(totalEarnings)}</Text>
+            <Text style={styles.balanceValue}>{isLoading ? "Chargement…" : formatMoney(totalEarnings)}</Text>
             {comparison.trend !== null ? (
               <View style={[styles.trendPill, comparison.trend < 0 && styles.trendPillDown]}>
                 <MaterialIcons name={comparison.trend >= 0 ? "trending-up" : "trending-down"} size={11} color={comparison.trend >= 0 ? "#48B889" : "#FBBF24"} />
@@ -252,9 +258,9 @@ export default function EarningsScreen() {
           <Text style={[styles.sectionAction, { color: theme.muted }]}>{history.length} mouvement{history.length > 1 ? "s" : ""}</Text>
         </View>
 
-        {walletQuery.isLoading ? (
+        {isLoading ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.emptyText, { color: theme.muted }]}>Chargement sécurisé de vos gains…</Text></View>
-        ) : walletQuery.error ? (
+        ) : hasError ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.emptyText, { color: theme.muted }]}>L'historique des gains est momentanément indisponible.</Text></View>
         ) : (
           <>
@@ -262,7 +268,7 @@ export default function EarningsScreen() {
           </>
         )}
 
-        {walletQuery.isLoading ? null : walletQuery.error ? null : history.length === 0 ? (
+        {isLoading ? null : hasError ? null : history.length === 0 ? (
           <View style={[styles.empty, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View style={[styles.emptyIcon, { backgroundColor: theme.background }]}><MaterialIcons name="savings" size={26} color={theme.muted} /></View>
             <Text style={[styles.emptyTitle, { color: theme.foreground }]}>Aucun gain sur cette période</Text>
