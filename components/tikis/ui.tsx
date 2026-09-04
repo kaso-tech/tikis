@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
   buttonText: { fontSize: 15, fontWeight: "600" },
   iconButton: { width: 40, height: 40, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF", borderWidth: 0 },
   iconButtonPressed: { opacity: 0.68 },
-  card: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 13, borderWidth: 0, elevation: 0 },
+  card: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 13, borderWidth: 0 },
   sectionHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   sectionTitle: { fontSize: 17, fontWeight: "600", color: "#111111", letterSpacing: -0.15 },
   sectionAction: { color: "#9A6201", fontSize: 13, fontWeight: "600" },

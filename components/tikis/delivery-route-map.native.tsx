@@ -54,5 +54,5 @@ export function DeliveryRouteMap({ pickup, dropoff, coordinates, routeSource, dr
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#EEEDF3" }, map: { ...StyleSheet.absoluteFillObject }, startMarker: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 0, shadowOpacity: 0, shadowRadius: 0, elevation: 0 }, destinationMarker: { width: 34, height: 34, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowOpacity: 0, shadowRadius: 0, elevation: 0 }, driverMarker: { width: 34, height: 34, borderRadius: 17, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
+  container: { flex: 1, backgroundColor: "#EEEDF3" }, map: { ...StyleSheet.absoluteFillObject }, startMarker: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 0 }, destinationMarker: { width: 34, height: 34, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" }, driverMarker: { width: 34, height: 34, borderRadius: 17, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
 });

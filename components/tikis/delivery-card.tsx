@@ -164,7 +164,7 @@ function DriverDistanceInfo({ loading, ready, value, unit, routeKm, navigationTa
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 9, marginBottom: 8, overflow: "hidden", elevation: 0, borderWidth: 1 },
+  card: { borderRadius: 9, marginBottom: 8, overflow: "hidden", borderWidth: 1 },
   summary: { padding: 12, paddingBottom: 10 },
   pressed: { opacity: 0.76 },
   topRow: { flexDirection: "row", alignItems: "center" },

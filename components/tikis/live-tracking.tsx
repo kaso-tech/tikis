@@ -236,9 +236,9 @@ export function LiveTrackingView({
           <View style={styles.mapInner}>
             <View style={[styles.mapBg, { backgroundColor: isDark ? "#1A1611" : theme.primary + "14" }]}>
               <View style={[styles.mapGrid, { borderColor: theme.primary + "0F" }]} />
-              <View style={[styles.mapRoad, styles.mapRoad1, { backgroundColor: theme.surface, shadowColor: theme.primary }]} />
-              <View style={[styles.mapRoad, styles.mapRoad2, { backgroundColor: theme.surface, shadowColor: theme.primary }]} />
-              <View style={[styles.mapRoad, styles.mapRoad3, { backgroundColor: theme.surface, shadowColor: theme.primary }]} />
+              <View style={[styles.mapRoad, styles.mapRoad1, { backgroundColor: theme.surface }]} />
+              <View style={[styles.mapRoad, styles.mapRoad2, { backgroundColor: theme.surface }]} />
+              <View style={[styles.mapRoad, styles.mapRoad3, { backgroundColor: theme.surface }]} />
               <View style={[styles.mapBlock, styles.mapBlockA, { backgroundColor: theme.surface, borderColor: theme.primary + "0F" }]} />
               <View style={[styles.mapBlock, styles.mapBlockB, { backgroundColor: theme.surface, borderColor: theme.primary + "0F" }]} />
               <View style={[styles.mapBlock, styles.mapBlockC, { backgroundColor: theme.surface, borderColor: theme.primary + "0F" }]} />
@@ -487,7 +487,7 @@ export function LiveTrackingView({
         <View style={[styles.routeCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.routeStops}>
             <View style={styles.routeStop}>
-              <View style={[styles.routePin, { backgroundColor: theme.success, borderColor: theme.surface, shadowColor: theme.success }]} />
+              <View style={[styles.routePin, { backgroundColor: theme.success, borderColor: theme.surface }]} />
               <View style={styles.routeStopBody}>
                 <Text style={[styles.routeStopLabel, { color: theme.muted }]}>Récupération</Text>
                 <Text style={[styles.routeStopName, { color: theme.foreground }]} numberOfLines={1}>{pickupName}</Text>
@@ -497,7 +497,7 @@ export function LiveTrackingView({
             </View>
             <View style={[styles.routeLineConnector, { backgroundColor: theme.border }]} />
             <View style={styles.routeStop}>
-              <View style={[styles.routePin, { backgroundColor: theme.error, borderColor: theme.surface, shadowColor: theme.error }]} />
+              <View style={[styles.routePin, { backgroundColor: theme.error, borderColor: theme.surface }]} />
               <View style={styles.routeStopBody}>
                 <Text style={[styles.routeStopLabel, { color: theme.muted }]}>Destination</Text>
                 <Text style={[styles.routeStopName, { color: theme.foreground }]} numberOfLines={1}>{dropoffName}</Text>
@@ -652,7 +652,7 @@ const styles = StyleSheet.create({
   routeStops: { gap: 0 },
   routeStop: { flexDirection: "row", alignItems: "flex-start", gap: 10, paddingVertical: 8 },
   routeLineConnector: { width: 2, height: 18, marginLeft: 7 },
-  routePin: { width: 16, height: 16, borderRadius: 8, marginTop: 2, borderWidth: 3, shadowOpacity: 0.3, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } },
+  routePin: { width: 16, height: 16, borderRadius: 8, marginTop: 2, borderWidth: 3 },
   routeStopBody: { flex: 1, minWidth: 0 },
   routeStopLabel: { fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 2 },
   routeStopName: { fontSize: 13, fontWeight: "600" },

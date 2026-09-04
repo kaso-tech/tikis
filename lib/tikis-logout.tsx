@@ -81,7 +81,7 @@ export function useTikisLogout() {
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: "center", padding: 24 },
   scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(8,22,42,0.56)" },
-  dialog: { backgroundColor: "#FFFFFF", borderRadius: 26, padding: 24, shadowColor: "#0B1F3A", shadowOpacity: 0.22, shadowOffset: { width: 0, height: 12 }, shadowRadius: 24, elevation: 8 },
+  dialog: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 24, borderWidth: 1, borderColor: "#E3E3E3" },
   icon: { width: 52, height: 52, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "#FFF1F1" },
   title: { color: "#0B1F3A", fontSize: 22, fontWeight: "900", marginTop: 17 },
   description: { color: "#697386", fontSize: 13, lineHeight: 20, marginTop: 7 },
@@ -94,4 +94,3 @@ const styles = StyleSheet.create({
   loading: { minHeight: 76, marginTop: 22, borderRadius: 16, backgroundColor: "#F3F8FA", alignItems: "center", justifyContent: "center", gap: 10 },
   loadingText: { color: "#B4232D", fontSize: 12, fontWeight: "800" },
 });
-

@@ -545,3 +545,7 @@
 - [x] Corriger toute incompatibilité introduite par la synchronisation avant publication.
 - [x] Relancer Expo et l’API, puis vérifier Metro, API et console administrateur.
 - [x] Enregistrer, pousser et livrer la version synchronisée validée.
+- [x] Inventorier tous les styles `shadow*` obsolètes de l’application et de la console admin.
+- [x] Remplacer les styles d’ombre obsolètes par le style épuré compatible avec le thème Tikis.
+- [x] Revalider TypeScript, tests, build admin et l’absence d’avertissement `shadow*` après démarrage.
+- [x] Enregistrer et livrer le nettoyage global des styles d’ombre.

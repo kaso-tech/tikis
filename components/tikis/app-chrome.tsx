@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
   headerBadgeText: { color: "#FFFFFF", fontWeight: "600", fontSize: 9 },
   drawerRoot: { flex: 1, flexDirection: "row" },
   scrim: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.42)" },
-  drawerPanel: { position: "absolute", top: 0, bottom: 0, left: 0, width: DRAWER_WIDTH, maxWidth: "85%", backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingBottom: 14, shadowColor: "transparent", borderRightWidth: 1, borderRightColor: "#E3E3E3" },
+  drawerPanel: { position: "absolute", top: 0, bottom: 0, left: 0, width: DRAWER_WIDTH, maxWidth: "85%", backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingBottom: 14, borderRightWidth: 1, borderRightColor: "#E3E3E3" },
   drawerPanelDark: { backgroundColor: "#171108", borderRightColor: "#4A3823" },
   drawerTop: { height: 40, alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   drawerEyebrow: { color: "#747474", fontSize: 10, fontWeight: "600", letterSpacing: 0.9 },
