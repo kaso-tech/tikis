@@ -58,11 +58,39 @@ Suite complète revérifiée (`npx tsc --noEmit`, `npx vitest run`) : aucune ré
 
 Suite complète revérifiée (`npx tsc --noEmit`, `npx vitest run`) : aucune régression (3 erreurs TS pré-existantes hors périmètre `admin/`, 6 échecs de test environnementaux déjà présents avant ces changements).
 
-## Phase 5 — Nettoyage transverse résiduel
-24. ☐ Rate-limit géographique distribué (B-1 lieux).
-25. ☐ Revue des points de sécurité générale déjà listés dans `AUDIT_RAPPORT_2026-09-03.md` (non repris dans l'audit du 09-04) pour confirmer leur statut actuel.
+## Phase 5 — Nettoyage transverse résiduel — ☑ fait (2026-09-04)
+24. ☑ **[B-1 lieux]** Rate-limit géographique rendu distribué : nouvelle table `tikis_rate_limits` (fenêtre fixe, incrément atomique `ON DUPLICATE KEY UPDATE`), remplace le compteur en mémoire de processus qui ne protégeait qu'une seule instance derrière un éventuel load balancer. Migration `drizzle/manual/0036_rate_limits.sql`.
+25. ☑ Revue des points de sécurité de `AUDIT_RAPPORT_2026-09-03.md` (section 1, S1-S8) :
+
+| # | Constat original | Statut vérifié le 2026-09-04 |
+|---|---|---|
+| S1 | Aucun middleware de sécurité HTTP | **Résolu** — `server/_core/security.ts` : `corsMiddleware` (allowlist), `securityHeadersMiddleware`, `publicApiRateLimit`/`authRateLimit`/`registerRateLimit`/`geographyRateLimit` (équivalents fonctionnels à helmet/cors/express-rate-limit), déjà branchés dans `server/_core/index.ts`. |
+| S2 | OTP en dur acceptable en production | **Résolu** — `TIKIS_OTP_MODE` (env) désactive entièrement le chemin de simulation en mode `real` ; les procédures `lookupSupabase`/`registerSupabase` (vérification réelle via `verifySupabasePhoneSession`) sont le chemin de production. |
+| S3 | `register` sans aucune vérification | **Résolu** — rate-limit par téléphone (`enforcePerPhoneRateLimit`) sur `register`/`registerSupabase` ; `registerSupabase` vérifie un vrai jeton Supabase. |
+| S4 | Session token en `sessionStorage` web (XSS) | **Était toujours ouvert, corrigé dans cette passe** — un cookie httpOnly (`setTikisProfileCookie`) existait déjà côté serveur, mais le client web maintenait *en plus* une copie du jeton dans `sessionStorage`, renvoyée en en-tête `x-tikis-session` que le serveur privilégiait sur le cookie (`pickTikisSessionToken`) : un vol par XSS suffisait donc à usurper une session sans jamais toucher au cookie protégé. `lib/tikis-session.ts` ne gère plus ce jeton côté web (le cookie httpOnly suffit, envoyé automatiquement) ; seul le natif (stockage sécurisé du système) continue de le faire. |
+| S5 | Aucun rate-limit sur les routes publiques sensibles | **Résolu** — voir S1 ; renforcé par le point 24 (distribué). |
+| S6 | `referral.settings` public trop détaillé | **Résolu** — `getReferralPublicSettings` ne renvoie que `{ rewardAmount, requiredDeliveries, enabled }`, pas la configuration complète. |
+| S7 | Pas de limite de taille sur les uploads KYC | **Résolu** — `kycBase64ImageSchema` plafonne à ~5 Mo binaire par fichier. |
+| S8 | Chiffrement au repos des fichiers KYC | **Non vérifiable depuis le code** — dépend de la configuration du bucket Supabase Storage (privé + URLs signées à durée courte) ; à confirmer côté infrastructure, hors périmètre d'une revue de code. |
+
+Suite complète revérifiée (`npx tsc --noEmit`, `npx vitest run`) : aucune régression (3 erreurs TS pré-existantes hors périmètre `admin/`, 6 échecs de test environnementaux déjà présents avant ces changements).
+
+**Note pour la mise en production** : appliquer aussi `drizzle/manual/0036_rate_limits.sql`.
 
 ---
 
 ## Suivi
 Ce fichier est mis à jour au fur et à mesure (cases cochées, notes d'écart) pour qu'aucun point de l'audit ne soit perdu de vue, y compris si le travail s'étale sur plusieurs sessions.
+
+## État final — toutes les phases terminées (2026-09-04)
+
+Les phases 0 à 5 sont complètes. Deux points ont été délibérément laissés ouverts, avec justification, plutôt que forcés dans cette passe :
+- **W-M6** (phase 4) : preuve serveur qu'un popup de confirmation a été affiché — nécessiterait une nouvelle fonctionnalité (jeton de confirmation signé), pas un correctif ponctuel.
+- **S8** (phase 5) : chiffrement au repos des fichiers KYC — dépend de la configuration infrastructure Supabase Storage, non vérifiable ni corrigeable depuis le code.
+
+**Migrations manuelles à appliquer en production**, dans l'ordre, en plus de celles déjà existantes :
+1. `drizzle/manual/0034_wallet_ledger_hardening.sql` (Phase 2)
+2. `drizzle/manual/0035_places_coordinates_index.sql` (Phase 3)
+3. `drizzle/manual/0036_rate_limits.sql` (Phase 5)
+
+Chaque phase a été validée par `npx tsc --noEmit` et `npx vitest run` avant d'être commitée ; aucune régression n'a été introduite sur l'ensemble du parcours (les échecs de test restants sont environnementaux — absence de base de données/réseau/variables d'environnement dans le bac à sable de développement — et préexistaient avant ce travail).

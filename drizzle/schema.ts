@@ -492,3 +492,16 @@ export const tikisDailyMetrics = mysqlTable("tikis_daily_metrics", {
 ]);
 
 export type TikisDailyMetric = typeof tikisDailyMetrics.$inferSelect;
+
+/** Rate-limit distribué (partagé entre toutes les instances du serveur, contrairement à un compteur en
+ *  mémoire de processus) : fenêtre fixe identifiée par `rateLimitKey` = "<portée>:<identifiant>:<fenêtre>"
+ *  (ex. "geo:+22670000000:29234561"), incrémentée atomiquement via ON DUPLICATE KEY UPDATE. */
+export const tikisRateLimits = mysqlTable("tikis_rate_limits", {
+  rateLimitKey: varchar("rateLimitKey", { length: 191 }).primaryKey(),
+  count: int("count").notNull().default(0),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("tikis_rate_limits_updated_at_index").on(table.updatedAt),
+]);
+
+export type TikisRateLimit = typeof tikisRateLimits.$inferSelect;

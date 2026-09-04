@@ -157,21 +157,20 @@ async function syncDeliveryParticipants(delivery: Pick<ResolvedDelivery, "id" | 
 
 const GEO_RATE_LIMIT_WINDOW_MS = 60_000;
 const GEO_RATE_LIMIT_MAX_REQUESTS = 40;
-const geographyRequests = new Map<string, number[]>();
 
-function enforceGeographyRateLimit(profilePhone: string) {
-  const now = Date.now();
-  const recent = (geographyRequests.get(profilePhone) ?? []).filter((timestamp) => now - timestamp < GEO_RATE_LIMIT_WINDOW_MS);
-  if (recent.length >= GEO_RATE_LIMIT_MAX_REQUESTS) {
+// Distribué (table partagée entre toutes les instances du serveur) : un compteur en mémoire de
+// processus ne protège que l'instance qui le détient — un client réparti sur plusieurs connexions
+// pouvait multiplier la limite effective par le nombre d'instances derrière le load balancer.
+async function enforceGeographyRateLimit(profilePhone: string) {
+  const withinLimit = await db.checkDistributedRateLimit("geo", profilePhone, GEO_RATE_LIMIT_WINDOW_MS, GEO_RATE_LIMIT_MAX_REQUESTS);
+  if (!withinLimit) {
     recordGeographicMetric("search", "rate_limited");
     throw new Error("Trop de demandes de lieux en cours. Réessayez dans une minute.");
   }
-  recent.push(now);
-  geographyRequests.set(profilePhone, recent);
 }
 
 const protectedGeographyProcedure = tikisProtectedProcedure.use(async ({ ctx, next }) => {
-  enforceGeographyRateLimit(ctx.tikisProfilePhone);
+  await enforceGeographyRateLimit(ctx.tikisProfilePhone);
   return next();
 });
 

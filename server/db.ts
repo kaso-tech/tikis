@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, tikisFavoritePlaces, tikisKycSubmissions, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisPushTokens, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, tikisYengapayWebhookEvents, users } from "../drizzle/schema";
+import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, tikisFavoritePlaces, tikisKycSubmissions, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisPushTokens, tikisRateLimits, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, tikisYengapayWebhookEvents, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { createYengapayPaymentIntent, readYengapayConfig, verifyYengapayPayment } from "./yengapay";
 import { sendPushToTokens, type PushMessage } from "./push";
@@ -960,6 +960,26 @@ async function enforceDriverApplicationRateLimit(driverPhone: string, db: DbHand
   if (Number(dayCount) >= MAX_APPLICATIONS_PER_DAY) {
     throw new Error(`Limite quotidienne de ${MAX_APPLICATIONS_PER_DAY} candidatures atteinte. Réessaie demain.`);
   }
+}
+
+/** Rate-limit partagé entre toutes les instances du serveur, via une table plutôt qu'un compteur en
+ *  mémoire de processus (qui ne protège que l'instance qui le détient — un attaquant réparti sur
+ *  plusieurs connexions peut alors multiplier la limite effective par le nombre d'instances).
+ *  Fenêtre fixe (bucket = fenêtre temporelle entière, pas une fenêtre glissante) : plus simple et
+ *  suffisamment précis pour du rate-limiting anti-abus, sans nécessiter un magasin partagé type Redis.
+ *  Incrément atomique via `ON DUPLICATE KEY UPDATE count = count + 1` (sûr sous concurrence). */
+export async function checkDistributedRateLimit(scope: string, identifier: string, windowMs: number, maxRequests: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return true; // Panne DB : ne jamais bloquer l'usage à cause d'un souci d'infrastructure du rate-limit lui-même.
+  const bucket = Math.floor(Date.now() / windowMs);
+  const rateLimitKey = `${scope}:${identifier}:${bucket}`.slice(0, 191);
+  await db.insert(tikisRateLimits).values({ rateLimitKey, count: 1 }).onDuplicateKeyUpdate({ set: { count: sql`${tikisRateLimits.count} + 1` } });
+  const row = (await db.select({ count: tikisRateLimits.count }).from(tikisRateLimits).where(eq(tikisRateLimits.rateLimitKey, rateLimitKey)).limit(1))[0];
+  if (Math.random() < 0.01) {
+    const staleBefore = new Date(Date.now() - windowMs * 4);
+    void db.delete(tikisRateLimits).where(lt(tikisRateLimits.updatedAt, staleBefore)).catch(() => {});
+  }
+  return (row?.count ?? 0) <= maxRequests;
 }
 
 export async function applyForTikisDelivery(input: { id: string; deliveryId: string; driverPhone: string; confirmedCommission: number; offerPrice?: number }) {

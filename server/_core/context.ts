@@ -33,6 +33,10 @@ function parseCookies(header: string | undefined): Record<string, string> {
   return result;
 }
 
+// L'en-tête n'est envoyé que par le client natif (stockage sécurisé du système, cf. lib/tikis-session.ts) ;
+// le client web s'appuie uniquement sur le cookie httpOnly ci-dessous, jamais lisible ni renvoyable par
+// un script injecté. Ne jamais faire porter ce jeton par le client web via un en-tête/sessionStorage : cela
+// annulerait la protection XSS que ce cookie httpOnly existe précisément pour apporter.
 function pickTikisSessionToken(opts: CreateExpressContextOptions): string | undefined {
   const headerValue = opts.req.headers["x-tikis-session"];
   const headerToken = Array.isArray(headerValue) ? headerValue[0] : headerValue;
