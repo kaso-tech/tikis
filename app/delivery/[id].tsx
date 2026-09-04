@@ -185,7 +185,11 @@ export default function DeliveryDetailScreen() {
     try {
       if (action === "apply") {
         if (!actionConfig?.amount) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
-        const result = await applyMutation.mutateAsync({ deliveryId, confirmedCommission: actionConfig.amount, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
+        // Le serveur calcule la commission sur `offerPrice` quand une contre-offre est fournie (server/db.ts,
+        // applyForTikisDelivery) : il faut recalculer sur ce même montant ici, sinon le contrôle de
+        // correspondance côté serveur rejette systématiquement toute candidature avec contre-offre.
+        const confirmedCommission = counterOffer?.amount ? Math.round(counterOffer.amount * (walletQuery.data?.commissionRate ?? 0)) : actionConfig.amount;
+        const result = await applyMutation.mutateAsync({ deliveryId, confirmedCommission, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
         utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
       }
       if (action === "withdraw") {

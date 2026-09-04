@@ -273,10 +273,10 @@ export function HomeScreen() {
     { enabled: Boolean(candidateDelivery?.id) },
   );
 
-  const applicationCommission = (delivery: Delivery) => {
+  const applicationCommission = (delivery: Delivery, priceOverride?: number) => {
     const rate = walletQuery.data?.commissionRate;
     if (!Number.isFinite(rate) || !rate || rate <= 0 || rate >= 1) return null;
-    return commissionFor(delivery.offeredPrice ?? delivery.estimatedPrice, { rate, currency: "FCFA" });
+    return commissionFor(priceOverride ?? (delivery.offeredPrice ?? delivery.estimatedPrice), { rate, currency: "FCFA" });
   };
 
   function requestDriverAction(delivery: Delivery) {
@@ -337,7 +337,10 @@ export function HomeScreen() {
         openNavigation(origin, delivery.pickup, delivery.dropoff);
         return;
       } else {
-        const confirmedCommission = applicationCommission(delivery);
+        // Le serveur calcule la commission sur `offerPrice` quand une contre-offre est fournie (server/db.ts,
+        // applyForTikisDelivery) : il faut recalculer sur ce même montant ici, sinon le contrôle de
+        // correspondance ajouté côté serveur rejette systématiquement toute candidature avec contre-offre.
+        const confirmedCommission = applicationCommission(delivery, counterOffer?.amount ?? undefined);
         if (confirmedCommission === null) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
         const result = await applyMutation.mutateAsync({ deliveryId: delivery.id, confirmedCommission, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
         utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);

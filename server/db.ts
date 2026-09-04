@@ -438,11 +438,22 @@ const MAX_COMPATIBLE_DRIVERS_NOTIFIED = 200;
  *  `deliveries.list` (server/routers.ts), juste appliquée dans l'autre sens. Pas de correspondance JSON
  *  au niveau SQL (`vehicles` est stocké en texte) : filtrage en JS, comme ailleurs dans ce fichier.
  *  Bornée à `MAX_COMPATIBLE_DRIVERS_NOTIFIED` par défense contre un volume de livreurs très important. */
+// Borne la lecture SQL elle-même (pas seulement l'accumulateur JS ci-dessous) : sans cette limite, la
+// requête chargeait la table des livreurs actifs en entier en mémoire, à l'intérieur de la même
+// transaction que la création/réactivation de la livraison, pour chaque publication. `vehicles` étant
+// stocké en texte (pas de correspondance JSON possible au niveau SQL), le compromis accepté est de ne
+// considérer que les `MAX_DRIVERS_SCANNED_FOR_COMPATIBILITY` profils actifs les plus récents : au-delà de
+// ce volume de livreurs actifs, certains ne recevront pas cette notification précise (l'app reste malgré
+// tout découvrable via `deliveries.list`, qui n'a pas cette limite).
+const MAX_DRIVERS_SCANNED_FOR_COMPATIBILITY = 2_000;
+
 async function getCompatibleDriverPhones(tx: any, vehicleTypes: SelectableVehicleType[]): Promise<string[]> {
   if (vehicleTypes.length === 0) return [];
   const drivers = await tx.select({ phone: tikisProfiles.phone, vehicles: tikisProfiles.vehicles })
     .from(tikisProfiles)
-    .where(and(eq(tikisProfiles.accountType, "driver"), eq(tikisProfiles.status, "active")));
+    .where(and(eq(tikisProfiles.accountType, "driver"), eq(tikisProfiles.status, "active")))
+    .orderBy(desc(tikisProfiles.id))
+    .limit(MAX_DRIVERS_SCANNED_FOR_COMPATIBILITY);
   const matches: string[] = [];
   for (const driver of drivers) {
     if (parseVehicles(driver.vehicles).some((vehicle) => vehicleTypes.includes(vehicle))) matches.push(driver.phone);
@@ -777,15 +788,21 @@ export async function requestTikisWalletOperation(profilePhone: string, type: "d
   const db = await getDb();
   if (!db) throw new Error("Le Wallet est temporairement indisponible.");
   await db.transaction(async (tx) => {
+    // `requestId` est fourni par l'appelant (généré une seule fois par soumission) : une relance réseau
+    // de la même demande ne doit pas créer une seconde ligne. On vérifie d'abord (comme le fait
+    // `applyWalletMovement` partout ailleurs) plutôt que de s'appuyer sur `onDuplicateKeyUpdate`, qui
+    // déclencherait une vraie clause UPDATE — bloquée par le trigger d'immuabilité de `tikis_wallet_ledger`
+    // (drizzle/manual/0034_wallet_ledger_hardening.sql), même pour ré-écrire la même valeur.
+    const idempotencyKey = `${type}:${profilePhone}:${requestId}`;
+    const existing = await tx.select({ id: tikisWalletLedger.id }).from(tikisWalletLedger).where(eq(tikisWalletLedger.idempotencyKey, idempotencyKey)).limit(1);
+    if (existing.length > 0) return;
     const wallet = await ensureTikisWallet(tx, profilePhone);
     if (type === "withdrawal" && wallet.availableBalance < amount) throw new Error("Votre solde disponible est insuffisant pour ce retrait.");
-    // `requestId` est fourni par l'appelant (généré une seule fois par soumission) : une relance
-    // réseau de la même demande ne crée donc jamais une seconde ligne dans le journal.
     await tx.insert(tikisWalletLedger).values({
       id: randomUUID(), profilePhone, deliveryId: null, operation: type === "deposit" ? "deposit_request" : "withdrawal_request", amount,
       availableBefore: wallet.availableBalance, availableAfter: wallet.availableBalance, heldBefore: wallet.heldBalance, heldAfter: wallet.heldBalance,
-      reason: type === "deposit" ? "Demande de dépôt en attente d’un moyen de paiement autorisé" : "Demande de retrait en attente de traitement", idempotencyKey: `${type}:${profilePhone}:${requestId}`,
-    }).onDuplicateKeyUpdate({ set: { idempotencyKey: `${type}:${profilePhone}:${requestId}` } });
+      reason: type === "deposit" ? "Demande de dépôt en attente d’un moyen de paiement autorisé" : "Demande de retrait en attente de traitement", idempotencyKey,
+    });
   });
   return { success: true } as const;
 }

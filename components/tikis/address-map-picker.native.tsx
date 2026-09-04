@@ -42,13 +42,19 @@ export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, 
   const { status: gpsStatus, requestBias } = useSearchLocationBias();
 
   const resolveCenter = useCallback(async (coordinate: Coordinate) => {
-    lastResolvedRef.current = coordinate;
     try {
       setMessage("Identification de l’adresse…");
       const result = await reverse.mutateAsync(coordinate);
+      // Marqué "résolu" seulement en cas de succès : si on l'enregistrait avant l'appel, un échec réseau
+      // laissait `lastResolvedRef` bloqué sur ce point pour le reste de la session de la modale — un
+      // nudge du marqueur à moins de 15 m ne redéclenchait alors plus jamais de nouvelle tentative.
+      lastResolvedRef.current = coordinate;
       setPlace(result ? { ...result, latitude: coordinate.latitude, longitude: coordinate.longitude, source: "reverse", precision: "exact" } : null);
       setMessage(result ? "" : "Adresse introuvable. Ajustez légèrement le marqueur.");
-    } catch (cause) { setMessage(cause instanceof Error ? cause.message : "Le géocodage inverse est momentanément indisponible."); }
+    } catch (cause) {
+      lastResolvedRef.current = null;
+      setMessage(cause instanceof Error ? cause.message : "Le géocodage inverse est momentanément indisponible.");
+    }
   }, [reverse]);
 
   const moveToPosition = useCallback(async () => {
