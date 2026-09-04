@@ -657,6 +657,7 @@ export function HomeScreen() {
         visible={Boolean(candidateDelivery)}
         candidates={candidatesQuery.data ?? []}
         deliveryStatus={candidateDelivery?.status ?? "open"}
+        deliveryPrice={candidateDelivery ? (candidateDelivery.offeredPrice ?? candidateDelivery.estimatedPrice) : 0}
         loadingId={actioningId}
         onClose={() => setCandidateDelivery(null)}
         onChoose={requestCandidateSelection}

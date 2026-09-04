@@ -432,10 +432,51 @@ async function deliveryJoins(rows: TikisDelivery[]): Promise<Delivery[]> {
   });
 }
 
+const MAX_COMPATIBLE_DRIVERS_NOTIFIED = 200;
+
+/** Livreurs actifs dont au moins un engin correspond à la livraison — même règle de compatibilité que
+ *  `deliveries.list` (server/routers.ts), juste appliquée dans l'autre sens. Pas de correspondance JSON
+ *  au niveau SQL (`vehicles` est stocké en texte) : filtrage en JS, comme ailleurs dans ce fichier.
+ *  Bornée à `MAX_COMPATIBLE_DRIVERS_NOTIFIED` par défense contre un volume de livreurs très important. */
+async function getCompatibleDriverPhones(tx: any, vehicleTypes: SelectableVehicleType[]): Promise<string[]> {
+  if (vehicleTypes.length === 0) return [];
+  const drivers = await tx.select({ phone: tikisProfiles.phone, vehicles: tikisProfiles.vehicles })
+    .from(tikisProfiles)
+    .where(and(eq(tikisProfiles.accountType, "driver"), eq(tikisProfiles.status, "active")));
+  const matches: string[] = [];
+  for (const driver of drivers) {
+    if (parseVehicles(driver.vehicles).some((vehicle) => vehicleTypes.includes(vehicle))) matches.push(driver.phone);
+    if (matches.length >= MAX_COMPATIBLE_DRIVERS_NOTIFIED) break;
+  }
+  return matches;
+}
+
+/** Informe chaque livreur compatible qu'une livraison est disponible (publication ou réactivation) —
+ *  spec §1 : "informer les livreurs compatibles". Avant ce correctif, aucun chemin ne le faisait : la
+ *  seule découverte possible était le polling manuel de `deliveries.list`. */
+async function notifyCompatibleDriversOfDelivery(tx: any, delivery: { id: string; title: string; vehicleTypes: string }, eventType: "delivery_published" | "delivery_reactivated_for_drivers", announcement: string) {
+  const compatiblePhones = await getCompatibleDriverPhones(tx, parseVehicles(delivery.vehicleTypes));
+  for (const driverPhone of compatiblePhones) {
+    await appendDeliveryEvent(tx, {
+      deliveryId: delivery.id,
+      eventType,
+      status: "open",
+      recipientPhone: driverPhone,
+      title: "Nouvelle livraison disponible",
+      body: `${announcement} : ${delivery.title}`,
+      tone: "info",
+      idempotencyKey: `${delivery.id}:${eventType}:${driverPhone}`,
+    });
+  }
+}
+
 export async function createTikisDelivery(input: InsertTikisDelivery) {
   const db = await getDb();
   if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
-  await db.insert(tikisDeliveries).values(input);
+  await db.transaction(async (tx) => {
+    await tx.insert(tikisDeliveries).values(input);
+    await notifyCompatibleDriversOfDelivery(tx, { id: input.id, title: input.title, vehicleTypes: input.vehicleTypes }, "delivery_published", "Une livraison compatible avec votre engin a été publiée");
+  });
   return getTikisDeliveryById(input.id);
 }
 
@@ -512,9 +553,20 @@ export async function getTikisDeliveryLiveLocation(deliveryId: string): Promise<
 export async function listTikisDeliveriesForProfile(profilePhone: string, role: "sender" | "driver") {
   const db = await getDb();
   if (!db) return [];
-  const predicate = role === "sender"
-    ? eq(tikisDeliveries.senderPhone, profilePhone)
-    : or(eq(tikisDeliveries.status, "open"), eq(tikisDeliveries.driverPhone, profilePhone));
+  let predicate;
+  if (role === "sender") {
+    predicate = eq(tikisDeliveries.senderPhone, profilePhone);
+  } else {
+    // Un candidat non retenu (statut "applied"/"withdrawn"/"replaced") doit pouvoir retrouver sa
+    // candidature dans son propre historique même une fois qu'un autre livreur a été sélectionné —
+    // sans cette clause, la livraison disparaissait silencieusement dès que `status` quittait "open"
+    // et que `driverPhone` pointait vers quelqu'un d'autre.
+    const candidacies = await db.select({ deliveryId: tikisDeliveryCandidates.deliveryId }).from(tikisDeliveryCandidates).where(eq(tikisDeliveryCandidates.driverPhone, profilePhone));
+    const candidacyDeliveryIds = candidacies.map((row) => row.deliveryId);
+    predicate = candidacyDeliveryIds.length > 0
+      ? or(eq(tikisDeliveries.status, "open"), eq(tikisDeliveries.driverPhone, profilePhone), inArray(tikisDeliveries.id, candidacyDeliveryIds))
+      : or(eq(tikisDeliveries.status, "open"), eq(tikisDeliveries.driverPhone, profilePhone));
+  }
   const rows = await db.select().from(tikisDeliveries).where(predicate).orderBy(desc(tikisDeliveries.createdAt));
   return deliveryJoins(rows);
 }
@@ -1097,6 +1149,7 @@ export async function reactivateTikisDeliveryFromSender(deliveryId: string, send
     if (!delivery || delivery.status !== "disabled") throw new Error("Seule une livraison désactivée peut être activée.");
     await tx.update(tikisDeliveries).set({ status: "open", updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_reactivated", status: "open", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Livraison activée", body: "Votre livraison est à nouveau visible pour les livreurs compatibles.", tone: "success", idempotencyKey: `${deliveryId}:reactivated:${delivery.updatedAt.getTime()}` });
+    await notifyCompatibleDriversOfDelivery(tx, { id: deliveryId, title: delivery.title, vehicleTypes: delivery.vehicleTypes }, "delivery_reactivated_for_drivers", "Une livraison compatible avec votre engin est de nouveau disponible");
   });
   return getTikisDeliveryById(deliveryId);
 }

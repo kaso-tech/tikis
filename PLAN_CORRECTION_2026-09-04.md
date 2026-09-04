@@ -49,11 +49,14 @@ Suite complète revérifiée (`npx tsc --noEmit`, `npx vitest run`) : aucune ré
 
 **Note pour la mise en production** : appliquer aussi `drizzle/manual/0035_places_coordinates_index.sql` (comme `0034_...` de la Phase 2).
 
-## Phase 4 — Workflow, notifications, temps réel
-20. ☐ **[Point 5 — W-C1]** Notifier les livreurs compatibles à la publication/réactivation d'une livraison.
-21. ☐ **[Point 5 — W-C4]** Synchroniser candidatures/retraits/signalements en Realtime (broadcast + invalidation `deliveries.candidates` côté client).
-22. ☐ **[W-H2/H3/H4]** Nettoyer l'infrastructure Realtime : filtrer les abonnements par appartenance réelle, supprimer la policy RLS morte, fusionner les canaux dupliqués (statut + position).
-23. ☐ **[W-M1..M6]** Corriger le prix candidat affiché (taux en dur), brancher les pièces jointes de signalement, notification admin sur signalement, corriger `isOpenDeliveryFresh`, rendre visible aux candidats non retenus leur propre candidature, tracer côté serveur qu'un popup a bien été affiché.
+## Phase 4 — Workflow, notifications, temps réel — ☑ fait (2026-09-04)
+20. ☑ **[Point 5 — W-C1]** Les livreurs compatibles (engin correspondant, profil actif) sont notifiés à la publication (`deliveries.create`) et à la réactivation (`reactivate`) d'une livraison (`notifyCompatibleDriversOfDelivery`, bornée à 200 destinataires par défense). Le Sender devient aussi membre du canal Realtime dès la création (pas seulement à la première modification).
+21. ☑ **[Point 5 — W-C4]** `submitApplication`, `withdraw` diffusent désormais un signal Realtime (comme `selectCandidate`/`confirm`/`complete`/`cancel` le faisaient déjà) ; `DeliveryRealtimeProvider` invalide maintenant aussi `deliveries.candidates` sur tout signal reçu — une feuille de candidatures déjà ouverte se met à jour sans rafraîchissement manuel.
+22. ☑ **[W-H2/H3/H4]** `DeliveryRealtimeProvider` ne s'abonne plus qu'aux livraisons où le profil participe réellement (Sender, ou livreur assigné) au lieu de toutes les livraisons "open" compatibles. `supabase/realtime_policies.sql` transformé en script de nettoyage de la policy JWT jamais câblée (une seule source de vérité RLS reste : `realtime_auth_phone_rls.sql`). Statut et position partagent maintenant un seul channel Supabase par livraison (`subscribeToDeliveryChannel`, `lib/supabase-tracking.ts`) au lieu de deux souscriptions indépendantes au même topic.
+23. ☑ **[W-M1..M5]** Prix candidat basé sur le prix réel de la livraison (`deliveryPrice`) au lieu de `commissionBlocked × 10` (taux en dur). Pièces jointes de signalement branchées de bout en bout (sélection photo, upload, `attachmentKey`). Badge de notification réel (sondage 30 s) sur les signalements ouverts dans la console admin, remplaçant le point statique jamais alimenté. `isOpenDeliveryFresh` (nommée/implémentée à l'envers, code mort) supprimée. Un candidat non retenu retrouve désormais sa propre candidature dans `deliveries.list` même après qu'un autre livreur a été sélectionné.
+   - **[W-M6 — décision documentée, non implémentée]** Tracer côté serveur qu'un popup de confirmation a bien été affiché avant chaque action financière nécessiterait un nouveau mécanisme (jeton de confirmation signé par écran, vérifié à la mutation) : une vraie fonctionnalité, pas un correctif ponctuel. Non fait dans cette passe — l'autorisation métier reste correctement vérifiée côté serveur pour chaque mutation (ce n'est pas une vulnérabilité isolée, cf. audit), seule la preuve a posteriori en cas de litige manque. À reprendre si un besoin explicite se présente.
+
+Suite complète revérifiée (`npx tsc --noEmit`, `npx vitest run`) : aucune régression (3 erreurs TS pré-existantes hors périmètre `admin/`, 6 échecs de test environnementaux déjà présents avant ces changements).
 
 ## Phase 5 — Nettoyage transverse résiduel
 24. ☐ Rate-limit géographique distribué (B-1 lieux).

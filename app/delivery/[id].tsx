@@ -458,6 +458,7 @@ export default function DeliveryDetailScreen() {
         visible={candidatesSheetOpen}
         candidates={candidates}
         deliveryStatus={delivery.status}
+        deliveryPrice={delivery.offeredPrice ?? delivery.estimatedPrice}
         loadingId={processing ? selectedCandidate?.id ?? null : null}
         onClose={() => setCandidatesSheetOpen(false)}
         onChoose={openCandidateAction}

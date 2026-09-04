@@ -510,16 +510,17 @@ export const appRouter = router({
     list: tikisProtectedProcedure.query(async ({ ctx }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       const deliveries = await db.listTikisDeliveriesForProfile(profile.phone, profile.accountType);
-      const compatible = profile.accountType === "driver"
-        ? deliveries.filter((delivery) => delivery.driverId === profile.phone || delivery.vehicleTypes.some((vehicle) => {
-          try { return JSON.parse(profile.vehicles).includes(vehicle); } catch { return false; }
-        }))
-        : deliveries;
       if (profile.accountType !== "driver") {
-        const candidateCounts = await db.countTikisDeliveryCandidates(compatible.map((delivery) => delivery.id));
-        return compatible.map((delivery) => ({ ...deliveryForProfile(delivery, profile), candidateCount: candidateCounts.get(delivery.id) ?? 0 }));
+        const candidateCounts = await db.countTikisDeliveryCandidates(deliveries.map((delivery) => delivery.id));
+        return deliveries.map((delivery) => ({ ...deliveryForProfile(delivery, profile), candidateCount: candidateCounts.get(delivery.id) ?? 0 }));
       }
-      const candidatesByDelivery = await db.listTikisDeliveryCandidateStatesForDriver(compatible.map((delivery) => delivery.id), profile.phone);
+      // Calculé sur l'ensemble de `deliveries` (avant le filtre de compatibilité) : un candidat non
+      // retenu doit retrouver sa propre candidature même si son engin ne correspondrait plus au filtre
+      // (la compatibilité au moment de candidater suffit, elle ne se réévalue pas après coup).
+      const candidatesByDelivery = await db.listTikisDeliveryCandidateStatesForDriver(deliveries.map((delivery) => delivery.id), profile.phone);
+      const compatible = deliveries.filter((delivery) => delivery.driverId === profile.phone || candidatesByDelivery.has(delivery.id) || delivery.vehicleTypes.some((vehicle) => {
+        try { return JSON.parse(profile.vehicles).includes(vehicle); } catch { return false; }
+      }));
       return compatible.map((delivery) => {
         const candidate = candidatesByDelivery.get(delivery.id);
         return { ...deliveryForProfile(delivery, profile), ...(candidate ? { ownCandidateStatus: candidate.status } : {}) };
@@ -598,6 +599,11 @@ export const appRouter = router({
           passengers: input.passengers ?? null,
         });
         if (!delivery) throw new Error("La livraison n’a pas pu être enregistrée.");
+        // Sans ceci, l'expéditeur ne devient membre du canal Realtime privé qu'à la première
+        // modification de la livraison (syncDeliveryParticipants n'était jusqu'ici appelé que par
+        // `update`), laissant la phase "en attente de candidatures" sans mise à jour temps réel.
+        await syncDeliveryParticipants({ id: delivery.id, senderPhone: delivery.senderPhone, driverPhone: delivery.driverPhone ?? undefined } as ResolvedDelivery);
+        void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livraison publiée", body: "Votre livraison est visible par les livreurs compatibles.", occurredAt: new Date().toISOString() });
         return delivery;
       } catch (cause) {
         console.error("[deliveries.create] failed", cause);
@@ -621,7 +627,11 @@ export const appRouter = router({
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("Seul un livreur peut candidater.");
       if (!profile.photoKey) throw new Error("Votre profil doit être vérifié (photo + pièce d'identité) avant de candidater à une livraison.");
-      return db.applyForTikisDelivery({ id: randomUUID(), deliveryId: input.deliveryId, driverPhone: profile.phone, confirmedCommission: input.confirmedCommission, ...(input.offerPrice ? { offerPrice: input.offerPrice } : {}) });
+      const result = await db.applyForTikisDelivery({ id: randomUUID(), deliveryId: input.deliveryId, driverPhone: profile.phone, confirmedCommission: input.confirmedCommission, ...(input.offerPrice ? { offerPrice: input.offerPrice } : {}) });
+      // Sans ce signal, la feuille de candidatures d'un Sender déjà ouverte sur l'écran détail ne
+      // voyait jamais apparaître une nouvelle candidature sans rafraîchissement manuel.
+      void publishDeliveryStatusBroadcast({ deliveryId: input.deliveryId, status: "open", title: "Nouvelle candidature", body: "Un livreur compatible s’est proposé pour votre livraison.", occurredAt: new Date().toISOString() });
+      return result;
     }),
     update: tikisProtectedProcedure.input(deliveryInputSchema.safeExtend({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
@@ -677,7 +687,9 @@ export const appRouter = router({
     withdraw: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("Seul un livreur peut retirer sa candidature.");
-      return db.withdrawTikisDeliveryCandidateWithWallet(input.deliveryId, profile.phone);
+      const result = await db.withdrawTikisDeliveryCandidateWithWallet(input.deliveryId, profile.phone);
+      void publishDeliveryStatusBroadcast({ deliveryId: input.deliveryId, status: "open", title: "Candidature retirée", body: "Un livreur a retiré sa candidature.", occurredAt: new Date().toISOString() });
+      return result;
     }),
     selectCandidate: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid(), candidateId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
@@ -865,6 +877,12 @@ export const appRouter = router({
       deliveryId: z.string().uuid(),
       reason: reportReasonSchema,
       description: reportDescriptionSchema,
+      // La colonne `attachmentKey` existait déjà côté base et admin, mais aucun chemin ne permettait de
+      // la remplir : le formulaire annonçait des pièces jointes "facultatives" sans jamais les accepter.
+      attachmentBase64: base64ImageSchema.optional(),
+      attachmentMime: photoMimeSchema.optional(),
+    }).superRefine((value, ctx) => {
+      if (value.attachmentBase64 && !value.attachmentMime) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["attachmentMime"], message: "Type d’image requis." });
     })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       const delivery = await db.getTikisDeliveryRecordById(input.deliveryId);
@@ -872,12 +890,21 @@ export const appRouter = router({
       const isSender = delivery.senderPhone === profile.phone;
       const isDriver = delivery.driverPhone === profile.phone;
       if (!isSender && !isDriver) throw new Error("Vous ne pouvez signaler qu’une livraison à laquelle vous participez.");
+      let attachmentKey: string | undefined;
+      if (input.attachmentBase64 && input.attachmentMime) {
+        const safePhone = profile.phone.replace(/[^0-9]/g, "");
+        const extension = input.attachmentMime === "image/png" ? "png" : input.attachmentMime === "image/webp" ? "webp" : "jpg";
+        const bytes = Buffer.from(input.attachmentBase64, "base64");
+        const stored = await storagePut(`tikis-reports/${safePhone}/${Date.now()}-${randomUUID()}.${extension}`, bytes, input.attachmentMime);
+        attachmentKey = stored.key;
+      }
       return adminDb.createDeliveryReport({
         deliveryId: input.deliveryId,
         reporterPhone: profile.phone,
         reporterRole: isSender ? "sender" : "driver",
         reason: input.reason,
         description: sanitizeDeliveryText(input.description),
+        ...(attachmentKey ? { attachmentKey } : {}),
       });
     }),
   }),

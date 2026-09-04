@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { closeDeliveryTrackingChannel, createDeliveryTrackingChannel, type DeliveryPosition } from "@/lib/supabase-tracking";
+import { subscribeToDeliveryChannel, type DeliveryPosition } from "@/lib/supabase-tracking";
 import { trpc } from "@/lib/trpc";
 
 const EMPTY_DELIVERY_ID = "00000000-0000-0000-0000-000000000000";
@@ -18,8 +18,7 @@ export function useLiveDeliveryPosition(deliveryId: string | null, enabled: bool
 
   useEffect(() => {
     if (!deliveryId || !enabled) return;
-    const channel = createDeliveryTrackingChannel(deliveryId, setBroadcastPosition);
-    return () => { void closeDeliveryTrackingChannel(channel); };
+    return subscribeToDeliveryChannel(deliveryId, { onPosition: setBroadcastPosition });
   }, [deliveryId, enabled]);
 
   return broadcastPosition ?? positionQuery.data ?? null;
