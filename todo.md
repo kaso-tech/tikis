@@ -540,3 +540,8 @@
 - [x] Revalider TypeScript, les tests, le build admin et les services après les correctifs de synchronisation.
 - [x] Corriger le scénario de test de projection de gains dont la valeur d’entrée ne correspond pas à la formule documentée.
 - [x] Ajouter de façon non destructive la colonne de suppression différée manquante au schéma actif et revalider l’accès géographique.
+- [x] Synchroniser la branche `main` et inventorier les grands changements distants.
+- [x] Installer les dépendances requises et valider TypeScript, les tests et le build admin.
+- [x] Corriger toute incompatibilité introduite par la synchronisation avant publication.
+- [x] Relancer Expo et l’API, puis vérifier Metro, API et console administrateur.
+- [x] Enregistrer, pousser et livrer la version synchronisée validée.
