@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
-import * as Notifications from "expo-notifications";
 import { trpc } from "@/lib/trpc";
 import { logger } from "@/lib/logger";
 
@@ -37,6 +36,7 @@ async function getDevicePushToken(): Promise<{ token: string; platform: "ios" | 
     return null;
   }
   try {
+    const Notifications = await import("expo-notifications");
     const response = await Notifications.getDevicePushTokenAsync();
     const token = response.data as unknown as string;
     if (!token) return null;

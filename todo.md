@@ -549,3 +549,7 @@
 - [x] Remplacer les styles d’ombre obsolètes par le style épuré compatible avec le thème Tikis.
 - [x] Revalider TypeScript, tests, build admin et l’absence d’avertissement `shadow*` après démarrage.
 - [x] Enregistrer et livrer le nettoyage global des styles d’ombre.
+- [x] Auditer l’enregistrement Expo Notifications et l’avertissement affiché sur le web.
+- [x] Limiter l’écoute des changements de jeton push aux plateformes natives.
+- [x] Revalider TypeScript, les tests et les journaux web après redémarrage.
+- [x] Enregistrer et livrer la correction de l’avertissement Expo Notifications.
