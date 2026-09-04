@@ -182,7 +182,7 @@ export const tikisWalletLedger = mysqlTable("tikis_wallet_ledger", {
   id: varchar("id", { length: 40 }).primaryKey(),
   profilePhone: varchar("profilePhone", { length: 20 }).notNull(),
   deliveryId: varchar("deliveryId", { length: 40 }),
-  operation: mysqlEnum("operation", ["block", "unblock", "debit", "compensation", "credit", "refund", "deposit_request", "withdrawal_request", "bonus", "penalty"]).notNull(),
+  operation: mysqlEnum("operation", ["block", "unblock", "debit", "commission_debit", "compensation", "credit", "refund", "deposit_request", "withdrawal_request", "bonus", "penalty"]).notNull(),
   amount: int("amount").notNull(),
   availableBefore: int("availableBefore").notNull(),
   availableAfter: int("availableAfter").notNull(),

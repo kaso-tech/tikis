@@ -229,7 +229,9 @@ export async function adminDashboardMetrics(sinceDays = 30) {
     db.select({ count: count() }).from(tikisDeliveries).where(and(eq(tikisDeliveries.status, "completed"), gte(tikisDeliveries.createdAt, since))),
     db.select({ count: count() }).from(tikisDeliveryReports).where(eq(tikisDeliveryReports.status, "open")),
     db.select({ count: sql<number>`count(distinct ${tikisDeliveries.driverPhone})` }).from(tikisDeliveries).where(and(gte(tikisDeliveries.createdAt, since), eq(tikisDeliveries.status, "completed"))),
-    db.select({ total: sql<number>`coalesce(sum(${tikisWalletLedger.amount}), 0)` }).from(tikisWalletLedger).where(and(eq(tikisWalletLedger.operation, "debit"), gte(tikisWalletLedger.createdAt, since), lte(tikisWalletLedger.createdAt, new Date()))),
+    // "commission_debit" est le seul mouvement qui correspond à un revenu réel de Tikis ; "debit" générique
+    // couvre aussi les retraits (argent des utilisateurs qui sort de leur propre Wallet), à ne jamais compter ici.
+    db.select({ total: sql<number>`coalesce(sum(${tikisWalletLedger.amount}), 0)` }).from(tikisWalletLedger).where(and(eq(tikisWalletLedger.operation, "commission_debit"), gte(tikisWalletLedger.createdAt, since), lte(tikisWalletLedger.createdAt, new Date()))),
     db.select({ createdAt: tikisDeliveries.createdAt, status: tikisDeliveries.status, vehicleTypes: tikisDeliveries.vehicleTypes }).from(tikisDeliveries).where(gte(tikisDeliveries.createdAt, since)),
   ]);
 
@@ -308,14 +310,16 @@ export async function adminChangeProfileRole(input: { phone: string; role: "send
   return { phone: input.phone, role: input.role };
 }
 
-export async function adminRewardWallet(input: { phone: string; amount: number; reason: string; adminId: number }) {
+export async function adminRewardWallet(input: { phone: string; amount: number; reason: string; adminId: number; requestId: string }) {
   if (!Number.isSafeInteger(input.amount) || input.amount <= 0 || input.amount > 1_000_000) throw new Error("Montant de récompense invalide.");
-  return db.adminAdjustWallet({ profilePhone: input.phone, amount: input.amount, direction: "credit", operation: "bonus", reason: input.reason || "Bonus accordé par l’administration", adminId: input.adminId });
+  // `requestId` est généré une seule fois côté client au moment du clic : un double-clic ou une
+  // relance réseau renvoie le même identifiant et ne produit donc jamais un second crédit réel.
+  return db.adminAdjustWallet({ profilePhone: input.phone, amount: input.amount, direction: "credit", operation: "bonus", reason: input.reason || "Bonus accordé par l’administration", idempotencyKey: `admin-reward:${input.requestId}` });
 }
 
-export async function adminPenalizeWallet(input: { phone: string; amount: number; reason: string; adminId: number }) {
+export async function adminPenalizeWallet(input: { phone: string; amount: number; reason: string; adminId: number; requestId: string }) {
   if (!Number.isSafeInteger(input.amount) || input.amount <= 0 || input.amount > 1_000_000) throw new Error("Montant de pénalité invalide.");
-  return db.adminAdjustWallet({ profilePhone: input.phone, amount: input.amount, direction: "debit", operation: "penalty", reason: input.reason || "Pénalité appliquée par l’administration", adminId: input.adminId });
+  return db.adminAdjustWallet({ profilePhone: input.phone, amount: input.amount, direction: "debit", operation: "penalty", reason: input.reason || "Pénalité appliquée par l’administration", idempotencyKey: `admin-penalty:${input.requestId}` });
 }
 
 // ————————————————————————————————————————————————————————————————————————
@@ -379,14 +383,17 @@ export async function adminForceCancelDelivery(input: { deliveryId: string; reas
     const candidates = await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, input.deliveryId), or(eq(tikisDeliveryCandidates.status, "applied"), eq(tikisDeliveryCandidates.status, "selected"), eq(tikisDeliveryCandidates.status, "confirmed"))));
     for (const candidate of candidates) {
       if (candidate.commissionBlocked > 0) {
-        await db.adminAdjustWallet({ profilePhone: candidate.driverPhone, amount: candidate.commissionBlocked, direction: "credit", operation: "credit", reason: `Annulation administrative de la livraison ${input.deliveryId} : commission libérée`, adminId: input.adminId });
+        // Même transaction que les mises à jour de statut ci-dessous (via `tx`) : si une étape
+        // échoue plus loin, ce crédit fait partie du rollback plutôt que de rester acquis seul.
+        // Clé déterministe par candidat : une relance de cette action ne peut jamais créditer deux fois.
+        await db.adminAdjustWallet({ profilePhone: candidate.driverPhone, amount: candidate.commissionBlocked, direction: "credit", operation: "credit", reason: `Annulation administrative de la livraison ${input.deliveryId} : commission libérée`, idempotencyKey: `${input.deliveryId}:admin-force-cancel:${candidate.id}` }, tx);
       }
       await tx.update(tikisDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, candidate.id));
     }
     await tx.update(tikisDeliveries).set({ status: "cancelled", updatedAt: new Date() }).where(eq(tikisDeliveries.id, input.deliveryId));
-    await tx.insert(tikisDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.senderPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikis.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel:${randomUUID()}` });
+    await tx.insert(tikisDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.senderPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikis.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel` }).onDuplicateKeyUpdate({ set: { idempotencyKey: `${input.deliveryId}:admin-cancel` } });
     if (delivery.driverPhone) {
-      await tx.insert(tikisDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.driverPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikis.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel-driver:${randomUUID()}` });
+      await tx.insert(tikisDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.driverPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikis.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel-driver` }).onDuplicateKeyUpdate({ set: { idempotencyKey: `${input.deliveryId}:admin-cancel-driver` } });
     }
     return { id: input.deliveryId, status: "cancelled" as const };
   });
@@ -412,9 +419,9 @@ export async function adminRewardReferral(input: { referralId: string; adminId: 
     if (!referral) throw new Error("Parrainage introuvable.");
     if (referral.status !== "qualified") throw new Error("Ce parrainage n’est pas (ou plus) éligible à une récompense.");
     await tx.update(tikisReferrals).set({ status: "rewarded", rewardedAt: new Date(), rewardedByAdminId: input.adminId }).where(eq(tikisReferrals.id, referral.id));
-    return referral;
-  }).then(async (referral) => {
-    await db.adminAdjustWallet({ profilePhone: referral.referrerPhone, amount: referral.rewardAmount, direction: "credit", operation: "bonus", reason: `Récompense de parrainage — filleul ${referral.refereePhone}`, adminId: input.adminId });
+    // Même transaction que la mise à jour du statut : si le crédit échoue, le parrainage reste "qualified"
+    // (rollback complet) plutôt que "rewarded" sans que l'argent n'ait jamais été crédité.
+    await db.adminAdjustWallet({ profilePhone: referral.referrerPhone, amount: referral.rewardAmount, direction: "credit", operation: "bonus", reason: `Récompense de parrainage — filleul ${referral.refereePhone}`, idempotencyKey: `${referral.id}:admin-reward` }, tx);
     return { referralId: referral.id, status: "rewarded" as const };
   });
 }
@@ -445,8 +452,11 @@ export async function adminGetFinanceSettings() {
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   await dbc.insert(tikisPlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
   const settings = (await dbc.select().from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
+  // Réutilise la même validation stricte que le taux appliqué en production (db.getTikisCommissionRate) :
+  // si la configuration est absente ou invalide, l'admin doit voir une erreur explicite plutôt qu'un
+  // taux par défaut silencieux de 10 % qui masquerait un vrai problème de configuration.
   return {
-    commissionRate: Number(settings?.commissionRate ?? "0.1"),
+    commissionRate: await db.getTikisCommissionRate(),
     minWithdrawal: settings?.minWithdrawal ?? 500,
     maxWithdrawal: settings?.maxWithdrawal ?? 500000,
   };

@@ -706,10 +706,10 @@ export const appRouter = router({
       if (profile.accountType !== "driver") return [];
       return db.getDriverCompletedDeliveryEarnings(profile.phone);
     }),
-    requestOperation: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000) })).mutation(async ({ ctx, input }) => {
+    requestOperation: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       if (input.type === "withdrawal") throw new Error("Les retraits ne sont plus proposés : le Wallet sert uniquement à recharger votre compte pour effectuer des livraisons.");
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
-      return db.requestTikisWalletOperation(profile.phone, input.type, input.amount);
+      return db.requestTikisWalletOperation(profile.phone, input.type, input.amount, input.requestId);
     }),
     initiateYengaPayTest: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000), idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{16,96}$/) })).mutation(async ({ ctx, input }) => {
       if (input.type === "withdrawal") throw new Error("Les retraits ne sont plus proposés : le Wallet sert uniquement à recharger votre compte pour effectuer des livraisons.");

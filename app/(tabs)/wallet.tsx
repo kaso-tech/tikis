@@ -15,7 +15,8 @@ type Tone = "primary" | "success" | "warning" | "error" | "neutral";
 const operationMeta: Record<WalletOperation, { label: string; icon: React.ComponentProps<typeof MaterialIcons>["name"]; tone: Tone }> = {
   block: { label: "Commission bloquée", icon: "lock-clock", tone: "warning" },
   unblock: { label: "Commission débloquée", icon: "lock-open", tone: "primary" },
-  debit: { label: "Commission prélevée", icon: "north-east", tone: "error" },
+  debit: { label: "Retrait", icon: "north-east", tone: "error" },
+  commission_debit: { label: "Commission prélevée", icon: "north-east", tone: "error" },
   compensation: { label: "Compensation", icon: "sync-alt", tone: "primary" },
   credit: { label: "Crédit", icon: "south-west", tone: "success" },
   refund: { label: "Remboursement", icon: "replay", tone: "success" },
@@ -63,7 +64,7 @@ export default function WalletScreen() {
     .filter((entry) => {
       const date = new Date(entry.createdAt);
       const now = new Date();
-      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && entry.operation === "debit";
+      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && entry.operation === "commission_debit";
     })
     .reduce((sum, entry) => sum + entry.amount, 0);
 

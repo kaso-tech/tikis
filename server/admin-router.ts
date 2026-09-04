@@ -95,13 +95,13 @@ export const tikisAdminRouter = router({
       await audit(ctx, "profile_role_changed", "profile", input.phone, { role: input.role });
       return result;
     }),
-    reward: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string(), amount: z.number().int().positive(), reason: z.string().max(300) })).mutation(async ({ ctx, input }) => {
+    reward: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string(), amount: z.number().int().positive(), reason: z.string().max(300), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await adminDb.adminRewardWallet({ ...input, adminId: ctx.tikisAdmin.adminId });
       await audit(ctx, "wallet_bonus_credited", "profile", input.phone, { amount: input.amount, reason: input.reason });
       return result;
     }),
-    penalize: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string(), amount: z.number().int().positive(), reason: z.string().max(300) })).mutation(async ({ ctx, input }) => {
+    penalize: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string(), amount: z.number().int().positive(), reason: z.string().max(300), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await adminDb.adminPenalizeWallet({ ...input, adminId: ctx.tikisAdmin.adminId });
       await audit(ctx, "wallet_penalty_applied", "profile", input.phone, { amount: input.amount, reason: input.reason });
@@ -169,7 +169,7 @@ export const tikisAdminRouter = router({
       await audit(ctx, "payment_transaction_settled", "payment_transaction", input.paymentId, { outcome: input.outcome, notes: input.notes });
       return result;
     }),
-    sendBonus: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string(), amount: z.number().int().positive().max(1000000), reason: z.string().max(300) })).mutation(async ({ ctx, input }) => {
+    sendBonus: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string(), amount: z.number().int().positive().max(1000000), reason: z.string().max(300), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await adminDb.adminRewardWallet({ ...input, adminId: ctx.tikisAdmin.adminId });
       await audit(ctx, "wallet_bonus_credited", "profile", input.phone, { amount: input.amount, reason: input.reason });

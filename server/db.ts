@@ -7,7 +7,7 @@ import { createYengapayPaymentIntent, readYengapayConfig, verifyYengapayPayment 
 import { sendPushToTokens, type PushMessage } from "./push";
 import { isValidExpoPushTokenShape } from "./_test-helpers/push-token-shape";
 import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppNotification, LocationLabel, SelectableVehicleType, WalletOperation, WalletSnapshot } from "../shared/tikis-domain";
-import { candidateMovementVersion } from "../shared/wallet-commission";
+import { candidateMovementVersion, computeReplacementSettlement } from "../shared/wallet-commission";
 import { DELIVERY_EXPIRATION_MS, deliveryActivityTimestamp, deliveryExpirationOutcome } from "../shared/delivery-expiration";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -495,7 +495,7 @@ export async function expireOpenTikisDeliveries(now = new Date()) {
         .where(and(eq(tikisDeliveryCandidates.deliveryId, delivery.id), inArray(tikisDeliveryCandidates.status, ["applied", "selected"])))
         .for("update");
       for (const candidate of candidates) {
-        const debits = await tx.select().from(tikisWalletLedger).where(and(eq(tikisWalletLedger.deliveryId, delivery.id), eq(tikisWalletLedger.profilePhone, candidate.driverPhone), eq(tikisWalletLedger.operation, "debit"))).for("update");
+        const debits = await tx.select().from(tikisWalletLedger).where(and(eq(tikisWalletLedger.deliveryId, delivery.id), eq(tikisWalletLedger.profilePhone, candidate.driverPhone), inArray(tikisWalletLedger.operation, ["debit", "commission_debit"]))).for("update");
         const debitedAmount = debits.reduce((total: number, entry: { amount: number }) => total + Number(entry.amount), 0);
         if (debitedAmount > 0) {
           await applyWalletMovement(tx, { profilePhone: candidate.driverPhone, deliveryId: delivery.id, operation: "compensation", amount: debitedAmount, availableDelta: debitedAmount, heldDelta: 0, reason: "Commission compensée : livraison expirée avant départ", idempotencyKey: `${delivery.id}:expired-compensation:${candidate.id}` });
@@ -667,18 +667,20 @@ export async function getDriverCompletedDeliveryEarnings(driverPhone: string): P
   });
 }
 
-export async function requestTikisWalletOperation(profilePhone: string, type: "deposit" | "withdrawal", amount: number) {
+export async function requestTikisWalletOperation(profilePhone: string, type: "deposit" | "withdrawal", amount: number, requestId: string) {
   if (!Number.isSafeInteger(amount) || amount < 100 || amount > 10_000_000) throw new Error("Le montant demandé est invalide.");
   const db = await getDb();
   if (!db) throw new Error("Le Wallet est temporairement indisponible.");
   await db.transaction(async (tx) => {
     const wallet = await ensureTikisWallet(tx, profilePhone);
     if (type === "withdrawal" && wallet.availableBalance < amount) throw new Error("Votre solde disponible est insuffisant pour ce retrait.");
+    // `requestId` est fourni par l'appelant (généré une seule fois par soumission) : une relance
+    // réseau de la même demande ne crée donc jamais une seconde ligne dans le journal.
     await tx.insert(tikisWalletLedger).values({
       id: randomUUID(), profilePhone, deliveryId: null, operation: type === "deposit" ? "deposit_request" : "withdrawal_request", amount,
       availableBefore: wallet.availableBalance, availableAfter: wallet.availableBalance, heldBefore: wallet.heldBalance, heldAfter: wallet.heldBalance,
-      reason: type === "deposit" ? "Demande de dépôt en attente d’un moyen de paiement autorisé" : "Demande de retrait en attente de traitement", idempotencyKey: `${type}:${profilePhone}:${randomUUID()}`,
-    });
+      reason: type === "deposit" ? "Demande de dépôt en attente d’un moyen de paiement autorisé" : "Demande de retrait en attente de traitement", idempotencyKey: `${type}:${profilePhone}:${requestId}`,
+    }).onDuplicateKeyUpdate({ set: { idempotencyKey: `${type}:${profilePhone}:${requestId}` } });
   });
   return { success: true } as const;
 }
@@ -754,22 +756,33 @@ export async function settleYengaPayTestPayment(input: { profilePhone: string; p
   });
 }
 
-/** Crédit/débit manuel décidé par l'administration (récompense, bonus, pénalité, correction). */
-export async function adminAdjustWallet(input: { profilePhone: string; amount: number; direction: "credit" | "debit"; operation: "bonus" | "penalty" | "credit" | "debit"; reason: string; adminId: number }) {
-  const db = await getDb();
-  if (!db) throw new Error("Le Wallet est temporairement indisponible.");
-  const wallet = await db.transaction(async (tx) => {
-    await applyWalletMovement(tx, {
+/** Crédit/débit manuel décidé par l'administration (récompense, bonus, pénalité, correction).
+ *  `idempotencyKey` doit être déterministe côté appelant (lié à l'action logique, pas généré à
+ *  chaque appel) pour qu'un double-clic ou une relance réseau ne produise jamais un second
+ *  mouvement réel — `applyWalletMovement` renvoie alors simplement le résultat déjà enregistré.
+ *  `tx` est optionnel : le fournir permet d'inclure ce mouvement dans une transaction plus large
+ *  (ex. `adminForceCancelDelivery`) afin qu'un échec ultérieur fasse un rollback complet plutôt
+ *  que de laisser un crédit déjà validé à côté d'un état non mis à jour. */
+export async function adminAdjustWallet(
+  input: { profilePhone: string; amount: number; direction: "credit" | "debit"; operation: "bonus" | "penalty" | "credit" | "debit"; reason: string; idempotencyKey: string },
+  tx?: any,
+) {
+  const run = async (activeTx: any) => {
+    await applyWalletMovement(activeTx, {
       profilePhone: input.profilePhone,
       operation: input.operation,
       amount: input.amount,
       availableDelta: input.direction === "credit" ? input.amount : -input.amount,
       heldDelta: 0,
       reason: input.reason,
-      idempotencyKey: `admin-adjust:${input.adminId}:${randomUUID()}`,
+      idempotencyKey: input.idempotencyKey,
     });
-    return walletSnapshotFromRecord(await ensureTikisWallet(tx, input.profilePhone));
-  });
+    return walletSnapshotFromRecord(await ensureTikisWallet(activeTx, input.profilePhone));
+  };
+  if (tx) return { wallet: await run(tx) };
+  const db = await getDb();
+  if (!db) throw new Error("Le Wallet est temporairement indisponible.");
+  const wallet = await db.transaction(run);
   return { wallet };
 }
 
@@ -1040,21 +1053,11 @@ export async function cancelTikisDeliveryFromSender(deliveryId: string, senderPh
   if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
   await db.transaction(async (tx) => {
     const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.senderPhone, senderPhone))).limit(1).for("update"))[0];
+    // Un livreur "selected"/"confirmed" implique toujours le statut "pending_confirmation" ou "active" —
+    // jamais "open"/"disabled" — donc cette garde suffit à elle seule à exclure tout candidat déjà engagé
+    // (aucun autre cas à traiter ici : `releaseAppliedCandidatesForSenderAction` couvre les candidats "applied").
     if (!delivery || !["open", "disabled"].includes(delivery.status)) throw new Error("Cette livraison ne peut plus être annulée : un livreur a déjà été sélectionné.");
     await releaseAppliedCandidatesForSenderAction(tx, delivery, "cancelled");
-    if (delivery.status === "pending_confirmation" && delivery.driverPhone) {
-      const selectedCandidate = (await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, delivery.driverPhone), eq(tikisDeliveryCandidates.status, "selected"))).limit(1).for("update"))[0];
-      if (selectedCandidate) {
-        const legacyDebit = (await tx.select().from(tikisWalletLedger).where(eq(tikisWalletLedger.idempotencyKey, `${deliveryId}:commission-debit:${selectedCandidate.id}`)).limit(1))[0];
-        if (legacyDebit) {
-          await applyWalletMovement(tx, { profilePhone: delivery.driverPhone, deliveryId, operation: "compensation", amount: selectedCandidate.commissionBlocked, availableDelta: selectedCandidate.commissionBlocked, heldDelta: 0, reason: "Commission compensée après annulation de la livraison", idempotencyKey: `${deliveryId}:cancelled:compensation:${delivery.driverPhone}` });
-        } else {
-          await releaseCandidateCommission(tx, selectedCandidate, "Commission libérée après annulation de la livraison", "cancelled-release");
-        }
-        await tx.update(tikisDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, selectedCandidate.id));
-        await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_cancelled", status: "cancelled", actorPhone: senderPhone, recipientPhone: delivery.driverPhone, title: "Livraison annulée", body: "L’expéditeur a annulé la livraison avant votre départ. Votre commission Tikis a été libérée.", tone: "warning", idempotencyKey: `${deliveryId}:cancelled:selected-driver` });
-      }
-    }
     await tx.update(tikisDeliveries).set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_cancelled", status: "cancelled", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Livraison annulée", body: "Votre livraison est conservée dans l’historique avec son statut d’annulation.", tone: "warning", idempotencyKey: `${deliveryId}:cancelled:sender` });
   });
@@ -1104,22 +1107,26 @@ export async function selectTikisDeliveryCandidateWithWallet(deliveryId: string,
         .where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, priorDriverPhone), inArray(tikisDeliveryCandidates.status, ["selected", "confirmed"])))
         .limit(1)
         .for("update"))[0];
-      if (priorCandidate?.status === "confirmed") {
-        // Commission réellement prélevée : remboursement réel, couvert autant que possible par la nouvelle commission.
-        const amountOwedToPriorDriver = priorCandidate.commissionBlocked;
-        const coveredByNewCommission = Math.min(targetCommission, amountOwedToPriorDriver);
-        const platformTopUp = Math.max(0, amountOwedToPriorDriver - coveredByNewCommission);
-        await applyWalletMovement(tx, { profilePhone: priorDriverPhone, deliveryId, operation: "compensation", amount: amountOwedToPriorDriver, availableDelta: amountOwedToPriorDriver, heldDelta: 0, reason: platformTopUp > 0 ? "Remboursement de commission après remplacement (complété par la plateforme)" : "Remboursement de commission après remplacement", idempotencyKey: `${deliveryId}:compensate:${priorDriverPhone}:${chosen.id}` });
-        if (platformTopUp > 0) {
+      // La décision (déblocage simple vs compensation réelle, plafonnée par construction — voir
+      // `computeReplacementSettlement`) est centralisée dans `shared/wallet-commission.ts` et testée
+      // indépendamment (`tests/replacement-settlement.test.ts`), pour que le code réel ne puisse pas
+      // diverger silencieusement de la logique vérifiée par les tests.
+      const settlement = computeReplacementSettlement(
+        priorCandidate ? { status: priorCandidate.status as "selected" | "confirmed", commissionBlocked: priorCandidate.commissionBlocked } : null,
+        targetCommission,
+      );
+      if (settlement.kind === "compensate" && priorCandidate) {
+        await applyWalletMovement(tx, { profilePhone: priorDriverPhone, deliveryId, operation: "compensation", amount: settlement.amountOwedToPriorDriver, availableDelta: settlement.amountOwedToPriorDriver, heldDelta: 0, reason: settlement.platformTopUp > 0 ? "Remboursement de commission après remplacement (complété par la plateforme)" : "Remboursement de commission après remplacement", idempotencyKey: `${deliveryId}:compensate:${priorDriverPhone}:${chosen.id}` });
+        if (settlement.platformTopUp > 0) {
           // La nouvelle commission ne suffisait pas à couvrir l'ancienne : traçé explicitement pour la comptabilité plateforme.
-          await appendDeliveryEvent(tx, { deliveryId, eventType: "platform_topup", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Complément plateforme", body: `La plateforme a complété ${platformTopUp} FCFA pour rembourser intégralement l’ancien livreur (nouvelle commission insuffisante).`, tone: "info", idempotencyKey: `${deliveryId}:platform-topup:${priorDriverPhone}:${chosen.id}` });
-        } else if (coveredByNewCommission < targetCommission) {
+          await appendDeliveryEvent(tx, { deliveryId, eventType: "platform_topup", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Complément plateforme", body: `La plateforme a complété ${settlement.platformTopUp} FCFA pour rembourser intégralement l’ancien livreur (nouvelle commission insuffisante).`, tone: "info", idempotencyKey: `${deliveryId}:platform-topup:${priorDriverPhone}:${chosen.id}` });
+        } else if (settlement.platformSurplus > 0) {
           // La nouvelle commission dépasse ce qui était dû à l'ancien livreur : le surplus reste acquis à la plateforme (aucune double perception, mais aucune sur-compensation du livreur remplacé non plus).
-          await appendDeliveryEvent(tx, { deliveryId, eventType: "platform_surplus", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Surplus de commission conservé", body: `${targetCommission - coveredByNewCommission} FCFA de la nouvelle commission dépassent le remboursement dû à l’ancien livreur et restent acquis à la plateforme.`, tone: "info", idempotencyKey: `${deliveryId}:platform-surplus:${priorDriverPhone}:${chosen.id}` });
+          await appendDeliveryEvent(tx, { deliveryId, eventType: "platform_surplus", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Surplus de commission conservé", body: `${settlement.platformSurplus} FCFA de la nouvelle commission dépassent le remboursement dû à l’ancien livreur et restent acquis à la plateforme.`, tone: "info", idempotencyKey: `${deliveryId}:platform-surplus:${priorDriverPhone}:${chosen.id}` });
         }
         await tx.update(tikisDeliveryCandidates).set({ status: "replaced", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, priorCandidate.id));
         await appendDeliveryEvent(tx, { deliveryId, eventType: "driver_replaced", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: priorDriverPhone, title: "Vous avez été remplacé", body: "Votre commission Tikis a été intégralement compensée.", tone: "warning", idempotencyKey: `${deliveryId}:replaced:${priorDriverPhone}:${chosen.id}` });
-      } else if (priorCandidate) {
+      } else if (settlement.kind === "release" && priorCandidate) {
         // Statut "selected" : jamais confirmé, jamais débité. Un simple déblocage suffit, aucune compensation ni
         // complément plateforme n'a de sens puisqu'aucun montant réel n'a quitté le Wallet de ce candidat.
         await releaseCandidateCommission(tx, priorCandidate, "Commission libérée : remplacé avant confirmation de disponibilité", `replaced-before-confirm:${chosen.id}`);
@@ -1171,7 +1178,9 @@ export async function confirmTikisDeliveryWithEvents(deliveryId: string, driverP
       await applyWalletMovement(tx, {
         profilePhone: driverPhone,
         deliveryId,
-        operation: "debit",
+        // Type dédié, distinct du "debit" générique utilisé pour les retraits : permet au KPI de revenu
+        // administrateur (commissionRevenue) et à l'affichage Wallet de ne compter que le vrai revenu Tikis.
+        operation: "commission_debit",
         amount: commission,
         availableDelta: usesReservation ? 0 : -commission,
         heldDelta: usesReservation ? -commission : 0,
