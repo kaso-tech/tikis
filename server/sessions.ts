@@ -29,6 +29,13 @@ export type SessionInput = {
   ipAddress?: string;
 };
 
+export function isMissingProfileSessionsSchema(error: unknown): boolean {
+  const candidate = error as { code?: string; message?: string; cause?: { code?: string; message?: string } };
+  const code = candidate?.cause?.code ?? candidate?.code;
+  const message = candidate?.cause?.message ?? candidate?.message ?? "";
+  return code === "ER_NO_SUCH_TABLE" || (message.includes("tikis_profile_sessions") && message.includes("doesn't exist"));
+}
+
 /** Upsert idempotent d'une session : si (phone, tokenHash) existe, on met à jour
  *  lastSeenAt + métadonnées. Sinon on crée. */
 export async function recordSession(input: SessionInput) {
@@ -127,7 +134,15 @@ export async function revokeAllOtherSessions(input: { phone: string; currentToke
 export async function isSessionRevoked(input: { phone: string; token: string }): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
-  const tokenHash = hashSessionToken(input.token);
-  const row = (await db.select({ revokedAt: tikisProfileSessions.revokedAt }).from(tikisProfileSessions).where(and(eq(tikisProfileSessions.phone, input.phone), eq(tikisProfileSessions.tokenHash, tokenHash))).limit(1))[0];
-  return Boolean(row?.revokedAt);
+  try {
+    const tokenHash = hashSessionToken(input.token);
+    const row = (await db.select({ revokedAt: tikisProfileSessions.revokedAt }).from(tikisProfileSessions).where(and(eq(tikisProfileSessions.phone, input.phone), eq(tikisProfileSessions.tokenHash, tokenHash))).limit(1))[0];
+    return Boolean(row?.revokedAt);
+  } catch (error) {
+    if (isMissingProfileSessionsSchema(error)) {
+      console.error("[sessions] Table de révocation absente : migration 0030 à appliquer. Vérification temporairement ignorée.");
+      return false;
+    }
+    throw error;
+  }
 }

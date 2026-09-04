@@ -558,3 +558,8 @@
 - [x] Ajouter ou adapter la régression de session associée.
 - [x] Revalider les services, sessions, compilation, tests et journaux.
 - [x] Enregistrer et livrer la correction des erreurs tRPC de session.
+- [x] Diagnostiquer la table ou colonne de sessions absente qui bloque les requêtes Tikis.
+- [x] Restaurer de manière non destructive le schéma de sessions et sécuriser son accès.
+- [x] Valider le chargement des livraisons, adresses et données protégées avec une session active.
+- [x] Revalider la création de livraison et l’absence d’erreur tRPC de session.
+- [x] Enregistrer et livrer la restauration fonctionnelle urgente.
