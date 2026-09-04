@@ -553,3 +553,8 @@
 - [x] Limiter l’écoute des changements de jeton push aux plateformes natives.
 - [x] Revalider TypeScript, les tests et les journaux web après redémarrage.
 - [x] Enregistrer et livrer la correction de l’avertissement Expo Notifications.
+- [x] Collecter et qualifier les erreurs tRPC de session visibles dans les journaux.
+- [x] Corriger le contexte ou la vérification de session à l’origine des erreurs.
+- [x] Ajouter ou adapter la régression de session associée.
+- [x] Revalider les services, sessions, compilation, tests et journaux.
+- [x] Enregistrer et livrer la correction des erreurs tRPC de session.

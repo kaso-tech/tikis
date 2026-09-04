@@ -4,6 +4,7 @@ import { sdk } from "./sdk";
 import { verifyTikisProfileSession } from "../tikis-session";
 import { verifyAdminSession, type AdminRole } from "../admin-auth";
 import { TIKIS_PROFILE_COOKIE } from "./cookies";
+import { COOKIE_NAME } from "../../shared/const";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -33,9 +34,27 @@ function parseCookies(header: string | undefined): Record<string, string> {
   return result;
 }
 
+type SessionHeaders = Record<string, string | string[] | undefined>;
+
+export function getTikisSessionTokenFromHeaders(headers: SessionHeaders): string | undefined {
+  const current = headers["x-tikis-session"];
+  const legacy = headers["x-tikis-profile-session"];
+  const token = Array.isArray(current) ? current[0] : current;
+  if (token) return token;
+  return Array.isArray(legacy) ? legacy[0] : legacy;
+}
+
+export function shouldAuthenticateManusRequest(headers: SessionHeaders): boolean {
+  const authorization = headers.authorization;
+  const bearer = Array.isArray(authorization) ? authorization[0] : authorization;
+  if (typeof bearer === "string" && bearer.startsWith("Bearer ")) return true;
+  const cookieHeader = headers.cookie;
+  const cookies = parseCookies(Array.isArray(cookieHeader) ? cookieHeader[0] : cookieHeader);
+  return Boolean(cookies[COOKIE_NAME]);
+}
+
 function pickTikisSessionToken(opts: CreateExpressContextOptions): string | undefined {
-  const headerValue = opts.req.headers["x-tikis-session"];
-  const headerToken = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+  const headerToken = getTikisSessionTokenFromHeaders(opts.req.headers);
   if (headerToken) return headerToken;
   const reqWithCookies = opts.req as { cookies?: Record<string, string> };
   if (!reqWithCookies.cookies) {
@@ -50,10 +69,12 @@ export async function createContext(opts: CreateExpressContextOptions): Promise<
   const adminSessionHeader = opts.req.headers["x-tikis-admin-session"];
   const adminSessionToken = Array.isArray(adminSessionHeader) ? adminSessionHeader[0] : adminSessionHeader;
 
-  try {
-    user = await sdk.authenticateRequest(opts.req);
-  } catch (error) {
-    user = null;
+  if (shouldAuthenticateManusRequest(opts.req.headers)) {
+    try {
+      user = await sdk.authenticateRequest(opts.req);
+    } catch {
+      user = null;
+    }
   }
 
   return {

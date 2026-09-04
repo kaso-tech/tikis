@@ -172,6 +172,7 @@ async function startServer() {
       router: appRouter,
       createContext,
       onError: ({ error, path, type, ctx, req }) => {
+        if (error.code === "UNAUTHORIZED") return;
         console.error(`[tRPC] ${type} ${path} failed:`, error);
         reportException(error, { source: "trpc", path, type, requestId: req?.headers?.["x-request-id"] });
       },

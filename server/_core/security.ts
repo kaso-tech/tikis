@@ -31,7 +31,7 @@ export function corsMiddleware(req: Request, res: Response, next: NextFunction) 
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
   res.header(
     "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Tikis-Admin-Session, X-Tikis-Profile-Session",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Tikis-Admin-Session, X-Tikis-Session, X-Tikis-Profile-Session",
   );
   res.header("Access-Control-Expose-Headers", "X-Tikis-Request-Id");
   res.header("Access-Control-Max-Age", "600");
