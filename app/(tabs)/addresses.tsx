@@ -3,7 +3,6 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressa
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SaveAddressDialog } from "@/components/tikis/save-address-dialog";
-import { type SavedFavorite } from "@/components/tikis/place-sheets";
 import { TikisButton } from "@/components/tikis/ui";
 import { YangoAddressPicker } from "@/components/tikis/yango-address-picker";
 import { formatFavoritePlace, locationSubtitle, locationTitle, sanitizePlaceText } from "@/lib/geo-rules";
@@ -11,7 +10,7 @@ import { favoriteToLocation, toPlacePayload, type StoredFavoritePlace } from "@/
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
-import type { LocationLabel } from "@/shared/tikis-domain";
+import type { LocationLabel, SavedFavorite } from "@/shared/tikis-domain";
 
 type FavoriteRecord = StoredFavoritePlace;
 type AddressCategory = "maison" | "bureau" | "famille" | "autre";

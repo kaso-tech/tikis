@@ -224,7 +224,12 @@ export function coordinateCacheKey(latitude: string | number, longitude: string 
   const safeLatitude = Number(latitude);
   const safeLongitude = Number(longitude);
   if (!Number.isFinite(safeLatitude) || !Number.isFinite(safeLongitude)) throw new Error("Coordonnées de lieu invalides.");
-  return `${safeLatitude.toFixed(7)}:${safeLongitude.toFixed(7)}`;
+  // 5 décimales ≈ 1,1 m de précision : suffisant pour identifier "le même lieu" tout en laissant
+  // deux positions de drag de carte proches (précision GPS/écran bien supérieure à 1 cm) retomber sur
+  // la même clé. À 7 décimales (~1 cm), deux relâchements successifs du même marqueur ne matchaient
+  // presque jamais, redéclenchant un appel Mapbox/OSM et créant une nouvelle ligne `tikis_places` à
+  // chaque fois — annulant en pratique l'intérêt du cache pour son cas d'usage principal.
+  return `${safeLatitude.toFixed(5)}:${safeLongitude.toFixed(5)}`;
 }
 
 export function tikisPlaceToLocation(place: TikisPlace): LocationLabel {
@@ -254,6 +259,50 @@ export async function getTikisPlaceByCoordinate(latitude: string | number, longi
   return result[0];
 }
 
+const NEARBY_PLACE_DEDUP_METERS = 50;
+/** Marge large pour une pré-sélection SQL par bornes (pas un filtre définitif) : la distance réelle est
+ *  ensuite recalculée en JS. ~0,0006° ≈ 65-67 m aux latitudes du Burkina Faso, une marge suffisante pour
+ *  ne jamais exclure un candidat à 50 m tout en restant sélectif dans un index (latitude, longitude). */
+const NEARBY_PLACE_BOUNDING_BOX_DEGREES = 0.0006;
+
+function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const earthRadiusMeters = 6_371_000;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const lat1 = toRad(aLat);
+  const lat2 = toRad(bLat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * earthRadiusMeters * Math.asin(Math.sqrt(h));
+}
+
+/** Lieux saisis manuellement (sans identifiant fournisseur) uniquement : un pin posé à quelques mètres
+ *  d'un lieu manuel déjà connu réutilise ce dernier plutôt que de créer un doublon quasi identique.
+ *  Les lieux avec un identifiant fournisseur (Google/Mapbox) ne passent jamais par ici : ils dédupliquent
+ *  déjà exactement par cet identifiant, ce qui est plus fiable qu'une proximité géographique. */
+async function findNearbyManualTikisPlace(latitude: number, longitude: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const candidates = await db.select().from(tikisPlaces).where(and(
+    isNull(tikisPlaces.googlePlaceId),
+    isNull(tikisPlaces.mapboxPlaceId),
+    gte(tikisPlaces.latitude, String(latitude - NEARBY_PLACE_BOUNDING_BOX_DEGREES)),
+    lte(tikisPlaces.latitude, String(latitude + NEARBY_PLACE_BOUNDING_BOX_DEGREES)),
+    gte(tikisPlaces.longitude, String(longitude - NEARBY_PLACE_BOUNDING_BOX_DEGREES)),
+    lte(tikisPlaces.longitude, String(longitude + NEARBY_PLACE_BOUNDING_BOX_DEGREES)),
+  )).limit(25);
+  let closest: { place: (typeof candidates)[number]; distance: number } | undefined;
+  for (const candidate of candidates) {
+    const distance = haversineMeters(latitude, longitude, Number(candidate.latitude), Number(candidate.longitude));
+    if (distance <= NEARBY_PLACE_DEDUP_METERS && (!closest || distance < closest.distance)) closest = { place: candidate, distance };
+  }
+  return closest?.place;
+}
+
+function tikisPlaceQualityScore(precision: string, featureType: string) {
+  return (precision === "exact" ? 40 : precision === "street" ? 30 : precision === "area" ? 20 : precision === "city" ? 10 : 0) + (featureType === "poi" ? 5 : 0);
+}
+
 export async function saveTikisPlace(input: Omit<InsertTikisPlace, "coordinateKey" | "resolvedAt">) {
   const db = await getDb();
   if (!db) throw new Error("La base de lieux est temporairement indisponible.");
@@ -266,12 +315,16 @@ export async function saveTikisPlace(input: Omit<InsertTikisPlace, "coordinateKe
     const cached = await getTikisPlaceByMapboxId(input.mapboxPlaceId);
     if (cached) return cached;
   }
-  const cachedByCoordinate = await getTikisPlaceByCoordinate(input.latitude, input.longitude);
-  if (cachedByCoordinate) {
-    const quality = (precision: string, featureType: string) => (precision === "exact" ? 40 : precision === "street" ? 30 : precision === "area" ? 20 : precision === "city" ? 10 : 0) + (featureType === "poi" ? 5 : 0);
-    if (quality(cachedByCoordinate.precision, cachedByCoordinate.featureType) >= quality(input.precision ?? "unknown", input.featureType ?? "unknown")) return cachedByCoordinate;
-    await db.update(tikisPlaces).set({ ...input, coordinateKey: coordinateCacheKey(input.latitude, input.longitude) }).where(eq(tikisPlaces.id, cachedByCoordinate.id));
-    const updated = await db.select().from(tikisPlaces).where(eq(tikisPlaces.id, cachedByCoordinate.id)).limit(1);
+  // Sans identifiant fournisseur (pin manuel, ou résultat "reverse" dont l'id est de toute façon
+  // ignoré ci-dessous) : au-delà de la clé de coordonnée exacte, un lieu à quelques mètres d'un lieu
+  // manuel déjà connu le réutilise plutôt que de créer un doublon quasi identique dans `tikis_places`.
+  const isManualPlace = isExactMapSelection || (!input.googlePlaceId && !input.mapboxPlaceId);
+  const existingPlace = (await getTikisPlaceByCoordinate(input.latitude, input.longitude))
+    ?? (isManualPlace ? await findNearbyManualTikisPlace(Number(input.latitude), Number(input.longitude)) : undefined);
+  if (existingPlace) {
+    if (tikisPlaceQualityScore(existingPlace.precision, existingPlace.featureType) >= tikisPlaceQualityScore(input.precision ?? "unknown", input.featureType ?? "unknown")) return existingPlace;
+    await db.update(tikisPlaces).set({ ...input, coordinateKey: coordinateCacheKey(input.latitude, input.longitude) }).where(eq(tikisPlaces.id, existingPlace.id));
+    const updated = await db.select().from(tikisPlaces).where(eq(tikisPlaces.id, existingPlace.id)).limit(1);
     if (updated[0]) return updated[0];
   }
   const inserted = await db.insert(tikisPlaces).values({

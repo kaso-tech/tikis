@@ -64,7 +64,10 @@ export const tikisPlaces = mysqlTable("tikis_places", {
   resolvedAt: timestamp("resolvedAt").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [index("tikis_places_coordinate_key_index").on(table.coordinateKey)]);
+}, (table) => [
+  index("tikis_places_coordinate_key_index").on(table.coordinateKey),
+  index("tikis_places_coordinates_index").on(table.latitude, table.longitude),
+]);
 
 /** Sender-owned shortcuts to canonical places; natural labels make favourites recognisable in the form. */
 export const tikisFavoritePlaces = mysqlTable("tikis_favorite_places", {

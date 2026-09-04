@@ -37,6 +37,10 @@ export function toPlacePayload(place: LocationLabel) {
     ...(place.province ? { province: place.province } : {}),
     ...(place.country ? { country: place.country } : {}),
     ...(place.source ? { source: place.source } : {}),
+    // Sans ceci, un lieu déjà classifié en mémoire (ex. un POI communautaire hors index Mapbox Suggest)
+    // perdrait sa classification à la première écriture en base — voir server/routers.ts (placeSchema).
+    ...(place.featureType ? { featureType: place.featureType } : {}),
+    ...(place.precision ? { precision: place.precision } : {}),
   };
 }
 

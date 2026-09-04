@@ -38,12 +38,16 @@ Suite complète revérifiée (`npx tsc --noEmit`, `npx vitest run`) : aucune err
 
 **Note pour la mise en production** : la migration `0034_wallet_ledger_hardening.sql` doit être appliquée manuellement (`mysql -u <user> -p <database> < drizzle/manual/0034_wallet_ledger_hardening.sql`), comme les autres fichiers de `drizzle/manual/`.
 
-## Phase 3 — Gestion des lieux
-15. ☐ **[Point 3 — bug régression « Maison du Peuple »]** Restaurer `featureType`/`precision` de bout en bout (schéma `placeSchema`, `toPlacePayload`, `saveDeliveryPlace`, `geography.savePlace`) pour ne plus jamais perdre la classification POI à l'écriture.
-16. ☐ **[H-1 lieux]** Faire consommer `formatListRouteParts`/`locationTitle` par `map-preview.native.tsx`/`.web.tsx` (légende de la mini-carte).
-17. ☐ **[H-2 lieux]** Supprimer le code mort de sélection de lieu (`place-sheets.tsx`, `place-picker.*`), migrer `SavedFavorite` vers `shared/tikis-domain.ts`.
-18. ☐ **[H-3 lieux]** Arrondir la clé de cache de géocodage inverse à 5 décimales + seuil de déplacement minimal avant nouvelle résolution.
-19. ☐ **[M-1/M-2/M-3 lieux]** Sanitization serveur des libellés, décision documentée sur `ensureCountry`, dédup par proximité des lieux manuels.
+## Phase 3 — Gestion des lieux — ☑ fait (2026-09-04)
+15. ☑ **[Point 3 — bug régression « Maison du Peuple »]** `featureType`/`precision` restaurés de bout en bout : `placeSchema` les accepte, `toPlacePayload` les transmet, `saveDeliveryPlace` et `geography.savePlace` (désormais un seul et même chemin d'écriture) les persistent au lieu de coder "unknown" en dur. Régression verrouillée par `tests/place-favorites-payload.test.ts`.
+16. ☑ **[H-1 lieux]** `map-preview.native.tsx`/`.web.tsx` consomment maintenant `formatListRouteParts` pour la légende de la mini-carte, au lieu de `pickup.name`/`dropoff.name` bruts — la règle "Ville → Ville" s'applique désormais aussi dans la carte, pas seulement dans le texte à côté.
+17. ☑ **[H-2 lieux]** Code mort supprimé : `place-sheets.tsx`, `place-picker.tsx`, `place-picker.native.tsx`, `place-picker.web.tsx`. Le type `SavedFavorite` vit maintenant dans `shared/tikis-domain.ts` (importé par `create-delivery.tsx`, `addresses.tsx`, `yango-address-picker.tsx`).
+18. ☑ **[H-3 lieux]** Clé de cache de géocodage inverse arrondie à 5 décimales (~1,1 m, au lieu de 7 ≈ 1 cm). Ajout d'un seuil de 15 m dans `address-map-picker.native.tsx` : un drag de carte en dessous de ce seuil ne redéclenche plus d'appel Mapbox/OSM ni d'écriture DB.
+19. ☑ **[M-1/M-2/M-3 lieux]** `saveDeliveryPlace`/`geography.savePlace` appliquent maintenant `sanitizePlaceText` sur tous les champs libres avant persistance. `ensureCountry` documenté comme décision produit assumée (blocage dur, conséquences connues). Dédup par proximité (50 m) des lieux manuels ajoutée (`findNearbyManualTikisPlace`) avec index de support (`drizzle/manual/0035_places_coordinates_index.sql`).
+
+Suite complète revérifiée (`npx tsc --noEmit`, `npx vitest run`) : aucune régression (3 erreurs TS pré-existantes hors périmètre `admin/`, 6 échecs de test environnementaux déjà présents avant ces changements).
+
+**Note pour la mise en production** : appliquer aussi `drizzle/manual/0035_places_coordinates_index.sql` (comme `0034_...` de la Phase 2).
 
 ## Phase 4 — Workflow, notifications, temps réel
 20. ☐ **[Point 5 — W-C1]** Notifier les livreurs compatibles à la publication/réactivation d'une livraison.

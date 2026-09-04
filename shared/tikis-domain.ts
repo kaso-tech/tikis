@@ -84,6 +84,12 @@ export interface LocationLabel {
   precision?: "exact" | "street" | "area" | "city" | "unknown";
 }
 
+export type SavedFavorite = {
+  id: number | string;
+  label: string;
+  location: LocationLabel;
+};
+
 export interface PlaceSuggestion {
   id: string;
   mapboxId?: string;

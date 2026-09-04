@@ -8,8 +8,7 @@ import { autocompleteQuery, haveSameSuggestionIds, PLACE_AUTOCOMPLETE_DEBOUNCE_M
 import { loadRecentPlaces, rememberRecentPlace } from "@/lib/recent-places";
 import { trpc } from "@/lib/trpc";
 import { useSearchLocationBias } from "@/hooks/use-search-location-bias";
-import { locationSubtitle, locationTitle, type LocationLabel, type PlaceSuggestion } from "@/shared/tikis-domain";
-import type { SavedFavorite } from "@/components/tikis/place-sheets";
+import { locationSubtitle, locationTitle, type LocationLabel, type PlaceSuggestion, type SavedFavorite } from "@/shared/tikis-domain";
 import { useThemeColors } from "@/lib/use-theme-colors";
 
 type LocationTarget = "pickup" | "dropoff" | "address";

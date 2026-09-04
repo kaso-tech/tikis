@@ -13,6 +13,7 @@ import { findCountryForPhone } from "../lib/registration-rules";
 import { createTikisProfileSession } from "./tikis-session";
 import { recordGeographicMetric } from "./geography-observability";
 import { isAllowedDeliveryText, sanitizeDeliveryText } from "../lib/tikis-engine";
+import { sanitizePlaceText } from "../lib/geo-rules";
 import { isValidReviewText, sanitizeReviewText } from "../lib/review-rules";
 import { canReviewDelivery } from "./_test-helpers/review-eligibility";
 import { tikisAdminRouter } from "./admin-router";
@@ -193,7 +194,13 @@ const base64ImageSchema = z.string().min(32).max(1_600_000).regex(/^[A-Za-z0-9+/
  *  3 images KYC = 20 MB max par soumission, contrôlé dans la mutation submit. */
 const kycBase64ImageSchema = z.string().min(32).max(6_700_000).regex(/^[A-Za-z0-9+/=]+$/, "Données d’image invalides.");
 const coordinateSchema = z.number().finite();
-const placeSchema = z.object({ name: z.string().max(140), district: z.string().max(120), city: z.string().max(120), latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180), googlePlaceId: z.string().max(255).optional(), mapboxId: z.string().max(255).optional(), mapboxSessionToken: z.string().uuid().optional(), formattedAddress: z.string().max(255).optional(), street: z.string().max(160).optional(), province: z.string().max(120).optional(), country: z.string().max(120).optional(), source: z.enum(["search", "retrieve", "reverse", "forward", "favorite", "manual", "legacy"]).optional() });
+// Mêmes valeurs que LocationLabel["featureType"]/["precision"] (shared/tikis-domain.ts) : transmettre la
+// classification déjà connue côté client évite qu'elle ne soit perdue (dégradée à "unknown") à la persistance
+// pour les lieux issus du repli communautaire (OpenStreetMap/Mapbox direct), qui ne repassent jamais par
+// resolve/reverse avant d'atteindre deliveries.create ou geography.savePlace.
+const featureTypeSchema = z.enum(["address", "secondary_address", "poi", "street", "neighborhood", "locality", "place", "point", "unknown"]);
+const precisionSchema = z.enum(["exact", "street", "area", "city", "unknown"]);
+const placeSchema = z.object({ name: z.string().max(140), district: z.string().max(120), city: z.string().max(120), latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180), googlePlaceId: z.string().max(255).optional(), mapboxId: z.string().max(255).optional(), mapboxSessionToken: z.string().uuid().optional(), formattedAddress: z.string().max(255).optional(), street: z.string().max(160).optional(), province: z.string().max(120).optional(), country: z.string().max(120).optional(), source: z.enum(["search", "retrieve", "reverse", "forward", "favorite", "manual", "legacy"]).optional(), featureType: featureTypeSchema.optional(), precision: precisionSchema.optional() });
 const favoriteLabelSchema = z.string().trim().min(1).max(80).regex(/^[\p{L}\p{N}]+(?:[ .,'’()\-][\p{L}\p{N}]+)*$/u, "Libellé de favori invalide.");
 const deliveryTextSchema = z.string().trim().min(3).max(450);
 const deliveryVehicleSchema = z.enum(["Vélo", "Moto", "Tricycle", "Voiture"]);
@@ -225,22 +232,27 @@ async function currentTikisProfile(phone: string) {
 }
 
 async function saveDeliveryPlace(place: z.infer<typeof placeSchema>) {
+  // `placeSchema` ne contrôle que la longueur, jamais le contenu : un appel API direct (hors app) pourrait
+  // sinon persister des caractères de contrôle ou des espaces multiples, visibles ensuite par toute la
+  // communauté d'utilisateurs qui reverrait ce lieu via le cache par coordonnée/mapboxId.
+  const name = sanitizePlaceText(place.name);
+  const formattedAddress = place.formattedAddress ? sanitizePlaceText(place.formattedAddress, 255) : undefined;
   return db.saveTikisPlace({
     googlePlaceId: place.googlePlaceId,
     mapboxPlaceId: place.mapboxId,
     latitude: String(place.latitude),
     longitude: String(place.longitude),
-    formattedAddress: place.formattedAddress ?? place.name,
-    placeName: place.name,
-    street: place.street,
-    district: place.district,
-    city: place.city,
-    province: place.province,
-    country: place.country,
+    formattedAddress: formattedAddress ?? name,
+    placeName: name,
+    street: place.street ? sanitizePlaceText(place.street) : undefined,
+    district: sanitizePlaceText(place.district),
+    city: sanitizePlaceText(place.city),
+    province: place.province ? sanitizePlaceText(place.province) : undefined,
+    country: place.country ? sanitizePlaceText(place.country) : undefined,
     provider: place.mapboxId ? "mapbox" : "manual",
     source: place.source ?? (place.mapboxId ? "retrieve" : "manual"),
-    featureType: "unknown",
-    precision: "unknown",
+    featureType: place.featureType ?? "unknown",
+    precision: place.precision ?? "unknown",
   });
 }
 
@@ -484,7 +496,9 @@ export const appRouter = router({
     pricingConfig: tikisProtectedProcedure.query(() => adminDb.adminGetPricingConfig()),
     countries: publicProcedure.query(() => db.listSupportedCountries()),
     searchCities: tikisProtectedProcedure.input(z.object({ query: z.string().min(2).max(80), countryCode: z.string().length(2) })).query(({ input }) => geography.searchCities(input.query, input.countryCode)),
-    savePlace: protectedGeographyProcedure.input(placeSchema).mutation(async ({ input }) => db.saveTikisPlace({ googlePlaceId: input.googlePlaceId, mapboxPlaceId: input.mapboxId, latitude: String(input.latitude), longitude: String(input.longitude), formattedAddress: input.formattedAddress ?? input.name, placeName: input.name, street: input.street, district: input.district, city: input.city, province: input.province, country: input.country, provider: input.mapboxId ? "mapbox" : "manual", source: input.mapboxId ? "retrieve" : "manual", featureType: "unknown", precision: "unknown" })),
+    // Identique à `saveDeliveryPlace` (même schéma, même sanitization, même persistance) : un seul
+    // chemin d'écriture des lieux, pour ne jamais laisser deux logiques diverger silencieusement.
+    savePlace: protectedGeographyProcedure.input(placeSchema).mutation(async ({ input }) => saveDeliveryPlace(input)),
     favorites: router({
       list: tikisProtectedProcedure.query(({ ctx }) => db.listFavoritePlaces(ctx.tikisProfilePhone)),
       add: tikisProtectedProcedure.input(z.object({ placeId: z.number().int().positive(), label: favoriteLabelSchema })).mutation(async ({ ctx, input }) => db.saveFavoritePlace(ctx.tikisProfilePhone, input.placeId, input.label)),
