@@ -130,6 +130,10 @@ function LiveTrackingFocus({
   const mapRef = useRef<MapView | null>(null);
   const liveDeliveryId = delivery.status === "active" ? delivery.id : null;
   const driverPosition = useLiveDeliveryPosition(liveDeliveryId, delivery.status === "active");
+  const driverStatsQuery = trpc.deliveries.driverStats.useQuery(
+    { driverPhone: delivery.driverPhone ?? "" },
+    { enabled: Boolean(delivery.driverPhone), refetchInterval: 60_000 },
+  );
   const dropoff = formatDeliveryDetailPlace(delivery.dropoff);
   const pickup = formatDeliveryDetailPlace(delivery.pickup);
 
@@ -294,11 +298,15 @@ function LiveTrackingFocus({
                 <View style={styles.driverInfo}>
                   <Text style={[styles.driverName, { color: theme.foreground }]} numberOfLines={1}>{delivery.driverName}</Text>
                   <View style={styles.driverMetaRow}>
-                    <View style={[styles.ratingPill, { backgroundColor: theme.foreground }]}>
-                      <Text style={[styles.ratingPillText, { color: theme.background }]}>★ 4.92</Text>
-                    </View>
+                    {driverStatsQuery.data && driverStatsQuery.data.reviewsCount > 0 ? (
+                      <View style={[styles.ratingPill, { backgroundColor: theme.foreground }]}>
+                        <Text style={[styles.ratingPillText, { color: theme.background }]}>★ {driverStatsQuery.data.rating.toFixed(2)}</Text>
+                      </View>
+                    ) : null}
                     <Text style={[styles.driverMetaText, { color: theme.muted }]}>
-                      {(delivery.vehicleTypes ?? []).join(" · ") || "Moto"}
+                      {driverStatsQuery.data && driverStatsQuery.data.completedDeliveries > 0
+                        ? `${driverStatsQuery.data.completedDeliveries} course${driverStatsQuery.data.completedDeliveries > 1 ? "s" : ""} · ${(delivery.vehicleTypes ?? []).join(" · ") || "Moto"}`
+                        : (delivery.vehicleTypes ?? []).join(" · ") || "Moto"}
                     </Text>
                   </View>
                 </View>

@@ -1251,6 +1251,22 @@ export async function getTikisDeliveryCandidateForDriver(deliveryId: string, dri
   return rows[0];
 }
 
+export async function getTikisDriverStats(driverPhone: string): Promise<{ rating: number; completedDeliveries: number; reviewsCount: number }> {
+  const db = await getDb();
+  if (!db) return { rating: 0, completedDeliveries: 0, reviewsCount: 0 };
+  const [ratingRow] = await db.select({ sum: sql<number>`COALESCE(SUM(${tikisDeliveryReviews.rating}), 0)`, count: sql<number>`COUNT(*)` })
+    .from(tikisDeliveryReviews)
+    .where(eq(tikisDeliveryReviews.driverPhone, driverPhone));
+  const [completedRow] = await db.select({ count: sql<number>`COUNT(*)` })
+    .from(tikisDeliveries)
+    .where(and(eq(tikisDeliveries.driverPhone, driverPhone), eq(tikisDeliveries.status, "completed")));
+  const sum = Number(ratingRow?.sum ?? 0);
+  const reviewsCount = Number(ratingRow?.count ?? 0);
+  const completedDeliveries = Number(completedRow?.count ?? 0);
+  const rating = reviewsCount > 0 ? Math.round((sum / reviewsCount) * 10) / 10 : 0;
+  return { rating, completedDeliveries, reviewsCount };
+}
+
 export async function listTikisDeliveryCandidateStatesForDriver(deliveryIds: string[], driverPhone: string) {
   const db = await getDb();
   if (!db || deliveryIds.length === 0) return new Map<string, TikisDeliveryCandidate>();

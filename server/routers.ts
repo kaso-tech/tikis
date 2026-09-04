@@ -533,6 +533,16 @@ export const appRouter = router({
       if (!isParticipant) throw new Error("Cette position n’est pas accessible.");
       return db.getTikisDeliveryLiveLocation(input.deliveryId);
     }),
+    driverStats: tikisProtectedProcedure.input(z.object({ driverPhone: phoneSchema })).query(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      const record = await db.getTikisProfileByPhone(input.driverPhone);
+      if (!record) throw new Error("Livreur introuvable.");
+      if (record.accountType !== "driver") throw new Error("Ce profil n'est pas un livreur.");
+      const isSelf = profile.phone === input.driverPhone;
+      const isParticipant = isSelf || profile.accountType === "sender" || profile.accountType === "admin";
+      if (!isParticipant) throw new Error("Accès non autorisé.");
+      return db.getTikisDriverStats(input.driverPhone);
+    }),
     updateLivePosition: tikisProtectedProcedure.input(z.object({
       deliveryId: z.string().uuid(),
       latitude: coordinateSchema.min(-90).max(90),
