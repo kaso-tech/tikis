@@ -7,9 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
-import { LiveTrackingView } from "@/components/tikis/live-tracking";
 import { SectionHeading, TikisButton } from "@/components/tikis/ui";
-import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { haptic } from "@/lib/haptics";
 import { deliveryRemainingMs, formatDeliveryCountdown } from "@/lib/delivery-countdown";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
@@ -139,14 +137,6 @@ export default function DeliveryDetailScreen() {
     return null;
   }, [senderAction]);
 
-  // Doit rester AVANT les `return` conditionnels ci-dessous : un hook ne peut jamais être appelé
-  // après un retour anticipé, sous peine de "Rendered more hooks than during the previous render".
-  const isLiveTracking = delivery?.status === "pending_confirmation" || delivery?.status === "active";
-  const livePositionQuery = useLiveDeliveryPosition(
-    isLiveTracking && delivery ? delivery.id : null,
-    Boolean(isLiveTracking && role === "sender"),
-  );
-
   if (deliveryQuery.isLoading) {
     return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.notFound}><ActivityIndicator color="#9A6201" /><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
   }
@@ -235,40 +225,8 @@ export default function DeliveryDetailScreen() {
     setAction("select");
   }
 
-  const pickupTime = isLiveTracking && delivery.status === "active" ? formatRelativeDate(delivery.scheduledAt ?? delivery.createdAt) : undefined;
-  const liveContent = isLiveTracking ? (
-    <LiveTrackingView
-      deliveryId={deliveryId}
-      status={delivery.status}
-      driverName={delivery.driverName}
-      driverPhone={delivery.driverPhone}
-      pickupLat={delivery.pickup.latitude}
-      pickupLng={delivery.pickup.longitude}
-      dropoffLat={delivery.dropoff.latitude}
-      dropoffLng={delivery.dropoff.longitude}
-      driverLat={livePositionQuery?.latitude ?? null}
-      driverLng={livePositionQuery?.longitude ?? null}
-      driverHeading={livePositionQuery?.heading ?? null}
-      pickupName={pickupPresentation.title}
-      pickupAddress={pickupPresentation.subtitle}
-      pickupTime={pickupTime}
-      dropoffName={dropoffPresentation.title}
-      dropoffAddress={dropoffPresentation.subtitle}
-      offeredPrice={delivery.offeredPrice ?? delivery.estimatedPrice}
-      senderName={delivery.senderName}
-      senderPhone={delivery.senderPhone}
-      onOpenMap={role === "sender" ? () => router.push(`/delivery/${deliveryId}/map` as any) : () => {}}
-      onReport={() => router.push(`/report/${deliveryId}` as any)}
-    >
-      {role === "driver" ? <DriverActions deliveryStatus={delivery.status} ownCandidateStatus={ownCandidate?.status} loading={processing} onApply={() => setAction("apply")} onWithdraw={() => setAction("withdraw")} onConfirm={() => setAction("confirm")} onComplete={() => setAction("complete")} /> : null}
-      {canUnselect ? <TikisButton label="Annuler le choix du livreur" icon="undo" variant="secondary" onPress={() => setSenderAction("unselect")} loading={senderProcessing && senderAction === "unselect"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
-      {message ? <Text style={styles.message}>{message}</Text> : null}
-    </LiveTrackingView>
-  ) : null;
-
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
-      {isLiveTracking ? liveContent : (
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Retour">
@@ -442,6 +400,7 @@ export default function DeliveryDetailScreen() {
                 <Text style={[styles.cancelButtonText, senderProcessing && styles.cancelButtonTextDisabled]}>Annuler la livraison</Text>
               </Pressable>
             ) : null}
+            {canUnselect ? <TikisButton label="Annuler le choix du livreur" icon="undo" variant="secondary" onPress={() => setSenderAction("unselect")} loading={senderProcessing && senderAction === "unselect"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
           </View>
         ) : null}
 
@@ -454,7 +413,6 @@ export default function DeliveryDetailScreen() {
           <TikisButton label="Noter le livreur" variant="ghost" icon="star-outline" onPress={() => router.push(`/review/${deliveryId}` as any)} style={styles.rateButton} />
         ) : null}
       </ScrollView>
-      )}
 
       {actionConfig ? <FinancialConfirmationModal visible title={actionConfig.title} description={actionConfig.description} amount={actionConfig.amount} confirmLabel={actionConfig.label} irreversible={actionConfig.irreversible} allowCounterOffer={action === "apply"} loading={processing} onCancel={() => { setAction(null); setSelectedCandidate(null); }} onConfirm={(counterOffer) => void confirmAction(counterOffer)} /> : null}
       {senderActionConfig ? <DeliveryActionConfirmationModal visible title={senderActionConfig.title} description={senderActionConfig.description} confirmLabel={senderActionConfig.confirmLabel} tone={senderActionConfig.tone} loading={senderProcessing} onCancel={() => !senderProcessing && setSenderAction(null)} onConfirm={() => void confirmSenderAction()} /> : null}

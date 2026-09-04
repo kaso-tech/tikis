@@ -61,14 +61,6 @@ export function SenderHomeKpiCards() {
           <MaterialIcons name="insights" size={18} color={theme.primary} />
           <Text style={styles.title}>Mon activité</Text>
         </View>
-        <Pressable
-          accessibilityRole="link"
-          onPress={() => router.push("/(tabs)/analytics" as any)}
-          style={({ pressed }) => [styles.headerLink, pressed && styles.pressed]}
-        >
-          <Text style={styles.headerLinkText}>Voir tout</Text>
-          <MaterialIcons name="chevron-right" size={14} color={theme.primary} />
-        </Pressable>
       </View>
 
       <View style={styles.kpiRow}>
