@@ -12,7 +12,14 @@ let captureException: ((error: unknown, context?: Record<string, unknown>) => vo
 let captureMessage: ((message: string, level?: "info" | "warning" | "error", context?: Record<string, unknown>) => void) | null = null;
 
 type SentryModule = {
-  init: (options: { dsn: string; environment: string; release: string; tracesSampleRate?: number; maxBreadcrumbs?: number }) => void;
+  init: (options: {
+    dsn: string;
+    environment: string;
+    release: string;
+    tracesSampleRate?: number;
+    maxBreadcrumbs?: number;
+    registerEsmLoaderHooks?: boolean;
+  }) => void;
   captureException: (error: unknown) => string;
   captureMessage: (message: string, level?: { level: string }) => string;
   setContext: (key: string, value: Record<string, unknown>) => void;
@@ -28,7 +35,12 @@ export async function initSentry() {
   let sentryModule: SentryModule;
   try {
     sentryModule = (await import("@sentry/node")) as unknown as SentryModule;
-    sentryModule.init({ dsn: SENTRY_DSN, environment: SENTRY_ENVIRONMENT, release: SENTRY_RELEASE, tracesSampleRate: 0.1, maxBreadcrumbs: 50 });
+    // `registerEsmLoaderHooks: false` désactive l'auto-instrumentation ESM d'import-in-the-middle : sous tsx
+    // (dev:server, Node 22+), ce hook entre en conflit avec le loader de tsx et provoque un
+    // ERR_INVALID_RETURN_PROPERTY_VALUE ("source" du load hook indéfini) sur le premier import() dynamique
+    // qui suit — cassant en cascade tous les autres (sessions, loyalty, analytics, géographie…). On n'utilise
+    // ici que la capture manuelle (captureException/captureMessage), donc l'instrumentation auto est inutile.
+    sentryModule.init({ dsn: SENTRY_DSN, environment: SENTRY_ENVIRONMENT, release: SENTRY_RELEASE, tracesSampleRate: 0.1, maxBreadcrumbs: 50, registerEsmLoaderHooks: false });
     captureException = (error, context) => {
       if (context) sentryModule.setContext("extra", context);
       sentryModule.captureException(error);
