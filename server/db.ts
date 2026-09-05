@@ -1,13 +1,14 @@
 import { randomUUID } from "crypto";
 import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, tikisFavoritePlaces, tikisKycSubmissions, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisPushTokens, tikisRateLimits, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, tikisYengapayWebhookEvents, users } from "../drizzle/schema";
+import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, TikisDriverPreferences, tikisDriverPreferences, tikisFavoritePlaces, tikisKycSubmissions, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisPushTokens, tikisRateLimits, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, tikisYengapayWebhookEvents, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { createYengapayPaymentIntent, readYengapayConfig, verifyYengapayPayment } from "./yengapay";
 import { sendPushToTokens, type PushMessage } from "./push";
 import { isValidExpoPushTokenShape } from "./_test-helpers/push-token-shape";
 import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppNotification, LocationLabel, SelectableVehicleType, WalletOperation, WalletSnapshot } from "../shared/tikis-domain";
 import { candidateMovementVersion, computeReplacementSettlement } from "../shared/wallet-commission";
+import { DEFAULT_DRIVER_PERIMETER, evaluatePerimeter, isValidPerimeterRadius, MAX_PERIMETER_RADIUS_KM, MIN_PERIMETER_RADIUS_KM, type DriverPerimeterPreferences } from "../shared/driver-perimeter";
 import { DELIVERY_EXPIRATION_MS, deliveryActivityTimestamp, deliveryExpirationOutcome } from "../shared/delivery-expiration";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -447,37 +448,145 @@ const MAX_COMPATIBLE_DRIVERS_NOTIFIED = 200;
 // tout découvrable via `deliveries.list`, qui n'a pas cette limite).
 const MAX_DRIVERS_SCANNED_FOR_COMPATIBILITY = 2_000;
 
-async function getCompatibleDriverPhones(tx: any, vehicleTypes: SelectableVehicleType[]): Promise<string[]> {
+function driverPreferencesToView(row: TikisDriverPreferences): DriverPerimeterPreferences {
+  return {
+    opportunityPushEnabled: Boolean(row.opportunityPushEnabled),
+    alertRadiusKm: row.alertRadiusKm ?? null,
+    discoveryRadiusKm: row.discoveryRadiusKm ?? null,
+    baseLatitude: row.baseLatitude === null ? null : Number(row.baseLatitude),
+    baseLongitude: row.baseLongitude === null ? null : Number(row.baseLongitude),
+    baseUpdatedAt: row.baseUpdatedAt ? row.baseUpdatedAt.toISOString() : null,
+  };
+}
+
+/** Préférences de périmètre d'un livreur. Aucune ligne en base = réglages par défaut : alertes push
+ *  désactivées, périmètre limité à la ville du profil (cf. shared/driver-perimeter.ts). */
+export async function getDriverPerimeterPreferences(profilePhone: string): Promise<DriverPerimeterPreferences> {
+  const db = await getDb();
+  if (!db) return DEFAULT_DRIVER_PERIMETER;
+  const rows = await db.select().from(tikisDriverPreferences).where(eq(tikisDriverPreferences.profilePhone, profilePhone)).limit(1);
+  const row = rows[0];
+  return row ? driverPreferencesToView(row) : DEFAULT_DRIVER_PERIMETER;
+}
+
+/** Met à jour les réglages choisis par le livreur. Les champs absents restent inchangés ; un rayon
+ *  explicitement `null` signifie « ma ville » et est donc bien écrit, pas ignoré. */
+export async function updateDriverPerimeterPreferences(profilePhone: string, patch: {
+  opportunityPushEnabled?: boolean;
+  alertRadiusKm?: number | null;
+  discoveryRadiusKm?: number | null;
+}): Promise<DriverPerimeterPreferences> {
+  const db = await getDb();
+  if (!db) throw new Error("Les réglages de notifications sont temporairement indisponibles.");
+  for (const radius of [patch.alertRadiusKm, patch.discoveryRadiusKm]) {
+    if (radius !== undefined && radius !== null && !isValidPerimeterRadius(radius)) {
+      throw new Error(`Le rayon doit être compris entre ${MIN_PERIMETER_RADIUS_KM} et ${MAX_PERIMETER_RADIUS_KM} km.`);
+    }
+  }
+  const values: Record<string, unknown> = {};
+  if (patch.opportunityPushEnabled !== undefined) values.opportunityPushEnabled = patch.opportunityPushEnabled;
+  if (patch.alertRadiusKm !== undefined) values.alertRadiusKm = patch.alertRadiusKm;
+  if (patch.discoveryRadiusKm !== undefined) values.discoveryRadiusKm = patch.discoveryRadiusKm;
+  await db.insert(tikisDriverPreferences).values({ profilePhone, ...values })
+    // `profilePhone` dans le SET garantit un UPDATE non vide même si `values` est vide (aucun champ
+    // fourni) : MySQL rejette un `ON DUPLICATE KEY UPDATE` sans affectation.
+    .onDuplicateKeyUpdate({ set: { profilePhone, ...values } });
+  return getDriverPerimeterPreferences(profilePhone);
+}
+
+/** Enregistre la position de référence servant de centre aux rayons. Publiée par l'app du livreur
+ *  quand elle dispose d'un point GPS ; sans elle, les rayons retombent sur le périmètre « ma ville ». */
+export async function updateDriverBasePosition(profilePhone: string, latitude: number, longitude: number): Promise<DriverPerimeterPreferences> {
+  const db = await getDb();
+  if (!db) throw new Error("La position de référence est temporairement indisponible.");
+  const baseUpdatedAt = new Date();
+  const position = { baseLatitude: String(latitude), baseLongitude: String(longitude), baseUpdatedAt };
+  await db.insert(tikisDriverPreferences).values({ profilePhone, ...position })
+    .onDuplicateKeyUpdate({ set: position });
+  return getDriverPerimeterPreferences(profilePhone);
+}
+
+type CompatibleDriver = { phone: string; city: string | null };
+
+async function getCompatibleDrivers(tx: any, vehicleTypes: SelectableVehicleType[]): Promise<CompatibleDriver[]> {
   if (vehicleTypes.length === 0) return [];
-  const drivers = await tx.select({ phone: tikisProfiles.phone, vehicles: tikisProfiles.vehicles })
+  const drivers = await tx.select({ phone: tikisProfiles.phone, vehicles: tikisProfiles.vehicles, city: tikisProfiles.city })
     .from(tikisProfiles)
     .where(and(eq(tikisProfiles.accountType, "driver"), eq(tikisProfiles.status, "active")))
     .orderBy(desc(tikisProfiles.id))
     .limit(MAX_DRIVERS_SCANNED_FOR_COMPATIBILITY);
-  const matches: string[] = [];
-  for (const driver of drivers) {
-    if (parseVehicles(driver.vehicles).some((vehicle) => vehicleTypes.includes(vehicle))) matches.push(driver.phone);
-    if (matches.length >= MAX_COMPATIBLE_DRIVERS_NOTIFIED) break;
-  }
-  return matches;
+  // Aucun plafond ici : c'est le filtre de périmètre, appliqué ensuite, qui doit décider qui mérite
+  // une notification. Tronquer dès la compatibilité d'engin — l'ordre étant « profils les plus
+  // récents » — pouvait ne retenir que des livreurs d'une seule ville et laisser une course publiée
+  // ailleurs sans aucun destinataire. Le plafond d'envoi s'applique donc après le périmètre.
+  return drivers
+    .filter((driver: { vehicles: string }) => parseVehicles(driver.vehicles).some((vehicle) => vehicleTypes.includes(vehicle)))
+    .map((driver: { phone: string; city: string | null }) => ({ phone: driver.phone, city: driver.city ?? null }));
+}
+
+/** Préférences de périmètre de plusieurs livreurs en une requête, complétées par les valeurs par
+ *  défaut pour ceux qui n'ont jamais ouvert leurs réglages (aucune ligne en base). */
+async function getDriverPerimetersByPhone(tx: any, phones: string[]): Promise<Map<string, DriverPerimeterPreferences>> {
+  const perimeters = new Map<string, DriverPerimeterPreferences>();
+  if (phones.length === 0) return perimeters;
+  const rows = await tx.select().from(tikisDriverPreferences).where(inArray(tikisDriverPreferences.profilePhone, phones));
+  for (const row of rows) perimeters.set(row.profilePhone, driverPreferencesToView(row));
+  for (const phone of phones) if (!perimeters.has(phone)) perimeters.set(phone, DEFAULT_DRIVER_PERIMETER);
+  return perimeters;
 }
 
 /** Informe chaque livreur compatible qu'une livraison est disponible (publication ou réactivation) —
  *  spec §1 : "informer les livreurs compatibles". Avant ce correctif, aucun chemin ne le faisait : la
- *  seule découverte possible était le polling manuel de `deliveries.list`. */
-async function notifyCompatibleDriversOfDelivery(tx: any, delivery: { id: string; title: string; vehicleTypes: string }, eventType: "delivery_published" | "delivery_reactivated_for_drivers", announcement: string) {
-  const compatiblePhones = await getCompatibleDriverPhones(tx, parseVehicles(delivery.vehicleTypes));
-  for (const driverPhone of compatiblePhones) {
+ *  seule découverte possible était le polling manuel de `deliveries.list`.
+ *
+ *  Deux filtres se cumulent, dans cet ordre : compatibilité de l'engin, puis périmètre d'alerte du
+ *  livreur (sa ville par défaut, ou son rayon s'il en a choisi un). Hors périmètre, aucune
+ *  notification n'est créée du tout : envoyer une alerte pour une course à l'autre bout du pays est
+ *  du bruit, pas de l'information. Dans le périmètre, la notification in-app est toujours créée ;
+ *  le push, lui, n'est envoyé qu'aux livreurs qui l'ont explicitement activé. */
+async function notifyCompatibleDriversOfDelivery(
+  tx: any,
+  delivery: { id: string; title: string; vehicleTypes: string; pickupPlaceId: number },
+  eventType: "delivery_published" | "delivery_reactivated_for_drivers",
+  announcement: string,
+) {
+  const compatibleDrivers = await getCompatibleDrivers(tx, parseVehicles(delivery.vehicleTypes));
+  if (compatibleDrivers.length === 0) return;
+  const [pickup] = await tx.select({ latitude: tikisPlaces.latitude, longitude: tikisPlaces.longitude, city: tikisPlaces.city, district: tikisPlaces.district, province: tikisPlaces.province })
+    .from(tikisPlaces).where(eq(tikisPlaces.id, delivery.pickupPlaceId)).limit(1);
+  if (!pickup) return;
+  const pickupPoint = {
+    latitude: Number(pickup.latitude),
+    longitude: Number(pickup.longitude),
+    city: pickup.city ?? null,
+    district: pickup.district ?? null,
+    province: pickup.province ?? null,
+  };
+  const perimeters = await getDriverPerimetersByPhone(tx, compatibleDrivers.map((driver) => driver.phone));
+
+  let notified = 0;
+  for (const driver of compatibleDrivers) {
+    if (notified >= MAX_COMPATIBLE_DRIVERS_NOTIFIED) break;
+    const perimeter = perimeters.get(driver.phone) ?? DEFAULT_DRIVER_PERIMETER;
+    const decision = evaluatePerimeter({
+      radiusKm: perimeter.alertRadiusKm,
+      driverCity: driver.city,
+      base: { latitude: perimeter.baseLatitude, longitude: perimeter.baseLongitude, updatedAt: perimeter.baseUpdatedAt },
+      pickup: pickupPoint,
+    });
+    if (!decision.matches) continue;
     await appendDeliveryEvent(tx, {
       deliveryId: delivery.id,
       eventType,
       status: "open",
-      recipientPhone: driverPhone,
+      recipientPhone: driver.phone,
       title: "Nouvelle livraison disponible",
       body: `${announcement} : ${delivery.title}`,
       tone: "info",
-      idempotencyKey: `${delivery.id}:${eventType}:${driverPhone}`,
+      idempotencyKey: `${delivery.id}:${eventType}:${driver.phone}`,
+      push: perimeter.opportunityPushEnabled,
     });
+    notified += 1;
   }
 }
 
@@ -486,7 +595,7 @@ export async function createTikisDelivery(input: InsertTikisDelivery) {
   if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
   await db.transaction(async (tx) => {
     await tx.insert(tikisDeliveries).values(input);
-    await notifyCompatibleDriversOfDelivery(tx, { id: input.id, title: input.title, vehicleTypes: input.vehicleTypes }, "delivery_published", "Une livraison compatible avec votre engin a été publiée");
+    await notifyCompatibleDriversOfDelivery(tx, { id: input.id, title: input.title, vehicleTypes: input.vehicleTypes, pickupPlaceId: input.pickupPlaceId }, "delivery_published", "Une livraison compatible avec votre engin a été publiée");
   });
   return getTikisDeliveryById(input.id);
 }
@@ -565,6 +674,7 @@ export async function listTikisDeliveriesForProfile(profilePhone: string, role: 
   const db = await getDb();
   if (!db) return [];
   let predicate;
+  let driverCandidacyDeliveryIds: string[] = [];
   if (role === "sender") {
     predicate = eq(tikisDeliveries.senderPhone, profilePhone);
   } else {
@@ -574,12 +684,45 @@ export async function listTikisDeliveriesForProfile(profilePhone: string, role: 
     // et que `driverPhone` pointait vers quelqu'un d'autre.
     const candidacies = await db.select({ deliveryId: tikisDeliveryCandidates.deliveryId }).from(tikisDeliveryCandidates).where(eq(tikisDeliveryCandidates.driverPhone, profilePhone));
     const candidacyDeliveryIds = candidacies.map((row) => row.deliveryId);
+    driverCandidacyDeliveryIds = candidacyDeliveryIds;
     predicate = candidacyDeliveryIds.length > 0
       ? or(eq(tikisDeliveries.status, "open"), eq(tikisDeliveries.driverPhone, profilePhone), inArray(tikisDeliveries.id, candidacyDeliveryIds))
       : or(eq(tikisDeliveries.status, "open"), eq(tikisDeliveries.driverPhone, profilePhone));
   }
   const rows = await db.select().from(tikisDeliveries).where(predicate).orderBy(desc(tikisDeliveries.createdAt));
-  return deliveryJoins(rows);
+  const deliveries = await deliveryJoins(rows);
+  if (role !== "driver") return deliveries;
+  return filterDeliveriesToDriverPerimeter(profilePhone, deliveries, driverCandidacyDeliveryIds);
+}
+
+/** Restreint les opportunités « open » au périmètre d'affichage du livreur (sa ville par défaut).
+ *  Ne s'applique qu'aux courses ouvertes auxquelles il n'est pas déjà lié : une course qu'il a déjà
+ *  acceptée, ou sur laquelle il a candidaté, reste toujours visible même hors périmètre — sinon elle
+ *  disparaîtrait de son écran dès qu'il change de rayon ou de ville, sans qu'il puisse la retrouver. */
+async function filterDeliveriesToDriverPerimeter(profilePhone: string, deliveries: Delivery[], candidacyDeliveryIds: string[]): Promise<Delivery[]> {
+  const linkedDeliveryIds = new Set(candidacyDeliveryIds);
+  const filterable = deliveries.filter((delivery) => delivery.status === "open" && delivery.driverId !== profilePhone && !linkedDeliveryIds.has(delivery.id));
+  if (filterable.length === 0) return deliveries;
+  const [profile, perimeter] = await Promise.all([
+    getTikisProfileByPhone(profilePhone),
+    getDriverPerimeterPreferences(profilePhone),
+  ]);
+  return deliveries.filter((delivery) => {
+    if (delivery.status !== "open" || delivery.driverId === profilePhone) return true;
+    if (linkedDeliveryIds.has(delivery.id)) return true;
+    return evaluatePerimeter({
+      radiusKm: perimeter.discoveryRadiusKm,
+      driverCity: profile?.city ?? null,
+      base: { latitude: perimeter.baseLatitude, longitude: perimeter.baseLongitude, updatedAt: perimeter.baseUpdatedAt },
+      pickup: {
+        latitude: delivery.pickup.latitude,
+        longitude: delivery.pickup.longitude,
+        city: delivery.pickup.city ?? null,
+        district: delivery.pickup.district ?? null,
+        province: delivery.pickup.province ?? null,
+      },
+    }).matches;
+  });
 }
 
 export async function expireOpenTikisDeliveries(now = new Date()) {
@@ -678,6 +821,11 @@ type DeliveryEventInput = {
   body: string;
   tone: "info" | "success" | "warning";
   idempotencyKey: string;
+  /** `false` pour créer la notification in-app sans envoyer de push. Utilisé par les alertes de
+   *  nouvelles courses, qui sont opt-in (cf. tikis_driver_preferences) : le livreur retrouve toujours
+   *  l'opportunité dans son centre de notifications, mais son téléphone ne sonne que s'il l'a demandé.
+   *  Les notifications transactionnelles ne passent jamais `false` : elles sont toujours poussées. */
+  push?: boolean;
 };
 
 export async function ensureTikisWallet(tx: any, profilePhone: string) {
@@ -715,7 +863,7 @@ async function appendDeliveryEvent(tx: any, event: DeliveryEventInput) {
   }).onDuplicateKeyUpdate({ set: { idempotencyKey: event.idempotencyKey } });
   // Push best-effort après la transaction : on capture le recipient, on envoie hors-transaction.
   // Le push est opt-in (token Expo enregistré), les in-app events sont toujours créés.
-  if (event.recipientPhone) {
+  if (event.recipientPhone && event.push !== false) {
     const data: Record<string, unknown> = { deliveryId: event.deliveryId, eventType: event.eventType };
     if (event.status) data.status = event.status;
     void enqueuePushToPhone({ phone: event.recipientPhone, title: event.title, body: event.body, data, channelId: "tikis-delivery" });
@@ -1186,7 +1334,7 @@ export async function reactivateTikisDeliveryFromSender(deliveryId: string, send
     if (!delivery || delivery.status !== "disabled") throw new Error("Seule une livraison désactivée peut être activée.");
     await tx.update(tikisDeliveries).set({ status: "open", updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_reactivated", status: "open", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Livraison activée", body: "Votre livraison est à nouveau visible pour les livreurs compatibles.", tone: "success", idempotencyKey: `${deliveryId}:reactivated:${delivery.updatedAt.getTime()}` });
-    await notifyCompatibleDriversOfDelivery(tx, { id: deliveryId, title: delivery.title, vehicleTypes: delivery.vehicleTypes }, "delivery_reactivated_for_drivers", "Une livraison compatible avec votre engin est de nouveau disponible");
+    await notifyCompatibleDriversOfDelivery(tx, { id: deliveryId, title: delivery.title, vehicleTypes: delivery.vehicleTypes, pickupPlaceId: delivery.pickupPlaceId }, "delivery_reactivated_for_drivers", "Une livraison compatible avec votre engin est de nouveau disponible");
   });
   return getTikisDeliveryById(deliveryId);
 }

@@ -7,6 +7,7 @@ import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { formatListRouteParts } from "@/lib/geo-rules";
 import { useDriverLocation } from "@/hooks/use-driver-location";
+import { useDriverBasePositionSync } from "@/hooks/use-driver-base-position-sync";
 import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
@@ -153,6 +154,8 @@ export function HomeScreen() {
     completed: new Animated.Value(1),
   }).current;
   const driverLocation = useDriverLocation({ enabled: role === "driver" });
+  // Tient à jour le centre des rayons « alertes » et « affichage » du livreur (cf. app/driver-alerts.tsx).
+  useDriverBasePositionSync(driverLocation.location, role === "driver");
 
   const filteredList = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();

@@ -14,6 +14,7 @@ import { createTikisProfileSession } from "./tikis-session";
 import { recordGeographicMetric } from "./geography-observability";
 import { isAllowedDeliveryText, sanitizeDeliveryText } from "../lib/tikis-engine";
 import { sanitizePlaceText } from "../lib/geo-rules";
+import { MAX_PERIMETER_RADIUS_KM, MIN_PERIMETER_RADIUS_KM } from "../shared/driver-perimeter";
 import { isValidReviewText, sanitizeReviewText } from "../lib/review-rules";
 import { canReviewDelivery } from "./_test-helpers/review-eligibility";
 import { tikisAdminRouter } from "./admin-router";
@@ -771,6 +772,41 @@ export const appRouter = router({
     unregisterPushToken: tikisProtectedProcedure.input(z.object({ token: z.string().min(20).max(200) })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       return db.unregisterPushToken({ phone: profile.phone, token: input.token });
+    }),
+  }),
+  /** Périmètre de travail du livreur : alertes push de nouvelles courses et rayon d'affichage des
+   *  opportunités (cf. shared/driver-perimeter.ts). Réservé aux comptes livreurs — un expéditeur n'a
+   *  ni opportunité à filtrer ni alerte de ce type à recevoir. */
+  driverPerimeter: router({
+    get: tikisProtectedProcedure.query(async ({ ctx }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "driver") throw new Error("Ces réglages sont réservés aux livreurs.");
+      return { ...(await db.getDriverPerimeterPreferences(profile.phone)), city: profile.city ?? null };
+    }),
+    update: tikisProtectedProcedure.input(z.object({
+      opportunityPushEnabled: z.boolean().optional(),
+      // `null` est une valeur métier à part entière (« ma ville »), à distinguer d'un champ absent
+      // qui, lui, laisse le réglage inchangé — d'où `.nullable().optional()` et non `.optional()`.
+      alertRadiusKm: z.number().int().min(MIN_PERIMETER_RADIUS_KM).max(MAX_PERIMETER_RADIUS_KM).nullable().optional(),
+      discoveryRadiusKm: z.number().int().min(MIN_PERIMETER_RADIUS_KM).max(MAX_PERIMETER_RADIUS_KM).nullable().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "driver") throw new Error("Ces réglages sont réservés aux livreurs.");
+      return { ...(await db.updateDriverPerimeterPreferences(profile.phone, input)), city: profile.city ?? null };
+    }),
+    /** Position de référence des rayons. Même géofencing que le suivi en direct : une position hors
+     *  zone de service est refusée plutôt que d'être enregistrée comme centre du périmètre. */
+    updateBasePosition: protectedGeographyProcedure.input(z.object({
+      latitude: coordinateSchema.min(-90).max(90),
+      longitude: coordinateSchema.min(-180).max(180),
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "driver") throw new Error("Ces réglages sont réservés aux livreurs.");
+      const countryCode = profile.country ?? findCountryForPhone(profile.phone).id;
+      if (!isCoordinateInCountry(input.latitude, input.longitude, countryCode)) {
+        throw new Error("La position détectée est en dehors de la zone de service. Vérifie ton GPS.");
+      }
+      return { ...(await db.updateDriverBasePosition(profile.phone, input.latitude, input.longitude)), city: profile.city ?? null };
     }),
   }),
   reviews: router({

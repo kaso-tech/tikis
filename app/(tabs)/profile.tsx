@@ -16,6 +16,7 @@ import { getApiBaseUrl } from "@/constants/oauth";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { availableWalletBalance, formatMoney } from "@/shared/tikis-domain";
+import { describePerimeter } from "@/shared/driver-perimeter";
 
 const COVER_HEIGHT = 200;
 
@@ -36,6 +37,7 @@ export default function ProfileScreen() {
   const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
   const reviewsQuery = trpc.reviews.list.useQuery(undefined, { enabled: Boolean(profile?.phone) });
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone) });
+  const perimeterQuery = trpc.driverPerimeter.get.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone) });
   const [editorOpen, setEditorOpen] = useState(false);
   const [fullName, setFullName] = useState(profile?.fullName ?? "");
   const [countryEditorOpen, setCountryEditorOpen] = useState(false);
@@ -57,6 +59,9 @@ export default function ProfileScreen() {
   const [vehiclesPickerOpen, setVehiclesPickerOpen] = useState(false);
 
   const driver = role === "driver";
+  const perimeterSummary = perimeterQuery.data
+    ? `${perimeterQuery.data.opportunityPushEnabled ? "Alertes activées" : "Alertes désactivées"} · ${describePerimeter(perimeterQuery.data.discoveryRadiusKm, perimeterQuery.data.city)}`
+    : "Notifications de nouvelles courses et rayon";
   const name = profile?.fullName ?? (driver ? "Antoine Kaboré" : "Aïcha Traoré");
   const initials = name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
   const photoUri = profile?.photoUrl ? `${getApiBaseUrl()}${profile.photoUrl}` : undefined;
@@ -303,6 +308,13 @@ export default function ProfileScreen() {
               label="Mes engins"
               sub={profile?.vehicles?.length ? profile.vehicles.join(", ") : "Sélectionnez vos engins"}
               onPress={() => setVehiclesPickerOpen(true)}
+            />
+            <MenuRow
+              icon="notifications-active"
+              iconBg="primary"
+              label="Alertes & périmètre"
+              sub={perimeterSummary}
+              onPress={() => router.push("/driver-alerts" as any)}
               last
             />
           </Section>

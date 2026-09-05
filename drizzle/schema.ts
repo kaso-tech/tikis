@@ -401,6 +401,28 @@ export const tikisPushTokens = mysqlTable("tikis_push_tokens", {
 
 export type TikisPushToken = typeof tikisPushTokens.$inferSelect;
 
+/** Périmètre de travail d'un livreur : quelles courses lui sont affichées, et pour lesquelles il
+ *  reçoit une alerte push. Absence de ligne = réglages par défaut (cf. shared/driver-perimeter.ts) :
+ *  alertes push désactivées, périmètre limité à la ville du profil. */
+export const tikisDriverPreferences = mysqlTable("tikis_driver_preferences", {
+  profilePhone: varchar("profilePhone", { length: 20 }).primaryKey(),
+  /** Opt-in explicite aux alertes push de nouvelles courses. Les notifications transactionnelles
+   *  (candidature retenue, mission confirmée, course annulée…) ne sont jamais concernées. */
+  opportunityPushEnabled: boolean("opportunityPushEnabled").notNull().default(false),
+  /** NULL = périmètre « ma ville ». Sinon rayon max en km autour de la position de référence. */
+  alertRadiusKm: int("alertRadiusKm"),
+  /** NULL = périmètre « ma ville ». Sinon rayon max en km autour de la position de référence. */
+  discoveryRadiusKm: int("discoveryRadiusKm"),
+  /** Position de référence des deux rayons : dernière position GPS publiée par le livreur. */
+  baseLatitude: decimal("baseLatitude", { precision: 10, scale: 7 }),
+  baseLongitude: decimal("baseLongitude", { precision: 10, scale: 7 }),
+  baseUpdatedAt: timestamp("baseUpdatedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type TikisDriverPreferences = typeof tikisDriverPreferences.$inferSelect;
+
 /** Programme de fidélité : règles métier (seuil livraisons, montant bonus, palier). */
 export const tikisLoyaltyPrograms = mysqlTable("tikis_loyalty_programs", {
   id: varchar("id", { length: 40 }).primaryKey(),
