@@ -539,7 +539,7 @@ export const appRouter = router({
       if (!record) throw new Error("Livreur introuvable.");
       if (record.accountType !== "driver") throw new Error("Ce profil n'est pas un livreur.");
       const isSelf = profile.phone === input.driverPhone;
-      const isParticipant = isSelf || profile.accountType === "sender" || profile.accountType === "admin";
+      const isParticipant = isSelf || profile.accountType === "sender";
       if (!isParticipant) throw new Error("Accès non autorisé.");
       return db.getTikisDriverStats(input.driverPhone);
     }),

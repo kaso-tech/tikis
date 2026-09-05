@@ -563,3 +563,14 @@
 - [x] Valider le chargement des livraisons, adresses et données protégées avec une session active.
 - [x] Revalider la création de livraison et l’absence d’erreur tRPC de session.
 - [x] Enregistrer et livrer la restauration fonctionnelle urgente.
+
+- [ ] Refaire le pull de la branche `main` et vérifier le dernier commit.
+- [ ] Vérifier les dépendances, compiler, tester et construire la console admin.
+- [ ] Relancer Expo et l’API, puis vérifier les services.
+- [ ] Enregistrer, pousser et livrer la dernière version validée.
+- [ ] Aligner les coordonnées du suivi en direct sur le contrat attendu par la carte.
+- [ ] Corriger la comparaison de rôle impossible dans le routeur de livraisons.
+- [ ] Revalider TypeScript, les tests, le build admin et les services après ces corrections.
+- [ ] Rétablir le bundling Metro après l’erreur de génération `.expo/types/router.d.ts`.
+- [ ] Revalider Metro, l’API, `/admin`, TypeScript et les tests après ce correctif.
+- [ ] Isoler le suivi cartographique natif de la route web afin d’éviter le chargement de `react-native-maps` sur web.
