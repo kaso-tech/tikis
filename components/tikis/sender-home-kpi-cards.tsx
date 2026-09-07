@@ -61,14 +61,6 @@ export function SenderHomeKpiCards() {
           <MaterialIcons name="insights" size={18} color={theme.primary} />
           <Text style={styles.title}>Mon activité</Text>
         </View>
-        <Pressable
-          accessibilityRole="link"
-          onPress={() => router.push("/(tabs)/analytics" as any)}
-          style={({ pressed }) => [styles.headerLink, pressed && styles.pressed]}
-        >
-          <Text style={styles.headerLinkText}>Voir tout</Text>
-          <MaterialIcons name="chevron-right" size={14} color={theme.primary} />
-        </Pressable>
       </View>
 
       <View style={styles.kpiRow}>
@@ -141,8 +133,6 @@ function makeStyles(theme: ThemedColors) {
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
     headerLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
     title: { fontSize: 14, fontWeight: "600", color: theme.foreground },
-    headerLink: { flexDirection: "row", alignItems: "center", gap: 2, paddingVertical: 4, paddingHorizontal: 6, borderRadius: 6 },
-    headerLinkText: { fontSize: 12, fontWeight: "600", color: theme.primary },
     loading: { alignItems: "center", paddingVertical: 12 },
     kpiRow: { flexDirection: "row", gap: 10 },
     kpiMain: { flex: 1.4, backgroundColor: theme.background, borderRadius: 8, padding: 12, gap: 4 },
