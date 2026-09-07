@@ -9,7 +9,6 @@ import { haptic } from "@/lib/haptics";
 import { trpc } from "@/lib/trpc";
 import { formatListRouteParts, geodesicDistanceKm, locationTitle } from "@/lib/geo-rules";
 import { useDriverLocation } from "@/hooks/use-driver-location";
-import { useDriverBasePositionSync } from "@/hooks/use-driver-base-position-sync";
 import { useDeviceHeading } from "@/hooks/use-device-heading";
 import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { compassRotationToTarget } from "@/lib/compass";
@@ -17,6 +16,7 @@ import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format"
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
+import { SenderHomeKpiCards } from "@/components/tikis/sender-home-kpi-cards";
 import { RateDeliveryDialog } from "@/components/tikis/rate-delivery-dialog";
 import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
 import { resolveDriverHomeAction } from "@/shared/delivery-home-action";
@@ -37,14 +37,14 @@ const TYPE_ICON: Record<Delivery["type"], React.ComponentProps<typeof MaterialIc
 };
 
 const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: string }> = {
-  draft: { label: "BROUILLON", color: "#667085", bg: "#E3E3E3" },
-  open: { label: "PUBLIÉE", color: "#9A6201", bg: "#E3E3E3" },
-  pending_confirmation: { label: "ATTRIBUÉE", color: "#9A6201", bg: "#E3E3E3" },
-  active: { label: "EN TRANSIT", color: "#176C52", bg: "#E3E3E3" },
-  completed: { label: "TERMINÉE", color: "#176C52", bg: "#176C52" },
-  disabled: { label: "DÉSACTIVÉE", color: "#A43740", bg: "#FFFFFF" },
-  cancelled: { label: "ANNULÉE", color: "#A43740", bg: "#FFFFFF" },
-  expired: { label: "EXPIRÉE", color: "#667085", bg: "#E3E3E3" },
+  draft: { label: "BROUILLON", color: "#7A6E61", bg: "#EEE8E0" },
+  open: { label: "PUBLIÉE", color: "#9A6201", bg: "#F8E8CE" },
+  pending_confirmation: { label: "ATTRIBUÉE", color: "#7A5600", bg: "#F4E9D2" },
+  active: { label: "EN TRANSIT", color: "#176C52", bg: "#DDEFE7" },
+  completed: { label: "TERMINÉE", color: "#4F6A5A", bg: "#E6EFE9" },
+  disabled: { label: "DÉSACTIVÉE", color: "#A43740", bg: "#F7E6E7" },
+  cancelled: { label: "ANNULÉE", color: "#A43740", bg: "#F7E6E7" },
+  expired: { label: "EXPIRÉE", color: "#6B6257", bg: "#EEE8E0" },
 };
 
 type FilterKey = "active" | "open" | "pending" | "completed";
@@ -108,10 +108,7 @@ export function HomeScreen() {
 
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 5_000, refetchOnMount: "always", refetchOnWindowFocus: true });
   const driverWallet = walletQuery.data?.wallet;
-  // Gains de courses = informatifs, calculés depuis les livraisons terminées (jamais depuis le Wallet, qui n'est
-  // jamais crédité par une livraison : le paiement se fait directement entre l'expéditeur et le livreur).
-  const driverEarningsHistoryQuery = trpc.wallet.driverEarningsHistory.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 5_000 });
-  const driverEarningsHistory = driverEarningsHistoryQuery.data ?? [];
+  const driverJournal = walletQuery.data?.journal ?? [];
 
   const [filter, setFilter] = useState<FilterKey>("open");
   const [searchQuery, setSearchQuery] = useState("");
@@ -157,8 +154,6 @@ export function HomeScreen() {
     completed: new Animated.Value(1),
   }).current;
   const driverLocation = useDriverLocation({ enabled: role === "driver" });
-  // Tient à jour le centre des rayons « alertes » et « affichage » du livreur (cf. app/driver-alerts.tsx).
-  useDriverBasePositionSync(driverLocation.location, role === "driver");
   const deviceHeading = useDeviceHeading(role === "driver");
 
   const filteredList = useMemo(() => {
@@ -275,10 +270,10 @@ export function HomeScreen() {
     { enabled: Boolean(candidateDelivery?.id) },
   );
 
-  const applicationCommission = (delivery: Delivery, priceOverride?: number) => {
+  const applicationCommission = (delivery: Delivery) => {
     const rate = walletQuery.data?.commissionRate;
     if (!Number.isFinite(rate) || !rate || rate <= 0 || rate >= 1) return null;
-    return commissionFor(priceOverride ?? (delivery.offeredPrice ?? delivery.estimatedPrice), { rate, currency: "FCFA" });
+    return commissionFor(delivery.offeredPrice ?? delivery.estimatedPrice, { rate, currency: "FCFA" });
   };
 
   function requestDriverAction(delivery: Delivery) {
@@ -339,10 +334,7 @@ export function HomeScreen() {
         openNavigation(origin, delivery.pickup, delivery.dropoff);
         return;
       } else {
-        // Le serveur calcule la commission sur `offerPrice` quand une contre-offre est fournie (server/db.ts,
-        // applyForTikisDelivery) : il faut recalculer sur ce même montant ici, sinon le contrôle de
-        // correspondance ajouté côté serveur rejette systématiquement toute candidature avec contre-offre.
-        const confirmedCommission = applicationCommission(delivery, counterOffer?.amount ?? undefined);
+        const confirmedCommission = applicationCommission(delivery);
         if (confirmedCommission === null) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
         const result = await applyMutation.mutateAsync({ deliveryId: delivery.id, confirmedCommission, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
         utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
@@ -409,7 +401,7 @@ export function HomeScreen() {
   const filterCounts = useMemo(() => Object.fromEntries(filterItems.map((item) => [item.key, deliveries.filter((delivery) => matchesFilter(delivery, item.key, isDriver)).length])) as Record<FilterKey, number>, [deliveries, filterItems, isDriver]);
   const filterTranslateY = filterTransition.interpolate({ inputRange: [0, 1], outputRange: [6, 0] });
   const firstNameDisplay = isDriver ? firstName : "à vous";
-  const todaysEarnings = useMemo(() => isDriver ? deliveryMetricsForDay(driverEarningsHistory).earnings : 0, [driverEarningsHistory, isDriver]);
+  const todaysEarnings = useMemo(() => isDriver ? deliveryMetricsForDay(driverJournal).earnings : 0, [driverJournal, isDriver]);
   const availableOpportunities = useMemo(() => {
     if (!isDriver) return 0;
     return deliveries.filter((delivery) => {
@@ -457,13 +449,10 @@ export function HomeScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
       <MapBackground selected={selected} role={role} sheetOverlayHeight={sheetValue.current} driverPosition={role === "driver" ? driverLocation.location : senderLivePosition} />
 
-      <View pointerEvents="auto" style={styles.mapTouchBlocker} />
 
       <Animated.View style={[styles.sheet, { height: sheetHeight }]}>
-        <View style={styles.sheetHeader}>
-          <View {...panResponder.panHandlers} style={styles.sheetDragHandle} accessibilityRole="adjustable" accessibilityLabel="Faire glisser le panneau de livraisons">
-            <View style={styles.sheetGrip} />
-          </View>
+        <View {...panResponder.panHandlers} style={styles.sheetHeader}>
+          <View style={styles.sheetGrip} />
           <View style={styles.sheetTop}>
             <View style={styles.greetingBlock}>
               {isDriver ? (
@@ -523,7 +512,7 @@ export function HomeScreen() {
               }}
               tintColor="#9A6201"
               colors={["#9A6201"]}
-              progressBackgroundColor="#FFFFFF"
+              progressBackgroundColor="#F7EFE5"
             />
           }
         >
@@ -538,21 +527,23 @@ export function HomeScreen() {
             </Pressable>
           ) : null}
 
+          {role === "sender" ? <SenderHomeKpiCards /> : null}
+
           <View style={styles.searchRow}>
             <View style={styles.searchPill}>
-              <MaterialIcons name="search" size={16} color="#667085" />
+              <MaterialIcons name="search" size={16} color="#747474" />
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 placeholder={isDriver ? "Rechercher une opportunité…" : "Rechercher une livraison…"}
-                placeholderTextColor={theme.placeholder}
+                placeholderTextColor="#B48753"
                 style={styles.searchInput}
                 returnKeyType="search"
                 clearButtonMode="while-editing"
               />
               {searchQuery.length > 0 ? (
                 <Pressable onPress={() => setSearchQuery("")} hitSlop={8} accessibilityLabel="Effacer la recherche">
-                  <MaterialIcons name="close" size={16} color="#667085" />
+                  <MaterialIcons name="close" size={16} color="#747474" />
                 </Pressable>
               ) : null}
             </View>
@@ -578,7 +569,7 @@ export function HomeScreen() {
           ) : !selected ? (
             <View style={styles.empty}>
               <View style={styles.emptyIcon}>
-                <MaterialIcons name={isDriver ? "local-shipping" : "add"} size={26} color="#667085" />
+                <MaterialIcons name={isDriver ? "local-shipping" : "add"} size={26} color="#747474" />
               </View>
                 <Text style={styles.emptyTitle}>{filter === "completed" ? isDriver ? "Aucune livraison terminée aujourd’hui" : "Aucune livraison terminée récemment" : isDriver ? "Aucune opportunité disponible" : "Aucune livraison disponible"}</Text>
                 <Text style={styles.emptyText}>
@@ -663,7 +654,6 @@ export function HomeScreen() {
         visible={Boolean(candidateDelivery)}
         candidates={candidatesQuery.data ?? []}
         deliveryStatus={candidateDelivery?.status ?? "open"}
-        deliveryPrice={candidateDelivery ? (candidateDelivery.offeredPrice ?? candidateDelivery.estimatedPrice) : 0}
         loadingId={actioningId}
         onClose={() => setCandidateDelivery(null)}
         onChoose={requestCandidateSelection}
@@ -795,19 +785,18 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
   }, [driverPosition, pickup, selectedDeliveryId, selectedDeliveryStatus]);
 
   return (
-    <View style={styles.mapBg} pointerEvents="none">
+    <View style={styles.mapBg}>
       <MapView
         ref={mapRef}
-        style={[StyleSheet.absoluteFill, styles.mapCanvas]}
-        pointerEvents="none"
+        style={StyleSheet.absoluteFill}
         initialRegion={region}
         showsCompass={false}
         rotateEnabled={false}
         toolbarEnabled={false}
         showsUserLocation={false}
         showsMyLocationButton={false}
-        zoomEnabled={false}
-        scrollEnabled={false}
+        zoomEnabled
+        scrollEnabled
       >
         {selected ? (
           <>
@@ -833,7 +822,7 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
               <View style={styles.pinWrap}>
                 <View style={styles.pinShadow} />
                 <View style={[styles.pinCircle, styles.pinCircleEnd]}>
-                  <MaterialIcons name="location-on" size={14} color="#A43740" />
+                  <MaterialIcons name="location-on" size={14} color="#B4232D" />
                 </View>
                 <View style={[styles.pinTriangle, styles.pinTriangleEnd]} />
               </View>
@@ -929,7 +918,7 @@ function DeliveryRow({
   const driverAction = delivery.status === "completed"
     ? null
     : delivery.ownCandidateStatus === "applied"
-      ? "Se retirer"
+      ? "Renoncer"
       : delivery.ownCandidateStatus === "selected"
         ? "Confirmer"
         : delivery.ownCandidateStatus === "confirmed" || delivery.status === "active"
@@ -941,8 +930,8 @@ function DeliveryRow({
     : null;
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const dateInfo = formatDeliveryCreationDate(delivery.createdAt, now);
-  const dateColor = dateInfo.tone === "primary" ? "#9A6201" : "#667085";
-  const dateBg = dateInfo.tone === "primary" ? "#FFFFFF" : "#F5F5F5";
+  const dateColor = dateInfo.tone === "primary" ? "#9A6201" : "#747474";
+  const dateBg = dateInfo.tone === "primary" ? "#F8F0E5" : "#F0F0F2";
   const totalDistance = formatDistanceKm(delivery.distanceKm);
   const pickupTitle = locationTitle(delivery.pickup);
   const pickupDistrict = delivery.pickup.district || delivery.pickup.city || "Quartier non renseigné";
@@ -1022,12 +1011,10 @@ function DeliveryRow({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F5F5F5" },
 
-  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5", zIndex: 0 },
-  mapCanvas: { zIndex: 0 },
-  mapTouchBlocker: { ...StyleSheet.absoluteFill, zIndex: 1 },
+  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5" },
   nativeMarkerStart: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
   nativeMarkerDriver: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#111111", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
-  nativeMarkerEnd: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#A43740" },
+  nativeMarkerEnd: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#B4232D" },
 
   pinWrap: { alignItems: "center", width: 36, paddingTop: 0 },
   pinShadow: { position: "absolute", bottom: 0, width: 14, height: 4, borderRadius: 7, backgroundColor: "rgba(0,0,0,0.25)" },
@@ -1038,34 +1025,33 @@ const styles = StyleSheet.create({
   pinTriangleStart: { borderTopColor: "#9A6201" },
   pinTriangleEnd: { borderTopColor: "#FFFFFF" },
 
-  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3", zIndex: 10 },
+  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#F7EFE5", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E5D2B9", zIndex: 10 },
   sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
 
-  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden", zIndex: 2, elevation: 2 },
+  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
-  sheetDragHandle: { alignSelf: "stretch", minHeight: 28, alignItems: "center", justifyContent: "center" },
-  sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#E3E3E3", marginBottom: 10 },
+  sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", marginBottom: 10 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
   greetingBlock: { flex: 1, minWidth: 0 },
   driverGainsRow: { flexDirection: "row", alignItems: "baseline", gap: 6, flexWrap: "wrap" },
   driverGainsValue: { color: "#9A6201", fontSize: 14, fontWeight: "700" },
   sheetTitle: { color: "#111111", fontSize: 14, fontWeight: "700", lineHeight: 18 },
-  sheetSubtitle: { color: "#667085", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
+  sheetSubtitle: { color: "#666666", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 
-  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E3E3E3" },
-  servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3" },
+  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#F7EFE5", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E5D2B9" },
+  servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
   servicePillNeutral: { backgroundColor: "#F5F5F5" },
   serviceText: { color: "#9A6201", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   serviceTextOffline: { color: "#111111" },
   onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9A6201" },
-  onlineDotOffline: { backgroundColor: "#667085" },
+  onlineDotOffline: { backgroundColor: "#747474" },
 
   searchRow: { paddingTop: 10, paddingBottom: 6 },
-  kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: "#FFFFFF", borderRadius: 10, borderWidth: 1, borderColor: "#E3E3E3" },
+  kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: "#F7EFE5", borderRadius: 10, borderWidth: 1, borderColor: "#E5D2B9" },
   kycBannerCopy: { flex: 1 },
   kycBannerTitle: { color: "#9A6201", fontSize: 12, fontWeight: "700" },
-  kycBannerText: { color: "#9A6201", fontSize: 11, marginTop: 2, lineHeight: 16 },
-  searchPill: { height: 40, backgroundColor: "#FFFFFF", borderRadius: 11, borderWidth: 1, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
+  kycBannerText: { color: "#6B4A1B", fontSize: 11, marginTop: 2, lineHeight: 16 },
+  searchPill: { height: 40, backgroundColor: "#F7EFE5", borderRadius: 11, borderWidth: 1, borderColor: "#E5D2B9", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: "#9A6201", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
 
   walletCard: { marginHorizontal: 14, marginTop: 6, marginBottom: 8, backgroundColor: "#111111", borderRadius: 12, padding: 14 },
@@ -1082,13 +1068,13 @@ const styles = StyleSheet.create({
 
   filterRow: { flexDirection: "row", gap: 6, paddingBottom: 10, alignItems: "center" },
   filterScroll: { flexGrow: 0 },
-  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", gap: 6 },
-  chipActive: { backgroundColor: "#FFFFFF", borderColor: "#9A6201" },
+  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", flexDirection: "row", alignItems: "center", gap: 6 },
+  chipActive: { backgroundColor: "#F7EFE5", borderColor: "#9A6201" },
   chipText: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
   chipTextActive: { color: "#9A6201" },
   chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
   chipCountActive: { backgroundColor: "#9A6201" },
-  chipCountText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700", lineHeight: 12 },
+  chipCountText: { color: "#F7EFE5", fontSize: 10, fontWeight: "700", lineHeight: 12 },
   tabContent: { minHeight: 1 },
 
   scrollArea: { flex: 1, marginTop: 2 },
@@ -1114,15 +1100,15 @@ const styles = StyleSheet.create({
   urgentBtnWhiteText: { color: "#9A6201", fontSize: 12, fontWeight: "700" },
 
   listSection: { marginTop: 4, gap: 8 },
-  row: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 11, borderWidth: 1, borderColor: "#E3E3E3" },
-  rowSelected: { borderColor: "#9A6201", backgroundColor: "#FFFFFF", borderWidth: 1.5 },
+  row: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 11, borderWidth: 1, borderColor: "#ECECEC" },
+  rowSelected: { borderColor: "#9A6201", backgroundColor: "#FAF6F0", borderWidth: 1.5 },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 9 },
   rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
   rowThumbDriver: { backgroundColor: "#9A6201" },
   rowMain: { flex: 1, minWidth: 0 },
   rowTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
   rowTitle: { color: "#111111", fontSize: 12.5, fontWeight: "600" },
-  rowSub: { color: "#667085", fontSize: 10.5, marginTop: 1 },
+  rowSub: { color: "#666666", fontSize: 10.5, marginTop: 1 },
   rowPrice: { color: "#111111", fontSize: 14, fontWeight: "700", textAlign: "right" },
   rowDetails: { flex: 1, color: "#111111", fontSize: 11.5, lineHeight: 16, paddingRight: 8 },
   rowDriverDistance: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 3, paddingTop: 1, position: "relative" },
@@ -1140,20 +1126,20 @@ const styles = StyleSheet.create({
   datePillText: { fontSize: 10.5, fontWeight: "700" },
   rowBottom: { flexDirection: "row", alignItems: "center", marginTop: 8, gap: 10 },
   rowStat: { flexDirection: "row", alignItems: "center", gap: 4 },
-  rowStatText: { color: "#667085", fontSize: 10.5, fontWeight: "500" },
+  rowStatText: { color: "#666666", fontSize: 10.5, fontWeight: "500" },
   rowActions: { marginLeft: "auto", flexDirection: "row", gap: 6 },
-  rowBtnOutline: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3" },
+  rowBtnOutline: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
   rowBtnOutlineText: { color: "#111111", fontSize: 10.5, fontWeight: "600" },
-  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", minWidth: 64, alignItems: "center", flexDirection: "row", gap: 4, justifyContent: "center" },
+  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", minWidth: 64, alignItems: "center", flexDirection: "row", gap: 4, justifyContent: "center" },
   rowBtnFilledText: { color: "#9A6201", fontSize: 10.5, fontWeight: "700" },
 
   loadingState: { alignItems: "center", paddingVertical: 32, gap: 8 },
-  loadingText: { color: "#667085", fontSize: 12 },
+  loadingText: { color: "#666666", fontSize: 12 },
   empty: { alignItems: "center", paddingHorizontal: 24, paddingVertical: 24 },
   emptyIcon: { width: 60, height: 60, borderRadius: 14, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center", marginBottom: 12 },
   emptyTitle: { color: "#111111", fontSize: 14, fontWeight: "600", marginBottom: 4 },
-  emptyText: { color: "#667085", fontSize: 12, textAlign: "center", lineHeight: 18 },
+  emptyText: { color: "#666666", fontSize: 12, textAlign: "center", lineHeight: 18 },
 
   pressed: { opacity: 0.7 },
-  scrollTopButton: { position: "absolute", right: 16, bottom: 24, width: 38, height: 38, borderRadius: 10, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", alignItems: "center", justifyContent: "center" },
+  scrollTopButton: { position: "absolute", right: 16, bottom: 24, width: 38, height: 38, borderRadius: 10, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE", alignItems: "center", justifyContent: "center" },
 });

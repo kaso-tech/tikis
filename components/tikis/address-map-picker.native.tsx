@@ -12,26 +12,10 @@ import type { LocationLabel } from "@/shared/tikis-domain";
 
 type Coordinate = { latitude: number; longitude: number };
 const FALLBACK_REGION = { latitude: 12.3714, longitude: -1.5197, latitudeDelta: 0.09, longitudeDelta: 0.09 };
-// En dessous de ce seuil, un nouveau glissement de carte ne redéclenche pas de géocodage inverse : la
-// précision GPS/écran est de toute façon bien supérieure à 15 m, donc deux relâchements proches du même
-// point n'apportent aucune information nouvelle — juste un appel Mapbox/OSM et une écriture DB en plus.
-const MIN_REVERSE_DISTANCE_METERS = 15;
-
-function distanceMeters(a: Coordinate, b: Coordinate): number {
-  const toRad = (deg: number) => (deg * Math.PI) / 180;
-  const earthRadiusMeters = 6_371_000;
-  const dLat = toRad(b.latitude - a.latitude);
-  const dLng = toRad(b.longitude - a.longitude);
-  const lat1 = toRad(a.latitude);
-  const lat2 = toRad(b.latitude);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
-  return 2 * earthRadiusMeters * Math.asin(Math.sqrt(h));
-}
 
 export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, onUse, onFavorite }: { visible: boolean; targetTitle: string; initialPlace: LocationLabel | null; countryCode?: string; onClose: () => void; onUse: (place: LocationLabel) => void; onFavorite: (place: LocationLabel, label: string) => Promise<void> }) {
   const mapRef = useRef<MapView>(null);
   const reverseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastResolvedRef = useRef<Coordinate | null>(null);
   const initializedForOpening = useRef(false);
   const [place, setPlace] = useState<LocationLabel | null>(initialPlace);
   const [isMoving, setIsMoving] = useState(false);
@@ -45,16 +29,9 @@ export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, 
     try {
       setMessage("Identification de l’adresse…");
       const result = await reverse.mutateAsync(coordinate);
-      // Marqué "résolu" seulement en cas de succès : si on l'enregistrait avant l'appel, un échec réseau
-      // laissait `lastResolvedRef` bloqué sur ce point pour le reste de la session de la modale — un
-      // nudge du marqueur à moins de 15 m ne redéclenchait alors plus jamais de nouvelle tentative.
-      lastResolvedRef.current = coordinate;
       setPlace(result ? { ...result, latitude: coordinate.latitude, longitude: coordinate.longitude, source: "reverse", precision: "exact" } : null);
       setMessage(result ? "" : "Adresse introuvable. Ajustez légèrement le marqueur.");
-    } catch (cause) {
-      lastResolvedRef.current = null;
-      setMessage(cause instanceof Error ? cause.message : "Le géocodage inverse est momentanément indisponible.");
-    }
+    } catch (cause) { setMessage(cause instanceof Error ? cause.message : "Le géocodage inverse est momentanément indisponible."); }
   }, [reverse]);
 
   const moveToPosition = useCallback(async () => {
@@ -85,7 +62,6 @@ export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, 
   function handleRegionChangeComplete(region: Coordinate) {
     setIsMoving(false);
     if (reverseTimer.current) clearTimeout(reverseTimer.current);
-    if (lastResolvedRef.current && distanceMeters(lastResolvedRef.current, region) < MIN_REVERSE_DISTANCE_METERS) return;
     reverseTimer.current = setTimeout(() => { void resolveCenter({ latitude: region.latitude, longitude: region.longitude }); }, 240);
   }
   async function saveFavorite(label: string) { if (!place || saving) return; setSaving(true); try { await onFavorite(place, label); setMessage("Adresse enregistrée dans Mes adresses."); } finally { setSaving(false); } }
@@ -106,11 +82,11 @@ export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, 
 }
 
 const baseStyles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F5F5F5" }, map: { ...StyleSheet.absoluteFill },
+  screen: { flex: 1, backgroundColor: "#F5F5F5" }, map: { ...StyleSheet.absoluteFillObject },
   centerMarker: { position: "absolute", top: "48%", alignSelf: "center", alignItems: "center", width: 40, height: 52, marginTop: -52 },
   markerShadow: { position: "absolute", bottom: -2, width: 18, height: 5, borderRadius: 9, backgroundColor: "rgba(0,0,0,0.30)" },
-  markerCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 2.5, borderColor: "#FFFFFF", shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
-  markerTriangle: { width: 0, height: 0, borderLeftWidth: 7, borderRightWidth: 7, borderTopWidth: 9, borderLeftColor: "transparent", borderRightColor: "transparent", borderTopColor: "#9A6201", marginTop: -2 }, controls: { flex: 1, paddingTop: 12 }, instruction: { alignSelf: "center", color: "#111111", fontSize: 14, fontWeight: "600", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.92)", overflow: "hidden" }, floatingControls: { position: "absolute", left: 14, right: 14, bottom: 160, flexDirection: "row", justifyContent: "space-between" }, roundButton: { width: 48, height: 48, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowOpacity: 0, shadowRadius: 0, elevation: 0 }, bottomSheet: { marginTop: "auto", backgroundColor: "#FFFFFF", borderTopLeftRadius: 12, borderTopRightRadius: 12, padding: 14, paddingTop: 8, shadowOpacity: 0, shadowRadius: 0, elevation: 0 }, sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: "#CFCFCF", alignSelf: "center", marginBottom: 10 }, sheetEyebrow: { color: "#9A6201", fontSize: 10, letterSpacing: 0.7, fontWeight: "600" }, placeTitle: { color: "#111111", fontSize: 16, fontWeight: "600", marginTop: 4 }, placeMeta: { color: "#667085", fontSize: 12, lineHeight: 16, marginTop: 2 }, placePlaceholder: { color: "#667085", fontSize: 13, marginTop: 6 }, resolving: { minHeight: 40, flexDirection: "row", alignItems: "center", gap: 8 }, resolvingText: { color: "#667085", fontSize: 12, fontWeight: "500" }, message: { color: "#9A6201", fontSize: 11, lineHeight: 16, marginTop: 6 }, sheetActions: { flexDirection: "row", gap: 7, marginTop: 12 }, useButton: { flex: 1, minHeight: 44, borderRadius: 8 }, favoriteButton: { width: 48, minHeight: 44, borderRadius: 8, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" }, pressed: { opacity: 0.65 },
+  markerCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 2.5, borderColor: "#FFFFFF" },
+  markerTriangle: { width: 0, height: 0, borderLeftWidth: 7, borderRightWidth: 7, borderTopWidth: 9, borderLeftColor: "transparent", borderRightColor: "transparent", borderTopColor: "#9A6201", marginTop: -2 }, controls: { flex: 1, paddingTop: 12 }, instruction: { alignSelf: "center", color: "#111111", fontSize: 14, fontWeight: "600", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.92)", overflow: "hidden" }, floatingControls: { position: "absolute", left: 14, right: 14, bottom: 160, flexDirection: "row", justifyContent: "space-between" }, roundButton: { width: 48, height: 48, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" }, bottomSheet: { marginTop: "auto", backgroundColor: "#FFFFFF", borderTopLeftRadius: 12, borderTopRightRadius: 12, padding: 14, paddingTop: 8 }, sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: "#CFCFCF", alignSelf: "center", marginBottom: 10 }, sheetEyebrow: { color: "#9A6201", fontSize: 10, letterSpacing: 0.7, fontWeight: "600" }, placeTitle: { color: "#111111", fontSize: 16, fontWeight: "600", marginTop: 4 }, placeMeta: { color: "#666666", fontSize: 12, lineHeight: 16, marginTop: 2 }, placePlaceholder: { color: "#666666", fontSize: 13, marginTop: 6 }, resolving: { minHeight: 40, flexDirection: "row", alignItems: "center", gap: 8 }, resolvingText: { color: "#666666", fontSize: 12, fontWeight: "500" }, message: { color: "#9A6201", fontSize: 11, lineHeight: 16, marginTop: 6 }, sheetActions: { flexDirection: "row", gap: 7, marginTop: 12 }, useButton: { flex: 1, minHeight: 44, borderRadius: 8 }, favoriteButton: { width: 48, minHeight: 44, borderRadius: 8, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" }, pressed: { opacity: 0.65 },
 });
 
 const styles = baseStyles;

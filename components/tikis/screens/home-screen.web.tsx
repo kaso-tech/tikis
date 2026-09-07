@@ -7,7 +7,6 @@ import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { formatListRouteParts } from "@/lib/geo-rules";
 import { useDriverLocation } from "@/hooks/use-driver-location";
-import { useDriverBasePositionSync } from "@/hooks/use-driver-base-position-sync";
 import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
@@ -30,14 +29,14 @@ const TYPE_ICON: Record<Delivery["type"], React.ComponentProps<typeof MaterialIc
 };
 
 const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: string }> = {
-  draft: { label: "BROUILLON", color: "#667085", bg: "#E3E3E3" },
-  open: { label: "PUBLIÉE", color: "#9A6201", bg: "#E3E3E3" },
-  pending_confirmation: { label: "ATTRIBUÉE", color: "#9A6201", bg: "#E3E3E3" },
-  active: { label: "EN TRANSIT", color: "#176C52", bg: "#E3E3E3" },
-  completed: { label: "TERMINÉE", color: "#176C52", bg: "#176C52" },
-  disabled: { label: "DÉSACTIVÉE", color: "#A43740", bg: "#FFFFFF" },
-  cancelled: { label: "ANNULÉE", color: "#A43740", bg: "#FFFFFF" },
-  expired: { label: "EXPIRÉE", color: "#667085", bg: "#E3E3E3" },
+  draft: { label: "BROUILLON", color: "#7A6E61", bg: "#EEE8E0" },
+  open: { label: "PUBLIÉE", color: "#9A6201", bg: "#F8E8CE" },
+  pending_confirmation: { label: "ATTRIBUÉE", color: "#7A5600", bg: "#F4E9D2" },
+  active: { label: "EN TRANSIT", color: "#176C52", bg: "#DDEFE7" },
+  completed: { label: "TERMINÉE", color: "#4F6A5A", bg: "#E6EFE9" },
+  disabled: { label: "DÉSACTIVÉE", color: "#A43740", bg: "#F7E6E7" },
+  cancelled: { label: "ANNULÉE", color: "#A43740", bg: "#F7E6E7" },
+  expired: { label: "EXPIRÉE", color: "#6B6257", bg: "#EEE8E0" },
 };
 
 type FilterKey = "active" | "open" | "pending" | "completed";
@@ -114,10 +113,7 @@ export function HomeScreen() {
 
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 5_000, refetchOnMount: "always", refetchOnWindowFocus: true });
   const driverWallet = walletQuery.data?.wallet;
-  // Gains de courses = informatifs, calculés depuis les livraisons terminées (jamais depuis le Wallet, qui n'est
-  // jamais crédité par une livraison : le paiement se fait directement entre l'expéditeur et le livreur).
-  const driverEarningsHistoryQuery = trpc.wallet.driverEarningsHistory.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 5_000 });
-  const driverEarningsHistory = driverEarningsHistoryQuery.data ?? [];
+  const driverJournal = walletQuery.data?.journal ?? [];
 
   const [filter, setFilter] = useState<FilterKey>("open");
   const [searchQuery, setSearchQuery] = useState("");
@@ -154,8 +150,6 @@ export function HomeScreen() {
     completed: new Animated.Value(1),
   }).current;
   const driverLocation = useDriverLocation({ enabled: role === "driver" });
-  // Tient à jour le centre des rayons « alertes » et « affichage » du livreur (cf. app/driver-alerts.tsx).
-  useDriverBasePositionSync(driverLocation.location, role === "driver");
 
   const filteredList = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -254,10 +248,10 @@ export function HomeScreen() {
     { enabled: Boolean(candidateDelivery?.id) },
   );
 
-  const applicationCommission = (delivery: Delivery, priceOverride?: number) => {
+  const applicationCommission = (delivery: Delivery) => {
     const rate = walletQuery.data?.commissionRate;
     if (!Number.isFinite(rate) || !rate || rate <= 0 || rate >= 1) return null;
-    return commissionFor(priceOverride ?? (delivery.offeredPrice ?? delivery.estimatedPrice), { rate, currency: "FCFA" });
+    return commissionFor(delivery.offeredPrice ?? delivery.estimatedPrice, { rate, currency: "FCFA" });
   };
 
   function requestApply(delivery: Delivery) {
@@ -304,10 +298,7 @@ export function HomeScreen() {
   async function handleApply(delivery: Delivery, counterOffer?: { amount: number | null }) {
     setApplyingId(delivery.id);
     try {
-      // Le serveur calcule la commission sur `offerPrice` quand une contre-offre est fournie (server/db.ts,
-      // applyForTikisDelivery) : il faut recalculer sur ce même montant ici, sinon le contrôle de
-      // correspondance ajouté côté serveur rejette systématiquement toute candidature avec contre-offre.
-      const confirmedCommission = applicationCommission(delivery, counterOffer?.amount ?? undefined);
+      const confirmedCommission = applicationCommission(delivery);
       if (confirmedCommission === null) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
       const result = await applyMutation.mutateAsync({ deliveryId: delivery.id, confirmedCommission, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
       utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
@@ -396,7 +387,7 @@ export function HomeScreen() {
   const filterCounts = useMemo(() => Object.fromEntries(filterItems.map((item) => [item.key, deliveries.filter((delivery) => matchesFilter(delivery, item.key, isDriver)).length])) as Record<FilterKey, number>, [deliveries, filterItems, isDriver]);
   const filterTranslateY = filterTransition.interpolate({ inputRange: [0, 1], outputRange: [6, 0] });
   const firstNameDisplay = isDriver ? firstName : "à vous";
-  const todaysEarnings = useMemo(() => isDriver ? deliveryMetricsForDay(driverEarningsHistory).earnings : 0, [driverEarningsHistory, isDriver]);
+  const todaysEarnings = useMemo(() => isDriver ? deliveryMetricsForDay(driverJournal).earnings : 0, [driverJournal, isDriver]);
   const availableOpportunities = useMemo(() => {
     if (!isDriver) return 0;
     return deliveries.filter((delivery) => {
@@ -503,7 +494,7 @@ export function HomeScreen() {
               }}
               tintColor="#9A6201"
               colors={["#9A6201"]}
-              progressBackgroundColor="#FFFFFF"
+              progressBackgroundColor="#F7EFE5"
             />
           }
         >
@@ -520,19 +511,19 @@ export function HomeScreen() {
 
           <View style={styles.searchRow}>
             <View style={styles.searchPill}>
-              <MaterialIcons name="search" size={16} color="#667085" />
+              <MaterialIcons name="search" size={16} color="#747474" />
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 placeholder={isDriver ? "Rechercher une opportunité…" : "Rechercher une livraison…"}
-                placeholderTextColor={theme.placeholder}
+                placeholderTextColor="#B48753"
                 style={styles.searchInput}
                 returnKeyType="search"
                 clearButtonMode="while-editing"
               />
               {searchQuery.length > 0 ? (
                 <Pressable onPress={() => setSearchQuery("")} hitSlop={8} accessibilityLabel="Effacer la recherche">
-                  <MaterialIcons name="close" size={16} color="#667085" />
+                  <MaterialIcons name="close" size={16} color="#747474" />
                 </Pressable>
               ) : null}
             </View>
@@ -558,7 +549,7 @@ export function HomeScreen() {
           ) : !selected ? (
             <View style={styles.empty}>
               <View style={styles.emptyIcon}>
-                <MaterialIcons name={isDriver ? "local-shipping" : "add"} size={26} color="#667085" />
+                <MaterialIcons name={isDriver ? "local-shipping" : "add"} size={26} color="#747474" />
               </View>
               <Text style={styles.emptyTitle}>{filter === "completed" ? isDriver ? "Aucune livraison terminée aujourd’hui" : "Aucune livraison terminée récemment" : isDriver ? "Aucune opportunité disponible" : "Aucune livraison disponible"}</Text>
               <Text style={styles.emptyText}>
@@ -624,7 +615,6 @@ export function HomeScreen() {
         visible={Boolean(candidateDelivery)}
         candidates={candidatesQuery.data ?? []}
         deliveryStatus={candidateDelivery?.status ?? "open"}
-        deliveryPrice={candidateDelivery ? (candidateDelivery.offeredPrice ?? candidateDelivery.estimatedPrice) : 0}
         loadingId={applyingId}
         onClose={() => setCandidateDelivery(null)}
         onChoose={requestCandidateSelection}
@@ -646,7 +636,7 @@ export function HomeScreen() {
         <ActionConfirmationModal visible title="Annuler cette livraison ?" description="La livraison sera retirée et ne recevra plus de candidatures." confirmLabel="Annuler la livraison" icon="cancel" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void cancelSenderDelivery(pendingAction.delivery)} />
       ) : null}
       {pendingAction?.kind === "withdraw" ? (
-        <ActionConfirmationModal visible title="Se retirer de cette candidature ?" description="Votre candidature sera retirée et la commission réservée redeviendra immédiatement disponible." confirmLabel="Se retirer" icon="undo" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
+        <ActionConfirmationModal visible title="Renoncer à cette candidature ?" description="Votre candidature sera retirée et la commission réservée redeviendra immédiatement disponible." confirmLabel="Renoncer" icon="undo" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
       ) : null}
       {pendingAction?.kind === "confirm" ? (
         <ActionConfirmationModal visible title="Confirmer cette mission ?" description="La commission réservée sera prélevée et la livraison passera en cours." confirmLabel="Confirmer" icon="check-circle" tone="success" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
@@ -725,7 +715,7 @@ function MapBackground({ selected, role, driverPosition }: { selected: Delivery 
   }, [driverPosition, dropoff, pickup, selected?.status]);
 
   return (
-    <View style={styles.mapBg} pointerEvents="none">
+    <View style={styles.mapBg}>
       <View style={[styles.mapBlock, { top: "10%", left: "8%", width: 90, height: 60 }]} />
       <View style={[styles.mapBlock, { top: "16%", right: "12%", width: 70, height: 80 }]} />
       <View style={[styles.mapBlock, { bottom: "20%", left: "6%", width: 100, height: 50 }]} />
@@ -772,7 +762,7 @@ function MapBackground({ selected, role, driverPosition }: { selected: Delivery 
         </View>
       ) : null}
       <View style={[styles.marker, styles.markerEnd]}>
-        <MaterialIcons name="location-on" size={16} color="#A43740" />
+        <MaterialIcons name="location-on" size={16} color="#B4232D" />
       </View>
     </View>
   );
@@ -858,7 +848,7 @@ function DeliveryRow({
   const driverAction = delivery.status === "completed"
     ? null
     : delivery.ownCandidateStatus === "applied"
-      ? "Se retirer"
+      ? "Renoncer"
       : delivery.ownCandidateStatus === "selected"
         ? "Confirmer"
         : delivery.ownCandidateStatus === "confirmed" || delivery.status === "active"
@@ -867,8 +857,8 @@ function DeliveryRow({
   const vehicleLabel = (delivery.vehicleTypes ?? []).join(" · ") || "Moto";
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const dateInfo = formatDeliveryCreationDate(delivery.createdAt, now);
-  const dateColor = dateInfo.tone === "primary" ? "#9A6201" : "#667085";
-  const dateBg = dateInfo.tone === "primary" ? "#FFFFFF" : "#F5F5F5";
+  const dateColor = dateInfo.tone === "primary" ? "#9A6201" : "#747474";
+  const dateBg = dateInfo.tone === "primary" ? "#F8F0E5" : "#F0F0F2";
   const totalDistance = formatDistanceKm(delivery.distanceKm);
   const driverDistText = driverDistance
     ? `${driverDistance.value} ${driverDistance.unit}`
@@ -901,12 +891,12 @@ function DeliveryRow({
       </View>
       <View style={styles.rowBottom}>
         <View style={styles.rowStat}>
-          <MaterialIcons name="route" size={12} color="#667085" />
+          <MaterialIcons name="route" size={12} color="#666666" />
           <Text style={styles.rowStatText}>{totalDistance.value} {totalDistance.unit}</Text>
         </View>
         {!isDriver ? (
           <View style={styles.rowStat}>
-            <MaterialIcons name="group" size={12} color="#667085" />
+            <MaterialIcons name="group" size={12} color="#666666" />
             <Text style={styles.rowStatText}>{delivery.candidateCount ?? 0} candidat{(delivery.candidateCount ?? 0) > 1 ? "s" : ""}</Text>
           </View>
         ) : null}
@@ -948,35 +938,35 @@ const styles = StyleSheet.create({
   marker: { position: "absolute", width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
   markerStart: { top: "32%", left: "16%", backgroundColor: "#9A6201" },
   markerDriver: { top: "50%", left: "42%", backgroundColor: "#111111" },
-  markerEnd: { top: "64%", right: "18%", backgroundColor: "#FFFFFF", borderColor: "#A43740" },
+  markerEnd: { top: "64%", right: "18%", backgroundColor: "#FFFFFF", borderColor: "#B4232D" },
 
-  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3", zIndex: 10 },
+  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#F7EFE5", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E5D2B9", zIndex: 10 },
   sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
 
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
-  sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#E3E3E3", marginBottom: 10 },
+  sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", marginBottom: 10 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
   greetingBlock: { flex: 1, minWidth: 0 },
   driverGainsRow: { flexDirection: "row", alignItems: "baseline", gap: 6, flexWrap: "wrap" },
   driverGainsValue: { color: "#9A6201", fontSize: 14, fontWeight: "700" },
   sheetTitle: { color: "#111111", fontSize: 14, fontWeight: "700", lineHeight: 18 },
-  sheetSubtitle: { color: "#667085", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
+  sheetSubtitle: { color: "#666666", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 
-  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E3E3E3" },
-  servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", shadowOpacity: 0, elevation: 0 },
-  servicePillNeutral: { backgroundColor: "#F5F5F5", shadowOpacity: 0, elevation: 0 },
+  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#F7EFE5", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E5D2B9" },
+  servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
+  servicePillNeutral: { backgroundColor: "#F5F5F5" },
   serviceText: { color: "#9A6201", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   serviceTextOffline: { color: "#111111" },
   onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9A6201" },
-  onlineDotOffline: { backgroundColor: "#667085" },
+  onlineDotOffline: { backgroundColor: "#747474" },
 
   searchRow: { paddingTop: 10, paddingBottom: 6 },
-  kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: "#FFFFFF", borderRadius: 10, borderWidth: 1, borderColor: "#E3E3E3" },
+  kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: "#F7EFE5", borderRadius: 10, borderWidth: 1, borderColor: "#E5D2B9" },
   kycBannerCopy: { flex: 1 },
   kycBannerTitle: { color: "#9A6201", fontSize: 12, fontWeight: "700" },
-  kycBannerText: { color: "#9A6201", fontSize: 11, marginTop: 2, lineHeight: 16 },
-  searchPill: { height: 40, backgroundColor: "#FFFFFF", borderRadius: 11, borderWidth: 1, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
+  kycBannerText: { color: "#6B4A1B", fontSize: 11, marginTop: 2, lineHeight: 16 },
+  searchPill: { height: 40, backgroundColor: "#F7EFE5", borderRadius: 11, borderWidth: 1, borderColor: "#E5D2B9", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: "#9A6201", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
 
   walletCard: { marginHorizontal: 14, marginTop: 6, marginBottom: 8, backgroundColor: "#111111", borderRadius: 12, padding: 14 },
@@ -993,13 +983,13 @@ const styles = StyleSheet.create({
 
   filterRow: { flexDirection: "row", gap: 6, paddingBottom: 10, alignItems: "center" },
   filterScroll: { flexGrow: 0 },
-  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", gap: 6 },
-  chipActive: { backgroundColor: "#FFFFFF", borderColor: "#9A6201" },
+  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", flexDirection: "row", alignItems: "center", gap: 6 },
+  chipActive: { backgroundColor: "#F7EFE5", borderColor: "#9A6201" },
   chipText: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
   chipTextActive: { color: "#9A6201" },
   chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
   chipCountActive: { backgroundColor: "#9A6201" },
-  chipCountText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700", lineHeight: 12 },
+  chipCountText: { color: "#F7EFE5", fontSize: 10, fontWeight: "700", lineHeight: 12 },
   tabContent: { minHeight: 1 },
 
   scrollArea: { flex: 1, marginTop: 2 },
@@ -1037,26 +1027,26 @@ const styles = StyleSheet.create({
   rowDriverDistanceText: { color: "#9A6201", fontSize: 12.5, fontWeight: "600" },
   rowStatusChip: { marginLeft: "auto", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
   rowStatusText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.35 },
-  rowSub: { color: "#667085", fontSize: 10.5, marginTop: 1 },
+  rowSub: { color: "#666666", fontSize: 10.5, marginTop: 1 },
   rowPrice: { color: "#111111", fontSize: 14, fontWeight: "700" },
   rowDateRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
   datePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   datePillText: { fontSize: 10.5, fontWeight: "700" },
   rowBottom: { flexDirection: "row", alignItems: "center", marginTop: 8, gap: 10 },
   rowStat: { flexDirection: "row", alignItems: "center", gap: 4 },
-  rowStatText: { color: "#667085", fontSize: 10.5, fontWeight: "500" },
+  rowStatText: { color: "#666666", fontSize: 10.5, fontWeight: "500" },
   rowActions: { marginLeft: "auto", flexDirection: "row", gap: 6 },
-  rowBtnOutline: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3" },
+  rowBtnOutline: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
   rowBtnOutlineText: { color: "#111111", fontSize: 10.5, fontWeight: "600" },
-  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", minWidth: 64, alignItems: "center", flexDirection: "row", gap: 4, justifyContent: "center" },
+  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", minWidth: 64, alignItems: "center", flexDirection: "row", gap: 4, justifyContent: "center" },
   rowBtnFilledText: { color: "#9A6201", fontSize: 10.5, fontWeight: "700" },
 
   loadingState: { alignItems: "center", paddingVertical: 32, gap: 8 },
-  loadingText: { color: "#667085", fontSize: 12 },
+  loadingText: { color: "#666666", fontSize: 12 },
   empty: { alignItems: "center", paddingHorizontal: 24, paddingVertical: 24 },
   emptyIcon: { width: 60, height: 60, borderRadius: 14, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center", marginBottom: 12 },
   emptyTitle: { color: "#111111", fontSize: 14, fontWeight: "600", marginBottom: 4 },
-  emptyText: { color: "#667085", fontSize: 12, textAlign: "center", lineHeight: 18 },
+  emptyText: { color: "#666666", fontSize: 12, textAlign: "center", lineHeight: 18 },
 
   pressed: { opacity: 0.7 },
 });

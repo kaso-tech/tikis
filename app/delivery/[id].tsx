@@ -7,7 +7,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
+import { LiveTrackingView } from "@/components/tikis/live-tracking";
 import { SectionHeading, TikisButton } from "@/components/tikis/ui";
+import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { haptic } from "@/lib/haptics";
 import { deliveryRemainingMs, formatDeliveryCountdown } from "@/lib/delivery-countdown";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
@@ -16,7 +18,7 @@ import { trpc } from "@/lib/trpc";
 import { deliveryStatusMeta, formatMoney, formatRelativeDate, type DriverCandidate } from "@/shared/tikis-domain";
 
 type FinancialAction = "apply" | "withdraw" | "select" | "confirm" | "complete" | null;
-type SenderAction = "disable" | "reactivate" | "cancel" | "unselect" | null;
+type SenderAction = "disable" | "reactivate" | "cancel" | null;
 
 function DetailRow({ icon, label, value }: { icon: ComponentProps<typeof MaterialIcons>["name"]; label: string; value: string }) {
   return (
@@ -82,7 +84,6 @@ export default function DeliveryDetailScreen() {
   const disableMutation = trpc.deliveries.disable.useMutation();
   const reactivateMutation = trpc.deliveries.reactivate.useMutation();
   const cancelMutation = trpc.deliveries.cancel.useMutation();
-  const unselectMutation = trpc.deliveries.unselectCandidate.useMutation();
   const reviewQuery = trpc.analytics.getForDelivery.useQuery({ deliveryId: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
   const driverReviewsQuery = trpc.reviews.list.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone) });
   const receivedReviewsCount = (driverReviewsQuery.data ?? []).length;
@@ -123,7 +124,7 @@ export default function DeliveryDetailScreen() {
     const commission = selectedCandidate?.commissionBlocked ?? Math.round(commissionBase * (walletQuery.data?.commissionRate ?? 0));
     if (action === "apply") return { title: "Envoyer votre candidature", description: "Cette commission sera temporairement bloquée sur votre Wallet. Elle sera définitivement prélevée uniquement si l’expéditeur vous sélectionne.", amount: commission, label: "Confirmer ma candidature", irreversible: false };
     if (action === "withdraw") return { title: "Retirer votre candidature", description: "Votre candidature sera retirée et la commission temporairement bloquée redeviendra immédiatement disponible.", amount: ownCandidate?.commissionBlocked ?? commission, label: "Retirer ma candidature", irreversible: false };
-    if (action === "select") return { title: delivery.status === "active" ? "Remplacer le livreur" : "Choisir ce livreur", description: delivery.status === "active" ? "Le nouveau livreur devra confirmer sa disponibilité. Sa commission compensera automatiquement celle de l’ancien livreur : Tikis conservera une seule commission." : "La commission de ce livreur reste réservée jusqu’à ce qu’il confirme sa disponibilité : c’est à ce moment-là qu’elle sera définitivement prélevée et que vos coordonnées deviendront visibles l’un pour l’autre. Les autres commissions bloquées sont libérées immédiatement. Vous pourrez annuler ce choix sans frais tant qu’il n’a pas confirmé.", amount: commission, label: delivery.status === "active" ? "Demander le remplacement" : "Choisir ce livreur", irreversible: delivery.status === "active" };
+    if (action === "select") return { title: delivery.status === "active" ? "Remplacer le livreur" : "Choisir ce livreur", description: delivery.status === "active" ? "Le nouveau livreur devra confirmer sa disponibilité. Sa commission compensera automatiquement celle de l’ancien livreur : Tikis conservera une seule commission." : "Le choix rend la mise en relation effective. La commission bloquée du livreur sera définitivement prélevée et les autres commissions seront libérées.", amount: commission, label: delivery.status === "active" ? "Demander le remplacement" : "Choisir ce livreur", irreversible: true };
     if (action === "confirm") return { title: "Confirmer la mission", description: "Votre confirmation autorise le partage des coordonnées avec l’expéditeur et finalise la mise en relation Tikis.", amount: ownCandidate?.commissionBlocked ?? commission, label: "Confirmer la mission", irreversible: true };
     if (action === "complete") return { title: "Terminer la livraison", description: "Confirmez uniquement lorsque la remise et le paiement direct avec l’expéditeur sont finalisés.", amount: 0, label: "Marquer comme terminée", irreversible: false };
     return null;
@@ -133,9 +134,16 @@ export default function DeliveryDetailScreen() {
     if (senderAction === "disable") return { title: "Désactiver la livraison", description: "Elle ne sera plus visible pour de nouveaux livreurs. Les candidatures en cours seront annulées et les commissions temporairement bloquées seront libérées.", confirmLabel: "Désactiver", tone: "warning" as const };
     if (senderAction === "reactivate") return { title: "Activer la livraison", description: "La livraison redeviendra visible pour les livreurs compatibles. Les anciennes candidatures restent annulées afin de leur permettre de se proposer avec les informations actuelles.", confirmLabel: "Activer", tone: "success" as const };
     if (senderAction === "cancel") return { title: "Annuler la livraison", description: "Cette action est réservée aux courses qui n’ont pas encore démarré. La livraison sera conservée dans votre historique avec son statut d’annulation.", confirmLabel: "Annuler la livraison", tone: "danger" as const };
-    if (senderAction === "unselect") return { title: "Annuler le choix du livreur", description: "Ce livreur n’a pas encore confirmé sa disponibilité : votre choix sera annulé sans aucun frais, sa commission bloquée sera intégralement libérée, et la livraison redeviendra ouverte aux candidatures. Le livreur reste candidat et pourra être choisi à nouveau.", confirmLabel: "Annuler le choix", tone: "warning" as const };
     return null;
   }, [senderAction]);
+
+  // Doit rester AVANT les `return` conditionnels ci-dessous : un hook ne peut jamais être appelé
+  // après un retour anticipé, sous peine de "Rendered more hooks than during the previous render".
+  const isLiveTracking = delivery?.status === "pending_confirmation" || delivery?.status === "active";
+  const livePositionQuery = useLiveDeliveryPosition(
+    isLiveTracking && delivery ? delivery.id : null,
+    Boolean(isLiveTracking && role === "sender"),
+  );
 
   if (deliveryQuery.isLoading) {
     return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.notFound}><ActivityIndicator color="#9A6201" /><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
@@ -154,7 +162,6 @@ export default function DeliveryDetailScreen() {
   const canDisable = role === "sender" && delivery.status === "open";
   const canReactivate = role === "sender" && delivery.status === "disabled";
   const canCancel = role === "sender" && (delivery.status === "open" || delivery.status === "disabled");
-  const canUnselect = role === "sender" && delivery.status === "pending_confirmation";
   const isActive = delivery.status === "active";
   const isCompleted = delivery.status === "completed";
   const pickupPresentation = formatDeliveryDetailPlace(delivery.pickup);
@@ -175,11 +182,7 @@ export default function DeliveryDetailScreen() {
     try {
       if (action === "apply") {
         if (!actionConfig?.amount) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
-        // Le serveur calcule la commission sur `offerPrice` quand une contre-offre est fournie (server/db.ts,
-        // applyForTikisDelivery) : il faut recalculer sur ce même montant ici, sinon le contrôle de
-        // correspondance côté serveur rejette systématiquement toute candidature avec contre-offre.
-        const confirmedCommission = counterOffer?.amount ? Math.round(counterOffer.amount * (walletQuery.data?.commissionRate ?? 0)) : actionConfig.amount;
-        const result = await applyMutation.mutateAsync({ deliveryId, confirmedCommission, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
+        const result = await applyMutation.mutateAsync({ deliveryId, confirmedCommission: actionConfig.amount, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
         utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
       }
       if (action === "withdraw") {
@@ -210,7 +213,6 @@ export default function DeliveryDetailScreen() {
       if (senderAction === "disable") await disableMutation.mutateAsync({ deliveryId });
       if (senderAction === "reactivate") await reactivateMutation.mutateAsync({ deliveryId });
       if (senderAction === "cancel") await cancelMutation.mutateAsync({ deliveryId });
-      if (senderAction === "unselect") await unselectMutation.mutateAsync({ deliveryId });
       await refreshDelivery();
       setSenderAction(null);
       haptic.success();
@@ -225,15 +227,46 @@ export default function DeliveryDetailScreen() {
     setAction("select");
   }
 
+  const pickupTime = isLiveTracking && delivery.status === "active" ? formatRelativeDate(delivery.scheduledAt ?? delivery.createdAt) : undefined;
+  const liveContent = isLiveTracking ? (
+    <LiveTrackingView
+      deliveryId={deliveryId}
+      status={delivery.status}
+      driverName={delivery.driverName}
+      driverPhone={delivery.driverPhone}
+      pickupLat={delivery.pickup.latitude}
+      pickupLng={delivery.pickup.longitude}
+      dropoffLat={delivery.dropoff.latitude}
+      dropoffLng={delivery.dropoff.longitude}
+      driverLat={livePositionQuery?.latitude ?? null}
+      driverLng={livePositionQuery?.longitude ?? null}
+      driverHeading={livePositionQuery?.heading ?? null}
+      pickupName={pickupPresentation.title}
+      pickupAddress={pickupPresentation.subtitle}
+      pickupTime={pickupTime}
+      dropoffName={dropoffPresentation.title}
+      dropoffAddress={dropoffPresentation.subtitle}
+      offeredPrice={delivery.offeredPrice ?? delivery.estimatedPrice}
+      senderName={delivery.senderName}
+      senderPhone={delivery.senderPhone}
+      onOpenMap={role === "sender" ? () => router.push(`/delivery/${deliveryId}/map` as any) : () => {}}
+      onReport={() => router.push(`/report/${deliveryId}` as any)}
+    >
+      {role === "driver" ? <DriverActions deliveryStatus={delivery.status} ownCandidateStatus={ownCandidate?.status} loading={processing} onApply={() => setAction("apply")} onWithdraw={() => setAction("withdraw")} onConfirm={() => setAction("confirm")} onComplete={() => setAction("complete")} /> : null}
+      {message ? <Text style={styles.message}>{message}</Text> : null}
+    </LiveTrackingView>
+  ) : null;
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
+      {isLiveTracking ? liveContent : (
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Retour">
             <MaterialIcons name="arrow-back" size={20} color="#111111" />
           </Pressable>
           <Pressable onPress={() => router.push(`/report/${deliveryId}` as any)} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Signaler">
-            <MaterialIcons name="flag" size={18} color="#A43740" />
+            <MaterialIcons name="flag" size={18} color="#B4232D" />
           </Pressable>
         </View>
 
@@ -336,13 +369,13 @@ export default function DeliveryDetailScreen() {
             <View style={styles.driverAvatar}>
               <Text style={styles.driverAvatarText}>{(delivery.driverName ?? "?").split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}</Text>
               <View style={styles.driverVerifiedBadge}>
-                <MaterialIcons name="check" size={10} color="#176C52" />
+                <MaterialIcons name="check" size={10} color="#167A55" />
               </View>
             </View>
             <View style={styles.driverInfo}>
               <View style={styles.driverNameRow}>
                 <Text style={styles.driverName} numberOfLines={1}>{role === "sender" ? delivery.driverName : delivery.senderName}</Text>
-                <MaterialIcons name="verified" size={14} color="#176C52" />
+                <MaterialIcons name="verified" size={14} color="#167A55" />
               </View>
               <Text style={styles.driverMeta}>{role === "sender" ? "Livreur confirmé" : "Expéditeur"}</Text>
             </View>
@@ -367,7 +400,7 @@ export default function DeliveryDetailScreen() {
               <Text style={styles.candidatesMeta}>{isActive ? "Voir les autres candidatures reçues" : `${candidates.length} livreur${candidates.length > 1 ? "s" : ""} ont proposé leur service`}</Text>
             </View>
             {candidates.length > 0 ? <View style={styles.candidatesCount}><Text style={styles.candidatesCountText}>{candidates.length}</Text></View> : null}
-            <MaterialIcons name="chevron-right" size={18} color="#667085" />
+            <MaterialIcons name="chevron-right" size={18} color="#747474" />
           </Pressable>
         ) : null}
 
@@ -396,11 +429,10 @@ export default function DeliveryDetailScreen() {
             {canDisable ? <TikisButton label="Désactiver la livraison" icon="pause-circle" variant="secondary" onPress={() => setSenderAction("disable")} loading={senderProcessing && senderAction === "disable"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
             {canCancel ? (
               <Pressable onPress={() => setSenderAction("cancel")} disabled={senderProcessing} style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed, senderProcessing && styles.cancelButtonDisabled]}>
-                <MaterialIcons name="cancel" size={16} color={senderProcessing ? "#A0A0A0" : "#A43740"} />
+                <MaterialIcons name="cancel" size={16} color={senderProcessing ? "#A0A0A0" : "#B4232D"} />
                 <Text style={[styles.cancelButtonText, senderProcessing && styles.cancelButtonTextDisabled]}>Annuler la livraison</Text>
               </Pressable>
             ) : null}
-            {canUnselect ? <TikisButton label="Annuler le choix du livreur" icon="undo" variant="secondary" onPress={() => setSenderAction("unselect")} loading={senderProcessing && senderAction === "unselect"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
           </View>
         ) : null}
 
@@ -408,11 +440,12 @@ export default function DeliveryDetailScreen() {
 
         {message ? <Text style={styles.message}>{message}</Text> : null}
         {isCompleted && role === "sender" ? review ? (
-          <View style={styles.reviewDone}><MaterialIcons name="star" size={20} color="#9A6201" /><View style={styles.reviewDoneInfo}><Text style={styles.reviewDoneTitle}>Avis envoyé · {review.rating}/5</Text><Text style={styles.reviewDoneText}>{review.comment || "Votre évaluation est enregistrée dans votre historique."}</Text></View></View>
+          <View style={styles.reviewDone}><MaterialIcons name="star" size={20} color="#9A6200" /><View style={styles.reviewDoneInfo}><Text style={styles.reviewDoneTitle}>Avis envoyé · {review.rating}/5</Text><Text style={styles.reviewDoneText}>{review.comment || "Votre évaluation est enregistrée dans votre historique."}</Text></View></View>
         ) : (
           <TikisButton label="Noter le livreur" variant="ghost" icon="star-outline" onPress={() => router.push(`/review/${deliveryId}` as any)} style={styles.rateButton} />
         ) : null}
       </ScrollView>
+      )}
 
       {actionConfig ? <FinancialConfirmationModal visible title={actionConfig.title} description={actionConfig.description} amount={actionConfig.amount} confirmLabel={actionConfig.label} irreversible={actionConfig.irreversible} allowCounterOffer={action === "apply"} loading={processing} onCancel={() => { setAction(null); setSelectedCandidate(null); }} onConfirm={(counterOffer) => void confirmAction(counterOffer)} /> : null}
       {senderActionConfig ? <DeliveryActionConfirmationModal visible title={senderActionConfig.title} description={senderActionConfig.description} confirmLabel={senderActionConfig.confirmLabel} tone={senderActionConfig.tone} loading={senderProcessing} onCancel={() => !senderProcessing && setSenderAction(null)} onConfirm={() => void confirmSenderAction()} /> : null}
@@ -420,7 +453,6 @@ export default function DeliveryDetailScreen() {
         visible={candidatesSheetOpen}
         candidates={candidates}
         deliveryStatus={delivery.status}
-        deliveryPrice={delivery.offeredPrice ?? delivery.estimatedPrice}
         loadingId={processing ? selectedCandidate?.id ?? null : null}
         onClose={() => setCandidatesSheetOpen(false)}
         onChoose={openCandidateAction}
@@ -433,7 +465,7 @@ function TimelineStep({ label, done }: { label: string; done: boolean }) {
   return (
     <View style={styles.timelineStep}>
       <View style={[styles.timelineDot, done && styles.timelineDotDone]}>
-        {done ? <MaterialIcons name="check" size={11} color="#FFFFFF" /> : <MaterialIcons name="radio-button-unchecked" size={9} color="#667085" />}
+        {done ? <MaterialIcons name="check" size={11} color="#FFFFFF" /> : <MaterialIcons name="radio-button-unchecked" size={9} color="#747474" />}
       </View>
       <Text style={[styles.timelineLabel, done && styles.timelineLabelDone]}>{label}</Text>
     </View>
@@ -445,13 +477,13 @@ function TimelineLine({ done }: { done: boolean }) {
 }
 
 function DeliveryActionConfirmationModal({ visible, title, description, confirmLabel, tone, loading, onCancel, onConfirm }: { visible: boolean; title: string; description: string; confirmLabel: string; tone: "success" | "warning" | "danger"; loading: boolean; onCancel: () => void; onConfirm: () => void }) {
-  const color = tone === "danger" ? "#A43740" : tone === "warning" ? "#9A6201" : "#176C52";
-  const background = tone === "danger" ? "#FFFFFF" : tone === "warning" ? "#FFFFFF" : "#E3E3E3";
+  const color = tone === "danger" ? "#B4232D" : tone === "warning" ? "#9A6200" : "#176C52";
+  const background = tone === "danger" ? "#FDEBEC" : tone === "warning" ? "#FEF6E2" : "#DDEFE7";
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}><View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={onCancel} /><View style={styles.actionSheet}><View style={styles.actionHandle} /><View style={[styles.actionIcon, { backgroundColor: background }]}><MaterialIcons name={tone === "danger" ? "warning-amber" : tone === "warning" ? "pause-circle" : "play-circle"} size={24} color={color} /></View><Text style={styles.actionTitle}>{title}</Text><Text style={styles.actionDescription}>{description}</Text><TikisButton label={confirmLabel} variant={tone === "danger" ? "danger" : tone === "warning" ? "secondary" : "primary"} onPress={onConfirm} loading={loading} style={styles.actionConfirm} /><TikisButton label="Conserver la livraison" variant="ghost" onPress={onCancel} disabled={loading} style={styles.actionCancel} /></View></View></Modal>;
 }
 
 function DriverActions({ deliveryStatus, ownCandidateStatus, loading, onApply, onWithdraw, onConfirm, onComplete }: { deliveryStatus: string; ownCandidateStatus?: string; loading: boolean; onApply: () => void; onWithdraw: () => void; onConfirm: () => void; onComplete: () => void }) {
-  if (deliveryStatus === "open") return <View style={styles.driverAction}>{ownCandidateStatus === "applied" ? <TikisButton label="Se retirer" variant="ghost" icon="undo" onPress={onWithdraw} loading={loading} disabled={loading} /> : <TikisButton label="Se proposer" icon="add-circle" onPress={onApply} loading={loading} disabled={loading} />}<Text style={styles.driverHint}>{ownCandidateStatus === "applied" ? "Votre candidature est enregistrée. Vous pouvez la retirer tant que vous n’êtes pas sélectionné." : "Postulez au prix client ou proposez votre prix via la modale de confirmation."}</Text></View>;
+  if (deliveryStatus === "open") return <View style={styles.driverAction}>{ownCandidateStatus === "applied" ? <TikisButton label="Renoncer" variant="ghost" icon="undo" onPress={onWithdraw} loading={loading} disabled={loading} /> : <TikisButton label="Se proposer" icon="add-circle" onPress={onApply} loading={loading} disabled={loading} />}<Text style={styles.driverHint}>{ownCandidateStatus === "applied" ? "Votre candidature est enregistrée. Vous pouvez la retirer tant que vous n’êtes pas sélectionné." : "Postulez au prix client ou proposez votre prix via la modale de confirmation."}</Text></View>;
   if (deliveryStatus === "pending_confirmation" && ownCandidateStatus === "selected") return <View style={styles.driverAction}><TikisButton label="Confirmer la course" icon="check-circle" onPress={onConfirm} loading={loading} disabled={loading} /><Text style={styles.driverHint}>Après confirmation, vos coordonnées seront partagées avec l’expéditeur.</Text></View>;
   if (deliveryStatus === "active" && ownCandidateStatus === "confirmed") return <View style={styles.driverAction}><TikisButton label="Marquer comme terminée" icon="task-alt" onPress={onComplete} loading={loading} disabled={loading} /><Text style={styles.driverHint}>À utiliser après remise et paiement direct avec l’expéditeur.</Text></View>;
   return null;
@@ -462,29 +494,29 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32, gap: 10 },
 
   topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4 },
-  iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
+  iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3" },
 
   heroMap: { height: 200, borderRadius: 12, backgroundColor: "#F5F5F5", position: "relative", overflow: "hidden", marginTop: 8 },
-  heroMapInner: { ...StyleSheet.absoluteFill, backgroundColor: "#F5F5F5" },
+  heroMapInner: { ...StyleSheet.absoluteFillObject, backgroundColor: "#F5F5F5" },
   heroMapBlock: { position: "absolute", backgroundColor: "#DCDEE3", borderRadius: 5 },
   heroMapRoad: { position: "absolute", backgroundColor: "#FFFFFF", borderRadius: 99 },
-  heroMapMarker: { position: "absolute", width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  heroMapMarker: { position: "absolute", width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
   heroMapMarkerStart: { top: "30%", left: "18%", backgroundColor: "#9A6201" },
-  heroMapMarkerEnd: { top: "60%", right: "22%", backgroundColor: "#FFFFFF", borderColor: "#A43740" },
+  heroMapMarkerEnd: { top: "60%", right: "22%", backgroundColor: "#FFFFFF", borderColor: "#B4232D" },
   heroMapStatus: { position: "absolute", top: 12, left: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 7 },
   heroMapRouteLoading: { position: "absolute", top: 12, right: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 7 },
   heroMapRouteLoadingText: { color: "#555555", fontSize: 10, fontWeight: "600" },
   heroMapDot: { width: 7, height: 7, borderRadius: 4 },
   heroMapStatusText: { color: "#111111", fontSize: 10, fontWeight: "600" },
 
-  eyebrow: { color: "#667085", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", marginTop: 4 },
-  eyebrowSmall: { color: "#667085", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
+  eyebrow: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", marginTop: 4 },
+  eyebrowSmall: { color: "#747474", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   title: { color: "#111111", fontSize: 22, fontWeight: "700", lineHeight: 28, marginTop: 4, includeFontPadding: false },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
-  metaText: { color: "#667085", fontSize: 11 },
-  metaDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: "#667085" },
-  countdown: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 6, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: "#FFFFFF", borderRadius: 7 },
-  countdownLabel: { color: "#9A6201", fontSize: 10, fontWeight: "600" },
+  metaText: { color: "#666666", fontSize: 11 },
+  metaDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: "#747474" },
+  countdown: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 6, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: "#FEF6E2", borderRadius: 7 },
+  countdownLabel: { color: "#6D4701", fontSize: 10, fontWeight: "600" },
   countdownValue: { color: "#9A6201", fontSize: 11, fontWeight: "700", fontVariant: ["tabular-nums"] },
 
   timelineCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, marginTop: 4 },
@@ -492,91 +524,91 @@ const styles = StyleSheet.create({
   timelineStep: { alignItems: "center", width: 70 },
   timelineDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
   timelineDotDone: { backgroundColor: "#9A6201" },
-  timelineLine: { flex: 1, height: 1.5, backgroundColor: "#E3E3E3", marginTop: 11 },
+  timelineLine: { flex: 1, height: 1.5, backgroundColor: "#ECECEC", marginTop: 11 },
   timelineLineDone: { backgroundColor: "#9A6201" },
-  timelineLabel: { color: "#667085", fontSize: 9, fontWeight: "600", textAlign: "center", marginTop: 6 },
+  timelineLabel: { color: "#747474", fontSize: 9, fontWeight: "600", textAlign: "center", marginTop: 6 },
   timelineLabelDone: { color: "#9A6201" },
 
   routeCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "stretch", gap: 10 },
   routeCol: { alignItems: "center", width: 14 },
   routePin: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
   routePinFrom: { backgroundColor: "#9A6201" },
-  routePinTo: { backgroundColor: "#A43740" },
-  routeLine: { width: 1.5, flex: 1, backgroundColor: "#E3E3E3", marginVertical: 4 },
+  routePinTo: { backgroundColor: "#B4232D" },
+  routeLine: { width: 1.5, flex: 1, backgroundColor: "#ECECEC", marginVertical: 4 },
   routeInfoWrap: { flex: 1, minWidth: 0 },
   routeInfo: { paddingVertical: 2 },
-  routeLabel: { color: "#667085", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
+  routeLabel: { color: "#747474", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
   routeValue: { color: "#111111", fontSize: 12, fontWeight: "600", marginTop: 2 },
-  routeMeta: { color: "#667085", fontSize: 10, marginTop: 1 },
+  routeMeta: { color: "#666666", fontSize: 10, marginTop: 1 },
 
   pricingCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14 },
   pricingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   pricingLabel: { color: "#111111", fontSize: 12, fontWeight: "600" },
   pricingValue: { color: "#111111", fontSize: 18, fontWeight: "700" },
-  pricingRef: { color: "#667085", fontSize: 10, marginTop: 1 },
-  pricingCounterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#E3E3E3" },
-  pricingCounterLabel: { color: "#667085", fontSize: 11, fontWeight: "500" },
+  pricingRef: { color: "#747474", fontSize: 10, marginTop: 1 },
+  pricingCounterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#ECECEC" },
+  pricingCounterLabel: { color: "#666666", fontSize: 11, fontWeight: "500" },
   pricingCounterValue: { color: "#9A6201", fontSize: 13, fontWeight: "700" },
-  pricingNote: { color: "#667085", fontSize: 11, lineHeight: 16, marginTop: 8 },
+  pricingNote: { color: "#747474", fontSize: 11, lineHeight: 16, marginTop: 8 },
 
   driverCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
-  driverAvatar: { width: 40, height: 40, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0 },
+  driverAvatar: { width: 40, height: 40, borderRadius: 10, backgroundColor: "#F8F0E5", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0 },
   driverAvatarText: { color: "#9A6201", fontSize: 13, fontWeight: "700" },
   driverVerifiedBadge: { position: "absolute", bottom: -2, right: -2, width: 14, height: 14, borderRadius: 7, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
   driverInfo: { flex: 1, minWidth: 0 },
   driverNameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   driverName: { color: "#111111", fontSize: 13, fontWeight: "600", flexShrink: 1 },
-  driverMeta: { color: "#667085", fontSize: 11, marginTop: 2 },
+  driverMeta: { color: "#666666", fontSize: 11, marginTop: 2 },
   driverActions: { flexDirection: "row", gap: 6 },
   driverActionBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
 
   candidatesTrigger: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
   candidatesTriggerActive: { borderWidth: 1, borderColor: "#9A6201", borderStyle: "dashed" },
-  candidatesIcon: { width: 36, height: 36, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
-  candidatesIconActive: { backgroundColor: "#FFFFFF" },
+  candidatesIcon: { width: 36, height: 36, borderRadius: 9, backgroundColor: "#F8F0E5", alignItems: "center", justifyContent: "center" },
+  candidatesIconActive: { backgroundColor: "#FEF6E2" },
   candidatesBody: { flex: 1, minWidth: 0 },
   candidatesTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },
-  candidatesMeta: { color: "#667085", fontSize: 11, marginTop: 2 },
+  candidatesMeta: { color: "#666666", fontSize: 11, marginTop: 2 },
   candidatesCount: { backgroundColor: "#111111", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 99 },
   candidatesCountText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700" },
 
   detailsCard: { backgroundColor: "#FFFFFF", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 2 },
-  detailsRow: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 9, borderBottomWidth: 1, borderBottomColor: "#E3E3E3" },
-  detailsIcon: { width: 26, height: 26, borderRadius: 8, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
-  detailsLabel: { color: "#667085", fontSize: 11, flexShrink: 0 },
+  detailsRow: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 9, borderBottomWidth: 1, borderBottomColor: "#ECECEC" },
+  detailsIcon: { width: 26, height: 26, borderRadius: 8, backgroundColor: "#F8F0E5", alignItems: "center", justifyContent: "center" },
+  detailsLabel: { color: "#747474", fontSize: 11, flexShrink: 0 },
   detailsValue: { color: "#111111", fontSize: 12, fontWeight: "600", flex: 1, textAlign: "right" },
-  detailsLast: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: "#E3E3E3", marginTop: 2 },
-  detailsDescription: { color: "#667085", fontSize: 12, lineHeight: 18 },
+  detailsLast: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: "#ECECEC", marginTop: 2 },
+  detailsDescription: { color: "#666666", fontSize: 12, lineHeight: 18 },
 
-  trackButton: { backgroundColor: "#FFFFFF", borderRadius: 10, borderWidth: 1, borderColor: "#E3E3E3", paddingVertical: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  trackButton: { backgroundColor: "#F7EFE5", borderRadius: 10, borderWidth: 1, borderColor: "#E5D2B9", paddingVertical: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   trackButtonText: { color: "#9A6201", fontSize: 13, fontWeight: "600" },
 
   senderActions: { gap: 8, marginTop: 4 },
   senderActionBtn: { minHeight: 46 },
-  cancelButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 46, borderRadius: 9, borderWidth: 1, borderColor: "#A43740", backgroundColor: "#FFFFFF" },
-  cancelButtonDisabled: { borderColor: "#E3E3E3" },
-  cancelButtonText: { color: "#A43740", fontSize: 13, fontWeight: "600" },
+  cancelButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 46, borderRadius: 9, borderWidth: 1, borderColor: "#B4232D", backgroundColor: "#FFFFFF" },
+  cancelButtonDisabled: { borderColor: "#D5D5DC" },
+  cancelButtonText: { color: "#B4232D", fontSize: 13, fontWeight: "600" },
   cancelButtonTextDisabled: { color: "#A0A0A0" },
 
   driverAction: { marginTop: 16 },
   secondaryDriverAction: { marginTop: 8 },
-  driverHint: { color: "#667085", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 10, paddingHorizontal: 12 },
+  driverHint: { color: "#666666", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 10, paddingHorizontal: 12 },
 
   actionOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.42)" },
   actionSheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 14, borderTopRightRadius: 14, padding: 16, paddingTop: 8, paddingBottom: 20 },
-  actionHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#E3E3E3", alignSelf: "center", marginBottom: 14 },
+  actionHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", alignSelf: "center", marginBottom: 14 },
   actionIcon: { width: 44, height: 44, borderRadius: 9, alignItems: "center", justifyContent: "center", marginBottom: 12, alignSelf: "center" },
   actionTitle: { color: "#111111", fontSize: 17, fontWeight: "600", textAlign: "center" },
-  actionDescription: { color: "#667085", fontSize: 13, lineHeight: 19, marginTop: 6, textAlign: "center" },
+  actionDescription: { color: "#666666", fontSize: 13, lineHeight: 19, marginTop: 6, textAlign: "center" },
   actionConfirm: { marginTop: 18 },
   actionCancel: { marginTop: 6 },
 
-  message: { color: "#A43740", textAlign: "center", fontSize: 13, fontWeight: "600", marginTop: 8 },
+  message: { color: "#B4232D", textAlign: "center", fontSize: 13, fontWeight: "600", marginTop: 8 },
 
-  reviewDone: { flexDirection: "row", gap: 10, alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 10, padding: 12, marginTop: 14 },
+  reviewDone: { flexDirection: "row", gap: 10, alignItems: "center", backgroundColor: "#FEF6E2", borderRadius: 10, padding: 12, marginTop: 14 },
   reviewDoneInfo: { flex: 1 },
-  reviewDoneTitle: { color: "#9A6201", fontSize: 13, fontWeight: "600" },
-  reviewDoneText: { color: "#9A6201", fontSize: 12, lineHeight: 17, marginTop: 2 },
+  reviewDoneTitle: { color: "#9A6200", fontSize: 13, fontWeight: "600" },
+  reviewDoneText: { color: "#9A6200", fontSize: 12, lineHeight: 17, marginTop: 2 },
   rateButton: { marginTop: 14 },
 
   notFound: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 12 },
