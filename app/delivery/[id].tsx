@@ -490,14 +490,14 @@ function DriverActions({ deliveryStatus, ownCandidateStatus, loading, onApply, o
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#EEEDF3" },
+  safe: { flex: 1, backgroundColor: "#F5F5F5" },
   content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32, gap: 10 },
 
   topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4 },
   iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3" },
 
-  heroMap: { height: 200, borderRadius: 12, backgroundColor: "#EEEDF3", position: "relative", overflow: "hidden", marginTop: 8 },
-  heroMapInner: { ...StyleSheet.absoluteFillObject, backgroundColor: "#EEEDF3" },
+  heroMap: { height: 200, borderRadius: 12, backgroundColor: "#F5F5F5", position: "relative", overflow: "hidden", marginTop: 8 },
+  heroMapInner: { ...StyleSheet.absoluteFillObject, backgroundColor: "#F5F5F5" },
   heroMapBlock: { position: "absolute", backgroundColor: "#DCDEE3", borderRadius: 5 },
   heroMapRoad: { position: "absolute", backgroundColor: "#FFFFFF", borderRadius: 99 },
   heroMapMarker: { position: "absolute", width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
@@ -522,7 +522,7 @@ const styles = StyleSheet.create({
   timelineCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, marginTop: 4 },
   timeline: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginTop: 10 },
   timelineStep: { alignItems: "center", width: 70 },
-  timelineDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
+  timelineDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
   timelineDotDone: { backgroundColor: "#9A6201" },
   timelineLine: { flex: 1, height: 1.5, backgroundColor: "#ECECEC", marginTop: 11 },
   timelineLineDone: { backgroundColor: "#9A6201" },
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
   driverName: { color: "#111111", fontSize: 13, fontWeight: "600", flexShrink: 1 },
   driverMeta: { color: "#666666", fontSize: 11, marginTop: 2 },
   driverActions: { flexDirection: "row", gap: 6 },
-  driverActionBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
+  driverActionBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
 
   candidatesTrigger: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
   candidatesTriggerActive: { borderWidth: 1, borderColor: "#9A6201", borderStyle: "dashed" },

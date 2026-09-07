@@ -551,7 +551,7 @@ function MenuRow({ icon, iconBg, label, sub, badge, onPress, last }: { icon: Rea
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#EEEDF3" },
+  safe: { flex: 1, backgroundColor: "#F5F5F5" },
   content: { paddingBottom: 40, gap: 12 },
 
   coverWrap: { position: "relative", marginBottom: -36 },

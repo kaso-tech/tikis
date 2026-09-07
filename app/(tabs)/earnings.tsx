@@ -319,7 +319,7 @@ function StatCard({ icon, value, label, tone }: { icon: React.ComponentProps<typ
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#EEEDF3" },
+  safe: { flex: 1, backgroundColor: "#F5F5F5" },
   pressed: { opacity: 0.7 },
   scroll: { padding: 12, paddingBottom: 32, gap: 14 },
 

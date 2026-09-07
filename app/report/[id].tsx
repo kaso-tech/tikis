@@ -50,7 +50,7 @@ const baseStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   ...baseStyles,
-  safe: { ...baseStyles.safe, backgroundColor: "#EEEDF3" },
+  safe: { ...baseStyles.safe, backgroundColor: "#F5F5F5" },
   content: { ...baseStyles.content, padding: 16, paddingBottom: 28 },
   topBar: { ...baseStyles.topBar, marginBottom: 17 },
   back: { ...baseStyles.back, borderRadius: 8, borderWidth: 0 },

@@ -297,7 +297,7 @@ const baseStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   ...baseStyles,
-  safeArea: { ...baseStyles.safeArea, backgroundColor: "#EEEDF3" },
+  safeArea: { ...baseStyles.safeArea, backgroundColor: "#F5F5F5" },
   scroll: { ...baseStyles.scroll, padding: 16, paddingBottom: 28 },
   logo: { ...baseStyles.logo, borderRadius: 14 },
   brandChip: { ...baseStyles.brandChip, borderRadius: 8, backgroundColor: "#F8F0E5", marginTop: 10 },
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
   title: { ...baseStyles.title, fontWeight: "600", fontSize: 26, lineHeight: 32 },
   fieldLabel: { ...baseStyles.fieldLabel, fontWeight: "600", marginTop: 20 },
   countryField: { ...baseStyles.countryField, borderRadius: 10, borderWidth: 0 },
-  countryBadge: { ...baseStyles.countryBadge, borderRadius: 8, backgroundColor: "#EEEDF3" },
+  countryBadge: { ...baseStyles.countryBadge, borderRadius: 8, backgroundColor: "#F5F5F5" },
   countryFlag: { ...baseStyles.countryFlag, fontWeight: "600" },
   countryName: { ...baseStyles.countryName, fontWeight: "600" },
   phoneField: { ...baseStyles.phoneField, borderRadius: 10, borderWidth: 0 },
@@ -353,5 +353,5 @@ const styles = StyleSheet.create({
   lockedRole: { ...baseStyles.lockedRole, borderRadius: 10, marginTop: 14 },
   countrySheet: { ...baseStyles.countrySheet, borderTopLeftRadius: 14, borderTopRightRadius: 14, padding: 16, paddingBottom: 24 },
   sheetTitle: { ...baseStyles.sheetTitle, fontWeight: "600" },
-  sheetClose: { ...baseStyles.sheetClose, borderRadius: 8, backgroundColor: "#EEEDF3" },
+  sheetClose: { ...baseStyles.sheetClose, borderRadius: 8, backgroundColor: "#F5F5F5" },
 });

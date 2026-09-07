@@ -262,7 +262,7 @@ function iconBgForTone(tone: Tone, theme: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#EEEDF3" },
+  safe: { flex: 1, backgroundColor: "#F5F5F5" },
 
   pressed: { opacity: 0.7 },
 
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   modalTitle: { color: "#111111", fontSize: 17, fontWeight: "600", textAlign: "center" },
   modalSub: { color: "#666666", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 },
   modalHint: { color: "#666666", fontSize: 10, lineHeight: 14, textAlign: "center", marginTop: 6 },
-  referenceCard: { backgroundColor: "#EEEDF3", borderRadius: 9, padding: 12, marginTop: 14 },
+  referenceCard: { backgroundColor: "#F5F5F5", borderRadius: 9, padding: 12, marginTop: 14 },
   referenceLabel: { color: "#666666", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textAlign: "center" },
   referenceValue: { color: "#111111", fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4, letterSpacing: 0.3 },
   requestError: { color: "#B4232D", fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: 6 },

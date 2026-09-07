@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   callButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#167A55", alignItems: "center", justifyContent: "center" },
   placeRow: { flexDirection: "row", alignItems: "center", gap: 9 },
   placeIcon: { width: 30, height: 30, borderRadius: 7, alignItems: "center", justifyContent: "center" },
-  pickupIcon: { backgroundColor: "#EEEDF3" },
+  pickupIcon: { backgroundColor: "#F5F5F5" },
   dropoffIcon: { backgroundColor: "#FFF3F3" },
   placeCopy: { flex: 1, minWidth: 0 },
   placeLabel: { color: "#9A9A9A", fontSize: 9, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },

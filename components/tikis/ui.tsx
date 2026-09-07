@@ -65,7 +65,7 @@ export function Avatar({ initials, color = "#111111", size = 44 }: { initials: s
 }
 
 export const tikisStyles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#EEEDF3" },
+  screen: { flex: 1, backgroundColor: "#F5F5F5" },
   screenContent: { paddingHorizontal: 16, paddingBottom: 104 },
   eyebrow: { color: "#9A6201", fontSize: 12, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },
   title: { color: "#111111", fontSize: 26, lineHeight: 32, fontWeight: "600", letterSpacing: -0.35 },

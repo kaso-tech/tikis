@@ -90,7 +90,7 @@ export { MapPreviewLeaflet as MapPreview };
 const styles = StyleSheet.create({
   frame: {
     borderRadius: 9,
-    backgroundColor: "#EEEDF3",
+    backgroundColor: "#F5F5F5",
     overflow: "hidden",
     position: "relative",
   },
