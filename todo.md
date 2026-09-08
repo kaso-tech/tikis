@@ -581,3 +581,5 @@
 - [x] Enregistrer, pousser et livrer la dernière version validée.
 - [x] Corriger le chargeur dynamique serveur qui renvoie `undefined` pour `loyalty.myProgress` et `sessions.list`.
 - [x] Revalider les flux authentifiés, TypeScript, les tests, le build admin et les services.
+
+- [x] Synchroniser github/main, installer les dépendances si nécessaire, compiler, tester et livrer la dernière version.
