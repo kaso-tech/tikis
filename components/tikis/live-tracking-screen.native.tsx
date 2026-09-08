@@ -1,7 +1,7 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Dimensions, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Animated, Dimensions, Linking, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, Polyline, type Region } from "react-native-maps";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
@@ -166,20 +166,10 @@ function LiveTrackingFocus({
     : 0;
   const etaMinutes = estimateEtaMinutes(distanceToTargetKm);
 
-  const statusLabel = delivery.status === "active"
-    ? "EN ROUTE VERS LE POINT DE COLLECTE"
-    : "EN ATTENTE DE CONFIRMATION";
-  const statusSub = delivery.status === "active"
-    ? driverCoord && pickup
-      ? `${delivery.driverName ?? "Le livreur"} est à ${formatDistance(distanceToTargetKm)} de ${pickup.title}`
-      : "Recherche de la position du livreur…"
-    : `${delivery.driverName ?? "Un livreur"} n'a pas encore confirmé le départ.`;
-
   const mapStyle = isDark ? MAP_STYLE_DARK : undefined;
 
   return (
     <View style={[styles.root, { backgroundColor: theme.background }]}>
-      {/* Map full screen */}
       <View style={styles.mapLayer}>
         {region ? (
           <MapView
@@ -243,17 +233,19 @@ function LiveTrackingFocus({
             >
               <MaterialIcons name="arrow-back" size={20} color={theme.foreground} />
             </Pressable>
-            <View style={[styles.etaBadge, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              {delivery.status === "active" ? (
-                <>
-                  <View style={[styles.livePulse, { backgroundColor: theme.success }]} />
-                  <Text style={[styles.etaBadgeText, { color: theme.foreground }]}>
-                    {driverCoord ? `Arrivée dans ${etaMinutes} min` : "Recherche GPS…"}
-                  </Text>
-                </>
-              ) : (
-                <Text style={[styles.etaBadgeText, { color: theme.foreground }]}>En attente</Text>
-              )}
+            <View style={[styles.topbarTabs, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={[styles.topbarTab, { backgroundColor: theme.primary }]}>
+                <Text style={[styles.topbarTabTextActive, { color: theme.background }]}>En cours</Text>
+                <View style={[styles.topbarTabCountActive, { backgroundColor: "rgba(255,255,255,0.25)" }]}>
+                  <Text style={[styles.topbarTabCountActiveText, { color: theme.background }]}>1</Text>
+                </View>
+              </View>
+              <View style={styles.topbarTab}>
+                <Text style={[styles.topbarTabText, { color: theme.muted }]}>Aujourd'hui</Text>
+              </View>
+              <View style={styles.topbarTab}>
+                <Text style={[styles.topbarTabText, { color: theme.muted }]}>Historique</Text>
+              </View>
             </View>
             <Pressable
               onPress={() => { void Linking.openURL("https://maps.google.com/?q=" + (pickupCoord ? `${pickupCoord.latitude},${pickupCoord.longitude}` : "")); }}
@@ -265,76 +257,280 @@ function LiveTrackingFocus({
             </Pressable>
           </View>
         </SafeAreaView>
+
+        {/* FAB centrer sur moi */}
+        <View style={styles.fabStack} pointerEvents="box-none">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Centrer la carte"
+            onPress={() => {
+              if (!region || !mapRef.current) return;
+              try { mapRef.current.animateToRegion(region, 300); } catch { /* map not ready */ }
+            }}
+            style={({ pressed }) => [styles.fab, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && { opacity: 0.7 }]}
+          >
+            <MaterialIcons name="my-location" size={18} color={theme.foreground} />
+          </Pressable>
+        </View>
       </View>
 
-      {/* Bottom sheet */}
-      <SafeAreaView edges={["bottom"]} style={styles.sheetWrap} pointerEvents="box-none">
-        <View style={[styles.sheet, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <View style={[styles.grip, { backgroundColor: theme.border }]} />
+      {/* Draggable sheet */}
+      <DraggableSheet
+        delivery={delivery}
+        theme={theme}
+        pickup={pickup}
+        dropoff={dropoff}
+        etaMinutes={etaMinutes}
+        distanceToTargetKm={distanceToTargetKm}
+        driverName={delivery.driverName}
+        driverPhone={delivery.driverPhone}
+        driverStats={driverStatsQuery.data ?? null}
+        vehicleTypes={delivery.vehicleTypes ?? []}
+        isDriverLive={delivery.status === "active" && Boolean(driverCoord)}
+      />
+    </View>
+  );
+}
 
-          <ScrollView contentContainerStyle={styles.sheetContent} showsVerticalScrollIndicator={false}>
-            <Text style={[styles.statusLabel, { color: theme.muted }]}>{statusLabel}</Text>
-            <Text style={[styles.statusValue, { color: theme.foreground }]}>
-              {delivery.status === "active" && driverCoord ? `${etaMinutes} min` : "—"}
+type DriverStats = { rating: number; completedDeliveries: number; reviewsCount: number };
+
+function DraggableSheet({
+  delivery,
+  theme,
+  pickup,
+  dropoff,
+  etaMinutes,
+  distanceToTargetKm,
+  driverName,
+  driverPhone,
+  driverStats,
+  vehicleTypes,
+  isDriverLive,
+}: {
+  delivery: Delivery;
+  theme: ReturnType<typeof useThemeColors>["colors"];
+  pickup: ReturnType<typeof formatDeliveryDetailPlace>;
+  dropoff: ReturnType<typeof formatDeliveryDetailPlace>;
+  etaMinutes: number;
+  distanceToTargetKm: number;
+  driverName?: string;
+  driverPhone?: string;
+  driverStats: DriverStats | null;
+  vehicleTypes: string[];
+  isDriverLive: boolean;
+}) {
+  const [tab, setTab] = useState<"active" | "waiting" | "today">("active");
+  const [sheetLevel, setSheetLevel] = useState<"mini" | "mid" | "full">("mid");
+
+  const panY = useRef(new Animated.Value(0)).current;
+  const sheetBaseHeight = useRef(new Animated.Value(SHEET_MID_HEIGHT)).current;
+
+  // Animation when sheetLevel changes
+  useEffect(() => {
+    Animated.spring(sheetBaseHeight, {
+      toValue: sheetLevel === "mini" ? SHEET_MIN_HEIGHT : sheetLevel === "mid" ? SHEET_MID_HEIGHT : SHEET_FULL_HEIGHT,
+      useNativeDriver: false,
+      friction: 9,
+    }).start();
+  }, [sheetLevel, sheetBaseHeight]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 6,
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy < 0) {
+          // Swipe up
+          panY.setValue(Math.max(gestureState.dy, -SHEET_FULL_HEIGHT));
+        } else {
+          // Swipe down
+          panY.setValue(Math.min(gestureState.dy, SHEET_MID_HEIGHT));
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        const dy = gestureState.dy;
+        if (dy < -40 && sheetLevel === "mini") setSheetLevel("mid");
+        else if (dy < -40 && sheetLevel === "mid") setSheetLevel("full");
+        else if (dy > 40 && sheetLevel === "full") setSheetLevel("mid");
+        else if (dy > 40 && sheetLevel === "mid") setSheetLevel("mini");
+        Animated.spring(panY, { toValue: 0, useNativeDriver: false, friction: 9 }).start();
+      },
+    }),
+  ).current;
+
+  const finalHeight = Animated.add(sheetBaseHeight, panY);
+
+  const statusLabel = delivery.status === "active"
+    ? "EN ROUTE VERS LE POINT DE COLLECTE"
+    : "EN ATTENTE DE CONFIRMATION";
+  const statusSub = isDriverLive
+    ? `${driverName ?? "Le livreur"} est à ${formatDistance(distanceToTargetKm)} de ${pickup.title}`
+    : "Recherche de la position du livreur…";
+
+  // Tab content filter
+  const visibleDeliveries = tab === "active"
+    ? [delivery]
+    : tab === "waiting"
+      ? []
+      : [delivery];
+
+  return (
+    <Animated.View
+      style={[
+        styles.sheetWrap,
+        { height: finalHeight, backgroundColor: theme.surface, borderColor: theme.border },
+      ]}
+    >
+      <SafeAreaView edges={["bottom"]} style={styles.sheetSafe}>
+        <View {...panResponder.panHandlers} style={styles.dragZone}>
+          <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
+        </View>
+
+        {/* Sheet tabs (Active / En attente / Aujourd'hui) */}
+        <View style={[styles.sheetTabs, { backgroundColor: theme.background }]}>
+          <Pressable
+            onPress={() => setTab("active")}
+            style={[styles.sheetTab, tab === "active" && { backgroundColor: theme.surface }]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === "active" }}
+          >
+            <Text style={[styles.sheetTabText, { color: tab === "active" ? theme.primary : theme.muted }]}>
+              Actives{tab === "active" ? ` 1` : ""}
             </Text>
-            <Text style={[styles.statusSub, { color: theme.muted }]}>{statusSub}</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setTab("waiting")}
+            style={[styles.sheetTab, tab === "waiting" && { backgroundColor: theme.surface }]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === "waiting" }}
+          >
+            <Text style={[styles.sheetTabText, { color: tab === "waiting" ? theme.primary : theme.muted }]}>En attente</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setTab("today")}
+            style={[styles.sheetTab, tab === "today" && { backgroundColor: theme.surface }]}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: tab === "today" }}
+          >
+            <Text style={[styles.sheetTabText, { color: tab === "today" ? theme.primary : theme.muted }]}>Aujourd'hui</Text>
+          </Pressable>
+        </View>
 
-            {delivery.status === "active" ? (
-              <View style={[styles.liveTag, { backgroundColor: theme.background }]}>
-                <View style={[styles.liveTagPulse, { backgroundColor: theme.success }]} />
-                <Text style={[styles.liveTagText, { color: theme.success }]}>Position en direct</Text>
+        <ScrollView
+          style={styles.sheetScroll}
+          contentContainerStyle={styles.sheetContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Delivery list (1 card) */}
+          {visibleDeliveries.map((d) => {
+            const type = (d.type ?? "Plis").toLowerCase();
+            const iconName: React.ComponentProps<typeof MaterialIcons>["name"] =
+              type === "personne" ? "person" : type === "autre" ? "inventory-2" : "local-shipping";
+            const isSelected = tab === "active" || tab === "today";
+            return (
+              <View
+                key={d.id}
+                style={[
+                  styles.deliveryCard,
+                  { backgroundColor: theme.background, borderColor: isSelected ? theme.primary : "transparent" },
+                ]}
+              >
+                <View style={[styles.deliveryThumb, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                  <MaterialIcons name={iconName} size={18} color={theme.foreground} />
+                  {isDriverLive ? <View style={[styles.deliveryLiveDot, { backgroundColor: theme.success, borderColor: theme.surface }]} /> : null}
+                </View>
+                <View style={styles.deliveryInfo}>
+                  <Text style={[styles.deliveryTitle, { color: theme.foreground }]} numberOfLines={1}>{d.title ?? d.type}</Text>
+                  <Text style={[styles.deliveryRoute, { color: theme.muted }]} numberOfLines={1}>
+                    {pickup.title} → {dropoff.title}
+                  </Text>
+                </View>
+                <View style={styles.deliveryEta}>
+                  <Text style={[styles.deliveryEtaTime, { color: theme.foreground }]}>
+                    {isDriverLive ? `${etaMinutes} min` : "—"}
+                  </Text>
+                  <Text style={[styles.deliveryEtaLabel, { color: theme.muted }]}>
+                    {isDriverLive ? "ETA" : "attente"}
+                  </Text>
+                </View>
               </View>
-            ) : null}
+            );
+          })}
 
-            <View style={[styles.progressTrack, { backgroundColor: theme.background }]}>
-              <View style={[styles.progressFill, { backgroundColor: theme.primary, width: delivery.status === "active" ? "55%" : "10%" }]} />
+          {visibleDeliveries.length === 0 ? (
+            <View style={[styles.emptyTab, { backgroundColor: theme.background }]}>
+              <MaterialIcons name="inbox" size={20} color={theme.muted} />
+              <Text style={[styles.emptyTabText, { color: theme.muted }]}>Aucune livraison dans cette catégorie.</Text>
             </View>
+          ) : null}
 
-            {delivery.driverName ? (
-              <View style={[styles.driverCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                <View style={[styles.avatar, { backgroundColor: theme.primary }]}>
-                  <Text style={styles.avatarText}>{getInitials(delivery.driverName)}</Text>
-                </View>
-                <View style={styles.driverInfo}>
-                  <Text style={[styles.driverName, { color: theme.foreground }]} numberOfLines={1}>{delivery.driverName}</Text>
-                  <View style={styles.driverMetaRow}>
-                    {driverStatsQuery.data && driverStatsQuery.data.reviewsCount > 0 ? (
-                      <View style={[styles.ratingPill, { backgroundColor: theme.foreground }]}>
-                        <Text style={[styles.ratingPillText, { color: theme.background }]}>★ {driverStatsQuery.data.rating.toFixed(2)}</Text>
-                      </View>
-                    ) : null}
-                    <Text style={[styles.driverMetaText, { color: theme.muted }]}>
-                      {driverStatsQuery.data && driverStatsQuery.data.completedDeliveries > 0
-                        ? `${driverStatsQuery.data.completedDeliveries} course${driverStatsQuery.data.completedDeliveries > 1 ? "s" : ""} · ${(delivery.vehicleTypes ?? []).join(" · ") || "Moto"}`
-                        : (delivery.vehicleTypes ?? []).join(" · ") || "Moto"}
-                    </Text>
+          {/* Track preview (timeline 4 étapes) */}
+          {sheetLevel !== "mini" ? (
+            <View style={[styles.trackPreview, { backgroundColor: theme.background, borderColor: theme.border }]}>
+              <View style={styles.trackPreviewHeader}>
+                <Text style={[styles.trackPreviewLabel, { color: theme.primary }]}>Course sélectionnée</Text>
+                {driverName ? (
+                  <View style={styles.trackPreviewDriver}>
+                    <View style={[styles.trackAvatar, { backgroundColor: theme.primary }]}>
+                      <Text style={[styles.trackAvatarText, { color: theme.surface }]}>{getInitials(driverName)}</Text>
+                    </View>
+                    <View style={{ flexShrink: 1 }}>
+                      <Text style={[styles.trackDriverName, { color: theme.foreground }]} numberOfLines={1}>{driverName}</Text>
+                      <Text style={[styles.trackDriverMeta, { color: theme.muted }]} numberOfLines={1}>
+                        {driverStats && driverStats.reviewsCount > 0
+                          ? `★ ${driverStats.rating.toFixed(2)} · ${driverStats.completedDeliveries} course${driverStats.completedDeliveries > 1 ? "s" : ""}`
+                          : `${vehicleTypes.join(" · ") || "Moto"}`}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-                {delivery.driverPhone ? (
-                  <>
-                    <Pressable
-                      onPress={() => { void Linking.openURL(`tel:${delivery.driverPhone}`); }}
-                      accessibilityRole="button"
-                      accessibilityLabel="Appeler le livreur"
-                      style={({ pressed }) => [styles.iconBtn, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && { opacity: 0.7 }]}
-                    >
-                      <MaterialIcons name="call" size={18} color={theme.foreground} />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => { void Linking.openURL(`sms:${delivery.driverPhone}`); }}
-                      accessibilityRole="button"
-                      accessibilityLabel="Envoyer un message"
-                      style={({ pressed }) => [styles.iconBtn, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && { opacity: 0.7 }]}
-                    >
-                      <MaterialIcons name="chat-bubble-outline" size={18} color={theme.foreground} />
-                    </Pressable>
-                  </>
                 ) : null}
               </View>
-            ) : null}
+              <View style={styles.trackTimeline}>
+                <TrackStep
+                  label="Publiée"
+                  state="done"
+                  theme={theme}
+                />
+                <TrackStep
+                  label="Acceptée"
+                  state="done"
+                  theme={theme}
+                />
+                <TrackStep
+                  label="En route"
+                  state={delivery.status === "active" ? "active" : "pending"}
+                  theme={theme}
+                />
+                <TrackStep
+                  label="Livrée"
+                  state={delivery.status === "completed" ? "done" : "pending"}
+                  theme={theme}
+                  last
+                />
+              </View>
+            </View>
+          ) : null}
 
-            <View style={styles.tripInfo}>
-              <View style={[styles.tripRow, { borderColor: theme.border }]}>
+          {/* Status info (visible mid + full) */}
+          {sheetLevel !== "mini" ? (
+            <View style={styles.statusBlock}>
+              <Text style={[styles.statusLabel, { color: theme.muted }]}>{statusLabel}</Text>
+              <Text style={[styles.statusValue, { color: theme.foreground }]}>
+                {isDriverLive ? `${etaMinutes} min` : "—"}
+              </Text>
+              <Text style={[styles.statusSub, { color: theme.muted }]}>{statusSub}</Text>
+              {isDriverLive ? (
+                <View style={[styles.liveTag, { backgroundColor: theme.background }]}>
+                  <View style={[styles.liveTagPulse, { backgroundColor: theme.success }]} />
+                  <Text style={[styles.liveTagText, { color: theme.success }]}>Position en direct</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          {/* Trip info (only full) */}
+          {sheetLevel === "full" ? (
+            <View style={[styles.tripInfo, { borderTopColor: theme.border }]}>
+              <View style={styles.tripRow}>
                 <View style={[styles.tripDot, { backgroundColor: theme.foreground }]} />
                 <View style={styles.tripText}>
                   <Text style={[styles.tripLabel, { color: theme.muted }]}>Point de collecte</Text>
@@ -342,7 +538,7 @@ function LiveTrackingFocus({
                   <Text style={[styles.tripAddress, { color: theme.muted }]} numberOfLines={1}>{locationTitle(delivery.pickup as LocationLabel)}</Text>
                 </View>
               </View>
-              <View style={[styles.tripRow, { borderColor: theme.border }]}>
+              <View style={[styles.tripRow, { borderTopColor: theme.border }]}>
                 <View style={[styles.tripDot, { backgroundColor: theme.foreground }]} />
                 <View style={styles.tripText}>
                   <Text style={[styles.tripLabel, { color: theme.muted }]}>Destination</Text>
@@ -353,16 +549,71 @@ function LiveTrackingFocus({
                 </View>
               </View>
             </View>
-          </ScrollView>
+          ) : null}
+        </ScrollView>
+
+        {/* Bottom actions (always visible) */}
+        <View style={[styles.sheetActions, { borderTopColor: theme.border }]}>
+          <Pressable
+            onPress={() => { /* TODO: cancel mutation */ }}
+            style={({ pressed }) => [styles.sheetBtn, { backgroundColor: theme.surface, borderColor: theme.error }, pressed && { opacity: 0.7 }]}
+          >
+            <MaterialIcons name="delete-outline" size={14} color={theme.error} />
+            <Text style={[styles.sheetBtnText, { color: theme.error }]}>Annuler</Text>
+          </Pressable>
+          {driverPhone ? (
+            <Pressable
+              onPress={() => { void Linking.openURL(`tel:${driverPhone}`); }}
+              style={({ pressed }) => [styles.sheetBtn, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && { opacity: 0.7 }]}
+            >
+              <MaterialIcons name="call" size={14} color={theme.foreground} />
+              <Text style={[styles.sheetBtnText, { color: theme.foreground }]}>Appeler</Text>
+            </Pressable>
+          ) : null}
+          {driverPhone ? (
+            <Pressable
+              onPress={() => { void Linking.openURL(`sms:${driverPhone}`); }}
+              style={({ pressed }) => [styles.sheetBtn, { backgroundColor: theme.primary, borderColor: theme.primary }, pressed && { opacity: 0.85 }]}
+            >
+              <MaterialIcons name="chat-bubble" size={14} color={theme.background} />
+              <Text style={[styles.sheetBtnTextPrimary, { color: theme.background }]}>Message</Text>
+            </Pressable>
+          ) : null}
         </View>
       </SafeAreaView>
+    </Animated.View>
+  );
+}
+
+function TrackStep({ label, state, theme, last }: { label: string; state: "done" | "active" | "pending"; theme: ReturnType<typeof useThemeColors>["colors"]; last?: boolean }) {
+  const isDone = state === "done";
+  const isActive = state === "active";
+  return (
+    <View style={styles.trackStep}>
+      <View
+        style={[
+          styles.trackStepBullet,
+          { backgroundColor: isDone || isActive ? theme.primary : theme.surface, borderColor: isDone || isActive ? theme.primary : theme.border },
+        ]}
+      >
+        {isDone ? (
+          <MaterialIcons name="check" size={11} color={theme.background} />
+        ) : isActive ? (
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: theme.surface }} />
+        ) : null}
+      </View>
+      {!last ? <View style={[styles.trackStepLine, { backgroundColor: isDone ? theme.primary : theme.border }]} /> : null}
+      <Text style={[styles.trackStepLabel, { color: isActive ? theme.primary : theme.muted, fontWeight: isActive ? "700" : "600" }]}>
+        {label}
+      </Text>
     </View>
   );
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
-const SHEET_MIN_HEIGHT = 280;
-const SHEET_MAX_HEIGHT = Math.min(420, SCREEN_HEIGHT * 0.55);
+const SHEET_MIN_HEIGHT = 110;
+const SHEET_MID_HEIGHT = Math.min(380, SCREEN_HEIGHT * 0.45);
+const SHEET_FULL_HEIGHT = Math.min(640, SCREEN_HEIGHT * 0.78);
 
 const MAP_STYLE_DARK = [
   { elementType: "geometry", stylers: [{ color: "#1d2c4d" }] },
@@ -389,48 +640,78 @@ const styles = StyleSheet.create({
   mapPlaceholder: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8 },
   mapPlaceholderText: { fontSize: 12, fontWeight: "500" },
 
-  // Top bar
+  // Top bar (style 2: back + tabs + extra)
   topBar: { position: "absolute", top: 0, left: 0, right: 0 },
-  topBarInner: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
+  topBarInner: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 4 },
   topBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
-  etaBadge: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth },
-  etaBadgeText: { fontSize: 13, fontWeight: "600" },
-  livePulse: { width: 8, height: 8, borderRadius: 4 },
+  topbarTabs: { flex: 1, flexDirection: "row", borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, padding: 4, gap: 2 },
+  topbarTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 8, borderRadius: 9, gap: 4 },
+  topbarTabText: { fontSize: 12, fontWeight: "600" },
+  topbarTabTextActive: { fontSize: 12, fontWeight: "700" },
+  topbarTabCountActive: { paddingHorizontal: 5, borderRadius: 8, minWidth: 18, alignItems: "center" },
+  topbarTabCountActiveText: { fontSize: 10, fontWeight: "700" },
+
+  // FAB stack (right side, above sheet)
+  fabStack: { position: "absolute", right: 16, bottom: 420, gap: 8 },
+  fab: { width: 46, height: 46, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
 
   // Markers
-  markerPickup: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", borderWidth: 3 },
-  markerDropoff: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", borderWidth: 3 },
+  markerPickup: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", borderWidth: 3 },
+  markerDropoff: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", borderWidth: 3 },
   markerLetter: { fontSize: 14, fontWeight: "700" },
-  markerDriver: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", borderWidth: 3 },
+  markerDriver: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", borderWidth: 4 },
 
-  // Sheet
-  sheetWrap: { position: "absolute", bottom: 0, left: 0, right: 0 },
-  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: StyleSheet.hairlineWidth, minHeight: SHEET_MIN_HEIGHT, maxHeight: SHEET_MAX_HEIGHT, paddingBottom: 16 },
-  grip: { width: 40, height: 4, borderRadius: 2, alignSelf: "center", marginTop: 10, marginBottom: 14 },
-  sheetContent: { paddingHorizontal: 20, paddingBottom: 8, gap: 10 },
+  // Draggable sheet
+  sheetWrap: { position: "absolute", bottom: 0, left: 0, right: 0, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderTopWidth: StyleSheet.hairlineWidth, borderLeftWidth: StyleSheet.hairlineWidth, borderRightWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  sheetSafe: { flex: 1 },
+  dragZone: { paddingTop: 10, paddingBottom: 6, alignItems: "center" },
+  sheetHandle: { width: 40, height: 4, borderRadius: 2 },
 
-  statusLabel: { fontSize: 11, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", textAlign: "center" },
-  statusValue: { fontSize: 26, fontWeight: "700", textAlign: "center", marginTop: 4 },
-  statusSub: { fontSize: 13, textAlign: "center", lineHeight: 18 },
-  liveTag: { flexDirection: "row", alignItems: "center", gap: 6, alignSelf: "center", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+  // Sheet tabs
+  sheetTabs: { flexDirection: "row", marginHorizontal: 14, marginTop: 4, borderRadius: 10, padding: 3, gap: 2 },
+  sheetTab: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: "center" },
+  sheetTabText: { fontSize: 12.5, fontWeight: "600" },
+
+  sheetScroll: { flex: 1, marginTop: 10 },
+  sheetContent: { paddingHorizontal: 14, paddingBottom: 8, gap: 8 },
+
+  // Delivery card (in sheet list)
+  deliveryCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: 12, borderWidth: 1.5 },
+  deliveryThumb: { width: 40, height: 40, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0, position: "relative", borderWidth: StyleSheet.hairlineWidth },
+  deliveryLiveDot: { position: "absolute", top: -2, right: -2, width: 10, height: 10, borderRadius: 5, borderWidth: 2 },
+  deliveryInfo: { flex: 1, minWidth: 0 },
+  deliveryTitle: { fontSize: 13.5, fontWeight: "600" },
+  deliveryRoute: { fontSize: 11.5, marginTop: 2 },
+  deliveryEta: { alignItems: "flex-end", flexShrink: 0 },
+  deliveryEtaTime: { fontSize: 16, fontWeight: "700", fontVariantNumeric: "tabular-nums" },
+  deliveryEtaLabel: { fontSize: 10.5, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4, marginTop: 1 },
+
+  // Track preview (timeline)
+  trackPreview: { padding: 12, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, marginTop: 6 },
+  trackPreviewHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12, gap: 10 },
+  trackPreviewLabel: { fontSize: 11, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.4 },
+  trackPreviewDriver: { flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 },
+  trackAvatar: { width: 24, height: 24, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  trackAvatarText: { fontSize: 10, fontWeight: "700" },
+  trackDriverName: { fontSize: 12, fontWeight: "600" },
+  trackDriverMeta: { fontSize: 11, marginTop: 1 },
+  trackTimeline: { flexDirection: "row", alignItems: "flex-start" },
+  trackStep: { flex: 1, alignItems: "center", position: "relative" },
+  trackStepBullet: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: "center", justifyContent: "center", marginBottom: 4, zIndex: 1 },
+  trackStepLine: { position: "absolute", top: 11, left: "50%", right: "-50%", height: 2 },
+  trackStepLabel: { fontSize: 9.5, textAlign: "center", textTransform: "uppercase", letterSpacing: 0.3, fontWeight: "600" },
+
+  // Status block (mid + full)
+  statusBlock: { alignItems: "center", paddingVertical: 6, gap: 4 },
+  statusLabel: { fontSize: 10.5, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
+  statusValue: { fontSize: 24, fontWeight: "700" },
+  statusSub: { fontSize: 12.5, textAlign: "center", lineHeight: 17 },
+  liveTag: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, alignSelf: "center" },
   liveTagPulse: { width: 6, height: 6, borderRadius: 3 },
   liveTagText: { fontSize: 11, fontWeight: "700" },
 
-  progressTrack: { height: 4, borderRadius: 2, overflow: "hidden", marginVertical: 6 },
-  progressFill: { height: "100%", borderRadius: 2 },
-
-  driverCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, marginTop: 6 },
-  avatar: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  avatarText: { color: "#FFFFFF", fontWeight: "700", fontSize: 16 },
-  driverInfo: { flex: 1, minWidth: 0 },
-  driverName: { fontSize: 15, fontWeight: "600" },
-  driverMetaRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
-  ratingPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 4 },
-  ratingPillText: { fontSize: 11, fontWeight: "700" },
-  driverMetaText: { fontSize: 12 },
-  iconBtn: { width: 40, height: 40, borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
-
-  tripInfo: { marginTop: 6 },
+  // Trip info (only full state)
+  tripInfo: { marginTop: 4 },
   tripRow: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
   tripDot: { width: 10, height: 10, borderRadius: 5, marginTop: 4, flexShrink: 0 },
   tripText: { flex: 1, minWidth: 0 },
@@ -438,7 +719,17 @@ const styles = StyleSheet.create({
   tripValue: { fontSize: 14, fontWeight: "600", marginTop: 2 },
   tripAddress: { fontSize: 12, marginTop: 2 },
 
-  // Empty
+  // Sheet bottom actions
+  sheetActions: { flexDirection: "row", paddingHorizontal: 14, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, gap: 8 },
+  sheetBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 11, borderRadius: 10, borderWidth: 1, gap: 5 },
+  sheetBtnText: { fontSize: 12.5, fontWeight: "600" },
+  sheetBtnTextPrimary: { fontSize: 12.5, fontWeight: "600" },
+
+  // Empty tab
+  emptyTab: { flexDirection: "row", alignItems: "center", gap: 8, padding: 16, borderRadius: 12 },
+  emptyTabText: { fontSize: 12.5 },
+
+  // Empty (no delivery at all)
   empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8, padding: 24 },
   emptyContent: { padding: 20, paddingTop: 60, alignItems: "center" },
   emptyCard: { width: "100%", maxWidth: 360, padding: 28, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", gap: 12 },
