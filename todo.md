@@ -583,3 +583,7 @@
 - [x] Revalider les flux authentifiés, TypeScript, les tests, le build admin et les services.
 
 - [x] Synchroniser github/main, installer les dépendances si nécessaire, compiler, tester et livrer la dernière version.
+
+- [x] Refaire le pull de github/main, revalider la version et livrer le dernier checkpoint.
+
+- [x] Corriger les régressions TypeScript du profil et du suivi live introduites par le dernier pull.
