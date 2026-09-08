@@ -56,12 +56,19 @@ export default function LiveTrackingTikisScreen() {
     refetchInterval: 15_000,
   });
 
-  const tracked = useMemo(() => {
-    const list = deliveriesQuery.data ?? [];
-    return list.find((d) => d.status === "active")
-      ?? list.find((d) => d.status === "pending_confirmation")
-      ?? null;
+  const activeDeliveries = useMemo(() => (deliveriesQuery.data ?? []).filter((d) => d.status === "active"), [deliveriesQuery.data]);
+  const pendingDeliveries = useMemo(() => (deliveriesQuery.data ?? []).filter((d) => d.status === "pending_confirmation"), [deliveriesQuery.data]);
+  const todayDeliveries = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    return (deliveriesQuery.data ?? []).filter((d) => {
+      if (!d.createdAt) return false;
+      const t = new Date(d.createdAt).getTime();
+      return t >= start.getTime() && (d.status === "completed" || d.status === "active" || d.status === "pending_confirmation");
+    });
   }, [deliveriesQuery.data]);
+
+  const tracked = useMemo(() => activeDeliveries[0] ?? pendingDeliveries[0] ?? null, [activeDeliveries, pendingDeliveries]);
 
   if (!profile) {
     return (
@@ -88,7 +95,18 @@ export default function LiveTrackingTikisScreen() {
     return <EmptyState theme={theme} onCreate={() => router.push("/(tabs)/" as any)} />;
   }
 
-  return <LiveTrackingFocus key={tracked.id} delivery={tracked} theme={theme} isDark={isDark} onBack={() => router.back()} />;
+  return (
+    <LiveTrackingFocus
+      key={tracked.id}
+      delivery={tracked}
+      activeDeliveries={activeDeliveries}
+      pendingDeliveries={pendingDeliveries}
+      todayDeliveries={todayDeliveries}
+      theme={theme}
+      isDark={isDark}
+      onBack={() => router.back()}
+    />
+  );
 }
 
 function EmptyState({ theme, onCreate }: { theme: ReturnType<typeof useThemeColors>["colors"]; onCreate: () => void }) {
@@ -118,11 +136,17 @@ function EmptyState({ theme, onCreate }: { theme: ReturnType<typeof useThemeColo
 
 function LiveTrackingFocus({
   delivery,
+  activeDeliveries,
+  pendingDeliveries,
+  todayDeliveries,
   theme,
   isDark,
   onBack,
 }: {
   delivery: Delivery;
+  activeDeliveries: Delivery[];
+  pendingDeliveries: Delivery[];
+  todayDeliveries: Delivery[];
   theme: ReturnType<typeof useThemeColors>["colors"];
   isDark: boolean;
   onBack: () => void;
@@ -237,7 +261,7 @@ function LiveTrackingFocus({
               <View style={[styles.topbarTab, { backgroundColor: theme.primary }]}>
                 <Text style={[styles.topbarTabTextActive, { color: theme.background }]}>En cours</Text>
                 <View style={[styles.topbarTabCountActive, { backgroundColor: "rgba(255,255,255,0.25)" }]}>
-                  <Text style={[styles.topbarTabCountActiveText, { color: theme.background }]}>1</Text>
+                  <Text style={[styles.topbarTabCountActiveText, { color: theme.background }]}>{activeDeliveries.length}</Text>
                 </View>
               </View>
               <View style={styles.topbarTab}>
@@ -276,16 +300,13 @@ function LiveTrackingFocus({
 
       {/* Draggable sheet */}
       <DraggableSheet
-        delivery={delivery}
-        theme={theme}
-        pickup={pickup}
-        dropoff={dropoff}
-        etaMinutes={etaMinutes}
-        distanceToTargetKm={distanceToTargetKm}
-        driverName={delivery.driverName}
-        driverPhone={delivery.driverPhone}
+        tracked={delivery}
+        activeDeliveries={activeDeliveries}
+        pendingDeliveries={pendingDeliveries}
+        todayDeliveries={todayDeliveries}
+        driverPosition={driverPosition}
         driverStats={driverStatsQuery.data ?? null}
-        vehicleTypes={delivery.vehicleTypes ?? []}
+        theme={theme}
         isDriverLive={delivery.status === "active" && Boolean(driverCoord)}
       />
     </View>
@@ -294,45 +315,133 @@ function LiveTrackingFocus({
 
 type DriverStats = { rating: number; completedDeliveries: number; reviewsCount: number };
 
-function DraggableSheet({
-  delivery,
-  theme,
-  pickup,
-  dropoff,
-  etaMinutes,
-  distanceToTargetKm,
-  driverName,
-  driverPhone,
-  driverStats,
-  vehicleTypes,
-  isDriverLive,
-}: {
-  delivery: Delivery;
-  theme: ReturnType<typeof useThemeColors>["colors"];
-  pickup: ReturnType<typeof formatDeliveryDetailPlace>;
-  dropoff: ReturnType<typeof formatDeliveryDetailPlace>;
-  etaMinutes: number;
-  distanceToTargetKm: number;
+type DeliveryLite = {
+  id: string;
+  title: string;
+  type: Delivery["type"];
+  pickup: Delivery["pickup"];
+  dropoff: Delivery["dropoff"];
+  status: Delivery["status"];
+  distanceKm: number;
+  estimatedPrice: number;
+  offeredPrice?: number;
   driverName?: string;
   driverPhone?: string;
+  vehicleTypes?: Delivery["vehicleTypes"];
+  createdAt: string;
+};
+
+function isLiveStatus(s: Delivery["status"]): boolean {
+  return s === "active" || s === "pending_confirmation";
+}
+
+function getDeliveryEtaMinutes(d: DeliveryLite, driverCoord: { latitude: number; longitude: number } | null): number {
+  const target = d.status === "active" ? d.pickup : d.dropoff;
+  if (!driverCoord || !target?.latitude || !target?.longitude) return 0;
+  const distance = geodesicDistanceKm(driverCoord, { latitude: target.latitude, longitude: target.longitude });
+  return estimateEtaMinutes(distance);
+}
+
+function DraggableSheet({
+  tracked,
+  activeDeliveries,
+  pendingDeliveries,
+  todayDeliveries,
+  driverPosition,
+  driverStats,
+  theme,
+  isDriverLive,
+}: {
+  tracked: Delivery;
+  activeDeliveries: Delivery[];
+  pendingDeliveries: Delivery[];
+  todayDeliveries: Delivery[];
+  driverPosition: { latitude: number; longitude: number; heading: number; recordedAt: string } | null;
   driverStats: DriverStats | null;
-  vehicleTypes: string[];
+  theme: ReturnType<typeof useThemeColors>["colors"];
   isDriverLive: boolean;
 }) {
   const [tab, setTab] = useState<"active" | "waiting" | "today">("active");
+  const [selectedDeliveryId, setSelectedDeliveryId] = useState<string>(tracked.id);
   const [sheetLevel, setSheetLevel] = useState<"mini" | "mid" | "full">("mid");
 
+  // Mutation pour annuler la delivery sélectionnée (utilise le tRPC sender.disable)
+  const utils = trpc.useUtils();
+  const cancelMutation = trpc.deliveries.disable.useMutation({
+    onSuccess: () => {
+      void utils.deliveries.list.invalidate();
+    },
+  });
+
+  // Vue sélectionnée : la delivery choisie dans la liste (ou la tracked par défaut)
+  const driverCoord = driverPosition ? { latitude: driverPosition.latitude, longitude: driverPosition.longitude } : null;
+
+  const visibleDeliveries: Delivery[] = useMemo(() => {
+    if (tab === "active") return activeDeliveries;
+    if (tab === "waiting") return pendingDeliveries;
+    return todayDeliveries;
+  }, [tab, activeDeliveries, pendingDeliveries, todayDeliveries]);
+
+  const selectedDelivery: Delivery | undefined = useMemo(() => {
+    if (selectedDeliveryId && visibleDeliveries.some((d) => d.id === selectedDeliveryId)) {
+      return visibleDeliveries.find((d) => d.id === selectedDeliveryId);
+    }
+    return visibleDeliveries[0] ?? tracked;
+  }, [selectedDeliveryId, visibleDeliveries, tracked]);
+
+  // === SHEET DRAG (height n'est pas animable sur UI thread — useNativeDriver: false est OK ici) ===
   const panY = useRef(new Animated.Value(0)).current;
   const sheetBaseHeight = useRef(new Animated.Value(SHEET_MID_HEIGHT)).current;
+  const dragState = useRef<{ active: boolean }>({ active: false });
 
-  // Animation when sheetLevel changes
   useEffect(() => {
     Animated.spring(sheetBaseHeight, {
       toValue: sheetLevel === "mini" ? SHEET_MIN_HEIGHT : sheetLevel === "mid" ? SHEET_MID_HEIGHT : SHEET_FULL_HEIGHT,
       useNativeDriver: false,
-      friction: 9,
+      tension: 220,
+      friction: 22,
+      mass: 0.8,
     }).start();
   }, [sheetLevel, sheetBaseHeight]);
+
+  // Reset panY quand le sheetLevel change (évite l'accumulation)
+  useEffect(() => {
+    panY.setValue(0);
+  }, [sheetLevel, panY]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 4,
+      onPanResponderGrant: () => {
+        dragState.current.active = true;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (!dragState.current.active) return;
+        // Clamp entre -50 et +50 par rapport à la base pour éviter le drift
+        const clamped = Math.max(-50, Math.min(50, gestureState.dy));
+        panY.setValue(clamped);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        dragState.current.active = false;
+        const dy = gestureState.dy;
+        const vY = gestureState.vy;
+        // Velocity-based : swipe rapide = change d'état même avec un petit dy
+        const fastSwipeUp = vY < -0.5 && sheetLevel !== "full";
+        const fastSwipeDown = vY > 0.5 && sheetLevel !== "mini";
+        if ((dy < -30 || fastSwipeUp) && sheetLevel === "mini") setSheetLevel("mid");
+        else if ((dy < -30 || fastSwipeUp) && sheetLevel === "mid") setSheetLevel("full");
+        else if ((dy > 30 || fastSwipeDown) && sheetLevel === "full") setSheetLevel("mid");
+        else if ((dy > 30 || fastSwipeDown) && sheetLevel === "mid") setSheetLevel("mini");
+        // Reset panY (la transition de sheetBaseHeight prend le relais)
+        Animated.spring(panY, { toValue: 0, useNativeDriver: false, tension: 220, friction: 22, mass: 0.8 }).start();
+      },
+      onPanResponderTerminate: () => {
+        dragState.current.active = false;
+        Animated.spring(panY, { toValue: 0, useNativeDriver: false }).start();
+      },
+    }),
+  ).current;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -359,19 +468,20 @@ function DraggableSheet({
 
   const finalHeight = Animated.add(sheetBaseHeight, panY);
 
-  const statusLabel = delivery.status === "active"
+  // Calculs dynamiques sur la delivery sélectionnée
+  const selectedPickup = selectedDelivery ? formatDeliveryDetailPlace(selectedDelivery.pickup) : null;
+  const selectedDropoff = selectedDelivery ? formatDeliveryDetailPlace(selectedDelivery.dropoff) : null;
+  const selectedEtaMinutes = selectedDelivery ? getDeliveryEtaMinutes(selectedDelivery, driverCoord) : 0;
+  const selectedIsLive = selectedDelivery ? (selectedDelivery.status === "active" && Boolean(driverCoord)) : false;
+
+  const statusLabel = selectedDelivery?.status === "active"
     ? "EN ROUTE VERS LE POINT DE COLLECTE"
     : "EN ATTENTE DE CONFIRMATION";
-  const statusSub = isDriverLive
-    ? `${driverName ?? "Le livreur"} est à ${formatDistance(distanceToTargetKm)} de ${pickup.title}`
-    : "Recherche de la position du livreur…";
-
-  // Tab content filter
-  const visibleDeliveries = tab === "active"
-    ? [delivery]
-    : tab === "waiting"
-      ? []
-      : [delivery];
+  const statusSub = selectedIsLive && selectedPickup
+    ? `${selectedDelivery?.driverName ?? "Le livreur"} est à ${formatDistance(geodesicDistanceKm(driverCoord!, { latitude: selectedDelivery!.pickup.latitude, longitude: selectedDelivery!.pickup.longitude }))} de ${selectedPickup.title}`
+    : selectedDelivery
+      ? "Recherche de la position du livreur…"
+      : "Aucune livraison sélectionnée";
 
   return (
     <Animated.View
@@ -388,22 +498,24 @@ function DraggableSheet({
         {/* Sheet tabs (Active / En attente / Aujourd'hui) */}
         <View style={[styles.sheetTabs, { backgroundColor: theme.background }]}>
           <Pressable
-            onPress={() => setTab("active")}
+            onPress={() => { setTab("active"); setSelectedDeliveryId(activeDeliveries[0]?.id ?? tracked.id); }}
             style={[styles.sheetTab, tab === "active" && { backgroundColor: theme.surface }]}
             accessibilityRole="tab"
             accessibilityState={{ selected: tab === "active" }}
           >
             <Text style={[styles.sheetTabText, { color: tab === "active" ? theme.primary : theme.muted }]}>
-              Actives{tab === "active" ? ` 1` : ""}
+              Actives{tab === "active" ? ` ${activeDeliveries.length}` : ""}
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => setTab("waiting")}
+            onPress={() => { setTab("waiting"); setSelectedDeliveryId(pendingDeliveries[0]?.id ?? tracked.id); }}
             style={[styles.sheetTab, tab === "waiting" && { backgroundColor: theme.surface }]}
             accessibilityRole="tab"
             accessibilityState={{ selected: tab === "waiting" }}
           >
-            <Text style={[styles.sheetTabText, { color: tab === "waiting" ? theme.primary : theme.muted }]}>En attente</Text>
+            <Text style={[styles.sheetTabText, { color: tab === "waiting" ? theme.primary : theme.muted }]}>
+              En attente{tab === "waiting" ? ` ${pendingDeliveries.length}` : ""}
+            </Text>
           </Pressable>
           <Pressable
             onPress={() => setTab("today")}
@@ -420,39 +532,46 @@ function DraggableSheet({
           contentContainerStyle={styles.sheetContent}
           showsVerticalScrollIndicator={false}
         >
-          {/* Delivery list (1 card) */}
+          {/* Delivery list (filtre par tab) */}
           {visibleDeliveries.map((d) => {
             const type = (d.type ?? "Plis").toLowerCase();
             const iconName: React.ComponentProps<typeof MaterialIcons>["name"] =
               type === "personne" ? "person" : type === "autre" ? "inventory-2" : "local-shipping";
-            const isSelected = tab === "active" || tab === "today";
+            const dPickup = formatDeliveryDetailPlace(d.pickup);
+            const dDropoff = formatDeliveryDetailPlace(d.dropoff);
+            const dEta = getDeliveryEtaMinutes(d, driverCoord);
+            const dIsLive = d.status === "active" && Boolean(driverCoord);
+            const isSelected = d.id === selectedDelivery?.id;
             return (
-              <View
+              <Pressable
                 key={d.id}
+                onPress={() => setSelectedDeliveryId(d.id)}
                 style={[
                   styles.deliveryCard,
-                  { backgroundColor: theme.background, borderColor: isSelected ? theme.primary : "transparent" },
+                  { backgroundColor: isSelected ? theme.background : theme.background, borderColor: isSelected ? theme.primary : "transparent" },
                 ]}
+                accessibilityRole="button"
+                accessibilityLabel={`Sélectionner ${d.title ?? d.type}`}
               >
                 <View style={[styles.deliveryThumb, { backgroundColor: theme.surface, borderColor: theme.border }]}>
                   <MaterialIcons name={iconName} size={18} color={theme.foreground} />
-                  {isDriverLive ? <View style={[styles.deliveryLiveDot, { backgroundColor: theme.success, borderColor: theme.surface }]} /> : null}
+                  {dIsLive ? <View style={[styles.deliveryLiveDot, { backgroundColor: theme.success, borderColor: theme.surface }]} /> : null}
                 </View>
                 <View style={styles.deliveryInfo}>
                   <Text style={[styles.deliveryTitle, { color: theme.foreground }]} numberOfLines={1}>{d.title ?? d.type}</Text>
                   <Text style={[styles.deliveryRoute, { color: theme.muted }]} numberOfLines={1}>
-                    {pickup.title} → {dropoff.title}
+                    {dPickup.title} → {dDropoff.title}
                   </Text>
                 </View>
                 <View style={styles.deliveryEta}>
                   <Text style={[styles.deliveryEtaTime, { color: theme.foreground }]}>
-                    {isDriverLive ? `${etaMinutes} min` : "—"}
+                    {dIsLive && dEta > 0 ? `${dEta} min` : "—"}
                   </Text>
                   <Text style={[styles.deliveryEtaLabel, { color: theme.muted }]}>
-                    {isDriverLive ? "ETA" : "attente"}
+                    {dIsLive && dEta > 0 ? "ETA" : isLiveStatus(d.status) ? "attente" : "—"}
                   </Text>
                 </View>
-              </View>
+              </Pressable>
             );
           })}
 
@@ -464,61 +583,57 @@ function DraggableSheet({
           ) : null}
 
           {/* Track preview (timeline 4 étapes) */}
-          {sheetLevel !== "mini" ? (
-            <View style={[styles.trackPreview, { backgroundColor: theme.background, borderColor: theme.border }]}>
-              <View style={styles.trackPreviewHeader}>
-                <Text style={[styles.trackPreviewLabel, { color: theme.primary }]}>Course sélectionnée</Text>
-                {driverName ? (
-                  <View style={styles.trackPreviewDriver}>
-                    <View style={[styles.trackAvatar, { backgroundColor: theme.primary }]}>
-                      <Text style={[styles.trackAvatarText, { color: theme.surface }]}>{getInitials(driverName)}</Text>
+          {sheetLevel !== "mini" && selectedDelivery ? (() => {
+            const sDriverName = selectedDelivery.driverName;
+            const sVehicleTypes = (selectedDelivery.vehicleTypes ?? []).join(" · ") || "Moto";
+            return (
+              <View style={[styles.trackPreview, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                <View style={styles.trackPreviewHeader}>
+                  <Text style={[styles.trackPreviewLabel, { color: theme.primary }]}>Course sélectionnée</Text>
+                  {sDriverName ? (
+                    <View style={styles.trackPreviewDriver}>
+                      <View style={[styles.trackAvatar, { backgroundColor: theme.primary }]}>
+                        <Text style={[styles.trackAvatarText, { color: theme.surface }]}>{getInitials(sDriverName)}</Text>
+                      </View>
+                      <View style={{ flexShrink: 1 }}>
+                        <Text style={[styles.trackDriverName, { color: theme.foreground }]} numberOfLines={1}>{sDriverName}</Text>
+                        <Text style={[styles.trackDriverMeta, { color: theme.muted }]} numberOfLines={1}>
+                          {driverStats && driverStats.reviewsCount > 0
+                            ? `★ ${driverStats.rating.toFixed(2)} · ${driverStats.completedDeliveries} course${driverStats.completedDeliveries > 1 ? "s" : ""}`
+                            : sVehicleTypes}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={{ flexShrink: 1 }}>
-                      <Text style={[styles.trackDriverName, { color: theme.foreground }]} numberOfLines={1}>{driverName}</Text>
-                      <Text style={[styles.trackDriverMeta, { color: theme.muted }]} numberOfLines={1}>
-                        {driverStats && driverStats.reviewsCount > 0
-                          ? `★ ${driverStats.rating.toFixed(2)} · ${driverStats.completedDeliveries} course${driverStats.completedDeliveries > 1 ? "s" : ""}`
-                          : `${vehicleTypes.join(" · ") || "Moto"}`}
-                      </Text>
-                    </View>
-                  </View>
-                ) : null}
+                  ) : null}
+                </View>
+                <View style={styles.trackTimeline}>
+                  <TrackStep label="Publiée" state="done" theme={theme} />
+                  <TrackStep label="Acceptée" state="done" theme={theme} />
+                  <TrackStep
+                    label="En route"
+                    state={selectedDelivery.status === "active" ? "active" : "pending"}
+                    theme={theme}
+                  />
+                  <TrackStep
+                    label="Livrée"
+                    state={selectedDelivery.status === "completed" ? "done" : "pending"}
+                    theme={theme}
+                    last
+                  />
+                </View>
               </View>
-              <View style={styles.trackTimeline}>
-                <TrackStep
-                  label="Publiée"
-                  state="done"
-                  theme={theme}
-                />
-                <TrackStep
-                  label="Acceptée"
-                  state="done"
-                  theme={theme}
-                />
-                <TrackStep
-                  label="En route"
-                  state={delivery.status === "active" ? "active" : "pending"}
-                  theme={theme}
-                />
-                <TrackStep
-                  label="Livrée"
-                  state={delivery.status === "completed" ? "done" : "pending"}
-                  theme={theme}
-                  last
-                />
-              </View>
-            </View>
-          ) : null}
+            );
+          })() : null}
 
           {/* Status info (visible mid + full) */}
-          {sheetLevel !== "mini" ? (
+          {sheetLevel !== "mini" && selectedDelivery ? (
             <View style={styles.statusBlock}>
               <Text style={[styles.statusLabel, { color: theme.muted }]}>{statusLabel}</Text>
               <Text style={[styles.statusValue, { color: theme.foreground }]}>
-                {isDriverLive ? `${etaMinutes} min` : "—"}
+                {selectedIsLive && selectedEtaMinutes > 0 ? `${selectedEtaMinutes} min` : "—"}
               </Text>
               <Text style={[styles.statusSub, { color: theme.muted }]}>{statusSub}</Text>
-              {isDriverLive ? (
+              {selectedIsLive ? (
                 <View style={[styles.liveTag, { backgroundColor: theme.background }]}>
                   <View style={[styles.liveTagPulse, { backgroundColor: theme.success }]} />
                   <Text style={[styles.liveTagText, { color: theme.success }]}>Position en direct</Text>
@@ -528,23 +643,23 @@ function DraggableSheet({
           ) : null}
 
           {/* Trip info (only full) */}
-          {sheetLevel === "full" ? (
+          {sheetLevel === "full" && selectedDelivery && selectedPickup && selectedDropoff ? (
             <View style={[styles.tripInfo, { borderTopColor: theme.border }]}>
               <View style={styles.tripRow}>
                 <View style={[styles.tripDot, { backgroundColor: theme.foreground }]} />
                 <View style={styles.tripText}>
                   <Text style={[styles.tripLabel, { color: theme.muted }]}>Point de collecte</Text>
-                  <Text style={[styles.tripValue, { color: theme.foreground }]} numberOfLines={1}>{pickup.title}</Text>
-                  <Text style={[styles.tripAddress, { color: theme.muted }]} numberOfLines={1}>{locationTitle(delivery.pickup as LocationLabel)}</Text>
+                  <Text style={[styles.tripValue, { color: theme.foreground }]} numberOfLines={1}>{selectedPickup.title}</Text>
+                  <Text style={[styles.tripAddress, { color: theme.muted }]} numberOfLines={1}>{locationTitle(selectedDelivery.pickup as LocationLabel)}</Text>
                 </View>
               </View>
               <View style={[styles.tripRow, { borderTopColor: theme.border }]}>
                 <View style={[styles.tripDot, { backgroundColor: theme.foreground }]} />
                 <View style={styles.tripText}>
                   <Text style={[styles.tripLabel, { color: theme.muted }]}>Destination</Text>
-                  <Text style={[styles.tripValue, { color: theme.foreground }]} numberOfLines={1}>{dropoff.title}</Text>
+                  <Text style={[styles.tripValue, { color: theme.foreground }]} numberOfLines={1}>{selectedDropoff.title}</Text>
                   <Text style={[styles.tripAddress, { color: theme.muted }]} numberOfLines={1}>
-                    {locationTitle(delivery.dropoff as LocationLabel)} · {formatDistance(delivery.distanceKm)} · {formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}
+                    {locationTitle(selectedDelivery.dropoff as LocationLabel)} · {formatDistance(selectedDelivery.distanceKm)} · {formatMoney(selectedDelivery.offeredPrice ?? selectedDelivery.estimatedPrice)}
                   </Text>
                 </View>
               </View>
@@ -555,24 +670,34 @@ function DraggableSheet({
         {/* Bottom actions (always visible) */}
         <View style={[styles.sheetActions, { borderTopColor: theme.border }]}>
           <Pressable
-            onPress={() => { /* TODO: cancel mutation */ }}
+            onPress={() => {
+              if (!selectedDelivery) return;
+              cancelMutation.mutate({ deliveryId: selectedDelivery.id });
+            }}
+            disabled={!selectedDelivery || !selectedDelivery.senderPhone || cancelMutation.isPending}
             style={({ pressed }) => [styles.sheetBtn, { backgroundColor: theme.surface, borderColor: theme.error }, pressed && { opacity: 0.7 }]}
           >
-            <MaterialIcons name="delete-outline" size={14} color={theme.error} />
-            <Text style={[styles.sheetBtnText, { color: theme.error }]}>Annuler</Text>
+            {cancelMutation.isPending ? (
+              <ActivityIndicator size="small" color={theme.error} />
+            ) : (
+              <>
+                <MaterialIcons name="delete-outline" size={14} color={theme.error} />
+                <Text style={[styles.sheetBtnText, { color: theme.error }]}>Annuler</Text>
+              </>
+            )}
           </Pressable>
-          {driverPhone ? (
+          {selectedDelivery?.driverPhone ? (
             <Pressable
-              onPress={() => { void Linking.openURL(`tel:${driverPhone}`); }}
+              onPress={() => { void Linking.openURL(`tel:${selectedDelivery!.driverPhone}`); }}
               style={({ pressed }) => [styles.sheetBtn, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && { opacity: 0.7 }]}
             >
               <MaterialIcons name="call" size={14} color={theme.foreground} />
               <Text style={[styles.sheetBtnText, { color: theme.foreground }]}>Appeler</Text>
             </Pressable>
           ) : null}
-          {driverPhone ? (
+          {selectedDelivery?.driverPhone ? (
             <Pressable
-              onPress={() => { void Linking.openURL(`sms:${driverPhone}`); }}
+              onPress={() => { void Linking.openURL(`sms:${selectedDelivery!.driverPhone}`); }}
               style={({ pressed }) => [styles.sheetBtn, { backgroundColor: theme.primary, borderColor: theme.primary }, pressed && { opacity: 0.85 }]}
             >
               <MaterialIcons name="chat-bubble" size={14} color={theme.background} />
