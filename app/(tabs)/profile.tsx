@@ -435,7 +435,7 @@ export default function ProfileScreen() {
             <MaterialIcons name="chevron-right" size={16} color={theme.muted} />
           </Pressable>
           <Pressable
-            onPress={() => router.push("/legal" as any)}
+            onPress={() => router.push("/legal/terms" as any)}
             style={({ pressed }) => [styles.actionRow, pressed && { backgroundColor: theme.pressed }]}
           >
             <View style={[styles.actionIcon, { backgroundColor: theme.background }]}>
