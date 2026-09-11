@@ -638,7 +638,7 @@ export function HomeScreen() {
         <ActionConfirmationModal visible title="Annuler cette livraison ?" description="La livraison sera retirée et ne recevra plus de candidatures." confirmLabel="Annuler la livraison" icon="cancel" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void cancelSenderDelivery(pendingAction.delivery)} />
       ) : null}
       {pendingAction?.kind === "withdraw" ? (
-        <ActionConfirmationModal visible title="Renoncer à cette candidature ?" description="Votre candidature sera retirée et la commission réservée redeviendra immédiatement disponible." confirmLabel="Renoncer" icon="undo" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
+        <ActionConfirmationModal visible title="Se retirer de cette candidature ?" description="Votre candidature sera retirée et la commission réservée redeviendra immédiatement disponible." confirmLabel="Se retirer" icon="undo" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
       ) : null}
       {pendingAction?.kind === "confirm" ? (
         <ActionConfirmationModal visible title="Confirmer cette mission ?" description="La commission réservée sera prélevée et la livraison passera en cours." confirmLabel="Confirmer" icon="check-circle" tone="success" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
@@ -850,7 +850,7 @@ function DeliveryRow({
   const driverAction = delivery.status === "completed"
     ? null
     : delivery.ownCandidateStatus === "applied"
-      ? "Renoncer"
+      ? "Se retirer"
       : delivery.ownCandidateStatus === "selected"
         ? "Confirmer"
         : delivery.ownCandidateStatus === "confirmed" || delivery.status === "active"

@@ -221,10 +221,10 @@ export default function WalletScreen() {
                   <Text style={styles.referenceValue}>{payment.providerReference}</Text>
                 </View>
                 {requestError ? <Text style={[styles.requestError, { color: theme.error }]}>{requestError}</Text> : <Text style={styles.modalHint}>Aucun moyen de paiement réel n’est débité dans ce mode.</Text>}
-                <View style={styles.modalActions}>
+                {__DEV__ ? <View style={styles.modalActions}>
                   <TikisButton label="Échouer" variant="secondary" disabled={requestLoading} onPress={() => void settlePayment("failed")} style={styles.modalAction} />
                   <TikisButton label="Simuler réussite" icon="check-circle" loading={requestLoading} disabled={requestLoading} onPress={() => void settlePayment("succeeded")} style={styles.modalAction} />
-                </View>
+                </View> : null}
               </>
             ) : (
               <>

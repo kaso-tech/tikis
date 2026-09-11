@@ -920,7 +920,7 @@ function DeliveryRow({
   const driverAction = delivery.status === "completed"
     ? null
     : delivery.ownCandidateStatus === "applied"
-      ? "Renoncer"
+      ? "Se retirer"
       : delivery.ownCandidateStatus === "selected"
         ? "Confirmer"
         : delivery.ownCandidateStatus === "confirmed" || delivery.status === "active"
