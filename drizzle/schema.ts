@@ -64,7 +64,10 @@ export const tikisPlaces = mysqlTable("tikis_places", {
   resolvedAt: timestamp("resolvedAt").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [index("tikis_places_coordinate_key_index").on(table.coordinateKey)]);
+}, (table) => [
+  index("tikis_places_coordinate_key_index").on(table.coordinateKey),
+  index("tikis_places_coordinates_index").on(table.latitude, table.longitude),
+]);
 
 /** Sender-owned shortcuts to canonical places; natural labels make favourites recognisable in the form. */
 export const tikisFavoritePlaces = mysqlTable("tikis_favorite_places", {
@@ -182,7 +185,7 @@ export const tikisWalletLedger = mysqlTable("tikis_wallet_ledger", {
   id: varchar("id", { length: 40 }).primaryKey(),
   profilePhone: varchar("profilePhone", { length: 20 }).notNull(),
   deliveryId: varchar("deliveryId", { length: 40 }),
-  operation: mysqlEnum("operation", ["block", "unblock", "debit", "compensation", "credit", "refund", "deposit_request", "withdrawal_request", "bonus", "penalty"]).notNull(),
+  operation: mysqlEnum("operation", ["block", "unblock", "debit", "commission_debit", "compensation", "credit", "refund", "deposit_request", "withdrawal_request", "bonus", "penalty"]).notNull(),
   amount: int("amount").notNull(),
   availableBefore: int("availableBefore").notNull(),
   availableAfter: int("availableAfter").notNull(),
@@ -398,6 +401,28 @@ export const tikisPushTokens = mysqlTable("tikis_push_tokens", {
 
 export type TikisPushToken = typeof tikisPushTokens.$inferSelect;
 
+/** Périmètre de travail d'un livreur : quelles courses lui sont affichées, et pour lesquelles il
+ *  reçoit une alerte push. Absence de ligne = réglages par défaut (cf. shared/driver-perimeter.ts) :
+ *  alertes push désactivées, périmètre limité à la ville du profil. */
+export const tikisDriverPreferences = mysqlTable("tikis_driver_preferences", {
+  profilePhone: varchar("profilePhone", { length: 20 }).primaryKey(),
+  /** Opt-in explicite aux alertes push de nouvelles courses. Les notifications transactionnelles
+   *  (candidature retenue, mission confirmée, course annulée…) ne sont jamais concernées. */
+  opportunityPushEnabled: boolean("opportunityPushEnabled").notNull().default(false),
+  /** NULL = périmètre « ma ville ». Sinon rayon max en km autour de la position de référence. */
+  alertRadiusKm: int("alertRadiusKm"),
+  /** NULL = périmètre « ma ville ». Sinon rayon max en km autour de la position de référence. */
+  discoveryRadiusKm: int("discoveryRadiusKm"),
+  /** Position de référence des deux rayons : dernière position GPS publiée par le livreur. */
+  baseLatitude: decimal("baseLatitude", { precision: 10, scale: 7 }),
+  baseLongitude: decimal("baseLongitude", { precision: 10, scale: 7 }),
+  baseUpdatedAt: timestamp("baseUpdatedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type TikisDriverPreferences = typeof tikisDriverPreferences.$inferSelect;
+
 /** Programme de fidélité : règles métier (seuil livraisons, montant bonus, palier). */
 export const tikisLoyaltyPrograms = mysqlTable("tikis_loyalty_programs", {
   id: varchar("id", { length: 40 }).primaryKey(),
@@ -489,3 +514,16 @@ export const tikisDailyMetrics = mysqlTable("tikis_daily_metrics", {
 ]);
 
 export type TikisDailyMetric = typeof tikisDailyMetrics.$inferSelect;
+
+/** Rate-limit distribué (partagé entre toutes les instances du serveur, contrairement à un compteur en
+ *  mémoire de processus) : fenêtre fixe identifiée par `rateLimitKey` = "<portée>:<identifiant>:<fenêtre>"
+ *  (ex. "geo:+22670000000:29234561"), incrémentée atomiquement via ON DUPLICATE KEY UPDATE. */
+export const tikisRateLimits = mysqlTable("tikis_rate_limits", {
+  rateLimitKey: varchar("rateLimitKey", { length: 191 }).primaryKey(),
+  count: int("count").notNull().default(0),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (table) => [
+  index("tikis_rate_limits_updated_at_index").on(table.updatedAt),
+]);
+
+export type TikisRateLimit = typeof tikisRateLimits.$inferSelect;

@@ -9,6 +9,7 @@ import { haptic } from "@/lib/haptics";
 import { trpc } from "@/lib/trpc";
 import { formatListRouteParts, geodesicDistanceKm, locationTitle } from "@/lib/geo-rules";
 import { useDriverLocation } from "@/hooks/use-driver-location";
+import { useDriverBasePositionSync } from "@/hooks/use-driver-base-position-sync";
 import { useDeviceHeading } from "@/hooks/use-device-heading";
 import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { compassRotationToTarget } from "@/lib/compass";
@@ -109,7 +110,10 @@ export function HomeScreen() {
 
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 5_000, refetchOnMount: "always", refetchOnWindowFocus: true });
   const driverWallet = walletQuery.data?.wallet;
-  const driverJournal = walletQuery.data?.journal ?? [];
+  // Gains de courses = informatifs, calculés depuis les livraisons terminées (jamais depuis le Wallet, qui n'est
+  // jamais crédité par une livraison : le paiement se fait directement entre l'expéditeur et le livreur).
+  const driverEarningsHistoryQuery = trpc.wallet.driverEarningsHistory.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 5_000 });
+  const driverEarningsHistory = driverEarningsHistoryQuery.data ?? [];
 
   const [filter, setFilter] = useState<FilterKey>("open");
   const [searchQuery, setSearchQuery] = useState("");
@@ -155,6 +159,8 @@ export function HomeScreen() {
     completed: new Animated.Value(1),
   }).current;
   const driverLocation = useDriverLocation({ enabled: role === "driver" });
+  // Tient à jour le centre des rayons « alertes » et « affichage » du livreur (cf. app/driver-alerts.tsx).
+  useDriverBasePositionSync(driverLocation.location, role === "driver");
   const deviceHeading = useDeviceHeading(role === "driver");
 
   const filteredList = useMemo(() => {
@@ -271,10 +277,10 @@ export function HomeScreen() {
     { enabled: Boolean(candidateDelivery?.id) },
   );
 
-  const applicationCommission = (delivery: Delivery) => {
+  const applicationCommission = (delivery: Delivery, priceOverride?: number) => {
     const rate = walletQuery.data?.commissionRate;
     if (!Number.isFinite(rate) || !rate || rate <= 0 || rate >= 1) return null;
-    return commissionFor(delivery.offeredPrice ?? delivery.estimatedPrice, { rate, currency: "FCFA" });
+    return commissionFor(priceOverride ?? (delivery.offeredPrice ?? delivery.estimatedPrice), { rate, currency: "FCFA" });
   };
 
   function requestDriverAction(delivery: Delivery) {
@@ -335,7 +341,10 @@ export function HomeScreen() {
         openNavigation(origin, delivery.pickup, delivery.dropoff);
         return;
       } else {
-        const confirmedCommission = applicationCommission(delivery);
+        // Le serveur calcule la commission sur `offerPrice` quand une contre-offre est fournie (server/db.ts,
+        // applyForTikisDelivery) : il faut recalculer sur ce même montant ici, sinon le contrôle de
+        // correspondance ajouté côté serveur rejette systématiquement toute candidature avec contre-offre.
+        const confirmedCommission = applicationCommission(delivery, counterOffer?.amount ?? undefined);
         if (confirmedCommission === null) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
         const result = await applyMutation.mutateAsync({ deliveryId: delivery.id, confirmedCommission, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
         utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
@@ -402,7 +411,7 @@ export function HomeScreen() {
   const filterCounts = useMemo(() => Object.fromEntries(filterItems.map((item) => [item.key, deliveries.filter((delivery) => matchesFilter(delivery, item.key, isDriver)).length])) as Record<FilterKey, number>, [deliveries, filterItems, isDriver]);
   const filterTranslateY = filterTransition.interpolate({ inputRange: [0, 1], outputRange: [6, 0] });
   const firstNameDisplay = isDriver ? firstName : "à vous";
-  const todaysEarnings = useMemo(() => isDriver ? deliveryMetricsForDay(driverJournal).earnings : 0, [driverJournal, isDriver]);
+  const todaysEarnings = useMemo(() => isDriver ? deliveryMetricsForDay(driverEarningsHistory).earnings : 0, [driverEarningsHistory, isDriver]);
   const availableOpportunities = useMemo(() => {
     if (!isDriver) return 0;
     return deliveries.filter((delivery) => {
@@ -655,6 +664,7 @@ export function HomeScreen() {
         visible={Boolean(candidateDelivery)}
         candidates={candidatesQuery.data ?? []}
         deliveryStatus={candidateDelivery?.status ?? "open"}
+        deliveryPrice={candidateDelivery ? (candidateDelivery.offeredPrice ?? candidateDelivery.estimatedPrice) : 0}
         loadingId={actioningId}
         onClose={() => setCandidateDelivery(null)}
         onChoose={requestCandidateSelection}

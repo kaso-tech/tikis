@@ -105,7 +105,7 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
     setActionBusy(true);
     setActionError("");
     try {
-      await trpc.adminConsole.users.reward.mutate({ phone: detail.profile.phone, amount, reason: rewardDraft.reason.trim() || "Bonus accordé par l’administration" });
+      await trpc.adminConsole.users.reward.mutate({ phone: detail.profile.phone, amount, reason: rewardDraft.reason.trim() || "Bonus accordé par l’administration", requestId: crypto.randomUUID() });
       setRewardDraft({ amount: "", reason: "" });
       await openDetail(detail.profile.phone);
     } catch (cause) {
@@ -122,7 +122,7 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
     setActionBusy(true);
     setActionError("");
     try {
-      await trpc.adminConsole.users.penalize.mutate({ phone: detail.profile.phone, amount, reason: penaltyDraft.reason.trim() || "Pénalité appliquée par l’administration" });
+      await trpc.adminConsole.users.penalize.mutate({ phone: detail.profile.phone, amount, reason: penaltyDraft.reason.trim() || "Pénalité appliquée par l’administration", requestId: crypto.randomUUID() });
       setPenaltyDraft({ amount: "", reason: "" });
       await openDetail(detail.profile.phone);
     } catch (cause) {

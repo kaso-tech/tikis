@@ -17,7 +17,7 @@ import { trpc } from "@/lib/trpc";
 import { deliveryStatusMeta, formatMoney, formatRelativeDate, type DriverCandidate } from "@/shared/tikis-domain";
 
 type FinancialAction = "apply" | "withdraw" | "select" | "confirm" | "complete" | null;
-type SenderAction = "disable" | "reactivate" | "cancel" | null;
+type SenderAction = "disable" | "reactivate" | "cancel" | "unselect" | null;
 
 function DetailRow({ icon, label, value }: { icon: ComponentProps<typeof MaterialIcons>["name"]; label: string; value: string }) {
   return (
@@ -84,6 +84,7 @@ export default function DeliveryDetailScreen() {
   const disableMutation = trpc.deliveries.disable.useMutation();
   const reactivateMutation = trpc.deliveries.reactivate.useMutation();
   const cancelMutation = trpc.deliveries.cancel.useMutation();
+  const unselectMutation = trpc.deliveries.unselectCandidate.useMutation();
   const reviewQuery = trpc.analytics.getForDelivery.useQuery({ deliveryId: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
   const driverReviewsQuery = trpc.reviews.list.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone) });
   const receivedReviewsCount = (driverReviewsQuery.data ?? []).length;
@@ -124,7 +125,7 @@ export default function DeliveryDetailScreen() {
     const commission = selectedCandidate?.commissionBlocked ?? Math.round(commissionBase * (walletQuery.data?.commissionRate ?? 0));
     if (action === "apply") return { title: "Envoyer votre candidature", description: "Cette commission sera temporairement bloquée sur votre Wallet. Elle sera définitivement prélevée uniquement si l’expéditeur vous sélectionne.", amount: commission, label: "Confirmer ma candidature", irreversible: false };
     if (action === "withdraw") return { title: "Retirer votre candidature", description: "Votre candidature sera retirée et la commission temporairement bloquée redeviendra immédiatement disponible.", amount: ownCandidate?.commissionBlocked ?? commission, label: "Retirer ma candidature", irreversible: false };
-    if (action === "select") return { title: delivery.status === "active" ? "Remplacer le livreur" : "Choisir ce livreur", description: delivery.status === "active" ? "Le nouveau livreur devra confirmer sa disponibilité. Sa commission compensera automatiquement celle de l’ancien livreur : Tikis conservera une seule commission." : "Le choix rend la mise en relation effective. La commission bloquée du livreur sera définitivement prélevée et les autres commissions seront libérées.", amount: commission, label: delivery.status === "active" ? "Demander le remplacement" : "Choisir ce livreur", irreversible: true };
+    if (action === "select") return { title: delivery.status === "active" ? "Remplacer le livreur" : "Choisir ce livreur", description: delivery.status === "active" ? "Le nouveau livreur devra confirmer sa disponibilité. Sa commission compensera automatiquement celle de l’ancien livreur : Tikis conservera une seule commission." : "La commission de ce livreur reste réservée jusqu’à ce qu’il confirme sa disponibilité : c’est à ce moment-là qu’elle sera définitivement prélevée et que vos coordonnées deviendront visibles l’un pour l’autre. Les autres commissions bloquées sont libérées immédiatement. Vous pourrez annuler ce choix sans frais tant qu’il n’a pas confirmé.", amount: commission, label: delivery.status === "active" ? "Demander le remplacement" : "Choisir ce livreur", irreversible: delivery.status === "active" };
     if (action === "confirm") return { title: "Confirmer la mission", description: "Votre confirmation autorise le partage des coordonnées avec l’expéditeur et finalise la mise en relation Tikis.", amount: ownCandidate?.commissionBlocked ?? commission, label: "Confirmer la mission", irreversible: true };
     if (action === "complete") return { title: "Terminer la livraison", description: "Confirmez uniquement lorsque la remise et le paiement direct avec l’expéditeur sont finalisés.", amount: 0, label: "Marquer comme terminée", irreversible: false };
     return null;
@@ -134,6 +135,7 @@ export default function DeliveryDetailScreen() {
     if (senderAction === "disable") return { title: "Désactiver la livraison", description: "Elle ne sera plus visible pour de nouveaux livreurs. Les candidatures en cours seront annulées et les commissions temporairement bloquées seront libérées.", confirmLabel: "Désactiver", tone: "warning" as const };
     if (senderAction === "reactivate") return { title: "Activer la livraison", description: "La livraison redeviendra visible pour les livreurs compatibles. Les anciennes candidatures restent annulées afin de leur permettre de se proposer avec les informations actuelles.", confirmLabel: "Activer", tone: "success" as const };
     if (senderAction === "cancel") return { title: "Annuler la livraison", description: "Cette action est réservée aux courses qui n’ont pas encore démarré. La livraison sera conservée dans votre historique avec son statut d’annulation.", confirmLabel: "Annuler la livraison", tone: "danger" as const };
+    if (senderAction === "unselect") return { title: "Annuler le choix du livreur", description: "Ce livreur n’a pas encore confirmé sa disponibilité : votre choix sera annulé sans aucun frais, sa commission bloquée sera intégralement libérée, et la livraison redeviendra ouverte aux candidatures. Le livreur reste candidat et pourra être choisi à nouveau.", confirmLabel: "Annuler le choix", tone: "warning" as const };
     return null;
   }, [senderAction]);
 
@@ -154,6 +156,7 @@ export default function DeliveryDetailScreen() {
   const canDisable = role === "sender" && delivery.status === "open";
   const canReactivate = role === "sender" && delivery.status === "disabled";
   const canCancel = role === "sender" && (delivery.status === "open" || delivery.status === "disabled");
+  const canUnselect = role === "sender" && delivery.status === "pending_confirmation";
   const isActive = delivery.status === "active";
   const isCompleted = delivery.status === "completed";
   const pickupPresentation = formatDeliveryDetailPlace(delivery.pickup);
@@ -174,7 +177,11 @@ export default function DeliveryDetailScreen() {
     try {
       if (action === "apply") {
         if (!actionConfig?.amount) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
-        const result = await applyMutation.mutateAsync({ deliveryId, confirmedCommission: actionConfig.amount, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
+        // Le serveur calcule la commission sur `offerPrice` quand une contre-offre est fournie (server/db.ts,
+        // applyForTikisDelivery) : il faut recalculer sur ce même montant ici, sinon le contrôle de
+        // correspondance côté serveur rejette systématiquement toute candidature avec contre-offre.
+        const confirmedCommission = counterOffer?.amount ? Math.round(counterOffer.amount * (walletQuery.data?.commissionRate ?? 0)) : actionConfig.amount;
+        const result = await applyMutation.mutateAsync({ deliveryId, confirmedCommission, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
         utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
       }
       if (action === "withdraw") {
@@ -205,6 +212,7 @@ export default function DeliveryDetailScreen() {
       if (senderAction === "disable") await disableMutation.mutateAsync({ deliveryId });
       if (senderAction === "reactivate") await reactivateMutation.mutateAsync({ deliveryId });
       if (senderAction === "cancel") await cancelMutation.mutateAsync({ deliveryId });
+      if (senderAction === "unselect") await unselectMutation.mutateAsync({ deliveryId });
       await refreshDelivery();
       setSenderAction(null);
       haptic.success();
@@ -394,6 +402,7 @@ export default function DeliveryDetailScreen() {
                 <Text style={[styles.cancelButtonText, senderProcessing && styles.cancelButtonTextDisabled]}>Annuler la livraison</Text>
               </Pressable>
             ) : null}
+            {canUnselect ? <TikisButton label="Annuler le choix du livreur" icon="undo" variant="secondary" onPress={() => setSenderAction("unselect")} loading={senderProcessing && senderAction === "unselect"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
           </View>
         ) : null}
 
@@ -413,6 +422,7 @@ export default function DeliveryDetailScreen() {
         visible={candidatesSheetOpen}
         candidates={candidates}
         deliveryStatus={delivery.status}
+        deliveryPrice={delivery.offeredPrice ?? delivery.estimatedPrice}
         loadingId={processing ? selectedCandidate?.id ?? null : null}
         onClose={() => setCandidatesSheetOpen(false)}
         onChoose={openCandidateAction}

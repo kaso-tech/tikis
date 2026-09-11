@@ -104,6 +104,11 @@ async function rememberResolvedPlace(place: LocationLabel) {
   }
 }
 
+/** Décision produit assumée : un lieu situé hors du pays associé au profil est rejeté (blocage dur), pas
+ *  seulement signalé. Conséquence connue et acceptée : un utilisateur proche d'une frontière pointant un
+ *  lieu légitimement situé de l'autre côté ne peut pas le sélectionner via ce chemin. La comparaison de
+ *  noms de pays (`localeCompare` sensibilité "base") tolère la casse et les accents mais reste sensible à
+ *  une variante de ponctuation (ex. apostrophe) si Mapbox et `COUNTRIES` divergeaient un jour sur ce point. */
 function ensureCountry(place: LocationLabel, countryCode?: string) {
   if (!countryCode || !place.country) return place;
   const expectedCountry = COUNTRIES.find((country) => country.id === countryCode)?.name;

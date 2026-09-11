@@ -192,7 +192,7 @@ describe("livraisons persistées Tikis", () => {
   it("refuse les retraits Wallet devenus indisponibles sans créer de mouvement", async () => {
     dbMock.getTikisProfileByPhone.mockResolvedValue(driver);
     const caller = appRouter.createCaller(contextFor(driver.phone));
-    await expect(caller.wallet.requestOperation({ type: "withdrawal", amount: 1_500 })).rejects.toThrow("Les retraits ne sont plus proposés");
+    await expect(caller.wallet.requestOperation({ type: "withdrawal", amount: 1_500, requestId: "3d487499-19e9-4f5e-a9c8-8777af588997" })).rejects.toThrow("Les retraits ne sont plus proposés");
     expect(dbMock.requestTikisWalletOperation).not.toHaveBeenCalled();
   });
 });

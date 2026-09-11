@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AdminAuthProvider, useAdminAuth } from "./lib/auth";
+import { trpc } from "./lib/trpc";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import CommissionPage from "./pages/CommissionPage";
@@ -57,10 +58,28 @@ function NavIcon({ glyph }: { glyph: string }) {
   return <span className="sidebar-link-icon">{glyph}</span>;
 }
 
+const OPEN_REPORTS_POLL_MS = 30_000;
+
 function Shell() {
   const { admin, logout } = useAdminAuth();
   const [page, setPage] = useState<PageKey>("dashboard");
   const [search, setSearch] = useState("");
+  const [openReportsCount, setOpenReportsCount] = useState(0);
+  useEffect(() => {
+    // Avant ce correctif, un nouveau signalement n'était visible qu'en rechargeant la page Tableau de
+    // bord : aucune notification. Le bouton "Notifications" de la barre du haut affichait un point fixe,
+    // sans donnée réelle. Un sondage léger suffit ici (pas besoin de temps réel pour ce cas d'usage admin).
+    let cancelled = false;
+    async function poll() {
+      try {
+        const openReports = await trpc.adminConsole.reports.list.query({ status: "open" });
+        if (!cancelled) setOpenReportsCount(Array.isArray(openReports) ? openReports.length : 0);
+      } catch { /* ignore : la prochaine tentative réessaiera */ }
+    }
+    void poll();
+    const interval = setInterval(() => void poll(), OPEN_REPORTS_POLL_MS);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
   useEffect(() => {
     function onNavigate(event: Event) {
       const custom = event as CustomEvent<{ page: PageKey }>;
@@ -135,7 +154,14 @@ function Shell() {
           </div>
           <div className="topbar-actions">
             <button className="icon-btn" title="Thème">◐</button>
-            <button className="icon-btn" title="Notifications"><span>◔</span><span className="dot" /></button>
+            <button
+              className="icon-btn"
+              title={openReportsCount > 0 ? `${openReportsCount} signalement${openReportsCount > 1 ? "s" : ""} ouvert${openReportsCount > 1 ? "s" : ""}` : "Aucun signalement ouvert"}
+              onClick={() => setPage("reports")}
+            >
+              <span>◔</span>
+              {openReportsCount > 0 ? <span className="dot" /> : null}
+            </button>
           </div>
         </header>
         <main className="main">

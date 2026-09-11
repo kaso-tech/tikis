@@ -27,7 +27,7 @@ export default function FinancePage() {
 
   const [bonusDraft, setBonusDraft] = useState({ phone: "", amount: "", reason: "" });
   const [sendingBonus, setSendingBonus] = useState(false);
-  const [pendingBonus, setPendingBonus] = useState<{ phone: string; amount: number; reason: string } | null>(null);
+  const [pendingBonus, setPendingBonus] = useState<{ phone: string; amount: number; reason: string; requestId: string } | null>(null);
 
   function loadTransactions(type: "deposit" | "withdrawal") {
     trpc.adminConsole.finance.transactions.query({ type, status: "pending" })
@@ -78,14 +78,16 @@ export default function FinancePage() {
     const amount = Number(bonusDraft.amount);
     if (!bonusDraft.phone.trim()) { setError("Renseignez le téléphone du bénéficiaire."); return; }
     if (!Number.isFinite(amount) || amount <= 0) { setError("Montant invalide."); return; }
-    setPendingBonus({ phone: bonusDraft.phone.trim(), amount, reason: bonusDraft.reason.trim() || "Crédit bonus" });
+    // Généré une seule fois ici, réutilisé même si la confirmation est déclenchée deux fois : un
+    // double-clic sur "Confirmer" ne peut donc jamais créditer deux fois le même bonus.
+    setPendingBonus({ phone: bonusDraft.phone.trim(), amount, reason: bonusDraft.reason.trim() || "Crédit bonus", requestId: crypto.randomUUID() });
   }
 
   async function confirmSendBonus() {
     if (!pendingBonus) return;
     setSendingBonus(true);
     try {
-      await trpc.adminConsole.finance.sendBonus.mutate({ phone: pendingBonus.phone, amount: pendingBonus.amount, reason: pendingBonus.reason });
+      await trpc.adminConsole.finance.sendBonus.mutate({ phone: pendingBonus.phone, amount: pendingBonus.amount, reason: pendingBonus.reason, requestId: pendingBonus.requestId });
       setSuccess(`${formatMoney(pendingBonus.amount)} envoyés à ${pendingBonus.phone}.`);
       setBonusDraft({ phone: "", amount: "", reason: "" });
       setPendingBonus(null);

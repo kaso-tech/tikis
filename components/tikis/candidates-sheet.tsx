@@ -11,6 +11,10 @@ type Props = {
   visible: boolean;
   candidates: DriverCandidate[];
   deliveryStatus: string;
+  /** Prix client de la livraison (offert ou estimé) : affiché pour tout candidat sans contre-offre.
+   *  Ne jamais le reconstruire depuis `commissionBlocked` — le taux de commission est configurable par
+   *  l'admin, une reconstruction suppose un taux fixe et affiche un montant erroné dès qu'il change. */
+  deliveryPrice: number;
   loadingId?: string | null;
   onClose: () => void;
   onChoose: (candidate: DriverCandidate) => void;
@@ -47,7 +51,7 @@ function nextSnap(current: number, velocityY: number): number {
   return SHEET_PEEK;
 }
 
-export function CandidatesSheet({ visible, candidates, deliveryStatus, loadingId, onClose, onChoose }: Props) {
+export function CandidatesSheet({ visible, candidates, deliveryStatus, deliveryPrice, loadingId, onClose, onChoose }: Props) {
   const { colors: theme } = useThemeColors();
   const styles = useMemo(() => stylesFor(theme), [theme]);
   const [tab, setTab] = useState<Tab>("all");
@@ -164,6 +168,7 @@ export function CandidatesSheet({ visible, candidates, deliveryStatus, loadingId
                     key={candidate.id}
                     candidate={candidate}
                     deliveryStatus={deliveryStatus}
+                    deliveryPrice={deliveryPrice}
                     loading={loadingId === candidate.id}
                     onChoose={() => onChoose(candidate)}
                     theme={theme}
@@ -204,11 +209,11 @@ function TabButton({ label, count, active, onPress, theme }: { label: string; co
   );
 }
 
-function CandidateCard({ candidate, deliveryStatus, loading, onChoose, theme }: { candidate: DriverCandidate; deliveryStatus: string; loading: boolean; onChoose: () => void; theme: any }) {
+function CandidateCard({ candidate, deliveryStatus, deliveryPrice, loading, onChoose, theme }: { candidate: DriverCandidate; deliveryStatus: string; deliveryPrice: number; loading: boolean; onChoose: () => void; theme: any }) {
   const isSelected = candidate.status === "selected" || candidate.status === "confirmed";
   const label = isSelected ? "En attente" : deliveryStatus === "active" ? "Remplacer" : "Choisir";
   const canChoose = !isSelected && !loading;
-  const vehiclePrice = candidate.offerPrice ?? candidate.commissionBlocked * 10;
+  const vehiclePrice = candidate.offerPrice ?? deliveryPrice;
   const postedAt = shortRelative(candidate.createdAt);
   const bearingDeg = 0;
   const certColor = theme.success;

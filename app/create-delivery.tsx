@@ -5,7 +5,6 @@ import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleShee
 import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
 import { createStyles } from "@/lib/create-styles";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { type SavedFavorite } from "@/components/tikis/place-sheets";
 import { YangoAddressPicker } from "@/components/tikis/yango-address-picker";
 import { TikisButton } from "@/components/tikis/ui";
 import { offeredPriceError, parseOfferedPrice, priceDifferencePercent, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
@@ -15,7 +14,7 @@ import { deliveryTextInputIssue, isAllowedDeliveryText, sanitizeDeliveryText } f
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { haptic } from "@/lib/haptics";
-import { locationSubtitle, locationTitle, type DeliveryType, type LocationLabel, type SelectableVehicleType } from "@/shared/tikis-domain";
+import { locationSubtitle, locationTitle, type DeliveryType, type LocationLabel, type SavedFavorite, type SelectableVehicleType } from "@/shared/tikis-domain";
 import { getDeliveryDraft, saveDeliveryDraft, type DeliveryDraft } from "@/lib/delivery-drafts";
 
 const VEHICLES: SelectableVehicleType[] = ["Vélo", "Moto", "Tricycle", "Voiture"];

@@ -13,6 +13,8 @@ import { findCountryForPhone } from "../lib/registration-rules";
 import { createTikisProfileSession } from "./tikis-session";
 import { recordGeographicMetric } from "./geography-observability";
 import { isAllowedDeliveryText, sanitizeDeliveryText } from "../lib/tikis-engine";
+import { sanitizePlaceText } from "../lib/geo-rules";
+import { MAX_PERIMETER_RADIUS_KM, MIN_PERIMETER_RADIUS_KM } from "../shared/driver-perimeter";
 import { isValidReviewText, sanitizeReviewText } from "../lib/review-rules";
 import { canReviewDelivery } from "./_test-helpers/review-eligibility";
 import { tikisAdminRouter } from "./admin-router";
@@ -156,21 +158,20 @@ async function syncDeliveryParticipants(delivery: Pick<ResolvedDelivery, "id" | 
 
 const GEO_RATE_LIMIT_WINDOW_MS = 60_000;
 const GEO_RATE_LIMIT_MAX_REQUESTS = 40;
-const geographyRequests = new Map<string, number[]>();
 
-function enforceGeographyRateLimit(profilePhone: string) {
-  const now = Date.now();
-  const recent = (geographyRequests.get(profilePhone) ?? []).filter((timestamp) => now - timestamp < GEO_RATE_LIMIT_WINDOW_MS);
-  if (recent.length >= GEO_RATE_LIMIT_MAX_REQUESTS) {
+// Distribué (table partagée entre toutes les instances du serveur) : un compteur en mémoire de
+// processus ne protège que l'instance qui le détient — un client réparti sur plusieurs connexions
+// pouvait multiplier la limite effective par le nombre d'instances derrière le load balancer.
+async function enforceGeographyRateLimit(profilePhone: string) {
+  const withinLimit = await db.checkDistributedRateLimit("geo", profilePhone, GEO_RATE_LIMIT_WINDOW_MS, GEO_RATE_LIMIT_MAX_REQUESTS);
+  if (!withinLimit) {
     recordGeographicMetric("search", "rate_limited");
     throw new Error("Trop de demandes de lieux en cours. Réessayez dans une minute.");
   }
-  recent.push(now);
-  geographyRequests.set(profilePhone, recent);
 }
 
 const protectedGeographyProcedure = tikisProtectedProcedure.use(async ({ ctx, next }) => {
-  enforceGeographyRateLimit(ctx.tikisProfilePhone);
+  await enforceGeographyRateLimit(ctx.tikisProfilePhone);
   return next();
 });
 
@@ -193,7 +194,13 @@ const base64ImageSchema = z.string().min(32).max(1_600_000).regex(/^[A-Za-z0-9+/
  *  3 images KYC = 20 MB max par soumission, contrôlé dans la mutation submit. */
 const kycBase64ImageSchema = z.string().min(32).max(6_700_000).regex(/^[A-Za-z0-9+/=]+$/, "Données d’image invalides.");
 const coordinateSchema = z.number().finite();
-const placeSchema = z.object({ name: z.string().max(140), district: z.string().max(120), city: z.string().max(120), latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180), googlePlaceId: z.string().max(255).optional(), mapboxId: z.string().max(255).optional(), mapboxSessionToken: z.string().uuid().optional(), formattedAddress: z.string().max(255).optional(), street: z.string().max(160).optional(), province: z.string().max(120).optional(), country: z.string().max(120).optional(), source: z.enum(["search", "retrieve", "reverse", "forward", "favorite", "manual", "legacy"]).optional() });
+// Mêmes valeurs que LocationLabel["featureType"]/["precision"] (shared/tikis-domain.ts) : transmettre la
+// classification déjà connue côté client évite qu'elle ne soit perdue (dégradée à "unknown") à la persistance
+// pour les lieux issus du repli communautaire (OpenStreetMap/Mapbox direct), qui ne repassent jamais par
+// resolve/reverse avant d'atteindre deliveries.create ou geography.savePlace.
+const featureTypeSchema = z.enum(["address", "secondary_address", "poi", "street", "neighborhood", "locality", "place", "point", "unknown"]);
+const precisionSchema = z.enum(["exact", "street", "area", "city", "unknown"]);
+const placeSchema = z.object({ name: z.string().max(140), district: z.string().max(120), city: z.string().max(120), latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180), googlePlaceId: z.string().max(255).optional(), mapboxId: z.string().max(255).optional(), mapboxSessionToken: z.string().uuid().optional(), formattedAddress: z.string().max(255).optional(), street: z.string().max(160).optional(), province: z.string().max(120).optional(), country: z.string().max(120).optional(), source: z.enum(["search", "retrieve", "reverse", "forward", "favorite", "manual", "legacy"]).optional(), featureType: featureTypeSchema.optional(), precision: precisionSchema.optional() });
 const favoriteLabelSchema = z.string().trim().min(1).max(80).regex(/^[\p{L}\p{N}]+(?:[ .,'’()\-][\p{L}\p{N}]+)*$/u, "Libellé de favori invalide.");
 const deliveryTextSchema = z.string().trim().min(3).max(450);
 const deliveryVehicleSchema = z.enum(["Vélo", "Moto", "Tricycle", "Voiture"]);
@@ -225,22 +232,27 @@ async function currentTikisProfile(phone: string) {
 }
 
 async function saveDeliveryPlace(place: z.infer<typeof placeSchema>) {
+  // `placeSchema` ne contrôle que la longueur, jamais le contenu : un appel API direct (hors app) pourrait
+  // sinon persister des caractères de contrôle ou des espaces multiples, visibles ensuite par toute la
+  // communauté d'utilisateurs qui reverrait ce lieu via le cache par coordonnée/mapboxId.
+  const name = sanitizePlaceText(place.name);
+  const formattedAddress = place.formattedAddress ? sanitizePlaceText(place.formattedAddress, 255) : undefined;
   return db.saveTikisPlace({
     googlePlaceId: place.googlePlaceId,
     mapboxPlaceId: place.mapboxId,
     latitude: String(place.latitude),
     longitude: String(place.longitude),
-    formattedAddress: place.formattedAddress ?? place.name,
-    placeName: place.name,
-    street: place.street,
-    district: place.district,
-    city: place.city,
-    province: place.province,
-    country: place.country,
+    formattedAddress: formattedAddress ?? name,
+    placeName: name,
+    street: place.street ? sanitizePlaceText(place.street) : undefined,
+    district: sanitizePlaceText(place.district),
+    city: sanitizePlaceText(place.city),
+    province: place.province ? sanitizePlaceText(place.province) : undefined,
+    country: place.country ? sanitizePlaceText(place.country) : undefined,
     provider: place.mapboxId ? "mapbox" : "manual",
     source: place.source ?? (place.mapboxId ? "retrieve" : "manual"),
-    featureType: "unknown",
-    precision: "unknown",
+    featureType: place.featureType ?? "unknown",
+    precision: place.precision ?? "unknown",
   });
 }
 
@@ -484,7 +496,9 @@ export const appRouter = router({
     pricingConfig: tikisProtectedProcedure.query(() => adminDb.adminGetPricingConfig()),
     countries: publicProcedure.query(() => db.listSupportedCountries()),
     searchCities: tikisProtectedProcedure.input(z.object({ query: z.string().min(2).max(80), countryCode: z.string().length(2) })).query(({ input }) => geography.searchCities(input.query, input.countryCode)),
-    savePlace: protectedGeographyProcedure.input(placeSchema).mutation(async ({ input }) => db.saveTikisPlace({ googlePlaceId: input.googlePlaceId, mapboxPlaceId: input.mapboxId, latitude: String(input.latitude), longitude: String(input.longitude), formattedAddress: input.formattedAddress ?? input.name, placeName: input.name, street: input.street, district: input.district, city: input.city, province: input.province, country: input.country, provider: input.mapboxId ? "mapbox" : "manual", source: input.mapboxId ? "retrieve" : "manual", featureType: "unknown", precision: "unknown" })),
+    // Identique à `saveDeliveryPlace` (même schéma, même sanitization, même persistance) : un seul
+    // chemin d'écriture des lieux, pour ne jamais laisser deux logiques diverger silencieusement.
+    savePlace: protectedGeographyProcedure.input(placeSchema).mutation(async ({ input }) => saveDeliveryPlace(input)),
     favorites: router({
       list: tikisProtectedProcedure.query(({ ctx }) => db.listFavoritePlaces(ctx.tikisProfilePhone)),
       add: tikisProtectedProcedure.input(z.object({ placeId: z.number().int().positive(), label: favoriteLabelSchema })).mutation(async ({ ctx, input }) => db.saveFavoritePlace(ctx.tikisProfilePhone, input.placeId, input.label)),
@@ -496,16 +510,17 @@ export const appRouter = router({
     list: tikisProtectedProcedure.query(async ({ ctx }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       const deliveries = await db.listTikisDeliveriesForProfile(profile.phone, profile.accountType);
-      const compatible = profile.accountType === "driver"
-        ? deliveries.filter((delivery) => delivery.driverId === profile.phone || delivery.vehicleTypes.some((vehicle) => {
-          try { return JSON.parse(profile.vehicles).includes(vehicle); } catch { return false; }
-        }))
-        : deliveries;
       if (profile.accountType !== "driver") {
-        const candidateCounts = await db.countTikisDeliveryCandidates(compatible.map((delivery) => delivery.id));
-        return compatible.map((delivery) => ({ ...deliveryForProfile(delivery, profile), candidateCount: candidateCounts.get(delivery.id) ?? 0 }));
+        const candidateCounts = await db.countTikisDeliveryCandidates(deliveries.map((delivery) => delivery.id));
+        return deliveries.map((delivery) => ({ ...deliveryForProfile(delivery, profile), candidateCount: candidateCounts.get(delivery.id) ?? 0 }));
       }
-      const candidatesByDelivery = await db.listTikisDeliveryCandidateStatesForDriver(compatible.map((delivery) => delivery.id), profile.phone);
+      // Calculé sur l'ensemble de `deliveries` (avant le filtre de compatibilité) : un candidat non
+      // retenu doit retrouver sa propre candidature même si son engin ne correspondrait plus au filtre
+      // (la compatibilité au moment de candidater suffit, elle ne se réévalue pas après coup).
+      const candidatesByDelivery = await db.listTikisDeliveryCandidateStatesForDriver(deliveries.map((delivery) => delivery.id), profile.phone);
+      const compatible = deliveries.filter((delivery) => delivery.driverId === profile.phone || candidatesByDelivery.has(delivery.id) || delivery.vehicleTypes.some((vehicle) => {
+        try { return JSON.parse(profile.vehicles).includes(vehicle); } catch { return false; }
+      }));
       return compatible.map((delivery) => {
         const candidate = candidatesByDelivery.get(delivery.id);
         return { ...deliveryForProfile(delivery, profile), ...(candidate ? { ownCandidateStatus: candidate.status } : {}) };
@@ -594,6 +609,11 @@ export const appRouter = router({
           passengers: input.passengers ?? null,
         });
         if (!delivery) throw new Error("La livraison n’a pas pu être enregistrée.");
+        // Sans ceci, l'expéditeur ne devient membre du canal Realtime privé qu'à la première
+        // modification de la livraison (syncDeliveryParticipants n'était jusqu'ici appelé que par
+        // `update`), laissant la phase "en attente de candidatures" sans mise à jour temps réel.
+        await syncDeliveryParticipants({ id: delivery.id, senderPhone: delivery.senderPhone, driverPhone: delivery.driverPhone ?? undefined } as ResolvedDelivery);
+        void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livraison publiée", body: "Votre livraison est visible par les livreurs compatibles.", occurredAt: new Date().toISOString() });
         return delivery;
       } catch (cause) {
         console.error("[deliveries.create] failed", cause);
@@ -617,7 +637,11 @@ export const appRouter = router({
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("Seul un livreur peut candidater.");
       if (!profile.photoKey) throw new Error("Votre profil doit être vérifié (photo + pièce d'identité) avant de candidater à une livraison.");
-      return db.applyForTikisDelivery({ id: randomUUID(), deliveryId: input.deliveryId, driverPhone: profile.phone, confirmedCommission: input.confirmedCommission, ...(input.offerPrice ? { offerPrice: input.offerPrice } : {}) });
+      const result = await db.applyForTikisDelivery({ id: randomUUID(), deliveryId: input.deliveryId, driverPhone: profile.phone, confirmedCommission: input.confirmedCommission, ...(input.offerPrice ? { offerPrice: input.offerPrice } : {}) });
+      // Sans ce signal, la feuille de candidatures d'un Sender déjà ouverte sur l'écran détail ne
+      // voyait jamais apparaître une nouvelle candidature sans rafraîchissement manuel.
+      void publishDeliveryStatusBroadcast({ deliveryId: input.deliveryId, status: "open", title: "Nouvelle candidature", body: "Un livreur compatible s’est proposé pour votre livraison.", occurredAt: new Date().toISOString() });
+      return result;
     }),
     update: tikisProtectedProcedure.input(deliveryInputSchema.safeExtend({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
@@ -673,13 +697,22 @@ export const appRouter = router({
     withdraw: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("Seul un livreur peut retirer sa candidature.");
-      return db.withdrawTikisDeliveryCandidateWithWallet(input.deliveryId, profile.phone);
+      const result = await db.withdrawTikisDeliveryCandidateWithWallet(input.deliveryId, profile.phone);
+      void publishDeliveryStatusBroadcast({ deliveryId: input.deliveryId, status: "open", title: "Candidature retirée", body: "Un livreur a retiré sa candidature.", occurredAt: new Date().toISOString() });
+      return result;
     }),
     selectCandidate: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid(), candidateId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "sender") throw new Error("Seul l’expéditeur peut choisir un livreur.");
       const delivery = await db.selectTikisDeliveryCandidateWithWallet(input.deliveryId, input.candidateId, profile.phone);
       if (delivery) { await syncDeliveryParticipants(delivery); void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Livreur sélectionné", body: "La livraison attend la confirmation du livreur.", occurredAt: new Date().toISOString() }); }
+      return delivery;
+    }),
+    unselectCandidate: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "sender") throw new Error("Seul l’expéditeur peut annuler son choix de livreur.");
+      const delivery = await db.unselectTikisDeliveryCandidateFromSender(input.deliveryId, profile.phone);
+      if (delivery) { await syncDeliveryParticipants(delivery); void publishDeliveryStatusBroadcast({ deliveryId: delivery.id, status: delivery.status, title: "Choix annulé", body: "L’expéditeur a annulé son choix avant confirmation du livreur.", occurredAt: new Date().toISOString() }); }
       return delivery;
     }),
     confirm: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
@@ -702,10 +735,17 @@ export const appRouter = router({
       const [wallet, journal, commissionRate] = await Promise.all([db.getTikisWalletSnapshot(profile.phone), db.listTikisWalletLedger(profile.phone), db.getTikisCommissionRate()]);
       return { wallet, journal, commissionRate };
     }),
-    requestOperation: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000) })).mutation(async ({ ctx, input }) => {
+    // Historique informatif des gains de courses d'un livreur : calculé depuis les livraisons terminées, jamais
+    // depuis le Wallet (qui n'est jamais crédité par une livraison, le paiement se faisant hors application).
+    driverEarningsHistory: tikisProtectedProcedure.query(async ({ ctx }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "driver") return [];
+      return db.getDriverCompletedDeliveryEarnings(profile.phone);
+    }),
+    requestOperation: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       if (input.type === "withdrawal") throw new Error("Les retraits ne sont plus proposés : le Wallet sert uniquement à recharger votre compte pour effectuer des livraisons.");
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
-      return db.requestTikisWalletOperation(profile.phone, input.type, input.amount);
+      return db.requestTikisWalletOperation(profile.phone, input.type, input.amount, input.requestId);
     }),
     initiateYengaPayTest: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000), idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{16,96}$/) })).mutation(async ({ ctx, input }) => {
       if (input.type === "withdrawal") throw new Error("Les retraits ne sont plus proposés : le Wallet sert uniquement à recharger votre compte pour effectuer des livraisons.");
@@ -742,6 +782,41 @@ export const appRouter = router({
     unregisterPushToken: tikisProtectedProcedure.input(z.object({ token: z.string().min(20).max(200) })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       return db.unregisterPushToken({ phone: profile.phone, token: input.token });
+    }),
+  }),
+  /** Périmètre de travail du livreur : alertes push de nouvelles courses et rayon d'affichage des
+   *  opportunités (cf. shared/driver-perimeter.ts). Réservé aux comptes livreurs — un expéditeur n'a
+   *  ni opportunité à filtrer ni alerte de ce type à recevoir. */
+  driverPerimeter: router({
+    get: tikisProtectedProcedure.query(async ({ ctx }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "driver") throw new Error("Ces réglages sont réservés aux livreurs.");
+      return { ...(await db.getDriverPerimeterPreferences(profile.phone)), city: profile.city ?? null };
+    }),
+    update: tikisProtectedProcedure.input(z.object({
+      opportunityPushEnabled: z.boolean().optional(),
+      // `null` est une valeur métier à part entière (« ma ville »), à distinguer d'un champ absent
+      // qui, lui, laisse le réglage inchangé — d'où `.nullable().optional()` et non `.optional()`.
+      alertRadiusKm: z.number().int().min(MIN_PERIMETER_RADIUS_KM).max(MAX_PERIMETER_RADIUS_KM).nullable().optional(),
+      discoveryRadiusKm: z.number().int().min(MIN_PERIMETER_RADIUS_KM).max(MAX_PERIMETER_RADIUS_KM).nullable().optional(),
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "driver") throw new Error("Ces réglages sont réservés aux livreurs.");
+      return { ...(await db.updateDriverPerimeterPreferences(profile.phone, input)), city: profile.city ?? null };
+    }),
+    /** Position de référence des rayons. Même géofencing que le suivi en direct : une position hors
+     *  zone de service est refusée plutôt que d'être enregistrée comme centre du périmètre. */
+    updateBasePosition: protectedGeographyProcedure.input(z.object({
+      latitude: coordinateSchema.min(-90).max(90),
+      longitude: coordinateSchema.min(-180).max(180),
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      if (profile.accountType !== "driver") throw new Error("Ces réglages sont réservés aux livreurs.");
+      const countryCode = profile.country ?? findCountryForPhone(profile.phone).id;
+      if (!isCoordinateInCountry(input.latitude, input.longitude, countryCode)) {
+        throw new Error("La position détectée est en dehors de la zone de service. Vérifie ton GPS.");
+      }
+      return { ...(await db.updateDriverBasePosition(profile.phone, input.latitude, input.longitude)), city: profile.city ?? null };
     }),
   }),
   reviews: router({
@@ -847,6 +922,12 @@ export const appRouter = router({
       deliveryId: z.string().uuid(),
       reason: reportReasonSchema,
       description: reportDescriptionSchema,
+      // La colonne `attachmentKey` existait déjà côté base et admin, mais aucun chemin ne permettait de
+      // la remplir : le formulaire annonçait des pièces jointes "facultatives" sans jamais les accepter.
+      attachmentBase64: base64ImageSchema.optional(),
+      attachmentMime: photoMimeSchema.optional(),
+    }).superRefine((value, ctx) => {
+      if (value.attachmentBase64 && !value.attachmentMime) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["attachmentMime"], message: "Type d’image requis." });
     })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       const delivery = await db.getTikisDeliveryRecordById(input.deliveryId);
@@ -854,12 +935,21 @@ export const appRouter = router({
       const isSender = delivery.senderPhone === profile.phone;
       const isDriver = delivery.driverPhone === profile.phone;
       if (!isSender && !isDriver) throw new Error("Vous ne pouvez signaler qu’une livraison à laquelle vous participez.");
+      let attachmentKey: string | undefined;
+      if (input.attachmentBase64 && input.attachmentMime) {
+        const safePhone = profile.phone.replace(/[^0-9]/g, "");
+        const extension = input.attachmentMime === "image/png" ? "png" : input.attachmentMime === "image/webp" ? "webp" : "jpg";
+        const bytes = Buffer.from(input.attachmentBase64, "base64");
+        const stored = await storagePut(`tikis-reports/${safePhone}/${Date.now()}-${randomUUID()}.${extension}`, bytes, input.attachmentMime);
+        attachmentKey = stored.key;
+      }
       return adminDb.createDeliveryReport({
         deliveryId: input.deliveryId,
         reporterPhone: profile.phone,
         reporterRole: isSender ? "sender" : "driver",
         reason: input.reason,
         description: sanitizeDeliveryText(input.description),
+        ...(attachmentKey ? { attachmentKey } : {}),
       });
     }),
   }),

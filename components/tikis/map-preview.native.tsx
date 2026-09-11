@@ -3,7 +3,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 
-import { formatNavigationTarget } from "@/lib/geo-rules";
+import { formatListRouteParts, formatNavigationTarget } from "@/lib/geo-rules";
 import type { LocationLabel } from "@/shared/tikis-domain";
 
 type Props = {
@@ -14,6 +14,10 @@ type Props = {
 };
 
 export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }: Props) {
+  // Même formateur centralisé que le texte du trajet (delivery-card.tsx) : sans lui, cette légende
+  // affichait `pickup.name`/`dropoff.name` bruts, ignorant la règle "Ville → Ville" quand les villes
+  // diffèrent — deux libellés différents pour le même trajet, dans le même écran.
+  const route = formatListRouteParts(pickup, dropoff);
   const center = {
     latitude: (pickup.latitude + dropoff.latitude) / 2,
     longitude: (pickup.longitude + dropoff.longitude) / 2,
@@ -65,7 +69,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
         <View style={styles.legendRow}>
           <View style={styles.legendDotPickup} />
           <Text numberOfLines={1} style={styles.legendLabel}>
-            {pickup.name || "Récupération"}
+            {route.pickup || "Récupération"}
           </Text>
         </View>
         <Text numberOfLines={1} style={styles.legendSub}>
@@ -75,7 +79,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
         <View style={styles.legendRow}>
           <View style={styles.legendDotDropoff} />
           <Text numberOfLines={1} style={styles.legendLabel}>
-            {dropoff.name || "Destination"}
+            {route.dropoff || "Destination"}
           </Text>
         </View>
         <Text numberOfLines={1} style={styles.legendSub}>

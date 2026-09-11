@@ -12,10 +12,26 @@ import type { LocationLabel } from "@/shared/tikis-domain";
 
 type Coordinate = { latitude: number; longitude: number };
 const FALLBACK_REGION = { latitude: 12.3714, longitude: -1.5197, latitudeDelta: 0.09, longitudeDelta: 0.09 };
+// En dessous de ce seuil, un nouveau glissement de carte ne redéclenche pas de géocodage inverse : la
+// précision GPS/écran est de toute façon bien supérieure à 15 m, donc deux relâchements proches du même
+// point n'apportent aucune information nouvelle — juste un appel Mapbox/OSM et une écriture DB en plus.
+const MIN_REVERSE_DISTANCE_METERS = 15;
+
+function distanceMeters(a: Coordinate, b: Coordinate): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const earthRadiusMeters = 6_371_000;
+  const dLat = toRad(b.latitude - a.latitude);
+  const dLng = toRad(b.longitude - a.longitude);
+  const lat1 = toRad(a.latitude);
+  const lat2 = toRad(b.latitude);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * earthRadiusMeters * Math.asin(Math.sqrt(h));
+}
 
 export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, onUse, onFavorite }: { visible: boolean; targetTitle: string; initialPlace: LocationLabel | null; countryCode?: string; onClose: () => void; onUse: (place: LocationLabel) => void; onFavorite: (place: LocationLabel, label: string) => Promise<void> }) {
   const mapRef = useRef<MapView>(null);
   const reverseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastResolvedRef = useRef<Coordinate | null>(null);
   const initializedForOpening = useRef(false);
   const [place, setPlace] = useState<LocationLabel | null>(initialPlace);
   const [isMoving, setIsMoving] = useState(false);
@@ -29,9 +45,16 @@ export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, 
     try {
       setMessage("Identification de l’adresse…");
       const result = await reverse.mutateAsync(coordinate);
+      // Marqué "résolu" seulement en cas de succès : si on l'enregistrait avant l'appel, un échec réseau
+      // laissait `lastResolvedRef` bloqué sur ce point pour le reste de la session de la modale — un
+      // nudge du marqueur à moins de 15 m ne redéclenchait alors plus jamais de nouvelle tentative.
+      lastResolvedRef.current = coordinate;
       setPlace(result ? { ...result, latitude: coordinate.latitude, longitude: coordinate.longitude, source: "reverse", precision: "exact" } : null);
       setMessage(result ? "" : "Adresse introuvable. Ajustez légèrement le marqueur.");
-    } catch (cause) { setMessage(cause instanceof Error ? cause.message : "Le géocodage inverse est momentanément indisponible."); }
+    } catch (cause) {
+      lastResolvedRef.current = null;
+      setMessage(cause instanceof Error ? cause.message : "Le géocodage inverse est momentanément indisponible.");
+    }
   }, [reverse]);
 
   const moveToPosition = useCallback(async () => {
@@ -62,6 +85,7 @@ export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, 
   function handleRegionChangeComplete(region: Coordinate) {
     setIsMoving(false);
     if (reverseTimer.current) clearTimeout(reverseTimer.current);
+    if (lastResolvedRef.current && distanceMeters(lastResolvedRef.current, region) < MIN_REVERSE_DISTANCE_METERS) return;
     reverseTimer.current = setTimeout(() => { void resolveCenter({ latitude: region.latitude, longitude: region.longitude }); }, 240);
   }
   async function saveFavorite(label: string) { if (!place || saving) return; setSaving(true); try { await onFavorite(place, label); setMessage("Adresse enregistrée dans Mes adresses."); } finally { setSaving(false); } }

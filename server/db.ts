@@ -1,13 +1,14 @@
 import { randomUUID } from "crypto";
 import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, tikisFavoritePlaces, tikisKycSubmissions, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisPushTokens, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, tikisYengapayWebhookEvents, users } from "../drizzle/schema";
+import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, TikisDriverPreferences, tikisDriverPreferences, tikisFavoritePlaces, tikisKycSubmissions, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisPushTokens, tikisRateLimits, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, tikisYengapayWebhookEvents, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { createYengapayPaymentIntent, readYengapayConfig, verifyYengapayPayment } from "./yengapay";
 import { sendPushToTokens, type PushMessage } from "./push";
 import { isValidExpoPushTokenShape } from "./_test-helpers/push-token-shape";
 import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppNotification, LocationLabel, SelectableVehicleType, WalletOperation, WalletSnapshot } from "../shared/tikis-domain";
-import { candidateMovementVersion } from "../shared/wallet-commission";
+import { candidateMovementVersion, computeReplacementSettlement } from "../shared/wallet-commission";
+import { DEFAULT_DRIVER_PERIMETER, evaluatePerimeter, isValidPerimeterRadius, MAX_PERIMETER_RADIUS_KM, MIN_PERIMETER_RADIUS_KM, type DriverPerimeterPreferences } from "../shared/driver-perimeter";
 import { DELIVERY_EXPIRATION_MS, deliveryActivityTimestamp, deliveryExpirationOutcome } from "../shared/delivery-expiration";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -224,7 +225,12 @@ export function coordinateCacheKey(latitude: string | number, longitude: string 
   const safeLatitude = Number(latitude);
   const safeLongitude = Number(longitude);
   if (!Number.isFinite(safeLatitude) || !Number.isFinite(safeLongitude)) throw new Error("Coordonnées de lieu invalides.");
-  return `${safeLatitude.toFixed(7)}:${safeLongitude.toFixed(7)}`;
+  // 5 décimales ≈ 1,1 m de précision : suffisant pour identifier "le même lieu" tout en laissant
+  // deux positions de drag de carte proches (précision GPS/écran bien supérieure à 1 cm) retomber sur
+  // la même clé. À 7 décimales (~1 cm), deux relâchements successifs du même marqueur ne matchaient
+  // presque jamais, redéclenchant un appel Mapbox/OSM et créant une nouvelle ligne `tikis_places` à
+  // chaque fois — annulant en pratique l'intérêt du cache pour son cas d'usage principal.
+  return `${safeLatitude.toFixed(5)}:${safeLongitude.toFixed(5)}`;
 }
 
 export function tikisPlaceToLocation(place: TikisPlace): LocationLabel {
@@ -254,6 +260,50 @@ export async function getTikisPlaceByCoordinate(latitude: string | number, longi
   return result[0];
 }
 
+const NEARBY_PLACE_DEDUP_METERS = 50;
+/** Marge large pour une pré-sélection SQL par bornes (pas un filtre définitif) : la distance réelle est
+ *  ensuite recalculée en JS. ~0,0006° ≈ 65-67 m aux latitudes du Burkina Faso, une marge suffisante pour
+ *  ne jamais exclure un candidat à 50 m tout en restant sélectif dans un index (latitude, longitude). */
+const NEARBY_PLACE_BOUNDING_BOX_DEGREES = 0.0006;
+
+function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const earthRadiusMeters = 6_371_000;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const lat1 = toRad(aLat);
+  const lat2 = toRad(bLat);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * earthRadiusMeters * Math.asin(Math.sqrt(h));
+}
+
+/** Lieux saisis manuellement (sans identifiant fournisseur) uniquement : un pin posé à quelques mètres
+ *  d'un lieu manuel déjà connu réutilise ce dernier plutôt que de créer un doublon quasi identique.
+ *  Les lieux avec un identifiant fournisseur (Google/Mapbox) ne passent jamais par ici : ils dédupliquent
+ *  déjà exactement par cet identifiant, ce qui est plus fiable qu'une proximité géographique. */
+async function findNearbyManualTikisPlace(latitude: number, longitude: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const candidates = await db.select().from(tikisPlaces).where(and(
+    isNull(tikisPlaces.googlePlaceId),
+    isNull(tikisPlaces.mapboxPlaceId),
+    gte(tikisPlaces.latitude, String(latitude - NEARBY_PLACE_BOUNDING_BOX_DEGREES)),
+    lte(tikisPlaces.latitude, String(latitude + NEARBY_PLACE_BOUNDING_BOX_DEGREES)),
+    gte(tikisPlaces.longitude, String(longitude - NEARBY_PLACE_BOUNDING_BOX_DEGREES)),
+    lte(tikisPlaces.longitude, String(longitude + NEARBY_PLACE_BOUNDING_BOX_DEGREES)),
+  )).limit(25);
+  let closest: { place: (typeof candidates)[number]; distance: number } | undefined;
+  for (const candidate of candidates) {
+    const distance = haversineMeters(latitude, longitude, Number(candidate.latitude), Number(candidate.longitude));
+    if (distance <= NEARBY_PLACE_DEDUP_METERS && (!closest || distance < closest.distance)) closest = { place: candidate, distance };
+  }
+  return closest?.place;
+}
+
+function tikisPlaceQualityScore(precision: string, featureType: string) {
+  return (precision === "exact" ? 40 : precision === "street" ? 30 : precision === "area" ? 20 : precision === "city" ? 10 : 0) + (featureType === "poi" ? 5 : 0);
+}
+
 export async function saveTikisPlace(input: Omit<InsertTikisPlace, "coordinateKey" | "resolvedAt">) {
   const db = await getDb();
   if (!db) throw new Error("La base de lieux est temporairement indisponible.");
@@ -266,12 +316,16 @@ export async function saveTikisPlace(input: Omit<InsertTikisPlace, "coordinateKe
     const cached = await getTikisPlaceByMapboxId(input.mapboxPlaceId);
     if (cached) return cached;
   }
-  const cachedByCoordinate = await getTikisPlaceByCoordinate(input.latitude, input.longitude);
-  if (cachedByCoordinate) {
-    const quality = (precision: string, featureType: string) => (precision === "exact" ? 40 : precision === "street" ? 30 : precision === "area" ? 20 : precision === "city" ? 10 : 0) + (featureType === "poi" ? 5 : 0);
-    if (quality(cachedByCoordinate.precision, cachedByCoordinate.featureType) >= quality(input.precision ?? "unknown", input.featureType ?? "unknown")) return cachedByCoordinate;
-    await db.update(tikisPlaces).set({ ...input, coordinateKey: coordinateCacheKey(input.latitude, input.longitude) }).where(eq(tikisPlaces.id, cachedByCoordinate.id));
-    const updated = await db.select().from(tikisPlaces).where(eq(tikisPlaces.id, cachedByCoordinate.id)).limit(1);
+  // Sans identifiant fournisseur (pin manuel, ou résultat "reverse" dont l'id est de toute façon
+  // ignoré ci-dessous) : au-delà de la clé de coordonnée exacte, un lieu à quelques mètres d'un lieu
+  // manuel déjà connu le réutilise plutôt que de créer un doublon quasi identique dans `tikis_places`.
+  const isManualPlace = isExactMapSelection || (!input.googlePlaceId && !input.mapboxPlaceId);
+  const existingPlace = (await getTikisPlaceByCoordinate(input.latitude, input.longitude))
+    ?? (isManualPlace ? await findNearbyManualTikisPlace(Number(input.latitude), Number(input.longitude)) : undefined);
+  if (existingPlace) {
+    if (tikisPlaceQualityScore(existingPlace.precision, existingPlace.featureType) >= tikisPlaceQualityScore(input.precision ?? "unknown", input.featureType ?? "unknown")) return existingPlace;
+    await db.update(tikisPlaces).set({ ...input, coordinateKey: coordinateCacheKey(input.latitude, input.longitude) }).where(eq(tikisPlaces.id, existingPlace.id));
+    const updated = await db.select().from(tikisPlaces).where(eq(tikisPlaces.id, existingPlace.id)).limit(1);
     if (updated[0]) return updated[0];
   }
   const inserted = await db.insert(tikisPlaces).values({
@@ -379,10 +433,170 @@ async function deliveryJoins(rows: TikisDelivery[]): Promise<Delivery[]> {
   });
 }
 
+const MAX_COMPATIBLE_DRIVERS_NOTIFIED = 200;
+
+/** Livreurs actifs dont au moins un engin correspond à la livraison — même règle de compatibilité que
+ *  `deliveries.list` (server/routers.ts), juste appliquée dans l'autre sens. Pas de correspondance JSON
+ *  au niveau SQL (`vehicles` est stocké en texte) : filtrage en JS, comme ailleurs dans ce fichier.
+ *  Bornée à `MAX_COMPATIBLE_DRIVERS_NOTIFIED` par défense contre un volume de livreurs très important. */
+// Borne la lecture SQL elle-même (pas seulement l'accumulateur JS ci-dessous) : sans cette limite, la
+// requête chargeait la table des livreurs actifs en entier en mémoire, à l'intérieur de la même
+// transaction que la création/réactivation de la livraison, pour chaque publication. `vehicles` étant
+// stocké en texte (pas de correspondance JSON possible au niveau SQL), le compromis accepté est de ne
+// considérer que les `MAX_DRIVERS_SCANNED_FOR_COMPATIBILITY` profils actifs les plus récents : au-delà de
+// ce volume de livreurs actifs, certains ne recevront pas cette notification précise (l'app reste malgré
+// tout découvrable via `deliveries.list`, qui n'a pas cette limite).
+const MAX_DRIVERS_SCANNED_FOR_COMPATIBILITY = 2_000;
+
+function driverPreferencesToView(row: TikisDriverPreferences): DriverPerimeterPreferences {
+  return {
+    opportunityPushEnabled: Boolean(row.opportunityPushEnabled),
+    alertRadiusKm: row.alertRadiusKm ?? null,
+    discoveryRadiusKm: row.discoveryRadiusKm ?? null,
+    baseLatitude: row.baseLatitude === null ? null : Number(row.baseLatitude),
+    baseLongitude: row.baseLongitude === null ? null : Number(row.baseLongitude),
+    baseUpdatedAt: row.baseUpdatedAt ? row.baseUpdatedAt.toISOString() : null,
+  };
+}
+
+/** Préférences de périmètre d'un livreur. Aucune ligne en base = réglages par défaut : alertes push
+ *  désactivées, périmètre limité à la ville du profil (cf. shared/driver-perimeter.ts). */
+export async function getDriverPerimeterPreferences(profilePhone: string): Promise<DriverPerimeterPreferences> {
+  const db = await getDb();
+  if (!db) return DEFAULT_DRIVER_PERIMETER;
+  const rows = await db.select().from(tikisDriverPreferences).where(eq(tikisDriverPreferences.profilePhone, profilePhone)).limit(1);
+  const row = rows[0];
+  return row ? driverPreferencesToView(row) : DEFAULT_DRIVER_PERIMETER;
+}
+
+/** Met à jour les réglages choisis par le livreur. Les champs absents restent inchangés ; un rayon
+ *  explicitement `null` signifie « ma ville » et est donc bien écrit, pas ignoré. */
+export async function updateDriverPerimeterPreferences(profilePhone: string, patch: {
+  opportunityPushEnabled?: boolean;
+  alertRadiusKm?: number | null;
+  discoveryRadiusKm?: number | null;
+}): Promise<DriverPerimeterPreferences> {
+  const db = await getDb();
+  if (!db) throw new Error("Les réglages de notifications sont temporairement indisponibles.");
+  for (const radius of [patch.alertRadiusKm, patch.discoveryRadiusKm]) {
+    if (radius !== undefined && radius !== null && !isValidPerimeterRadius(radius)) {
+      throw new Error(`Le rayon doit être compris entre ${MIN_PERIMETER_RADIUS_KM} et ${MAX_PERIMETER_RADIUS_KM} km.`);
+    }
+  }
+  const values: Record<string, unknown> = {};
+  if (patch.opportunityPushEnabled !== undefined) values.opportunityPushEnabled = patch.opportunityPushEnabled;
+  if (patch.alertRadiusKm !== undefined) values.alertRadiusKm = patch.alertRadiusKm;
+  if (patch.discoveryRadiusKm !== undefined) values.discoveryRadiusKm = patch.discoveryRadiusKm;
+  await db.insert(tikisDriverPreferences).values({ profilePhone, ...values })
+    // `profilePhone` dans le SET garantit un UPDATE non vide même si `values` est vide (aucun champ
+    // fourni) : MySQL rejette un `ON DUPLICATE KEY UPDATE` sans affectation.
+    .onDuplicateKeyUpdate({ set: { profilePhone, ...values } });
+  return getDriverPerimeterPreferences(profilePhone);
+}
+
+/** Enregistre la position de référence servant de centre aux rayons. Publiée par l'app du livreur
+ *  quand elle dispose d'un point GPS ; sans elle, les rayons retombent sur le périmètre « ma ville ». */
+export async function updateDriverBasePosition(profilePhone: string, latitude: number, longitude: number): Promise<DriverPerimeterPreferences> {
+  const db = await getDb();
+  if (!db) throw new Error("La position de référence est temporairement indisponible.");
+  const baseUpdatedAt = new Date();
+  const position = { baseLatitude: String(latitude), baseLongitude: String(longitude), baseUpdatedAt };
+  await db.insert(tikisDriverPreferences).values({ profilePhone, ...position })
+    .onDuplicateKeyUpdate({ set: position });
+  return getDriverPerimeterPreferences(profilePhone);
+}
+
+type CompatibleDriver = { phone: string; city: string | null };
+
+async function getCompatibleDrivers(tx: any, vehicleTypes: SelectableVehicleType[]): Promise<CompatibleDriver[]> {
+  if (vehicleTypes.length === 0) return [];
+  const drivers = await tx.select({ phone: tikisProfiles.phone, vehicles: tikisProfiles.vehicles, city: tikisProfiles.city })
+    .from(tikisProfiles)
+    .where(and(eq(tikisProfiles.accountType, "driver"), eq(tikisProfiles.status, "active")))
+    .orderBy(desc(tikisProfiles.id))
+    .limit(MAX_DRIVERS_SCANNED_FOR_COMPATIBILITY);
+  // Aucun plafond ici : c'est le filtre de périmètre, appliqué ensuite, qui doit décider qui mérite
+  // une notification. Tronquer dès la compatibilité d'engin — l'ordre étant « profils les plus
+  // récents » — pouvait ne retenir que des livreurs d'une seule ville et laisser une course publiée
+  // ailleurs sans aucun destinataire. Le plafond d'envoi s'applique donc après le périmètre.
+  return drivers
+    .filter((driver: { vehicles: string }) => parseVehicles(driver.vehicles).some((vehicle) => vehicleTypes.includes(vehicle)))
+    .map((driver: { phone: string; city: string | null }) => ({ phone: driver.phone, city: driver.city ?? null }));
+}
+
+/** Préférences de périmètre de plusieurs livreurs en une requête, complétées par les valeurs par
+ *  défaut pour ceux qui n'ont jamais ouvert leurs réglages (aucune ligne en base). */
+async function getDriverPerimetersByPhone(tx: any, phones: string[]): Promise<Map<string, DriverPerimeterPreferences>> {
+  const perimeters = new Map<string, DriverPerimeterPreferences>();
+  if (phones.length === 0) return perimeters;
+  const rows = await tx.select().from(tikisDriverPreferences).where(inArray(tikisDriverPreferences.profilePhone, phones));
+  for (const row of rows) perimeters.set(row.profilePhone, driverPreferencesToView(row));
+  for (const phone of phones) if (!perimeters.has(phone)) perimeters.set(phone, DEFAULT_DRIVER_PERIMETER);
+  return perimeters;
+}
+
+/** Informe chaque livreur compatible qu'une livraison est disponible (publication ou réactivation) —
+ *  spec §1 : "informer les livreurs compatibles". Avant ce correctif, aucun chemin ne le faisait : la
+ *  seule découverte possible était le polling manuel de `deliveries.list`.
+ *
+ *  Deux filtres se cumulent, dans cet ordre : compatibilité de l'engin, puis périmètre d'alerte du
+ *  livreur (sa ville par défaut, ou son rayon s'il en a choisi un). Hors périmètre, aucune
+ *  notification n'est créée du tout : envoyer une alerte pour une course à l'autre bout du pays est
+ *  du bruit, pas de l'information. Dans le périmètre, la notification in-app est toujours créée ;
+ *  le push, lui, n'est envoyé qu'aux livreurs qui l'ont explicitement activé. */
+async function notifyCompatibleDriversOfDelivery(
+  tx: any,
+  delivery: { id: string; title: string; vehicleTypes: string; pickupPlaceId: number },
+  eventType: "delivery_published" | "delivery_reactivated_for_drivers",
+  announcement: string,
+) {
+  const compatibleDrivers = await getCompatibleDrivers(tx, parseVehicles(delivery.vehicleTypes));
+  if (compatibleDrivers.length === 0) return;
+  const [pickup] = await tx.select({ latitude: tikisPlaces.latitude, longitude: tikisPlaces.longitude, city: tikisPlaces.city, district: tikisPlaces.district, province: tikisPlaces.province })
+    .from(tikisPlaces).where(eq(tikisPlaces.id, delivery.pickupPlaceId)).limit(1);
+  if (!pickup) return;
+  const pickupPoint = {
+    latitude: Number(pickup.latitude),
+    longitude: Number(pickup.longitude),
+    city: pickup.city ?? null,
+    district: pickup.district ?? null,
+    province: pickup.province ?? null,
+  };
+  const perimeters = await getDriverPerimetersByPhone(tx, compatibleDrivers.map((driver) => driver.phone));
+
+  let notified = 0;
+  for (const driver of compatibleDrivers) {
+    if (notified >= MAX_COMPATIBLE_DRIVERS_NOTIFIED) break;
+    const perimeter = perimeters.get(driver.phone) ?? DEFAULT_DRIVER_PERIMETER;
+    const decision = evaluatePerimeter({
+      radiusKm: perimeter.alertRadiusKm,
+      driverCity: driver.city,
+      base: { latitude: perimeter.baseLatitude, longitude: perimeter.baseLongitude, updatedAt: perimeter.baseUpdatedAt },
+      pickup: pickupPoint,
+    });
+    if (!decision.matches) continue;
+    await appendDeliveryEvent(tx, {
+      deliveryId: delivery.id,
+      eventType,
+      status: "open",
+      recipientPhone: driver.phone,
+      title: "Nouvelle livraison disponible",
+      body: `${announcement} : ${delivery.title}`,
+      tone: "info",
+      idempotencyKey: `${delivery.id}:${eventType}:${driver.phone}`,
+      push: perimeter.opportunityPushEnabled,
+    });
+    notified += 1;
+  }
+}
+
 export async function createTikisDelivery(input: InsertTikisDelivery) {
   const db = await getDb();
   if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
-  await db.insert(tikisDeliveries).values(input);
+  await db.transaction(async (tx) => {
+    await tx.insert(tikisDeliveries).values(input);
+    await notifyCompatibleDriversOfDelivery(tx, { id: input.id, title: input.title, vehicleTypes: input.vehicleTypes, pickupPlaceId: input.pickupPlaceId }, "delivery_published", "Une livraison compatible avec votre engin a été publiée");
+  });
   return getTikisDeliveryById(input.id);
 }
 
@@ -459,11 +673,56 @@ export async function getTikisDeliveryLiveLocation(deliveryId: string): Promise<
 export async function listTikisDeliveriesForProfile(profilePhone: string, role: "sender" | "driver") {
   const db = await getDb();
   if (!db) return [];
-  const predicate = role === "sender"
-    ? eq(tikisDeliveries.senderPhone, profilePhone)
-    : or(eq(tikisDeliveries.status, "open"), eq(tikisDeliveries.driverPhone, profilePhone));
+  let predicate;
+  let driverCandidacyDeliveryIds: string[] = [];
+  if (role === "sender") {
+    predicate = eq(tikisDeliveries.senderPhone, profilePhone);
+  } else {
+    // Un candidat non retenu (statut "applied"/"withdrawn"/"replaced") doit pouvoir retrouver sa
+    // candidature dans son propre historique même une fois qu'un autre livreur a été sélectionné —
+    // sans cette clause, la livraison disparaissait silencieusement dès que `status` quittait "open"
+    // et que `driverPhone` pointait vers quelqu'un d'autre.
+    const candidacies = await db.select({ deliveryId: tikisDeliveryCandidates.deliveryId }).from(tikisDeliveryCandidates).where(eq(tikisDeliveryCandidates.driverPhone, profilePhone));
+    const candidacyDeliveryIds = candidacies.map((row) => row.deliveryId);
+    driverCandidacyDeliveryIds = candidacyDeliveryIds;
+    predicate = candidacyDeliveryIds.length > 0
+      ? or(eq(tikisDeliveries.status, "open"), eq(tikisDeliveries.driverPhone, profilePhone), inArray(tikisDeliveries.id, candidacyDeliveryIds))
+      : or(eq(tikisDeliveries.status, "open"), eq(tikisDeliveries.driverPhone, profilePhone));
+  }
   const rows = await db.select().from(tikisDeliveries).where(predicate).orderBy(desc(tikisDeliveries.createdAt));
-  return deliveryJoins(rows);
+  const deliveries = await deliveryJoins(rows);
+  if (role !== "driver") return deliveries;
+  return filterDeliveriesToDriverPerimeter(profilePhone, deliveries, driverCandidacyDeliveryIds);
+}
+
+/** Restreint les opportunités « open » au périmètre d'affichage du livreur (sa ville par défaut).
+ *  Ne s'applique qu'aux courses ouvertes auxquelles il n'est pas déjà lié : une course qu'il a déjà
+ *  acceptée, ou sur laquelle il a candidaté, reste toujours visible même hors périmètre — sinon elle
+ *  disparaîtrait de son écran dès qu'il change de rayon ou de ville, sans qu'il puisse la retrouver. */
+async function filterDeliveriesToDriverPerimeter(profilePhone: string, deliveries: Delivery[], candidacyDeliveryIds: string[]): Promise<Delivery[]> {
+  const linkedDeliveryIds = new Set(candidacyDeliveryIds);
+  const filterable = deliveries.filter((delivery) => delivery.status === "open" && delivery.driverId !== profilePhone && !linkedDeliveryIds.has(delivery.id));
+  if (filterable.length === 0) return deliveries;
+  const [profile, perimeter] = await Promise.all([
+    getTikisProfileByPhone(profilePhone),
+    getDriverPerimeterPreferences(profilePhone),
+  ]);
+  return deliveries.filter((delivery) => {
+    if (delivery.status !== "open" || delivery.driverId === profilePhone) return true;
+    if (linkedDeliveryIds.has(delivery.id)) return true;
+    return evaluatePerimeter({
+      radiusKm: perimeter.discoveryRadiusKm,
+      driverCity: profile?.city ?? null,
+      base: { latitude: perimeter.baseLatitude, longitude: perimeter.baseLongitude, updatedAt: perimeter.baseUpdatedAt },
+      pickup: {
+        latitude: delivery.pickup.latitude,
+        longitude: delivery.pickup.longitude,
+        city: delivery.pickup.city ?? null,
+        district: delivery.pickup.district ?? null,
+        province: delivery.pickup.province ?? null,
+      },
+    }).matches;
+  });
 }
 
 export async function expireOpenTikisDeliveries(now = new Date()) {
@@ -482,20 +741,10 @@ export async function expireOpenTikisDeliveries(now = new Date()) {
       const activityAt = deliveryActivityTimestamp({ createdAt: delivery.createdAt, updatedAt: delivery.updatedAt });
       const outcome = deliveryExpirationOutcome(delivery.status as "open" | "pending_confirmation" | "active" | "disabled", activityAt ?? delivery.createdAt, now.getTime());
       if (outcome === "complete" && delivery.driverPhone) {
-        const earning = Math.round(delivery.offeredPrice ?? delivery.estimatedPrice);
-        await applyWalletMovement(tx, {
-          profilePhone: delivery.driverPhone,
-          deliveryId: delivery.id,
-          operation: "credit",
-          amount: earning,
-          availableDelta: earning,
-          heldDelta: 0,
-          reason: "Gain de livraison crédité après clôture automatique à 24 h",
-          idempotencyKey: `${delivery.id}:delivery-earning`,
-        });
+        // Paiement direct Sender ↔ livreur, hors application : aucun crédit de Wallet ici (cf. completeTikisDeliveryWithEvents).
         await tx.update(tikisDeliveries).set({ status: "completed", completedAt: now, updatedAt: now }).where(eq(tikisDeliveries.id, delivery.id));
         await appendDeliveryEvent(tx, { deliveryId: delivery.id, eventType: "delivery_completed", status: "completed", recipientPhone: delivery.senderPhone, title: "Livraison terminée automatiquement", body: "La course en cours a été clôturée automatiquement après 24 heures.", tone: "success", idempotencyKey: `${delivery.id}:auto-completed-sender` });
-        await appendDeliveryEvent(tx, { deliveryId: delivery.id, eventType: "delivery_completed", status: "completed", recipientPhone: delivery.driverPhone, title: "Livraison terminée automatiquement", body: `La course a été clôturée après 24 heures. Votre gain de ${earning} FCFA a été ajouté à votre Wallet.`, tone: "success", idempotencyKey: `${delivery.id}:auto-completed-driver` });
+        await appendDeliveryEvent(tx, { deliveryId: delivery.id, eventType: "delivery_completed", status: "completed", recipientPhone: delivery.driverPhone, title: "Livraison terminée automatiquement", body: "La course a été clôturée après 24 heures.", tone: "success", idempotencyKey: `${delivery.id}:auto-completed-driver` });
         completedCount += 1;
         completedDeliveryIds.push(delivery.id);
         continue;
@@ -505,7 +754,7 @@ export async function expireOpenTikisDeliveries(now = new Date()) {
         .where(and(eq(tikisDeliveryCandidates.deliveryId, delivery.id), inArray(tikisDeliveryCandidates.status, ["applied", "selected"])))
         .for("update");
       for (const candidate of candidates) {
-        const debits = await tx.select().from(tikisWalletLedger).where(and(eq(tikisWalletLedger.deliveryId, delivery.id), eq(tikisWalletLedger.profilePhone, candidate.driverPhone), eq(tikisWalletLedger.operation, "debit"))).for("update");
+        const debits = await tx.select().from(tikisWalletLedger).where(and(eq(tikisWalletLedger.deliveryId, delivery.id), eq(tikisWalletLedger.profilePhone, candidate.driverPhone), inArray(tikisWalletLedger.operation, ["debit", "commission_debit"]))).for("update");
         const debitedAmount = debits.reduce((total: number, entry: { amount: number }) => total + Number(entry.amount), 0);
         if (debitedAmount > 0) {
           await applyWalletMovement(tx, { profilePhone: candidate.driverPhone, deliveryId: delivery.id, operation: "compensation", amount: debitedAmount, availableDelta: debitedAmount, heldDelta: 0, reason: "Commission compensée : livraison expirée avant départ", idempotencyKey: `${delivery.id}:expired-compensation:${candidate.id}` });
@@ -572,6 +821,11 @@ type DeliveryEventInput = {
   body: string;
   tone: "info" | "success" | "warning";
   idempotencyKey: string;
+  /** `false` pour créer la notification in-app sans envoyer de push. Utilisé par les alertes de
+   *  nouvelles courses, qui sont opt-in (cf. tikis_driver_preferences) : le livreur retrouve toujours
+   *  l'opportunité dans son centre de notifications, mais son téléphone ne sonne que s'il l'a demandé.
+   *  Les notifications transactionnelles ne passent jamais `false` : elles sont toujours poussées. */
+  push?: boolean;
 };
 
 export async function ensureTikisWallet(tx: any, profilePhone: string) {
@@ -609,7 +863,7 @@ async function appendDeliveryEvent(tx: any, event: DeliveryEventInput) {
   }).onDuplicateKeyUpdate({ set: { idempotencyKey: event.idempotencyKey } });
   // Push best-effort après la transaction : on capture le recipient, on envoie hors-transaction.
   // Le push est opt-in (token Expo enregistré), les in-app events sont toujours créés.
-  if (event.recipientPhone) {
+  if (event.recipientPhone && event.push !== false) {
     const data: Record<string, unknown> = { deliveryId: event.deliveryId, eventType: event.eventType };
     if (event.status) data.status = event.status;
     void enqueuePushToPhone({ phone: event.recipientPhone, title: event.title, body: event.body, data, channelId: "tikis-delivery" });
@@ -655,17 +909,47 @@ export async function listTikisWalletLedger(profilePhone: string): Promise<Finan
   return entries.map((entry) => ({ id: entry.id, deliveryId: entry.deliveryId ?? "", createdAt: entry.createdAt.toISOString(), operation: entry.operation as WalletOperation, amount: entry.amount, balanceBefore: entry.availableBefore + entry.heldBefore, balanceAfter: entry.availableAfter + entry.heldAfter, reason: entry.reason }));
 }
 
-export async function requestTikisWalletOperation(profilePhone: string, type: "deposit" | "withdrawal", amount: number) {
+/** Historique informatif des gains d'un livreur, calculé à partir des livraisons terminées — jamais depuis le
+ *  Wallet, qui n'est jamais crédité par une livraison (le paiement de la course se fait hors application). Le
+ *  format reprend celui de `FinancialRecord` pour rester compatible avec les écrans "Gains" existants. */
+export async function getDriverCompletedDeliveryEarnings(driverPhone: string): Promise<FinancialRecord[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.driverPhone, driverPhone), eq(tikisDeliveries.status, "completed"))).orderBy(desc(tikisDeliveries.completedAt));
+  return rows.map((row) => {
+    const amount = Math.round(row.offeredPrice ?? row.estimatedPrice);
+    return {
+      id: `${row.id}:earning`,
+      deliveryId: row.id,
+      createdAt: (row.completedAt ?? row.updatedAt).toISOString(),
+      operation: "credit",
+      amount,
+      balanceBefore: 0,
+      balanceAfter: 0,
+      reason: "Gain de livraison (payé directement par l’expéditeur, non crédité au Wallet Tikis)",
+    } satisfies FinancialRecord;
+  });
+}
+
+export async function requestTikisWalletOperation(profilePhone: string, type: "deposit" | "withdrawal", amount: number, requestId: string) {
   if (!Number.isSafeInteger(amount) || amount < 100 || amount > 10_000_000) throw new Error("Le montant demandé est invalide.");
   const db = await getDb();
   if (!db) throw new Error("Le Wallet est temporairement indisponible.");
   await db.transaction(async (tx) => {
+    // `requestId` est fourni par l'appelant (généré une seule fois par soumission) : une relance réseau
+    // de la même demande ne doit pas créer une seconde ligne. On vérifie d'abord (comme le fait
+    // `applyWalletMovement` partout ailleurs) plutôt que de s'appuyer sur `onDuplicateKeyUpdate`, qui
+    // déclencherait une vraie clause UPDATE — bloquée par le trigger d'immuabilité de `tikis_wallet_ledger`
+    // (drizzle/manual/0034_wallet_ledger_hardening.sql), même pour ré-écrire la même valeur.
+    const idempotencyKey = `${type}:${profilePhone}:${requestId}`;
+    const existing = await tx.select({ id: tikisWalletLedger.id }).from(tikisWalletLedger).where(eq(tikisWalletLedger.idempotencyKey, idempotencyKey)).limit(1);
+    if (existing.length > 0) return;
     const wallet = await ensureTikisWallet(tx, profilePhone);
     if (type === "withdrawal" && wallet.availableBalance < amount) throw new Error("Votre solde disponible est insuffisant pour ce retrait.");
     await tx.insert(tikisWalletLedger).values({
       id: randomUUID(), profilePhone, deliveryId: null, operation: type === "deposit" ? "deposit_request" : "withdrawal_request", amount,
       availableBefore: wallet.availableBalance, availableAfter: wallet.availableBalance, heldBefore: wallet.heldBalance, heldAfter: wallet.heldBalance,
-      reason: type === "deposit" ? "Demande de dépôt en attente d’un moyen de paiement autorisé" : "Demande de retrait en attente de traitement", idempotencyKey: `${type}:${profilePhone}:${randomUUID()}`,
+      reason: type === "deposit" ? "Demande de dépôt en attente d’un moyen de paiement autorisé" : "Demande de retrait en attente de traitement", idempotencyKey,
     });
   });
   return { success: true } as const;
@@ -742,22 +1026,33 @@ export async function settleYengaPayTestPayment(input: { profilePhone: string; p
   });
 }
 
-/** Crédit/débit manuel décidé par l'administration (récompense, bonus, pénalité, correction). */
-export async function adminAdjustWallet(input: { profilePhone: string; amount: number; direction: "credit" | "debit"; operation: "bonus" | "penalty" | "credit" | "debit"; reason: string; adminId: number }) {
-  const db = await getDb();
-  if (!db) throw new Error("Le Wallet est temporairement indisponible.");
-  const wallet = await db.transaction(async (tx) => {
-    await applyWalletMovement(tx, {
+/** Crédit/débit manuel décidé par l'administration (récompense, bonus, pénalité, correction).
+ *  `idempotencyKey` doit être déterministe côté appelant (lié à l'action logique, pas généré à
+ *  chaque appel) pour qu'un double-clic ou une relance réseau ne produise jamais un second
+ *  mouvement réel — `applyWalletMovement` renvoie alors simplement le résultat déjà enregistré.
+ *  `tx` est optionnel : le fournir permet d'inclure ce mouvement dans une transaction plus large
+ *  (ex. `adminForceCancelDelivery`) afin qu'un échec ultérieur fasse un rollback complet plutôt
+ *  que de laisser un crédit déjà validé à côté d'un état non mis à jour. */
+export async function adminAdjustWallet(
+  input: { profilePhone: string; amount: number; direction: "credit" | "debit"; operation: "bonus" | "penalty" | "credit" | "debit"; reason: string; idempotencyKey: string },
+  tx?: any,
+) {
+  const run = async (activeTx: any) => {
+    await applyWalletMovement(activeTx, {
       profilePhone: input.profilePhone,
       operation: input.operation,
       amount: input.amount,
       availableDelta: input.direction === "credit" ? input.amount : -input.amount,
       heldDelta: 0,
       reason: input.reason,
-      idempotencyKey: `admin-adjust:${input.adminId}:${randomUUID()}`,
+      idempotencyKey: input.idempotencyKey,
     });
-    return walletSnapshotFromRecord(await ensureTikisWallet(tx, input.profilePhone));
-  });
+    return walletSnapshotFromRecord(await ensureTikisWallet(activeTx, input.profilePhone));
+  };
+  if (tx) return { wallet: await run(tx) };
+  const db = await getDb();
+  if (!db) throw new Error("Le Wallet est temporairement indisponible.");
+  const wallet = await db.transaction(run);
   return { wallet };
 }
 
@@ -832,6 +1127,26 @@ async function enforceDriverApplicationRateLimit(driverPhone: string, db: DbHand
   }
 }
 
+/** Rate-limit partagé entre toutes les instances du serveur, via une table plutôt qu'un compteur en
+ *  mémoire de processus (qui ne protège que l'instance qui le détient — un attaquant réparti sur
+ *  plusieurs connexions peut alors multiplier la limite effective par le nombre d'instances).
+ *  Fenêtre fixe (bucket = fenêtre temporelle entière, pas une fenêtre glissante) : plus simple et
+ *  suffisamment précis pour du rate-limiting anti-abus, sans nécessiter un magasin partagé type Redis.
+ *  Incrément atomique via `ON DUPLICATE KEY UPDATE count = count + 1` (sûr sous concurrence). */
+export async function checkDistributedRateLimit(scope: string, identifier: string, windowMs: number, maxRequests: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return true; // Panne DB : ne jamais bloquer l'usage à cause d'un souci d'infrastructure du rate-limit lui-même.
+  const bucket = Math.floor(Date.now() / windowMs);
+  const rateLimitKey = `${scope}:${identifier}:${bucket}`.slice(0, 191);
+  await db.insert(tikisRateLimits).values({ rateLimitKey, count: 1 }).onDuplicateKeyUpdate({ set: { count: sql`${tikisRateLimits.count} + 1` } });
+  const row = (await db.select({ count: tikisRateLimits.count }).from(tikisRateLimits).where(eq(tikisRateLimits.rateLimitKey, rateLimitKey)).limit(1))[0];
+  if (Math.random() < 0.01) {
+    const staleBefore = new Date(Date.now() - windowMs * 4);
+    void db.delete(tikisRateLimits).where(lt(tikisRateLimits.updatedAt, staleBefore)).catch(() => {});
+  }
+  return (row?.count ?? 0) <= maxRequests;
+}
+
 export async function applyForTikisDelivery(input: { id: string; deliveryId: string; driverPhone: string; confirmedCommission: number; offerPrice?: number }) {
   const db = await getDb();
   if (!db) throw new Error("Les candidatures sont temporairement indisponibles.");
@@ -847,6 +1162,12 @@ export async function applyForTikisDelivery(input: { id: string; deliveryId: str
     if (!Number.isFinite(rate) || rate <= 0 || rate >= 1) throw new Error("Le taux de commission configuré est invalide.");
     const price = input.offerPrice ?? delivery.offeredPrice ?? delivery.estimatedPrice;
     const commission = Math.round(price * rate);
+    // Le montant affiché dans le popup de confirmation côté client doit correspondre exactement à ce qui sera
+    // réellement bloqué : si le taux de commission a changé entre l'affichage et l'envoi, on rejette plutôt que
+    // de bloquer silencieusement un montant différent de celui que le livreur a confirmé.
+    if (input.confirmedCommission !== commission) {
+      throw new Error("Le montant de la commission a changé entre-temps. Veuillez recharger et confirmer à nouveau.");
+    }
     const walletBefore = await ensureTikisWallet(tx, input.driverPhone);
     const existingBlocked = (await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, input.deliveryId), eq(tikisDeliveryCandidates.driverPhone, input.driverPhone), eq(tikisDeliveryCandidates.status, "applied"))).limit(1))[0]?.commissionBlocked ?? 0;
     // Solde qui serait réellement disponible pour cette candidature : le disponible actuel + ce qui est déjà bloqué pour cette même candidature (remplacée, pas cumulée).
@@ -1013,6 +1334,7 @@ export async function reactivateTikisDeliveryFromSender(deliveryId: string, send
     if (!delivery || delivery.status !== "disabled") throw new Error("Seule une livraison désactivée peut être activée.");
     await tx.update(tikisDeliveries).set({ status: "open", updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_reactivated", status: "open", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Livraison activée", body: "Votre livraison est à nouveau visible pour les livreurs compatibles.", tone: "success", idempotencyKey: `${deliveryId}:reactivated:${delivery.updatedAt.getTime()}` });
+    await notifyCompatibleDriversOfDelivery(tx, { id: deliveryId, title: delivery.title, vehicleTypes: delivery.vehicleTypes, pickupPlaceId: delivery.pickupPlaceId }, "delivery_reactivated_for_drivers", "Une livraison compatible avec votre engin est de nouveau disponible");
   });
   return getTikisDeliveryById(deliveryId);
 }
@@ -1022,21 +1344,11 @@ export async function cancelTikisDeliveryFromSender(deliveryId: string, senderPh
   if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
   await db.transaction(async (tx) => {
     const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.senderPhone, senderPhone))).limit(1).for("update"))[0];
+    // Un livreur "selected"/"confirmed" implique toujours le statut "pending_confirmation" ou "active" —
+    // jamais "open"/"disabled" — donc cette garde suffit à elle seule à exclure tout candidat déjà engagé
+    // (aucun autre cas à traiter ici : `releaseAppliedCandidatesForSenderAction` couvre les candidats "applied").
     if (!delivery || !["open", "disabled"].includes(delivery.status)) throw new Error("Cette livraison ne peut plus être annulée : un livreur a déjà été sélectionné.");
     await releaseAppliedCandidatesForSenderAction(tx, delivery, "cancelled");
-    if (delivery.status === "pending_confirmation" && delivery.driverPhone) {
-      const selectedCandidate = (await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, delivery.driverPhone), eq(tikisDeliveryCandidates.status, "selected"))).limit(1).for("update"))[0];
-      if (selectedCandidate) {
-        const legacyDebit = (await tx.select().from(tikisWalletLedger).where(eq(tikisWalletLedger.idempotencyKey, `${deliveryId}:commission-debit:${selectedCandidate.id}`)).limit(1))[0];
-        if (legacyDebit) {
-          await applyWalletMovement(tx, { profilePhone: delivery.driverPhone, deliveryId, operation: "compensation", amount: selectedCandidate.commissionBlocked, availableDelta: selectedCandidate.commissionBlocked, heldDelta: 0, reason: "Commission compensée après annulation de la livraison", idempotencyKey: `${deliveryId}:cancelled:compensation:${delivery.driverPhone}` });
-        } else {
-          await releaseCandidateCommission(tx, selectedCandidate, "Commission libérée après annulation de la livraison", "cancelled-release");
-        }
-        await tx.update(tikisDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, selectedCandidate.id));
-        await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_cancelled", status: "cancelled", actorPhone: senderPhone, recipientPhone: delivery.driverPhone, title: "Livraison annulée", body: "L’expéditeur a annulé la livraison avant votre départ. Votre commission Tikis a été libérée.", tone: "warning", idempotencyKey: `${deliveryId}:cancelled:selected-driver` });
-      }
-    }
     await tx.update(tikisDeliveries).set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_cancelled", status: "cancelled", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Livraison annulée", body: "Votre livraison est conservée dans l’historique avec son statut d’annulation.", tone: "warning", idempotencyKey: `${deliveryId}:cancelled:sender` });
   });
@@ -1076,28 +1388,68 @@ export async function selectTikisDeliveryCandidateWithWallet(deliveryId: string,
       await releaseCandidateCommission(tx, candidate, "Commission débloquée après sélection d’un autre livreur", `release:${chosen.id}:${candidate.updatedAt.getTime()}`);
       await appendDeliveryEvent(tx, { deliveryId, eventType: "candidate_not_selected", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: candidate.driverPhone, title: "Livreur non retenu", body: "Un autre livreur a été sélectionné ; votre commission bloquée a été libérée.", tone: "info", idempotencyKey: `${candidate.id}:not-selected:${chosen.id}` });
     }
-    if (priorDriverPhone && delivery.accruedCommission) {
-      // Montant réellement perdu par l'ancien livreur (ce qui lui a été prélevé), pas la commission du nouveau candidat :
-      // les deux ne coïncident que si les prix offerts sont identiques (contre-offres possibles par candidat).
-      const amountOwedToPriorDriver = delivery.accruedCommission;
-      // La nouvelle commission sert d'abord à couvrir ce remboursement ; le reste (ou le manque) reste/est assumé par la plateforme.
-      const coveredByNewCommission = Math.min(targetCommission, amountOwedToPriorDriver);
-      const platformTopUp = Math.max(0, amountOwedToPriorDriver - coveredByNewCommission);
-      await applyWalletMovement(tx, { profilePhone: priorDriverPhone, deliveryId, operation: "compensation", amount: amountOwedToPriorDriver, availableDelta: amountOwedToPriorDriver, heldDelta: 0, reason: platformTopUp > 0 ? "Remboursement de commission après remplacement (complété par la plateforme)" : "Remboursement de commission après remplacement", idempotencyKey: `${deliveryId}:compensate:${priorDriverPhone}:${chosen.id}` });
-      if (platformTopUp > 0) {
-        // La nouvelle commission ne suffisait pas à couvrir l'ancienne : traçé explicitement pour la comptabilité plateforme.
-        await appendDeliveryEvent(tx, { deliveryId, eventType: "platform_topup", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Complément plateforme", body: `La plateforme a complété ${platformTopUp} FCFA pour rembourser intégralement l’ancien livreur (nouvelle commission insuffisante).`, tone: "info", idempotencyKey: `${deliveryId}:platform-topup:${priorDriverPhone}:${chosen.id}` });
-      } else if (coveredByNewCommission < targetCommission) {
-        // La nouvelle commission dépasse ce qui était dû à l'ancien livreur : le surplus reste acquis à la plateforme (aucune double perception, mais aucune sur-compensation du livreur remplacé non plus).
-        await appendDeliveryEvent(tx, { deliveryId, eventType: "platform_surplus", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Surplus de commission conservé", body: `${targetCommission - coveredByNewCommission} FCFA de la nouvelle commission dépassent le remboursement dû à l’ancien livreur et restent acquis à la plateforme.`, tone: "info", idempotencyKey: `${deliveryId}:platform-surplus:${priorDriverPhone}:${chosen.id}` });
+    if (priorDriverPhone) {
+      // Source de vérité = le statut réel du candidat précédent, pas `delivery.accruedCommission` (renseigné dès la
+      // simple sélection, avant toute confirmation). Un candidat "selected" n'a jamais été débité : sa commission est
+      // encore intégralement dans `heldBalance`. Le confondre avec un candidat "confirmed" (réellement débité) crée
+      // un double crédit (l'ancien montant réservé n'est jamais retiré du held, mais une "compensation" est quand
+      // même ajoutée au disponible) et laisse deux candidats actifs simultanément sur la même livraison.
+      const priorCandidate = (await tx.select().from(tikisDeliveryCandidates)
+        .where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, priorDriverPhone), inArray(tikisDeliveryCandidates.status, ["selected", "confirmed"])))
+        .limit(1)
+        .for("update"))[0];
+      // La décision (déblocage simple vs compensation réelle, plafonnée par construction — voir
+      // `computeReplacementSettlement`) est centralisée dans `shared/wallet-commission.ts` et testée
+      // indépendamment (`tests/replacement-settlement.test.ts`), pour que le code réel ne puisse pas
+      // diverger silencieusement de la logique vérifiée par les tests.
+      const settlement = computeReplacementSettlement(
+        priorCandidate ? { status: priorCandidate.status as "selected" | "confirmed", commissionBlocked: priorCandidate.commissionBlocked } : null,
+        targetCommission,
+      );
+      if (settlement.kind === "compensate" && priorCandidate) {
+        await applyWalletMovement(tx, { profilePhone: priorDriverPhone, deliveryId, operation: "compensation", amount: settlement.amountOwedToPriorDriver, availableDelta: settlement.amountOwedToPriorDriver, heldDelta: 0, reason: settlement.platformTopUp > 0 ? "Remboursement de commission après remplacement (complété par la plateforme)" : "Remboursement de commission après remplacement", idempotencyKey: `${deliveryId}:compensate:${priorDriverPhone}:${chosen.id}` });
+        if (settlement.platformTopUp > 0) {
+          // La nouvelle commission ne suffisait pas à couvrir l'ancienne : traçé explicitement pour la comptabilité plateforme.
+          await appendDeliveryEvent(tx, { deliveryId, eventType: "platform_topup", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Complément plateforme", body: `La plateforme a complété ${settlement.platformTopUp} FCFA pour rembourser intégralement l’ancien livreur (nouvelle commission insuffisante).`, tone: "info", idempotencyKey: `${deliveryId}:platform-topup:${priorDriverPhone}:${chosen.id}` });
+        } else if (settlement.platformSurplus > 0) {
+          // La nouvelle commission dépasse ce qui était dû à l'ancien livreur : le surplus reste acquis à la plateforme (aucune double perception, mais aucune sur-compensation du livreur remplacé non plus).
+          await appendDeliveryEvent(tx, { deliveryId, eventType: "platform_surplus", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Surplus de commission conservé", body: `${settlement.platformSurplus} FCFA de la nouvelle commission dépassent le remboursement dû à l’ancien livreur et restent acquis à la plateforme.`, tone: "info", idempotencyKey: `${deliveryId}:platform-surplus:${priorDriverPhone}:${chosen.id}` });
+        }
+        await tx.update(tikisDeliveryCandidates).set({ status: "replaced", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, priorCandidate.id));
+        await appendDeliveryEvent(tx, { deliveryId, eventType: "driver_replaced", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: priorDriverPhone, title: "Vous avez été remplacé", body: "Votre commission Tikis a été intégralement compensée.", tone: "warning", idempotencyKey: `${deliveryId}:replaced:${priorDriverPhone}:${chosen.id}` });
+      } else if (settlement.kind === "release" && priorCandidate) {
+        // Statut "selected" : jamais confirmé, jamais débité. Un simple déblocage suffit, aucune compensation ni
+        // complément plateforme n'a de sens puisqu'aucun montant réel n'a quitté le Wallet de ce candidat.
+        await releaseCandidateCommission(tx, priorCandidate, "Commission libérée : remplacé avant confirmation de disponibilité", `replaced-before-confirm:${chosen.id}`);
+        await tx.update(tikisDeliveryCandidates).set({ status: "replaced", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, priorCandidate.id));
+        await appendDeliveryEvent(tx, { deliveryId, eventType: "driver_replaced", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: priorDriverPhone, title: "Vous avez été remplacé", body: "Vous n’aviez pas encore confirmé votre disponibilité : votre commission bloquée a été intégralement libérée, sans pénalité.", tone: "info", idempotencyKey: `${deliveryId}:replaced-unconfirmed:${priorDriverPhone}:${chosen.id}` });
       }
-      await tx.update(tikisDeliveryCandidates).set({ status: "replaced", updatedAt: new Date() }).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, priorDriverPhone), eq(tikisDeliveryCandidates.status, "confirmed")));
-      await appendDeliveryEvent(tx, { deliveryId, eventType: "driver_replaced", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: priorDriverPhone, title: "Vous avez été remplacé", body: "Votre commission Tikis a été intégralement compensée.", tone: "warning", idempotencyKey: `${deliveryId}:replaced:${priorDriverPhone}:${chosen.id}` });
     }
     await tx.update(tikisDeliveryCandidates).set({ status: "selected", commissionBlocked: targetCommission, updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, chosen.id));
     await tx.update(tikisDeliveries).set({ status: "pending_confirmation", driverPhone: chosen.driverPhone, ...(priorDriverPhone ? { previousDriverPhone: priorDriverPhone } : {}), ...(chosen.offerPrice ? { offeredPrice: chosen.offerPrice } : {}), accruedCommission: targetCommission, selectedAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
     await appendDeliveryEvent(tx, { deliveryId, eventType: priorDriverPhone ? "driver_replaced" : "driver_selected", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: senderPhone, title: priorDriverPhone ? "Livreur remplacé" : "Livreur sélectionné", body: "Aucun montant n’est demandé au Wallet de l’expéditeur. Le livreur doit confirmer sa disponibilité.", tone: "success", idempotencyKey: `${deliveryId}:sender-selected:${chosen.id}` });
     await appendDeliveryEvent(tx, { deliveryId, eventType: priorDriverPhone ? "driver_replaced" : "driver_selected", status: "pending_confirmation", actorPhone: senderPhone, recipientPhone: chosen.driverPhone, title: priorDriverPhone ? "Vous êtes le nouveau livreur" : "Vous avez été sélectionné", body: "Votre commission reste réservée et sera prélevée lorsque vous confirmerez votre disponibilité.", tone: "success", idempotencyKey: `${deliveryId}:driver-selected:${chosen.id}` });
+  });
+  return getTikisDeliveryById(deliveryId);
+}
+
+/** Le Sender annule son choix avant que le livreur ait confirmé sa disponibilité : retour à "sans livreur",
+ *  sans aucune incidence financière (la commission n'a jamais été débitée, elle est simplement libérée).
+ *  Différent d'un remplacement (aucun autre candidat n'est sélectionné à la place) et différent d'une annulation
+ *  de la livraison entière (les autres candidatures "applied" restent intactes, la livraison redevient "open"). */
+export async function unselectTikisDeliveryCandidateFromSender(deliveryId: string, senderPhone: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
+  await db.transaction(async (tx) => {
+    const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.senderPhone, senderPhone))).limit(1).for("update"))[0];
+    if (!delivery || delivery.status !== "pending_confirmation" || !delivery.driverPhone) throw new Error("Cette livraison n’a pas de choix de livreur à annuler.");
+    const candidate = (await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, delivery.driverPhone), eq(tikisDeliveryCandidates.status, "selected"))).limit(1).for("update"))[0];
+    if (!candidate) throw new Error("Ce choix ne peut plus être annulé.");
+    await releaseCandidateCommission(tx, candidate, "Commission libérée : choix du livreur annulé avant confirmation", `unselected:${candidate.updatedAt.getTime()}`);
+    await tx.update(tikisDeliveryCandidates).set({ status: "applied", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, candidate.id));
+    await tx.update(tikisDeliveries).set({ status: "open", driverPhone: null, accruedCommission: null, selectedAt: null, updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
+    await appendDeliveryEvent(tx, { deliveryId, eventType: "driver_unselected", status: "open", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Choix annulé", body: "Vous avez annulé votre choix, sans frais. La livraison est de nouveau ouverte aux candidatures.", tone: "info", idempotencyKey: `${deliveryId}:unselected:sender:${candidate.id}` });
+    await appendDeliveryEvent(tx, { deliveryId, eventType: "driver_unselected", status: "open", actorPhone: senderPhone, recipientPhone: candidate.driverPhone, title: "Vous n’êtes plus sélectionné", body: "L’expéditeur a annulé son choix avant votre confirmation. Votre commission bloquée a été libérée, sans pénalité. Votre candidature reste active.", tone: "info", idempotencyKey: `${deliveryId}:unselected:driver:${candidate.id}` });
   });
   return getTikisDeliveryById(deliveryId);
 }
@@ -1117,7 +1469,9 @@ export async function confirmTikisDeliveryWithEvents(deliveryId: string, driverP
       await applyWalletMovement(tx, {
         profilePhone: driverPhone,
         deliveryId,
-        operation: "debit",
+        // Type dédié, distinct du "debit" générique utilisé pour les retraits : permet au KPI de revenu
+        // administrateur (commissionRevenue) et à l'affichage Wallet de ne compter que le vrai revenu Tikis.
+        operation: "commission_debit",
         amount: commission,
         availableDelta: usesReservation ? 0 : -commission,
         heldDelta: usesReservation ? -commission : 0,
@@ -1168,17 +1522,9 @@ export async function completeTikisDeliveryWithEvents(deliveryId: string, profil
   const completedDelivery = await db.transaction(async (tx) => {
     const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.status, "active"), or(eq(tikisDeliveries.senderPhone, profilePhone), eq(tikisDeliveries.driverPhone, profilePhone)))).limit(1).for("update"))[0];
     if (!delivery || !delivery.driverPhone) throw new Error("Cette livraison ne peut pas être terminée.");
-    const earning = Math.round(delivery.offeredPrice ?? delivery.estimatedPrice);
-    await applyWalletMovement(tx, {
-      profilePhone: delivery.driverPhone,
-      deliveryId,
-      operation: "credit",
-      amount: earning,
-      availableDelta: earning,
-      heldDelta: 0,
-      reason: "Gain de livraison crédité après confirmation de fin de course",
-      idempotencyKey: `${deliveryId}:delivery-earning`,
-    });
+    // Le paiement de la course est effectué directement entre le Sender et le livreur, hors application (cf. spec
+    // Partie 2 — introduction). Tikis ne gère jamais ce paiement : aucun crédit n'est appliqué au Wallet du livreur
+    // ici. Le Wallet ne sert qu'à réserver/débiter la commission Tikis ; il n'est jamais crédité par une livraison.
     await tx.update(tikisDeliveries).set({ status: "completed", completedAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_completed", status: "completed", actorPhone: profilePhone, recipientPhone: delivery.senderPhone, title: "Livraison terminée", body: "Votre livraison est terminée. Vous pouvez maintenant évaluer le livreur.", tone: "success", idempotencyKey: `${deliveryId}:completed-sender` });
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_completed", status: "completed", actorPhone: profilePhone, recipientPhone: delivery.driverPhone, title: "Course terminée", body: "La course est ajoutée à votre historique.", tone: "success", idempotencyKey: `${deliveryId}:completed-driver` });

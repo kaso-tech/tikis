@@ -14,7 +14,7 @@ export type DeliveryRouteVisibility = "exact" | "approximate";
 
 export type CandidateStatus = "applied" | "selected" | "confirmed" | "withdrawn" | "replaced";
 
-export type WalletOperation = "block" | "unblock" | "debit" | "compensation" | "credit" | "refund" | "deposit_request" | "withdrawal_request" | "bonus" | "penalty";
+export type WalletOperation = "block" | "unblock" | "debit" | "commission_debit" | "compensation" | "credit" | "refund" | "deposit_request" | "withdrawal_request" | "bonus" | "penalty";
 
 export type VehicleType = "Vélo" | "Moto" | "Tricycle" | "Voiture" | "Fourgonnette";
 export type SelectableVehicleType = Exclude<VehicleType, "Fourgonnette">;
@@ -83,6 +83,12 @@ export interface LocationLabel {
   featureType?: "address" | "secondary_address" | "poi" | "street" | "neighborhood" | "locality" | "place" | "point" | "unknown";
   precision?: "exact" | "street" | "area" | "city" | "unknown";
 }
+
+export type SavedFavorite = {
+  id: number | string;
+  label: string;
+  location: LocationLabel;
+};
 
 export interface PlaceSuggestion {
   id: string;

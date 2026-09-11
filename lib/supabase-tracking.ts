@@ -87,37 +87,60 @@ export function deliveryChannelName(deliveryId: string) {
   return safeId ? `delivery:${safeId}` : null;
 }
 
-export function createDeliveryTrackingChannel(deliveryId: string, onPosition: RealtimeListener) {
-  const supabase = supabaseClient();
-  const name = deliveryChannelName(deliveryId);
-  if (!supabase || !name) return null;
-  const channel = supabase.channel(name, { config: { private: true } })
-    .on("broadcast", { event: "position" }, ({ payload }) => {
-      const position = normalizeDeliveryPosition(payload);
-      if (position) onPosition(position);
-    })
-    .subscribe();
-  return channel;
-}
-
-export function createDeliveryStatusChannel(deliveryId: string, onStatus: DeliveryStatusListener) {
-  const supabase = supabaseClient();
-  const name = deliveryChannelName(deliveryId);
-  if (!supabase || !name) return null;
-  return supabase.channel(name, { config: { private: true } })
-    .on("broadcast", { event: "status" }, ({ payload }) => {
-      const event = normalizeDeliveryStatusEvent(payload);
-      if (event && event.deliveryId === deliveryId) onStatus(event);
-    })
-    .subscribe();
-}
-
 export async function broadcastDeliveryPosition(channel: RealtimeChannel | null, position: DeliveryPosition) {
   if (!channel) return;
   await channel.send({ type: "broadcast", event: "position", payload: position });
 }
 
-export async function closeDeliveryTrackingChannel(channel: RealtimeChannel | null) {
-  if (!channel) return;
-  await channel.unsubscribe();
+type DeliveryChannelEntry = {
+  channel: RealtimeChannel;
+  statusListeners: Set<DeliveryStatusListener>;
+  positionListeners: Set<RealtimeListener>;
+};
+
+// Un seul channel Supabase par livraison, partagé entre tous les abonnés (statut ET position) : avant ce
+// correctif, `createDeliveryStatusChannel` et `createDeliveryTrackingChannel` ouvraient chacun leur propre
+// souscription sur le même topic `delivery:<id>` — deux connexions Realtime indépendantes pour la même
+// livraison dès que l'écran de suivi live était ouvert en même temps que le fournisseur global.
+const deliveryChannels = new Map<string, DeliveryChannelEntry>();
+
+function getOrCreateDeliveryChannelEntry(deliveryId: string): DeliveryChannelEntry | null {
+  const existing = deliveryChannels.get(deliveryId);
+  if (existing) return existing;
+  const supabase = supabaseClient();
+  const name = deliveryChannelName(deliveryId);
+  if (!supabase || !name) return null;
+  const statusListeners = new Set<DeliveryStatusListener>();
+  const positionListeners = new Set<RealtimeListener>();
+  const channel = supabase.channel(name, { config: { private: true } })
+    .on("broadcast", { event: "status" }, ({ payload }) => {
+      const event = normalizeDeliveryStatusEvent(payload);
+      if (event && event.deliveryId === deliveryId) statusListeners.forEach((listener) => listener(event));
+    })
+    .on("broadcast", { event: "position" }, ({ payload }) => {
+      const position = normalizeDeliveryPosition(payload);
+      if (position) positionListeners.forEach((listener) => listener(position));
+    })
+    .subscribe();
+  const entry: DeliveryChannelEntry = { channel, statusListeners, positionListeners };
+  deliveryChannels.set(deliveryId, entry);
+  return entry;
+}
+
+/** S'abonne au statut et/ou à la position d'une livraison. Réutilise le channel existant si un autre
+ *  consommateur y est déjà abonné ; ne ferme la souscription Realtime que lorsque plus personne n'écoute
+ *  ce `deliveryId`. Retourne une fonction de désabonnement à appeler au démontage. */
+export function subscribeToDeliveryChannel(deliveryId: string, handlers: { onStatus?: DeliveryStatusListener; onPosition?: RealtimeListener }): () => void {
+  const entry = getOrCreateDeliveryChannelEntry(deliveryId);
+  if (!entry) return () => {};
+  if (handlers.onStatus) entry.statusListeners.add(handlers.onStatus);
+  if (handlers.onPosition) entry.positionListeners.add(handlers.onPosition);
+  return () => {
+    if (handlers.onStatus) entry.statusListeners.delete(handlers.onStatus);
+    if (handlers.onPosition) entry.positionListeners.delete(handlers.onPosition);
+    if (entry.statusListeners.size === 0 && entry.positionListeners.size === 0) {
+      deliveryChannels.delete(deliveryId);
+      void entry.channel.unsubscribe();
+    }
+  };
 }

@@ -14,9 +14,6 @@ const profileSource = source("app/(tabs)/profile.tsx");
 const walletSource = source("app/(tabs)/wallet.tsx");
 const nativeHomeSource = source("components/tikis/screens/home-screen.native.tsx");
 const webHomeSource = source("components/tikis/screens/home-screen.web.tsx");
-const placeSheetSource = source("components/tikis/place-sheets.tsx");
-const pickerNativeSource = source("components/tikis/place-picker.native.tsx");
-const pickerWebSource = source("components/tikis/place-picker.web.tsx");
 const yangoSource = source("components/tikis/yango-address-picker.tsx");
 const authSource = source("components/tikis/auth-flow.tsx");
 
@@ -35,7 +32,7 @@ describe("palette des champs et menus", () => {
   it("harmonise les recherches et sélecteurs de lieux sur mobile et web", () => {
     expect(addressesSource).toContain("backgroundColor: theme.input");
     expect(yangoSource).toContain("backgroundColor: theme.input");
-    for (const pickerSource of [placeSheetSource, pickerNativeSource, pickerWebSource, nativeHomeSource, webHomeSource]) {
+    for (const pickerSource of [nativeHomeSource, webHomeSource]) {
       expect(pickerSource).toContain("#F7EFE5");
       expect(pickerSource).toContain("#9A6201");
     }

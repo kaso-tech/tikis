@@ -1,7 +1,7 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { StyleSheet, Text, View } from "react-native";
 
-import { formatNavigationTarget } from "@/lib/geo-rules";
+import { formatListRouteParts, formatNavigationTarget } from "@/lib/geo-rules";
 import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
 import { createStyles } from "@/lib/create-styles";
 import type { LocationLabel } from "@/shared/tikis-domain";
@@ -35,8 +35,12 @@ function projectOntoCanvas(
 }
 
 export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }: Props) {
-  const { colors: theme } = useThemeColors();
+const { colors: theme } = useThemeColors();
   const styles = useMemo(() => stylesFor(theme), [theme]);
+  // Même formateur centralisé que le texte du trajet (delivery-card.tsx) : sans lui, cette légende
+  // affichait `pickup.name`/`dropoff.name` bruts, ignorant la règle "Ville → Ville" quand les villes
+  // diffèrent — deux libellés différents pour le même trajet, dans le même écran.
+  const route = formatListRouteParts(pickup, dropoff);
   const minLat = Math.min(pickup.latitude, dropoff.latitude);
   const maxLat = Math.max(pickup.latitude, dropoff.latitude);
   const minLng = Math.min(pickup.longitude, dropoff.longitude);
@@ -93,7 +97,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
         <View style={styles.legendRow}>
           <View style={styles.legendDotPickup} />
           <Text numberOfLines={1} style={styles.legendLabel}>
-            {pickup.name || "Récupération"}
+            {route.pickup || "Récupération"}
           </Text>
         </View>
         <Text numberOfLines={1} style={styles.legendSub}>
@@ -103,7 +107,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
         <View style={styles.legendRow}>
           <View style={styles.legendDotDropoff} />
           <Text numberOfLines={1} style={styles.legendLabel}>
-            {dropoff.name || "Destination"}
+            {route.dropoff || "Destination"}
           </Text>
         </View>
         <Text numberOfLines={1} style={styles.legendSub}>

@@ -1,4 +1,4 @@
-import { DELIVERY_EXPIRATION_MS, deliveryActivityTimestamp, isOpenDeliveryExpired } from "./delivery-expiration";
+import { DELIVERY_EXPIRATION_MS, deliveryActivityTimestamp } from "./delivery-expiration";
 import type { DeliveryStatus } from "./tikis-domain";
 
 export type DeliveryFreshness = {
@@ -12,10 +12,4 @@ export function isOpenDeliveryStale(delivery: DeliveryFreshness & { status: Deli
   const activityAt = deliveryActivityTimestamp(delivery);
   if (activityAt === null) return false;
   return now - activityAt >= DELIVERY_EXPIRATION_MS;
-}
-
-export function isOpenDeliveryFresh(delivery: DeliveryFreshness & { status: DeliveryStatus }, now = Date.now()): boolean {
-  const activityAt = deliveryActivityTimestamp(delivery);
-  if (activityAt === null) return false;
-  return isOpenDeliveryExpired(delivery.status, activityAt, now);
 }

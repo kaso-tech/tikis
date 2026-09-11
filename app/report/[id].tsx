@@ -1,13 +1,16 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { isAllowedDeliveryText } from "@/lib/tikis-engine";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
+
+type AttachmentMime = "image/jpeg" | "image/png" | "image/webp";
 
 const REASONS: { label: string; value: "comportement" | "sécurité" | "paiement" | "objet_endommagé" | "retard" | "autre" }[] = [
   { label: "Retard important", value: "retard" },
@@ -26,9 +29,22 @@ export default function ReportDeliveryScreen() {
   const delivery = deliveryQuery.data;
   const [reason, setReason] = useState<typeof REASONS[number]["value"]>(REASONS[0].value);
   const [description, setDescription] = useState("");
+  const [attachment, setAttachment] = useState<{ base64: string; mime: AttachmentMime; previewUri: string } | null>(null);
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
   const reportMutation = trpc.reports.create.useMutation();
+
+  async function pickAttachment() {
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.5, base64: true });
+    if (result.canceled || !result.assets[0]?.base64) return;
+    const mime = result.assets[0].mimeType;
+    if (mime !== "image/jpeg" && mime !== "image/png" && mime !== "image/webp") {
+      setError("Choisissez une image JPEG, PNG ou WebP.");
+      return;
+    }
+    setAttachment({ base64: result.assets[0].base64, mime, previewUri: result.assets[0].uri });
+    setError("");
+  }
 
   async function send() {
     if (!id) return;
@@ -36,7 +52,12 @@ export default function ReportDeliveryScreen() {
     if (!isAllowedDeliveryText(description)) { setError("Caractères non autorisés"); return; }
     setError("");
     try {
-      await reportMutation.mutateAsync({ deliveryId: id, reason, description: description.trim() });
+      await reportMutation.mutateAsync({
+        deliveryId: id,
+        reason,
+        description: description.trim(),
+        ...(attachment ? { attachmentBase64: attachment.base64, attachmentMime: attachment.mime } : {}),
+      });
       setSent(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Le signalement n’a pas pu être envoyé. Réessayez.");
@@ -110,6 +131,7 @@ export default function ReportDeliveryScreen() {
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
