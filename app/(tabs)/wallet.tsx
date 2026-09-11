@@ -25,13 +25,7 @@ const operationMeta: Record<WalletOperation, { label: string; icon: React.Compon
   penalty: { label: "Pénalité", icon: "remove-circle-outline", tone: "error" },
 };
 
-const TONE_COLOR: Record<Tone, string> = {
-  primary: "#007B8B",
-  success: "#167A55",
-  warning: "#9A6200",
-  error: "#B4232D",
-  neutral: "#666666",
-};
+const LEGACY_TONE_COLORS_REMOVED = true;
 
 export default function WalletScreen() {
   const { colors: theme } = useThemeColors();
@@ -193,7 +187,7 @@ export default function WalletScreen() {
               return (
                 <View key={entry.id} style={[styles.txRow, !isLast && { borderBottomColor: theme.border }]}>
                   <View style={[styles.txIcon, iconBgForTone(meta.tone, theme)]}>
-                    <MaterialIcons name={meta.icon} size={16} color={TONE_COLOR[meta.tone]} />
+                    <MaterialIcons name={meta.icon} size={16} color={iconColorForTone(meta.tone, theme)} />
                   </View>
                   <View style={styles.txBody}>
                     <View style={styles.txLine1}>
@@ -253,6 +247,14 @@ export default function WalletScreen() {
   );
 }
 
+function iconColorForTone(tone: Tone, theme: any) {
+  if (tone === "success") return theme.success;
+  if (tone === "warning") return theme.warning;
+  if (tone === "error") return theme.error;
+  if (tone === "primary") return theme.primary;
+  return theme.muted;
+}
+
 function iconBgForTone(tone: Tone, theme: any) {
   if (tone === "success") return { backgroundColor: theme.success + "22" };
   if (tone === "warning") return { backgroundColor: theme.warning + "22" };
@@ -270,7 +272,7 @@ const styles = StyleSheet.create({
 
   balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#9A6201", position: "relative", overflow: "hidden" },
   balanceCardDriver: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#9A6201", borderWidth: 0, overflow: "hidden" },
-  balanceCardSender: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#007B8B", borderWidth: 0, overflow: "hidden" },
+  balanceCardSender: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#C2891F", borderWidth: 0, overflow: "hidden" },
   balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#D7A447", opacity: 0.25, borderRadius: 14 },
   balanceEyebrow: { color: "rgba(255,255,255,0.6)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   balanceEyebrowLight: { color: "rgba(255,255,255,0.7)" },
@@ -352,7 +354,7 @@ const styles = StyleSheet.create({
   referenceLabel: { color: "#666666", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textAlign: "center" },
   referenceValue: { color: "#111111", fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4, letterSpacing: 0.3 },
   requestError: { color: "#B4232D", fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: 6 },
-  amountWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "#F7EFE5", borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 12, marginTop: 14 },
+  amountWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: 1, borderColor: "#E3E3E3", paddingHorizontal: 12, marginTop: 14 },
   amountInput: { flex: 1, color: "#9A6201", fontSize: 15, fontWeight: "500", minHeight: 46 },
   amountCurrency: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
   modalActions: { flexDirection: "row", gap: 8, marginTop: 16 },

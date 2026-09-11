@@ -209,8 +209,8 @@ function CandidateCard({ candidate, deliveryStatus, loading, onChoose, theme }: 
   const vehiclePrice = candidate.offerPrice ?? candidate.commissionBlocked * 10;
   const postedAt = shortRelative(candidate.createdAt);
   const bearingDeg = 0;
-  const certColor = isDark(theme) ? "#5BC0DE" : "#007B8B";
-  const certBg = isDark(theme) ? "rgba(91,192,222,0.18)" : "#E5F4F7";
+  const certColor = theme.success;
+  const certBg = isDark(theme) ? "rgba(95,196,151,0.18)" : "rgba(23,108,82,0.10)";
   const dividerColor = isDark(theme) ? "#262626" : "#E8E8E8";
   const subFg = isDark(theme) ? "#8A8A8A" : "#6B6B6B";
   const mutedFg = isDark(theme) ? "#5A5A5A" : "#9A9A9A";

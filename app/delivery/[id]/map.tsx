@@ -79,7 +79,7 @@ export default function DeliveryMapScreen() {
         <View style={styles.center}>
           <MaterialIcons name="lock-outline" size={32} color="#9A6201" />
           <Text style={[styles.loadingText, { color: theme.muted, marginTop: 10 }]}>Le suivi en direct est réservé aux expéditeurs.</Text>
-          <Pressable onPress={() => router.back()} style={{ marginTop: 16 }}><Text style={{ color: "#007B8B", fontWeight: "700" }}>Retour</Text></Pressable>
+          <Pressable onPress={() => router.back()} style={{ marginTop: 16 }}><Text style={{ color: theme.primary, fontWeight: "700" }}>Retour</Text></Pressable>
         </View>
       </SafeAreaView>
     );
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
   privacyText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: "500" },
   routeError: { color: "#9A6200", fontSize: 11, lineHeight: 16, marginBottom: 10 },
   driverCard: { flexDirection: "row", alignItems: "center", gap: 10, paddingBottom: 12, marginBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  driverAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center" },
+  driverAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.primary, alignItems: "center", justifyContent: "center" },
   driverAvatarText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
   driverName: { fontSize: 14, fontWeight: "700" },
   driverSub: { fontSize: 11, marginTop: 1 },

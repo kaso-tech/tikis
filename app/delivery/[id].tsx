@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
   detailsLast: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: "#ECECEC", marginTop: 2 },
   detailsDescription: { color: "#666666", fontSize: 12, lineHeight: 18 },
 
-  trackButton: { backgroundColor: "#F7EFE5", borderRadius: 10, borderWidth: 1, borderColor: "#E5D2B9", paddingVertical: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  trackButton: { backgroundColor: "#FFFFFF", borderRadius: 10, borderWidth: 1, borderColor: "#E3E3E3", paddingVertical: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   trackButtonText: { color: "#9A6201", fontSize: 13, fontWeight: "600" },
 
   senderActions: { gap: 8, marginTop: 4 },

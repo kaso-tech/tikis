@@ -638,7 +638,7 @@ const styles = StyleSheet.create({
   footerSummaryLabel: { color: "#747474", fontSize: 10, fontWeight: "600" },
   footerSummaryValue: { color: "#111111", fontSize: 14, fontWeight: "700", marginTop: 1 },
   footerCta: { minWidth: 160, minHeight: 44 },
-  draftButton: { width: 44, height: 44, borderRadius: 9, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", alignItems: "center", justifyContent: "center" },
+  draftButton: { width: 44, height: 44, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", alignItems: "center", justifyContent: "center" },
 
   pressed: { opacity: 0.7 },
 });

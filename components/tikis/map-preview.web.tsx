@@ -140,7 +140,7 @@ const styles = StyleSheet.create({
   routeLine: {
     position: "absolute",
     height: 2,
-    backgroundColor: "#007B8B",
+    backgroundColor: "#9A6201",
     borderRadius: 1,
   },
   pickup: {
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: "#007B8B",
+    backgroundColor: "#9A6201",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#007B8B",
+    backgroundColor: "#9A6201",
   },
   legendDotDropoff: {
     width: 8,

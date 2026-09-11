@@ -7,7 +7,7 @@ type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 type ButtonPalette = { background: string; foreground: string; border?: string };
 
 const buttonColors: Record<ButtonVariant, ButtonPalette> = {
-  primary: { background: "#F7EFE5", foreground: "#9A6201", border: "#E5D2B9" },
+  primary: { background: "#FFFFFF", foreground: "#9A6201", border: "#E3E3E3" },
   secondary: { background: "#FFFFFF", foreground: "#111111", border: "#D7D5DE" },
   ghost: { background: "#E4E3E9", foreground: "#111111", border: "#D0CED7" },
   danger: { background: "#F8E8E9", foreground: "#B4232D", border: "#E8C7CA" },

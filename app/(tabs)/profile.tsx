@@ -188,13 +188,13 @@ export default function ProfileScreen() {
           <Text style={[styles.heroName, { color: theme.foreground }]} numberOfLines={1}>{name}</Text>
           <Text style={[styles.heroPhone, { color: theme.muted }]} numberOfLines={1}>{profile?.phone ?? ""}</Text>
           <View style={styles.heroBadges}>
-            <View style={[styles.badge, { backgroundColor: isDark ? theme.pressed : "#F7EFE5" }]}>
+            <View style={[styles.badge, { backgroundColor: theme.background }]}>
               <MaterialIcons name={driver ? "two-wheeler" : "inventory-2"} size={11} color={theme.primary} />
               <Text style={[styles.badgeText, { color: theme.primary }]}>
                 {driver ? `Livreur · ${(profile?.vehicles ?? []).join(" · ") || "Moto"}` : "Expéditeur"}
               </Text>
             </View>
-            <View style={[styles.badge, { backgroundColor: isDark ? theme.tealSoft ?? theme.pressed : "#E5F6F7" }]}>
+            <View style={[styles.badge, { backgroundColor: theme.background }]}>
               <MaterialIcons name="verified" size={11} color={theme.success} />
               <Text style={[styles.badgeText, { color: theme.success }]}>Identité vérifiée</Text>
             </View>
@@ -246,7 +246,7 @@ export default function ProfileScreen() {
         {/* CARD: Identité */}
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.cardHeader}>
-            <View style={[styles.cardEmoji, { backgroundColor: isDark ? theme.pressed : "#F7EFE5" }]}>
+            <View style={[styles.cardEmoji, { backgroundColor: theme.background }]}>
               <Text style={styles.cardEmojiText}>👤</Text>
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -275,7 +275,7 @@ export default function ProfileScreen() {
         {driver ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View style={styles.cardHeader}>
-              <View style={[styles.cardEmoji, { backgroundColor: isDark ? theme.pressed : "#F7EFE5" }]}>
+              <View style={[styles.cardEmoji, { backgroundColor: theme.background }]}>
                 <Text style={styles.cardEmojiText}>📊</Text>
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
@@ -295,7 +295,7 @@ export default function ProfileScreen() {
         {driver ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View style={styles.cardHeader}>
-              <View style={[styles.cardEmoji, { backgroundColor: isDark ? theme.pressed : "#F7EFE5" }]}>
+              <View style={[styles.cardEmoji, { backgroundColor: theme.background }]}>
                 <Text style={styles.cardEmojiText}>🛡️</Text>
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
@@ -347,7 +347,7 @@ export default function ProfileScreen() {
         {/* CARD: Historique + Avis (toujours) */}
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.cardHeader}>
-            <View style={[styles.cardEmoji, { backgroundColor: isDark ? theme.pressed : "#F7EFE5" }]}>
+            <View style={[styles.cardEmoji, { backgroundColor: theme.background }]}>
               <Text style={styles.cardEmojiText}>📋</Text>
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -393,7 +393,7 @@ export default function ProfileScreen() {
         {driver ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View style={styles.cardHeader}>
-              <View style={[styles.cardEmoji, { backgroundColor: isDark ? theme.pressed : "#F7EFE5" }]}>
+              <View style={[styles.cardEmoji, { backgroundColor: theme.background }]}>
                 <Text style={styles.cardEmojiText}>🎁</Text>
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
@@ -546,7 +546,7 @@ export default function ProfileScreen() {
             {locationError ? <Text style={styles.error}>{locationError}</Text> : null}
             <ScrollView style={{ maxHeight: 380, marginTop: 8 }}>
               {(countriesQuery.data ?? []).map((c) => (
-                <Pressable key={c.id} onPress={() => void selectCountry(c.id)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, c.id === profile?.country && { borderColor: theme.primary, backgroundColor: isDark ? theme.pressed : "#E5F6F7" }, pressed && { opacity: 0.8 }]}>
+                <Pressable key={c.id} onPress={() => void selectCountry(c.id)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, c.id === profile?.country && { borderColor: theme.primary, backgroundColor: theme.background }, pressed && { opacity: 0.8 }]}>
                   <Text style={styles.countryRowFlag}>{countryFlagEmoji(c.id)}</Text>
                   <Text style={[styles.countryOptionText, { color: theme.foreground, flex: 1 }, c.id === profile?.country && { color: theme.primary, fontWeight: "700" }]}>{c.name}</Text>
                   {locationSaving === "country" ? null : c.id === profile?.country ? <MaterialIcons name="check-circle" size={20} color={theme.primary} /> : null}
@@ -763,7 +763,7 @@ const styles = StyleSheet.create({
   vehicleLabel: { fontSize: 14, fontWeight: "600", flex: 1 },
 
   fieldLabel: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
-  input: { backgroundColor: "#F7EFE5", borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 12, paddingVertical: 12, color: "#9A6201", fontSize: 13, fontWeight: "500" },
+  input: { backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: 1, borderColor: "#E3E3E3", paddingHorizontal: 12, paddingVertical: 12, color: "#111111", fontSize: 13, fontWeight: "500" },
   countryOptionText: { fontSize: 13, fontWeight: "600" },
   countryRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 10, borderWidth: 1, marginBottom: 8 },
   countryRowFlag: { fontSize: 20 },
