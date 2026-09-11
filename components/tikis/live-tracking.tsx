@@ -2,7 +2,8 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useRouter } from "expo-router";
 import { type ComponentProps, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Easing, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
+import { createStyles } from "@/lib/create-styles";
 import type { DeliveryStatus } from "@/shared/tikis-domain";
 import { formatMoney } from "@/shared/tikis-domain";
 
@@ -123,6 +124,7 @@ export function LiveTrackingView({
   children,
 }: Props) {
   const { colors: theme, isDark } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const router = useRouter();
   const currentStep = useMemo(() => deriveStep(status, Boolean(driverPhone)), [status, driverPhone]);
   const currentStepIdx = stepIndex(currentStep);
@@ -234,7 +236,7 @@ export function LiveTrackingView({
 
         <View style={[styles.mapCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.mapInner}>
-            <View style={[styles.mapBg, { backgroundColor: isDark ? "#1A1611" : theme.primary + "14" }]}>
+            <View style={[styles.mapBg, { backgroundColor: isDark ? "#231A10" : theme.primary + "14" }]}>
               <View style={[styles.mapGrid, { borderColor: theme.primary + "0F" }]} />
               <View style={[styles.mapRoad, styles.mapRoad1, { backgroundColor: theme.surface }]} />
               <View style={[styles.mapRoad, styles.mapRoad2, { backgroundColor: theme.surface }]} />
@@ -575,7 +577,7 @@ function getInitials(name: string): string {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-const styles = StyleSheet.create({
+const stylesFor = createStyles((theme: ThemedColors) => ({
   root: { flex: 1 },
   scroll: { padding: 12, paddingBottom: 36, gap: 12 },
   headerRow: { flexDirection: "row", alignItems: "center", gap: 8 },
@@ -638,7 +640,7 @@ const styles = StyleSheet.create({
 
   driverCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: 14, borderWidth: 1 },
   driverAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", position: "relative" },
-  driverAvatarText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
+  driverAvatarText: { color: theme.surface, fontWeight: "700", fontSize: 14 },
   driverVerified: { position: "absolute", bottom: -1, right: -1, width: 16, height: 16, borderRadius: 8, alignItems: "center", justifyContent: "center", borderWidth: 2 },
   driverInfo: { flex: 1, minWidth: 0 },
   driverName: { fontSize: 13, fontWeight: "600" },
@@ -680,4 +682,4 @@ const styles = StyleSheet.create({
   activityBullet: { width: 6, height: 6, borderRadius: 3 },
   activityText: { flex: 1, fontSize: 11 },
   activityTime: { fontSize: 10, fontWeight: "500" },
-});
+}));

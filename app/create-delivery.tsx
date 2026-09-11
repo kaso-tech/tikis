@@ -2,7 +2,8 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
+import { createStyles } from "@/lib/create-styles";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { type SavedFavorite } from "@/components/tikis/place-sheets";
 import { YangoAddressPicker } from "@/components/tikis/yango-address-picker";
@@ -33,6 +34,7 @@ type DeliveryFieldName = "title" | "details" | "passengers" | "pickup" | "dropof
 
 export default function CreateDeliveryScreen() {
   const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const { deliveryId, draftId } = useLocalSearchParams<{ deliveryId?: string; draftId?: string }>();
   const { profile } = useTikisStore();
   const [title, setTitle] = useState("");
@@ -523,7 +525,7 @@ function MiniNumber({ value, onChangeText, placeholder }: { value: string; onCha
   return <TextInput value={value} onChangeText={(text) => onChangeText(text.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" placeholder={placeholder} placeholderTextColor={theme.muted} style={styles.miniInput} />;
 }
 
-const styles = StyleSheet.create({
+const stylesFor = createStyles((theme: ThemedColors) => ({
   safe: { flex: 1, backgroundColor: theme.background },
   keyboard: { flex: 1 },
   content: { padding: 16, paddingBottom: 24, gap: 14 },
@@ -532,113 +534,113 @@ const styles = StyleSheet.create({
   iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: theme.border },
   iconBtnSpacer: { width: 36 },
   topTitleWrap: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  topTitle: { color: "#111111", fontSize: 15, fontWeight: "600" },
-  topStep: { color: "#9A6201", fontSize: 11, fontWeight: "700" },
+  topTitle: { color: theme.foreground, fontSize: 15, fontWeight: "600" },
+  topStep: { color: theme.primary, fontSize: 11, fontWeight: "700" },
 
   progressWrap: { paddingHorizontal: 16, paddingBottom: 8 },
-  progressTrack: { height: 4, backgroundColor: "#ECECEC", borderRadius: 2, overflow: "hidden" },
+  progressTrack: { height: 4, backgroundColor: theme.divider, borderRadius: 2, overflow: "hidden" },
   progressFill: { height: "100%", backgroundColor: theme.primary, borderRadius: 2 },
 
-  eyebrow: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 4 },
-  sectionTitle: { color: "#111111", fontSize: 14, fontWeight: "600", marginBottom: 10 },
+  eyebrow: { color: theme.muted, fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 4 },
+  sectionTitle: { color: theme.foreground, fontSize: 14, fontWeight: "600", marginBottom: 10 },
   section: { gap: 4 },
   routeHeaderRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   draftsButton: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
-  draftsButtonText: { color: "#9A6201", fontSize: 11, fontWeight: "700" },
+  draftsButtonText: { color: theme.primary, fontSize: 11, fontWeight: "700" },
   routeFavoriteBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, alignItems: "center", justifyContent: "center" },
   favoriteInputRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 38, paddingTop: 6, paddingRight: 6 },
-  favoriteInput: { flex: 1, backgroundColor: theme.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 10, paddingVertical: 8, color: "#111111", fontSize: 12, fontWeight: "500" },
+  favoriteInput: { flex: 1, backgroundColor: theme.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 10, paddingVertical: 8, color: theme.foreground, fontSize: 12, fontWeight: "500" },
   favoriteSaveBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: theme.primary },
-  favoriteSaveBtnText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
+  favoriteSaveBtnText: { color: theme.surface, fontSize: 12, fontWeight: "700" },
 
   routeCard: { backgroundColor: theme.surface, borderRadius: 12, padding: 12, gap: 4 },
   routeInput: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, backgroundColor: theme.surface, borderRadius: 9, borderWidth: 1, borderColor: theme.border, borderLeftWidth: 3 },
-  routeInputFrom: { borderLeftColor: "#9A6201" },
-  routeInputTo: { borderLeftColor: "#B4232D" },
+  routeInputFrom: { borderLeftColor: theme.primary },
+  routeInputTo: { borderLeftColor: theme.error },
   routeInputInvalid: { borderColor: theme.error, borderWidth: 1 },
   routeInputIcon: { width: 24, height: 24, borderRadius: 12, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center" },
   routeInputIconFrom: { backgroundColor: theme.primary + "14" },
   routeInputIconTo: { backgroundColor: theme.error + "14" },
   routeInputContent: { flex: 1, minWidth: 0 },
-  routeInputLabel: { color: "#747474", fontSize: 9, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase" },
-  routeInputLabelInvalid: { color: "#B4232D" },
-  routeInputValue: { color: "#111111", fontSize: 13, fontWeight: "600", marginTop: 1 },
-  routeInputMeta: { color: "#666666", fontSize: 10, marginTop: 1 },
-  routeInputPlaceholder: { color: "#747474", fontSize: 12, fontWeight: "500", marginTop: 4 },
-  routeInputIssue: { color: "#B4232D", fontSize: 10, fontWeight: "600", marginTop: 2 },
+  routeInputLabel: { color: theme.muted, fontSize: 9, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase" },
+  routeInputLabelInvalid: { color: theme.error },
+  routeInputValue: { color: theme.foreground, fontSize: 13, fontWeight: "600", marginTop: 1 },
+  routeInputMeta: { color: theme.muted, fontSize: 10, marginTop: 1 },
+  routeInputPlaceholder: { color: theme.muted, fontSize: 12, fontWeight: "500", marginTop: 4 },
+  routeInputIssue: { color: theme.error, fontSize: 10, fontWeight: "600", marginTop: 2 },
 
   routeConnector: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 18, paddingVertical: 4 },
-  routeConnectorLine: { width: 1.5, height: 16, backgroundColor: "#ECECEC" },
-  routeConnectorLineDashed: { backgroundColor: "#ECECEC", opacity: 0.5 },
-  routeConnectorMeta: { color: "#747474", fontSize: 10, fontWeight: "600" },
+  routeConnectorLine: { width: 1.5, height: 16, backgroundColor: theme.divider },
+  routeConnectorLineDashed: { backgroundColor: theme.divider, opacity: 0.5 },
+  routeConnectorMeta: { color: theme.muted, fontSize: 10, fontWeight: "600" },
 
   routeMiniSummary: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: theme.primary + "14", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginTop: 4 },
-  routeMiniSummaryLabel: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
-  routeMiniSummaryValue: { color: "#9A6201", fontSize: 13, fontWeight: "700" },
+  routeMiniSummaryLabel: { color: theme.primary, fontSize: 11, fontWeight: "600" },
+  routeMiniSummaryValue: { color: theme.primary, fontSize: 13, fontWeight: "700" },
 
-  routeMessage: { color: "#167A55", fontSize: 11, marginTop: 4, lineHeight: 16 },
-  routeWarning: { color: "#9A6200" },
+  routeMessage: { color: theme.success, fontSize: 11, marginTop: 4, lineHeight: 16 },
+  routeWarning: { color: theme.warning },
   retryRoute: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
-  retryRouteText: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
-  routeTitle: { color: "#666666", fontSize: 11, marginTop: 6, lineHeight: 16 },
+  retryRouteText: { color: theme.primary, fontSize: 11, fontWeight: "600" },
+  routeTitle: { color: theme.muted, fontSize: 11, marginTop: 6, lineHeight: 16 },
 
   shortcut: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: theme.surface, borderRadius: 9, padding: 12 },
-  shortcutText: { flex: 1, color: "#747474", fontSize: 12 },
+  shortcutText: { flex: 1, color: theme.muted, fontSize: 12 },
 
   typeGrid: { flexDirection: "row", gap: 8 },
-  typeCard: { flex: 1, backgroundColor: theme.surface, borderWidth: 1, borderColor: "#ECECEC", borderRadius: 10, paddingVertical: 12, paddingHorizontal: 8, alignItems: "center", gap: 4 },
+  typeCard: { flex: 1, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.divider, borderRadius: 10, paddingVertical: 12, paddingHorizontal: 8, alignItems: "center", gap: 4 },
   typeCardActive: { backgroundColor: theme.surface, borderColor: theme.primary },
   typeIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: theme.primary + "14", alignItems: "center", justifyContent: "center" },
   typeIconActive: { backgroundColor: theme.primary + "14" },
-  typeLabel: { color: "#111111", fontSize: 11, fontWeight: "600" },
-  typeLabelActive: { color: "#9A6201" },
-  typeSub: { color: "#747474", fontSize: 9, fontWeight: "500", textAlign: "center" },
-  typeSubActive: { color: "#9A6201" },
+  typeLabel: { color: theme.foreground, fontSize: 11, fontWeight: "600" },
+  typeLabelActive: { color: theme.primary },
+  typeSub: { color: theme.muted, fontSize: 9, fontWeight: "500", textAlign: "center" },
+  typeSubActive: { color: theme.primary },
 
   vehicleGrid: { flexDirection: "row", gap: 8 },
-  vehicleCard: { flex: 1, backgroundColor: theme.surface, borderWidth: 1, borderColor: "#ECECEC", borderRadius: 10, paddingVertical: 10, alignItems: "center", gap: 4 },
+  vehicleCard: { flex: 1, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.divider, borderRadius: 10, paddingVertical: 10, alignItems: "center", gap: 4 },
   vehicleCardActive: { backgroundColor: theme.surface, borderColor: theme.primary },
-  vehicleLabel: { color: "#111111", fontSize: 10, fontWeight: "600" },
-  vehicleLabelActive: { color: "#9A6201" },
+  vehicleLabel: { color: theme.foreground, fontSize: 10, fontWeight: "600" },
+  vehicleLabelActive: { color: theme.primary },
 
   fieldWrap: { gap: 5 },
-  fieldLabel: { color: "#111111", fontSize: 12, fontWeight: "600" },
-  fieldLabelInvalid: { color: "#B4232D" },
+  fieldLabel: { color: theme.foreground, fontSize: 12, fontWeight: "600" },
+  fieldLabelInvalid: { color: theme.error },
   field: { flexDirection: "row", alignItems: "center", backgroundColor: theme.surface, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10, gap: 8, borderWidth: 1, borderColor: theme.border },
   fieldMultiline: { alignItems: "flex-start", paddingVertical: 12, minHeight: 80 },
   fieldInvalid: { borderColor: theme.error },
   fieldIcon: { marginRight: 2 },
-  input: { flex: 1, color: "#111111", fontSize: 13, fontWeight: "500" },
+  input: { flex: 1, color: theme.foreground, fontSize: 13, fontWeight: "500" },
   inputMultiline: { minHeight: 60, textAlignVertical: "top" },
-  fieldIssue: { color: "#B4232D", fontSize: 11, fontWeight: "500" },
+  fieldIssue: { color: theme.error, fontSize: 11, fontWeight: "500" },
 
   measureCard: { backgroundColor: theme.surface, borderRadius: 10, padding: 12, gap: 10, marginTop: 4 },
-  measureTitle: { color: "#111111", fontSize: 12, fontWeight: "600" },
-  measureSubtitle: { color: "#666666", fontSize: 11, lineHeight: 16 },
+  measureTitle: { color: theme.foreground, fontSize: 12, fontWeight: "600" },
+  measureSubtitle: { color: theme.muted, fontSize: 11, lineHeight: 16 },
   dimensionRow: { flexDirection: "row", gap: 6 },
-  miniInput: { flex: 1, backgroundColor: theme.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 10, paddingVertical: 10, color: "#111111", fontSize: 12, fontWeight: "600", textAlign: "center" },
+  miniInput: { flex: 1, backgroundColor: theme.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 10, paddingVertical: 10, color: theme.foreground, fontSize: 12, fontWeight: "600", textAlign: "center" },
 
   priceCard: { backgroundColor: theme.primary, borderRadius: 12, padding: 14, gap: 10 },
   priceCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   priceCardLabel: { color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
-  priceCardValue: { color: "#FFFFFF", fontSize: 20, fontWeight: "700" },
+  priceCardValue: { color: theme.surface, fontSize: 20, fontWeight: "700" },
   priceCardInput: { flexDirection: "row", alignItems: "center", backgroundColor: theme.surface, borderRadius: 8, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 12, paddingVertical: 12, gap: 8 },
-  priceCardInputText: { flex: 1, color: "#111111", fontSize: 15, fontWeight: "600" },
-  priceCardInputSuffix: { color: "#9A6201", fontSize: 12, fontWeight: "600" },
+  priceCardInputText: { flex: 1, color: theme.foreground, fontSize: 15, fontWeight: "600" },
+  priceCardInputSuffix: { color: theme.primary, fontSize: 12, fontWeight: "600" },
   priceCardHelper: { flexDirection: "row", alignItems: "center", gap: 4 },
   priceCardNote: { color: "rgba(255,255,255,0.7)", fontSize: 11, lineHeight: 16, flex: 1 },
-  priceError: { color: "#FFFFFF", fontSize: 11, fontWeight: "600", backgroundColor: "rgba(180,35,45,0.4)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+  priceError: { color: theme.surface, fontSize: 11, fontWeight: "600", backgroundColor: "rgba(180,35,45,0.4)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
 
-  publicationLoadingHint: { color: "#9A6201", fontSize: 12, textAlign: "center", marginTop: 4, fontWeight: "600" },
-  publicationHint: { color: "#9A6200", fontSize: 12, textAlign: "center", marginTop: 4, fontWeight: "500" },
-  footerNote: { color: "#747474", fontSize: 10, lineHeight: 14, textAlign: "center", marginTop: 8 },
+  publicationLoadingHint: { color: theme.primary, fontSize: 12, textAlign: "center", marginTop: 4, fontWeight: "600" },
+  publicationHint: { color: theme.warning, fontSize: 12, textAlign: "center", marginTop: 4, fontWeight: "500" },
+  footerNote: { color: theme.muted, fontSize: 10, lineHeight: 14, textAlign: "center", marginTop: 8 },
 
-  footer: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10, paddingBottom: 18, backgroundColor: theme.surface, borderTopWidth: 1, borderTopColor: "#ECECEC" },
+  footer: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10, paddingBottom: 18, backgroundColor: theme.surface, borderTopWidth: 1, borderTopColor: theme.divider },
   footerSummary: { flex: 1 },
-  footerSummaryLabel: { color: "#747474", fontSize: 10, fontWeight: "600" },
-  footerSummaryValue: { color: "#111111", fontSize: 14, fontWeight: "700", marginTop: 1 },
+  footerSummaryLabel: { color: theme.muted, fontSize: 10, fontWeight: "600" },
+  footerSummaryValue: { color: theme.foreground, fontSize: 14, fontWeight: "700", marginTop: 1 },
   footerCta: { minWidth: 160, minHeight: 44 },
   draftButton: { width: 44, height: 44, borderRadius: 9, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, alignItems: "center", justifyContent: "center" },
 
   pressed: { opacity: 0.7 },
-});
+}));

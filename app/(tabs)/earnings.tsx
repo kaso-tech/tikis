@@ -131,7 +131,7 @@ export default function EarningsScreen() {
             {comparison.trend !== null ? (
               <View style={[styles.trendPill, comparison.trend < 0 && styles.trendPillDown]}>
                 <MaterialIcons name={comparison.trend >= 0 ? "trending-up" : "trending-down"} size={11} color={comparison.trend >= 0 ? theme.trendUp : theme.trendDown} />
-                <Text style={[styles.trendText, { color: theme.trendUp }], comparison.trend < 0 && styles.trendTextDown]}>
+                <Text style={[styles.trendText, comparison.trend < 0 && styles.trendTextDown, { color: comparison.trend >= 0 ? theme.trendUp : theme.trendDown }]}>
                   {comparison.trend >= 0 ? "+" : ""}{comparison.trend}% vs 7 j
                 </Text>
               </View>

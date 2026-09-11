@@ -3,7 +3,8 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
+import { createStyles } from "@/lib/create-styles";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { LoyaltyProgress } from "@/components/tikis/loyalty-progress";
@@ -19,6 +20,7 @@ const COVER_HEIGHT = 200;
 
 export default function ProfileScreen() {
   const { colors: theme, isDark } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const { role, profile, updateProfile } = useTikisStore();
   const { openLogoutConfirmation } = useTikisLogout();
   const updateMutation = trpc.profiles.update.useMutation();
@@ -645,6 +647,7 @@ export default function ProfileScreen() {
 
 function StatBox({ label, value, color, small }: { label: string; value: string; color: string; small?: boolean }) {
   const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   return (
     <View style={[styles.statBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
       <Text style={[styles.statValue, small && { fontSize: 13 }]} numberOfLines={1}>{value}</Text>
@@ -655,6 +658,7 @@ function StatBox({ label, value, color, small }: { label: string; value: string;
 
 function CtaTile({ icon, label, meta, onPress }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; label: string; meta: string; onPress: () => void }) {
   const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   return (
     <Pressable
       onPress={onPress}
@@ -681,7 +685,7 @@ function InfoRow({ label, value, theme, last }: { label: string; value: string; 
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = createStyles((theme: ThemedColors) => ({
   safe: { flex: 1 },
   content: { paddingBottom: 40, paddingHorizontal: 14, paddingTop: 12, gap: 10 },
 
@@ -691,9 +695,9 @@ const styles = StyleSheet.create({
   heroAvatarWrap: { position: "relative", marginTop: 4, marginBottom: 10 },
   heroAvatar: { width: 88, height: 88, borderRadius: 44, alignItems: "center", justifyContent: "center", borderWidth: 4 },
   avatarDriver: { backgroundColor: theme.foreground },
-  avatarSender: { backgroundColor: "#176C52" },
+  avatarSender: { backgroundColor: theme.success },
   heroAvatarImage: { width: 88, height: 88, borderRadius: 44, borderWidth: 4, borderColor: theme.surface },
-  heroAvatarText: { color: "#FFFFFF", fontSize: 28, fontWeight: "700" },
+  heroAvatarText: { color: theme.surface, fontSize: 28, fontWeight: "700" },
   heroAvatarEdit: { position: "absolute", right: -2, bottom: -2, width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: theme.surface },
   heroName: { fontSize: 20, fontWeight: "700" },
   heroPhone: { fontSize: 13, marginTop: 4 },
@@ -704,7 +708,7 @@ const styles = StyleSheet.create({
   // Stats row (3 KPIs)
   statsRow: { flexDirection: "row", gap: 8 },
   statBox: { flex: 1, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 10, alignItems: "center", gap: 4, borderWidth: StyleSheet.hairlineWidth },
-  statValue: { fontSize: 18, fontWeight: "700", fontVariantNumeric: "tabular-nums", color: "#111111" },
+  statValue: { fontSize: 18, fontWeight: "700", fontVariantNumeric: "tabular-nums", color: theme.foreground },
   statLabel: { fontSize: 10.5, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
 
   // Quick CTAs (2 tiles)
@@ -749,29 +753,29 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.42)" },
   sheet: { backgroundColor: theme.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, paddingTop: 8, paddingBottom: 24 },
   sheetGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: "center", marginBottom: 14 },
-  sheetTitle: { color: "#111111", fontSize: 17, fontWeight: "600" },
-  sheetSubtitle: { color: "#666666", fontSize: 12, marginTop: 4 },
+  sheetTitle: { color: theme.foreground, fontSize: 17, fontWeight: "600" },
+  sheetSubtitle: { color: theme.muted, fontSize: 12, marginTop: 4 },
 
   photoPicker: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, backgroundColor: theme.primary + "14", borderRadius: 10, marginTop: 14 },
   photoPickerIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center" },
-  photoPickerText: { color: "#9A6201", fontSize: 12, fontWeight: "600" },
-  photoPickerSub: { color: "#747474", fontSize: 10, marginTop: 2 },
+  photoPickerText: { color: theme.primary, fontSize: 12, fontWeight: "600" },
+  photoPickerSub: { color: theme.muted, fontSize: 10, marginTop: 2 },
 
   vehiclesList: { gap: 2, marginTop: 12 },
   vehicleRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 12, borderWidth: 1, borderRadius: 10, marginBottom: 2 },
   vehicleCheckbox: { width: 22, height: 22, borderRadius: 5, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   vehicleLabel: { fontSize: 14, fontWeight: "600", flex: 1 },
 
-  fieldLabel: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
-  input: { backgroundColor: theme.surface, borderRadius: 9, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 12, paddingVertical: 12, color: "#111111", fontSize: 13, fontWeight: "500" },
+  fieldLabel: { color: theme.muted, fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
+  input: { backgroundColor: theme.surface, borderRadius: 9, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 12, paddingVertical: 12, color: theme.foreground, fontSize: 13, fontWeight: "500" },
   countryOptionText: { fontSize: 13, fontWeight: "600" },
   countryRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 10, borderWidth: 1, marginBottom: 8 },
   countryRowFlag: { fontSize: 20 },
   deleteIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: theme.error + "14", alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 4 },
   inputError: { borderWidth: 1, borderColor: theme.error },
-  helper: { color: "#747474", fontSize: 10, marginTop: 4 },
-  error: { color: "#B4232D", fontSize: 11, fontWeight: "600", marginTop: 4 },
+  helper: { color: theme.muted, fontSize: 10, marginTop: 4 },
+  error: { color: theme.error, fontSize: 11, fontWeight: "600", marginTop: 4 },
   saveButton: { marginTop: 18 },
 
   pressed: { opacity: 0.7 },
-});
+}));

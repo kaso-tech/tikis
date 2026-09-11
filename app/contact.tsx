@@ -1,11 +1,12 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
+import { createStyles } from "@/lib/create-styles";
 import { sanitizeDeliveryText, isAllowedDeliveryText } from "@/lib/tikis-engine";
 
 type ContactReason = "general" | "account" | "delivery" | "payment" | "report" | "other";
@@ -24,6 +25,7 @@ const CONTACT_PHONE = "+226 25 00 00 00";
 
 export default function ContactScreen() {
   const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const [reason, setReason] = useState<ContactReason>("general");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -144,7 +146,7 @@ export default function ContactScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = createStyles((theme: ThemedColors) => ({
   safe: { flex: 1 },
   header: { minHeight: 64, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 10 },
   back: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center" },
@@ -169,9 +171,9 @@ const styles = StyleSheet.create({
   textarea: { minHeight: 110, textAlignVertical: "top" },
   counter: { fontSize: 10, fontWeight: "500", textAlign: "right", marginTop: 4 },
   helper: { fontSize: 11, lineHeight: 16 },
-  error: { color: "#B4232D", fontSize: 12, fontWeight: "600" },
+  error: { color: theme.error, fontSize: 12, fontWeight: "600" },
   success: { borderRadius: 10, padding: 16, alignItems: "center", gap: 8 },
   successTitle: { fontSize: 15, fontWeight: "600" },
   successText: { fontSize: 12, lineHeight: 18, textAlign: "center" },
   pressed: { opacity: 0.67 },
-});
+}));

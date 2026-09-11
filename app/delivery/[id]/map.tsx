@@ -7,7 +7,8 @@ import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
 import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { haptic } from "@/lib/haptics";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
+import { createStyles } from "@/lib/create-styles";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 
@@ -45,6 +46,7 @@ function stepIndex(status: string) {
 
 export default function DeliveryMapScreen() {
   const { colors: theme, isDark } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile, role } = useTikisStore();
   const deliveryQuery = trpc.deliveries.get.useQuery({ id: id ?? fallbackId }, { enabled: Boolean(id && profile?.phone), refetchInterval: 8_000 });
@@ -170,7 +172,7 @@ export default function DeliveryMapScreen() {
   </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const stylesFor = createStyles((theme: ThemedColors) => ({
   safe: { flex: 1 },
   header: { height: 62, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 10 },
   back: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center" },
@@ -182,11 +184,11 @@ const styles = StyleSheet.create({
   headerPlaceholder: { width: 40 },
   etaBanner: { flexDirection: "row", alignItems: "center", gap: 12, marginHorizontal: 12, marginTop: 10, padding: 13, borderRadius: 12 },
   etaIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
-  etaValue: { color: "#FFFFFF", fontSize: 17, fontWeight: "700" },
+  etaValue: { color: theme.surface, fontSize: 17, fontWeight: "700" },
   etaLabel: { color: "rgba(255,255,255,0.72)", fontSize: 11.5, marginTop: 2 },
   mapWrap: { flex: 1, margin: 12, marginBottom: 0, borderRadius: 10, overflow: "hidden" },
   routeLoading: { position: "absolute", top: 14, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, height: 30, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.95)" },
-  routeLoadingText: { color: "#555555", fontSize: 11, fontWeight: "600" },
+  routeLoadingText: { color: theme.muted, fontSize: 11, fontWeight: "600" },
   timelineRow: { flexDirection: "row", marginHorizontal: 12, marginTop: 10, padding: 12, borderRadius: 10 },
   timelineStep: { flex: 1, alignItems: "center", position: "relative" },
   timelineDot: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
@@ -195,19 +197,19 @@ const styles = StyleSheet.create({
   bottomPanel: { marginTop: 10, padding: 14, paddingBottom: 18 },
   privacyBanner: { flexDirection: "row", gap: 7, padding: 10, borderRadius: 8, marginBottom: 10 },
   privacyText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: "500" },
-  routeError: { color: "#9A6200", fontSize: 11, lineHeight: 16, marginBottom: 10 },
+  routeError: { color: theme.warning, fontSize: 11, lineHeight: 16, marginBottom: 10 },
   driverCard: { flexDirection: "row", alignItems: "center", gap: 10, paddingBottom: 12, marginBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   driverAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.primary, alignItems: "center", justifyContent: "center" },
-  driverAvatarText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
+  driverAvatarText: { color: theme.surface, fontWeight: "700", fontSize: 13 },
   driverName: { fontSize: 14, fontWeight: "700" },
   driverSub: { fontSize: 11, marginTop: 1 },
-  callButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#167A55", alignItems: "center", justifyContent: "center" },
+  callButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: theme.success, alignItems: "center", justifyContent: "center" },
   placeRow: { flexDirection: "row", alignItems: "center", gap: 9 },
   placeIcon: { width: 30, height: 30, borderRadius: 7, alignItems: "center", justifyContent: "center" },
-  pickupIcon: { backgroundColor: "#F5F5F5" },
-  dropoffIcon: { backgroundColor: "#FFF3F3" },
+  pickupIcon: { backgroundColor: theme.background },
+  dropoffIcon: { backgroundColor: theme.error + "14" },
   placeCopy: { flex: 1, minWidth: 0 },
-  placeLabel: { color: "#9A9A9A", fontSize: 9, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },
+  placeLabel: { color: theme.muted, fontSize: 9, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },
   placeTitle: { fontSize: 13, fontWeight: "600", marginTop: 2 },
   placeSubtitle: { fontSize: 10, marginTop: 2 },
   divider: { height: 10, width: 1, marginLeft: 14, marginVertical: 3 },
@@ -215,4 +217,4 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 9, padding: 18 },
   loadingText: { fontWeight: "500" },
   pressed: { opacity: 0.67 },
-});
+}));

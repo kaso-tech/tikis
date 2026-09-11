@@ -1,7 +1,8 @@
-import { useState } from "react";
+import {useState, useMemo} from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
+import { createStyles } from "@/lib/create-styles";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { offeredPriceError, parseOfferedPrice, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
@@ -29,6 +30,7 @@ const LEGACY_TONE_COLORS_REMOVED = true;
 
 export default function WalletScreen() {
   const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const { role, profile } = useTikisStore();
   const utilities = trpc.useUtils();
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 12_000, refetchOnMount: "always", refetchOnWindowFocus: true });
@@ -263,7 +265,7 @@ function iconBgForTone(tone: Tone, theme: any) {
   return { backgroundColor: theme.background };
 }
 
-const styles = StyleSheet.create({
+const stylesFor = createStyles((theme: ThemedColors) => ({
   safe: { flex: 1, backgroundColor: theme.background },
 
   pressed: { opacity: 0.7 },
@@ -273,23 +275,23 @@ const styles = StyleSheet.create({
   balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: theme.primary, position: "relative", overflow: "hidden" },
   balanceCardDriver: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: theme.primary, borderWidth: 0, overflow: "hidden" },
   balanceCardSender: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: theme.primary, borderWidth: 0, overflow: "hidden" },
-  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#D7A447", opacity: 0.25, borderRadius: 14 },
+  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: theme.primary, opacity: 0.25, borderRadius: 14 },
   balanceEyebrow: { color: "rgba(255,255,255,0.6)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   balanceEyebrowLight: { color: "rgba(255,255,255,0.7)" },
   balanceValueRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
-  balanceValue: { color: "#FFFFFF", fontSize: 28, fontWeight: "700", lineHeight: 34, includeFontPadding: false },
+  balanceValue: { color: theme.surface, fontSize: 28, fontWeight: "700", lineHeight: 34, includeFontPadding: false },
   trendPill: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: "rgba(22,122,85,0.25)", borderRadius: 99 },
-  trendText: { color: "#48B889", fontSize: 10, fontWeight: "700" },
+  trendText: { color: theme.trendUp, fontSize: 10, fontWeight: "700" },
   trendPillLight: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 99 },
-  trendTextLight: { color: "#FFFFFF", fontSize: 10, fontWeight: "700" },
+  trendTextLight: { color: theme.surface, fontSize: 10, fontWeight: "700" },
   balanceDivider: { height: 1, backgroundColor: "rgba(255,255,255,0.12)" },
   balanceDividerLight: { backgroundColor: "rgba(255,255,255,0.18)" },
   balanceRows: { flexDirection: "row", gap: 12 },
   balanceCol: { flex: 1 },
   balanceLabel: { color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: "600" },
   balanceLabelLight: { color: "rgba(255,255,255,0.7)" },
-  balanceSub: { color: "#FFFFFF", fontSize: 12, fontWeight: "600", marginTop: 2 },
-  balanceSubPending: { color: "#FBBF24" },
+  balanceSub: { color: theme.surface, fontSize: 12, fontWeight: "600", marginTop: 2 },
+  balanceSubPending: { color: theme.trendDown },
 
   actionsRow: { flexDirection: "row", gap: 8, paddingHorizontal: 8, marginTop: 6 },
   actionCard: { flex: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1 },
@@ -306,17 +308,17 @@ const styles = StyleSheet.create({
   quickStatIconPrimary: { backgroundColor: theme.primary + "14" },
   quickStatIconSuccess: { backgroundColor: theme.success + "14" },
   quickStatIconAmber: { backgroundColor: theme.warning + "14" },
-  quickStatValue: { color: "#111111", fontSize: 13, fontWeight: "700" },
-  quickStatLabel: { color: "#747474", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
+  quickStatValue: { color: theme.foreground, fontSize: 13, fontWeight: "700" },
+  quickStatLabel: { color: theme.muted, fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
 
   senderInfo: { marginHorizontal: 8, padding: 12, backgroundColor: theme.primary + "14", borderRadius: 10, flexDirection: "row", gap: 10, alignItems: "center" },
   senderInfoIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: theme.primary, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  senderInfoText: { flex: 1, color: "#9A6201", fontSize: 11, lineHeight: 16 },
+  senderInfoText: { flex: 1, color: theme.primary, fontSize: 11, lineHeight: 16 },
   senderInfoTextBold: { fontWeight: "700" },
 
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 10, marginTop: 6 },
-  sectionTitle: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
-  sectionAction: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
+  sectionTitle: { color: theme.muted, fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
+  sectionAction: { color: theme.primary, fontSize: 11, fontWeight: "600" },
 
   listCard: { borderRadius: 12, overflow: "hidden" },
   txRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 12 },
@@ -339,24 +341,24 @@ const styles = StyleSheet.create({
 
   empty: { alignItems: "center", paddingVertical: 30, paddingHorizontal: 24, gap: 8 },
   emptyIcon: { width: 56, height: 56, borderRadius: 14, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center" },
-  emptyTitle: { color: "#111111", fontSize: 14, fontWeight: "600" },
-  emptySub: { color: "#666666", fontSize: 12, textAlign: "center", lineHeight: 18, maxWidth: 240 },
-  emptyText: { color: "#666666", fontSize: 12, textAlign: "center", padding: 24 },
+  emptyTitle: { color: theme.foreground, fontSize: 14, fontWeight: "600" },
+  emptySub: { color: theme.muted, fontSize: 12, textAlign: "center", lineHeight: 18, maxWidth: 240 },
+  emptyText: { color: theme.muted, fontSize: 12, textAlign: "center", padding: 24 },
 
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.42)" },
   modalSheet: { backgroundColor: theme.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, paddingTop: 8, paddingBottom: 24 },
   sheetGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: "center", marginBottom: 14 },
   modalIcon: { width: 44, height: 44, borderRadius: 9, backgroundColor: theme.primary + "14", alignSelf: "center", alignItems: "center", justifyContent: "center", marginBottom: 12 },
-  modalTitle: { color: "#111111", fontSize: 17, fontWeight: "600", textAlign: "center" },
-  modalSub: { color: "#666666", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 },
-  modalHint: { color: "#666666", fontSize: 10, lineHeight: 14, textAlign: "center", marginTop: 6 },
+  modalTitle: { color: theme.foreground, fontSize: 17, fontWeight: "600", textAlign: "center" },
+  modalSub: { color: theme.muted, fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 },
+  modalHint: { color: theme.muted, fontSize: 10, lineHeight: 14, textAlign: "center", marginTop: 6 },
   referenceCard: { backgroundColor: theme.background, borderRadius: 9, padding: 12, marginTop: 14 },
-  referenceLabel: { color: "#666666", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textAlign: "center" },
-  referenceValue: { color: "#111111", fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4, letterSpacing: 0.3 },
-  requestError: { color: "#B4232D", fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: 6 },
+  referenceLabel: { color: theme.muted, fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textAlign: "center" },
+  referenceValue: { color: theme.foreground, fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4, letterSpacing: 0.3 },
+  requestError: { color: theme.error, fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: 6 },
   amountWrap: { flexDirection: "row", alignItems: "center", backgroundColor: theme.surface, borderRadius: 9, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 12, marginTop: 14 },
-  amountInput: { flex: 1, color: "#9A6201", fontSize: 15, fontWeight: "500", minHeight: 46 },
-  amountCurrency: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
+  amountInput: { flex: 1, color: theme.primary, fontSize: 15, fontWeight: "500", minHeight: 46 },
+  amountCurrency: { color: theme.primary, fontSize: 11, fontWeight: "600" },
   modalActions: { flexDirection: "row", gap: 8, marginTop: 16 },
   modalAction: { flex: 1, minHeight: 42 },
-});
+}));

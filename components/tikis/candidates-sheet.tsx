@@ -1,7 +1,8 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Dimensions, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
+import { createStyles } from "@/lib/create-styles";
 import { formatMoney, isDriverCertified, type DriverCandidate } from "@/shared/tikis-domain";
 
 type Tab = "all" | "certified" | "best";
@@ -48,6 +49,7 @@ function nextSnap(current: number, velocityY: number): number {
 
 export function CandidatesSheet({ visible, candidates, deliveryStatus, loadingId, onClose, onChoose }: Props) {
   const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const [tab, setTab] = useState<Tab>("all");
   const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
   const sheetValue = useRef(SHEET_PEEK);
@@ -138,7 +140,7 @@ export function CandidatesSheet({ visible, candidates, deliveryStatus, loadingId
                     : `${candidates.length} livreur${candidates.length > 1 ? "s" : ""} proposent leur service`}
                 </Text>
               </View>
-              <Pressable onPress={closeSheet} style={({ pressed }) => [styles.close, { backgroundColor: isDark(theme) ? "#1F1F1F" : "#F0F0F0" }, pressed && styles.pressed]} accessibilityLabel="Fermer">
+              <Pressable onPress={closeSheet} style={({ pressed }) => [styles.close, { backgroundColor: isDark(theme) ? theme.surface : theme.background }, pressed && styles.pressed]} accessibilityLabel="Fermer">
                 <MaterialIcons name="close" size={16} color={theme.foreground} />
               </Pressable>
             </View>
@@ -211,10 +213,10 @@ function CandidateCard({ candidate, deliveryStatus, loading, onChoose, theme }: 
   const bearingDeg = 0;
   const certColor = theme.success;
   const certBg = isDark(theme) ? "rgba(95,196,151,0.18)" : "rgba(23,108,82,0.10)";
-  const dividerColor = isDark(theme) ? "#262626" : "#E8E8E8";
-  const subFg = isDark(theme) ? "#8A8A8A" : "#6B6B6B";
-  const mutedFg = isDark(theme) ? "#5A5A5A" : "#9A9A9A";
-  const disabledBg = isDark(theme) ? "#1A1A1A" : "#F0F0F0";
+  const dividerColor = isDark(theme) ? theme.border : theme.border;
+  const subFg = isDark(theme) ? theme.muted : theme.muted;
+  const mutedFg = isDark(theme) ? theme.muted : theme.muted;
+  const disabledBg = isDark(theme) ? theme.surface : theme.background;
 
   return (
     <View
@@ -302,7 +304,7 @@ function CandidateCard({ candidate, deliveryStatus, loading, onChoose, theme }: 
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = createStyles((theme: ThemedColors) => ({
   root: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, justifyContent: "flex-end" },
   backdrop: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0 },
   sheet: { width: "100%", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
@@ -352,4 +354,4 @@ const styles = StyleSheet.create({
   selectedPillText: { fontSize: 8, fontWeight: "700", letterSpacing: 0.4 },
   cta: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, alignItems: "center", justifyContent: "center" },
   ctaText: { fontSize: 12, fontWeight: "600" },
-});
+}));

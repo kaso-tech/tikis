@@ -2,7 +2,8 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { StyleSheet, Text, View } from "react-native";
 
 import { formatNavigationTarget } from "@/lib/geo-rules";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
+import { createStyles } from "@/lib/create-styles";
 import type { LocationLabel } from "@/shared/tikis-domain";
 
 type Props = {
@@ -35,6 +36,7 @@ function projectOntoCanvas(
 
 export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }: Props) {
   const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const minLat = Math.min(pickup.latitude, dropoff.latitude);
   const maxLat = Math.max(pickup.latitude, dropoff.latitude);
   const minLng = Math.min(pickup.longitude, dropoff.longitude);
@@ -83,7 +85,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
       </View>
       {approximate ? (
         <View style={styles.approximate}>
-          <MaterialIcons name="privacy-tip" size={11} color="#9A6200" />
+          <MaterialIcons name="privacy-tip" size={11} color={theme.warning} />
           <Text style={styles.approximateText}>Aperçu indicatif</Text>
         </View>
       ) : null}
@@ -114,10 +116,10 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
 
 export { MapPreviewLeaflet as MapPreview };
 
-const styles = StyleSheet.create({
+const stylesFor = createStyles((theme: ThemedColors) => ({
   frame: {
     borderRadius: 9,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: theme.background,
     overflow: "hidden",
     position: "relative",
   },
@@ -128,7 +130,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     opacity: 0.45,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: theme.background,
   },
   gridHorizontal: {
     position: "absolute",
@@ -136,7 +138,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: "#D7D5DE",
+    backgroundColor: theme.border,
     opacity: 0.45,
   },
   routeLine: {
@@ -165,7 +167,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "#B4232D",
+    borderColor: theme.error,
   },
   approximate: {
     position: "absolute",
@@ -180,7 +182,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface,
   },
   approximateText: {
-    color: "#9A6200",
+    color: theme.warning,
     fontSize: 10,
     fontWeight: "600",
   },
@@ -209,23 +211,23 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#B4232D",
+    backgroundColor: theme.error,
   },
   legendLabel: {
-    color: "#111111",
+    color: theme.foreground,
     fontSize: 11,
     fontWeight: "600",
     flex: 1,
   },
   legendSub: {
-    color: "#666666",
+    color: theme.muted,
     fontSize: 10,
     lineHeight: 13,
     paddingLeft: 15,
   },
   legendDivider: {
     height: 1,
-    backgroundColor: "#ECECEC",
+    backgroundColor: theme.divider,
     marginVertical: 2,
   },
-});
+}));
