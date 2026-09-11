@@ -548,7 +548,7 @@ export default function ProfileScreen() {
               {(countriesQuery.data ?? []).map((c) => (
                 <Pressable key={c.id} onPress={() => void selectCountry(c.id)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, c.id === profile?.country && { borderColor: theme.primary, backgroundColor: isDark ? theme.pressed : "#E5F6F7" }, pressed && { opacity: 0.8 }]}>
                   <Text style={styles.countryRowFlag}>{countryFlagEmoji(c.id)}</Text>
-                  <Text style={[styles.countryOptionText, { color: theme.foreground, flex: 1 }, c.id === profile?.country && { color: theme.primary, fontWeight: "800" }]}>{c.name}</Text>
+                  <Text style={[styles.countryOptionText, { color: theme.foreground, flex: 1 }, c.id === profile?.country && { color: theme.primary, fontWeight: "700" }]}>{c.name}</Text>
                   {locationSaving === "country" ? null : c.id === profile?.country ? <MaterialIcons name="check-circle" size={20} color={theme.primary} /> : null}
                 </Pressable>
               ))}
@@ -691,7 +691,7 @@ const styles = StyleSheet.create({
   heroAvatarWrap: { position: "relative", marginTop: 4, marginBottom: 10 },
   heroAvatar: { width: 88, height: 88, borderRadius: 44, alignItems: "center", justifyContent: "center", borderWidth: 4 },
   avatarDriver: { backgroundColor: "#111111" },
-  avatarSender: { backgroundColor: "#007B8B" },
+  avatarSender: { backgroundColor: "#176C52" },
   heroAvatarImage: { width: 88, height: 88, borderRadius: 44, borderWidth: 4, borderColor: "#FFFFFF" },
   heroAvatarText: { color: "#FFFFFF", fontSize: 28, fontWeight: "700" },
   heroAvatarEdit: { position: "absolute", right: -2, bottom: -2, width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },

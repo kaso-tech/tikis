@@ -117,7 +117,7 @@ export default function DeliveryMapScreen() {
 
     {/* Bandeau ETA — l'élément central d'une page de suivi professionnelle */}
     {isLive ? (
-      <View style={[styles.etaBanner, { backgroundColor: "#0B1F3A" }]}>
+      <View style={[styles.etaBanner, { backgroundColor: theme.primary }]}>
         <View style={styles.etaIconWrap}><MaterialIcons name="local-shipping" size={20} color="#FFFFFF" /></View>
         <View style={{ flex: 1 }}>
           <Text style={styles.etaValue}>{eta !== null ? `${eta} min` : "Calcul en cours…"}</Text>
@@ -135,17 +135,17 @@ export default function DeliveryMapScreen() {
     <View style={[styles.timelineRow, { backgroundColor: theme.surface }]}>
       {STEPS.map((s, i) => (
         <View key={s.key} style={styles.timelineStep}>
-          <View style={[styles.timelineDot, { backgroundColor: i <= step ? "#007B8B" : theme.border }]}>
+          <View style={[styles.timelineDot, { backgroundColor: i <= step ? theme.primary : theme.border }]}>
             <MaterialIcons name={s.icon} size={13} color={i <= step ? "#FFFFFF" : theme.muted} />
           </View>
           <Text style={[styles.timelineLabel, { color: i <= step ? theme.foreground : theme.muted }]}>{s.label}</Text>
-          {i < STEPS.length - 1 ? <View style={[styles.timelineLine, { backgroundColor: i < step ? "#007B8B" : theme.border }]} /> : null}
+          {i < STEPS.length - 1 ? <View style={[styles.timelineLine, { backgroundColor: i < step ? theme.primary : theme.border }]} /> : null}
         </View>
       ))}
     </View>
 
     <View style={[styles.bottomPanel, { backgroundColor: theme.surface }]}>
-      {indicative ? <View style={[styles.privacyBanner, { backgroundColor: theme.background }]}><MaterialIcons name="privacy-tip" size={18} color="#8A5A0E" /><Text style={[styles.privacyText, { color: theme.muted }]}>Aperçu indicatif : les coordonnées précises sont protégées jusqu’à la confirmation de la mission.</Text></View> : null}
+      {indicative ? <View style={[styles.privacyBanner, { backgroundColor: theme.background }]}><MaterialIcons name="privacy-tip" size={18} color={theme.primary} /><Text style={[styles.privacyText, { color: theme.muted }]}>Aperçu indicatif : les coordonnées précises sont protégées jusqu’à la confirmation de la mission.</Text></View> : null}
       {routeError ? <Text style={styles.routeError}>Le tracé détaillé est indisponible. La liaison entre les deux points reste affichée.</Text> : null}
 
       {delivery.driverName ? (
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
   headerPlaceholder: { width: 40 },
   etaBanner: { flexDirection: "row", alignItems: "center", gap: 12, marginHorizontal: 12, marginTop: 10, padding: 13, borderRadius: 12 },
   etaIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
-  etaValue: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
+  etaValue: { color: "#FFFFFF", fontSize: 17, fontWeight: "700" },
   etaLabel: { color: "rgba(255,255,255,0.72)", fontSize: 11.5, marginTop: 2 },
   mapWrap: { flex: 1, margin: 12, marginBottom: 0, borderRadius: 10, overflow: "hidden" },
   routeLoading: { position: "absolute", top: 14, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, height: 30, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.95)" },
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   routeError: { color: "#9A6200", fontSize: 11, lineHeight: 16, marginBottom: 10 },
   driverCard: { flexDirection: "row", alignItems: "center", gap: 10, paddingBottom: 12, marginBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   driverAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center" },
-  driverAvatarText: { color: "#FFFFFF", fontWeight: "800", fontSize: 13 },
+  driverAvatarText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
   driverName: { fontSize: 14, fontWeight: "700" },
   driverSub: { fontSize: 11, marginTop: 1 },
   callButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#167A55", alignItems: "center", justifyContent: "center" },

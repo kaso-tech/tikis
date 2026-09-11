@@ -312,9 +312,9 @@ function ArchiveRow({ delivery, role, isLast }: { delivery: Delivery; role: "sen
     expired: "#FEF6E2",
     disabled: "#F5F5F5",
     draft: "#F5F5F5",
-    open: "#F7EFE5",
-    pending_confirmation: "#F7EFE5",
-    active: "#F7EFE5",
+    open: theme.background,
+    pending_confirmation: theme.background,
+    active: theme.background,
   };
   const statusColor: Record<DeliveryStatus, string> = {
     completed: theme.success,
@@ -361,12 +361,12 @@ const styles = StyleSheet.create({
   iconBtn: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", borderWidth: 1 },
   pressed: { opacity: 0.7 },
 
-  pageTitle: { fontSize: 22, fontWeight: "800", letterSpacing: -0.5, marginTop: 6 },
+  pageTitle: { fontSize: 22, fontWeight: "700", letterSpacing: -0.4, marginTop: 6 },
   pageSub: { fontSize: 12, marginTop: 2 },
 
   statsBand: { flexDirection: "row", gap: 6, marginTop: 14 },
   statPill: { flex: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 6, alignItems: "center", borderWidth: 1, gap: 2 },
-  statPillValue: { fontSize: 16, fontWeight: "800", letterSpacing: -0.3 },
+  statPillValue: { fontSize: 16, fontWeight: "700", letterSpacing: -0.2 },
   statPillLabel: { fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
 
   searchRow: { marginTop: 14 },

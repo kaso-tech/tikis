@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   draftCard: { borderRadius: 12, padding: 14, borderWidth: 1, gap: 8 },
   draftTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   draftBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  draftBadgeText: { fontSize: 9, fontWeight: "800", letterSpacing: 0.4 },
+  draftBadgeText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.4 },
   draftDate: { fontSize: 10, fontWeight: "500" },
   draftTitle: { fontSize: 14, fontWeight: "700" },
   draftMeta: { flexDirection: "row", alignItems: "center", gap: 5 },
