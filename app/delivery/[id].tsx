@@ -21,7 +21,7 @@ type SenderAction = "disable" | "reactivate" | "cancel" | null;
 function DetailRow({ icon, label, value }: { icon: ComponentProps<typeof MaterialIcons>["name"]; label: string; value: string }) {
   return (
     <View style={styles.detailsRow}>
-      <View style={styles.detailsIcon}><MaterialIcons name={icon} size={16} color="#9A6201" /></View>
+      <View style={styles.detailsIcon}><MaterialIcons name={icon} size={16} color={theme.primary} /></View>
       <Text style={styles.detailsLabel}>{label}</Text>
       <Text style={styles.detailsValue} numberOfLines={1}>{value}</Text>
     </View>
@@ -136,7 +136,7 @@ export default function DeliveryDetailScreen() {
   }, [senderAction]);
 
   if (deliveryQuery.isLoading) {
-    return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.notFound}><ActivityIndicator color="#9A6201" /><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
+    return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.notFound}><ActivityIndicator color={theme.primary} /><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
   }
 
   if (!delivery) {
@@ -222,10 +222,10 @@ export default function DeliveryDetailScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Retour">
-            <MaterialIcons name="arrow-back" size={20} color="#111111" />
+            <MaterialIcons name="arrow-back" size={20} color={theme.foreground} />
           </Pressable>
           <Pressable onPress={() => router.push(`/report/${deliveryId}` as any)} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Signaler">
-            <MaterialIcons name="flag" size={18} color="#B4232D" />
+            <MaterialIcons name="flag" size={18} color={theme.error} />
           </Pressable>
         </View>
 
@@ -242,7 +242,7 @@ export default function DeliveryDetailScreen() {
           </View>
           {requestRouteMutation.isPending ? (
             <View style={styles.heroMapRouteLoading} pointerEvents="none">
-              <ActivityIndicator size="small" color="#9A6201" />
+              <ActivityIndicator size="small" color={theme.primary} />
               <Text style={styles.heroMapRouteLoadingText}>Calcul de l'itinéraire…</Text>
             </View>
           ) : null}
@@ -261,7 +261,7 @@ export default function DeliveryDetailScreen() {
             </>
           ) : null}
         </View>
-        {showsCountdown ? <View style={styles.countdown} accessibilityRole="text" accessibilityLabel={`${countdownLabel} ${countdown}`}><MaterialIcons name="schedule" size={15} color="#9A6201" /><Text style={styles.countdownLabel}>{countdownLabel}</Text><Text style={styles.countdownValue}>{countdown}</Text></View> : null}
+        {showsCountdown ? <View style={styles.countdown} accessibilityRole="text" accessibilityLabel={`${countdownLabel} ${countdown}`}><MaterialIcons name="schedule" size={15} color={theme.primary} /><Text style={styles.countdownLabel}>{countdownLabel}</Text><Text style={styles.countdownValue}>{countdown}</Text></View> : null}
 
         <View style={styles.timelineCard}>
           <Text style={styles.eyebrowSmall}>SUIVI</Text>
@@ -328,22 +328,22 @@ export default function DeliveryDetailScreen() {
             <View style={styles.driverAvatar}>
               <Text style={styles.driverAvatarText}>{(delivery.driverName ?? "?").split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}</Text>
               <View style={styles.driverVerifiedBadge}>
-                <MaterialIcons name="check" size={10} color="#167A55" />
+                <MaterialIcons name="check" size={10} color={theme.success} />
               </View>
             </View>
             <View style={styles.driverInfo}>
               <View style={styles.driverNameRow}>
                 <Text style={styles.driverName} numberOfLines={1}>{role === "sender" ? delivery.driverName : delivery.senderName}</Text>
-                <MaterialIcons name="verified" size={14} color="#167A55" />
+                <MaterialIcons name="verified" size={14} color={theme.success} />
               </View>
               <Text style={styles.driverMeta}>{role === "sender" ? "Livreur confirmé" : "Expéditeur"}</Text>
             </View>
             <View style={styles.driverActions}>
               <Pressable onPress={() => void Linking.openURL(`tel:${role === "sender" ? delivery.driverPhone : delivery.senderPhone}`)} style={({ pressed }) => [styles.driverActionBtn, pressed && styles.pressed]} accessibilityLabel="Appeler">
-                <MaterialIcons name="phone" size={16} color="#111111" />
+                <MaterialIcons name="phone" size={16} color={theme.foreground} />
               </Pressable>
               <Pressable style={({ pressed }) => [styles.driverActionBtn, pressed && styles.pressed]} accessibilityLabel="Message">
-                <MaterialIcons name="chat" size={16} color="#111111" />
+                <MaterialIcons name="chat" size={16} color={theme.foreground} />
               </Pressable>
             </View>
           </View>
@@ -352,14 +352,14 @@ export default function DeliveryDetailScreen() {
         {showCandidates ? (
           <Pressable onPress={() => setCandidatesSheetOpen(true)} style={({ pressed }) => [styles.candidatesTrigger, isActive && styles.candidatesTriggerActive, pressed && styles.pressed]}>
             <View style={[styles.candidatesIcon, isActive && styles.candidatesIconActive]}>
-              <MaterialIcons name="group" size={18} color="#9A6201" />
+              <MaterialIcons name="group" size={18} color={theme.primary} />
             </View>
             <View style={styles.candidatesBody}>
               <Text style={styles.candidatesTitle}>{isActive ? "Changer de livreur" : "Livreurs candidats"}</Text>
               <Text style={styles.candidatesMeta}>{isActive ? "Voir les autres candidatures reçues" : `${candidates.length} livreur${candidates.length > 1 ? "s" : ""} ont proposé leur service`}</Text>
             </View>
             {candidates.length > 0 ? <View style={styles.candidatesCount}><Text style={styles.candidatesCountText}>{candidates.length}</Text></View> : null}
-            <MaterialIcons name="chevron-right" size={18} color="#747474" />
+            <MaterialIcons name="chevron-right" size={18} color={theme.muted} />
           </Pressable>
         ) : null}
 
@@ -376,7 +376,7 @@ export default function DeliveryDetailScreen() {
 
         {role === "sender" && (isActive || delivery.status === "pending_confirmation") ? (
           <Pressable onPress={() => router.push(`/delivery/${deliveryId}/map` as any)} style={({ pressed }) => [styles.trackButton, pressed && styles.pressed]}>
-            <MaterialIcons name="my-location" size={16} color="#9A6201" />
+            <MaterialIcons name="my-location" size={16} color={theme.primary} />
             <Text style={styles.trackButtonText}>Suivre en direct</Text>
           </Pressable>
         ) : null}
@@ -388,7 +388,7 @@ export default function DeliveryDetailScreen() {
             {canDisable ? <TikisButton label="Désactiver la livraison" icon="pause-circle" variant="secondary" onPress={() => setSenderAction("disable")} loading={senderProcessing && senderAction === "disable"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
             {canCancel ? (
               <Pressable onPress={() => setSenderAction("cancel")} disabled={senderProcessing} style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed, senderProcessing && styles.cancelButtonDisabled]}>
-                <MaterialIcons name="cancel" size={16} color={senderProcessing ? "#A0A0A0" : "#B4232D"} />
+                <MaterialIcons name="cancel" size={16} color={senderProcessing ? theme.muted : theme.error} />
                 <Text style={[styles.cancelButtonText, senderProcessing && styles.cancelButtonTextDisabled]}>Annuler la livraison</Text>
               </Pressable>
             ) : null}
@@ -399,7 +399,7 @@ export default function DeliveryDetailScreen() {
 
         {message ? <Text style={styles.message}>{message}</Text> : null}
         {isCompleted && role === "sender" ? review ? (
-          <View style={styles.reviewDone}><MaterialIcons name="star" size={20} color="#9A6200" /><View style={styles.reviewDoneInfo}><Text style={styles.reviewDoneTitle}>Avis envoyé · {review.rating}/5</Text><Text style={styles.reviewDoneText}>{review.comment || "Votre évaluation est enregistrée dans votre historique."}</Text></View></View>
+          <View style={styles.reviewDone}><MaterialIcons name="star" size={20} color={theme.warning} /><View style={styles.reviewDoneInfo}><Text style={styles.reviewDoneTitle}>Avis envoyé · {review.rating}/5</Text><Text style={styles.reviewDoneText}>{review.comment || "Votre évaluation est enregistrée dans votre historique."}</Text></View></View>
         ) : (
           <TikisButton label="Noter le livreur" variant="ghost" icon="star-outline" onPress={() => router.push(`/review/${deliveryId}` as any)} style={styles.rateButton} />
         ) : null}
@@ -423,7 +423,7 @@ function TimelineStep({ label, done }: { label: string; done: boolean }) {
   return (
     <View style={styles.timelineStep}>
       <View style={[styles.timelineDot, done && styles.timelineDotDone]}>
-        {done ? <MaterialIcons name="check" size={11} color="#FFFFFF" /> : <MaterialIcons name="radio-button-unchecked" size={9} color="#747474" />}
+        {done ? <MaterialIcons name="check" size={11} color={theme.surface} /> : <MaterialIcons name="radio-button-unchecked" size={9} color={theme.muted} />}
       </View>
       <Text style={[styles.timelineLabel, done && styles.timelineLabelDone]}>{label}</Text>
     </View>
@@ -435,8 +435,8 @@ function TimelineLine({ done }: { done: boolean }) {
 }
 
 function DeliveryActionConfirmationModal({ visible, title, description, confirmLabel, tone, loading, onCancel, onConfirm }: { visible: boolean; title: string; description: string; confirmLabel: string; tone: "success" | "warning" | "danger"; loading: boolean; onCancel: () => void; onConfirm: () => void }) {
-  const color = tone === "danger" ? "#B4232D" : tone === "warning" ? "#9A6200" : "#176C52";
-  const background = tone === "danger" ? "#FDEBEC" : tone === "warning" ? "#FEF6E2" : "#DDEFE7";
+  const color = tone === "danger" ? theme.error : tone === "warning" ? theme.warning : theme.success;
+  const background = tone === "danger" ? theme.error + "14" : tone === "warning" ? theme.warning + "14" : theme.success + "14";
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}><View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={onCancel} /><View style={styles.actionSheet}><View style={styles.actionHandle} /><View style={[styles.actionIcon, { backgroundColor: background }]}><MaterialIcons name={tone === "danger" ? "warning-amber" : tone === "warning" ? "pause-circle" : "play-circle"} size={24} color={color} /></View><Text style={styles.actionTitle}>{title}</Text><Text style={styles.actionDescription}>{description}</Text><TikisButton label={confirmLabel} variant={tone === "danger" ? "danger" : tone === "warning" ? "secondary" : "primary"} onPress={onConfirm} loading={loading} style={styles.actionConfirm} /><TikisButton label="Conserver la livraison" variant="ghost" onPress={onCancel} disabled={loading} style={styles.actionCancel} /></View></View></Modal>;
 }
 
@@ -448,19 +448,19 @@ function DriverActions({ deliveryStatus, ownCandidateStatus, loading, onApply, o
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F5F5F5" },
+  safe: { flex: 1, backgroundColor: theme.background },
   content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32, gap: 10 },
 
   topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4 },
-  iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3" },
+  iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: theme.border },
 
-  heroMap: { height: 200, borderRadius: 12, backgroundColor: "#F5F5F5", position: "relative", overflow: "hidden", marginTop: 8 },
-  heroMapInner: { ...StyleSheet.absoluteFillObject, backgroundColor: "#F5F5F5" },
+  heroMap: { height: 200, borderRadius: 12, backgroundColor: theme.background, position: "relative", overflow: "hidden", marginTop: 8 },
+  heroMapInner: { ...StyleSheet.absoluteFillObject, backgroundColor: theme.background },
   heroMapBlock: { position: "absolute", backgroundColor: "#DCDEE3", borderRadius: 5 },
-  heroMapRoad: { position: "absolute", backgroundColor: "#FFFFFF", borderRadius: 99 },
-  heroMapMarker: { position: "absolute", width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
-  heroMapMarkerStart: { top: "30%", left: "18%", backgroundColor: "#9A6201" },
-  heroMapMarkerEnd: { top: "60%", right: "22%", backgroundColor: "#FFFFFF", borderColor: "#B4232D" },
+  heroMapRoad: { position: "absolute", backgroundColor: theme.surface, borderRadius: 99 },
+  heroMapMarker: { position: "absolute", width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: theme.surface },
+  heroMapMarkerStart: { top: "30%", left: "18%", backgroundColor: theme.primary },
+  heroMapMarkerEnd: { top: "60%", right: "22%", backgroundColor: theme.surface, borderColor: theme.error },
   heroMapStatus: { position: "absolute", top: 12, left: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 7 },
   heroMapRouteLoading: { position: "absolute", top: 12, right: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 7 },
   heroMapRouteLoadingText: { color: "#555555", fontSize: 10, fontWeight: "600" },
@@ -472,26 +472,26 @@ const styles = StyleSheet.create({
   title: { color: "#111111", fontSize: 22, fontWeight: "700", lineHeight: 28, marginTop: 4, includeFontPadding: false },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
   metaText: { color: "#666666", fontSize: 11 },
-  metaDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: "#747474" },
-  countdown: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 6, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: "#FEF6E2", borderRadius: 7 },
+  metaDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: theme.muted },
+  countdown: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 6, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: theme.warning + "14", borderRadius: 7 },
   countdownLabel: { color: "#6D4701", fontSize: 10, fontWeight: "600" },
   countdownValue: { color: "#9A6201", fontSize: 11, fontWeight: "700", fontVariant: ["tabular-nums"] },
 
-  timelineCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, marginTop: 4 },
+  timelineCard: { backgroundColor: theme.surface, borderRadius: 12, padding: 14, marginTop: 4 },
   timeline: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginTop: 10 },
   timelineStep: { alignItems: "center", width: 70 },
-  timelineDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
-  timelineDotDone: { backgroundColor: "#9A6201" },
+  timelineDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: theme.background, alignItems: "center", justifyContent: "center" },
+  timelineDotDone: { backgroundColor: theme.primary },
   timelineLine: { flex: 1, height: 1.5, backgroundColor: "#ECECEC", marginTop: 11 },
-  timelineLineDone: { backgroundColor: "#9A6201" },
+  timelineLineDone: { backgroundColor: theme.primary },
   timelineLabel: { color: "#747474", fontSize: 9, fontWeight: "600", textAlign: "center", marginTop: 6 },
   timelineLabelDone: { color: "#9A6201" },
 
-  routeCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "stretch", gap: 10 },
+  routeCard: { backgroundColor: theme.surface, borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "stretch", gap: 10 },
   routeCol: { alignItems: "center", width: 14 },
   routePin: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
-  routePinFrom: { backgroundColor: "#9A6201" },
-  routePinTo: { backgroundColor: "#B4232D" },
+  routePinFrom: { backgroundColor: theme.primary },
+  routePinTo: { backgroundColor: theme.error },
   routeLine: { width: 1.5, flex: 1, backgroundColor: "#ECECEC", marginVertical: 4 },
   routeInfoWrap: { flex: 1, minWidth: 0 },
   routeInfo: { paddingVertical: 2 },
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
   routeValue: { color: "#111111", fontSize: 12, fontWeight: "600", marginTop: 2 },
   routeMeta: { color: "#666666", fontSize: 10, marginTop: 1 },
 
-  pricingCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14 },
+  pricingCard: { backgroundColor: theme.surface, borderRadius: 12, padding: 14 },
   pricingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   pricingLabel: { color: "#111111", fontSize: 12, fontWeight: "600" },
   pricingValue: { color: "#111111", fontSize: 18, fontWeight: "700" },
@@ -509,42 +509,42 @@ const styles = StyleSheet.create({
   pricingCounterValue: { color: "#9A6201", fontSize: 13, fontWeight: "700" },
   pricingNote: { color: "#747474", fontSize: 11, lineHeight: 16, marginTop: 8 },
 
-  driverCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
-  driverAvatar: { width: 40, height: 40, borderRadius: 10, backgroundColor: "#F8F0E5", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0 },
+  driverCard: { backgroundColor: theme.surface, borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
+  driverAvatar: { width: 40, height: 40, borderRadius: 10, backgroundColor: theme.primary + "14", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0 },
   driverAvatarText: { color: "#9A6201", fontSize: 13, fontWeight: "700" },
-  driverVerifiedBadge: { position: "absolute", bottom: -2, right: -2, width: 14, height: 14, borderRadius: 7, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
+  driverVerifiedBadge: { position: "absolute", bottom: -2, right: -2, width: 14, height: 14, borderRadius: 7, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center" },
   driverInfo: { flex: 1, minWidth: 0 },
   driverNameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   driverName: { color: "#111111", fontSize: 13, fontWeight: "600", flexShrink: 1 },
   driverMeta: { color: "#666666", fontSize: 11, marginTop: 2 },
   driverActions: { flexDirection: "row", gap: 6 },
-  driverActionBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
+  driverActionBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: theme.background, alignItems: "center", justifyContent: "center" },
 
-  candidatesTrigger: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
-  candidatesTriggerActive: { borderWidth: 1, borderColor: "#9A6201", borderStyle: "dashed" },
-  candidatesIcon: { width: 36, height: 36, borderRadius: 9, backgroundColor: "#F8F0E5", alignItems: "center", justifyContent: "center" },
-  candidatesIconActive: { backgroundColor: "#FEF6E2" },
+  candidatesTrigger: { backgroundColor: theme.surface, borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
+  candidatesTriggerActive: { borderWidth: 1, borderColor: theme.primary, borderStyle: "dashed" },
+  candidatesIcon: { width: 36, height: 36, borderRadius: 9, backgroundColor: theme.primary + "14", alignItems: "center", justifyContent: "center" },
+  candidatesIconActive: { backgroundColor: theme.warning + "14" },
   candidatesBody: { flex: 1, minWidth: 0 },
   candidatesTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },
   candidatesMeta: { color: "#666666", fontSize: 11, marginTop: 2 },
-  candidatesCount: { backgroundColor: "#111111", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 99 },
+  candidatesCount: { backgroundColor: theme.foreground, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 99 },
   candidatesCountText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700" },
 
-  detailsCard: { backgroundColor: "#FFFFFF", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 2 },
+  detailsCard: { backgroundColor: theme.surface, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 2 },
   detailsRow: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 9, borderBottomWidth: 1, borderBottomColor: "#ECECEC" },
-  detailsIcon: { width: 26, height: 26, borderRadius: 8, backgroundColor: "#F8F0E5", alignItems: "center", justifyContent: "center" },
+  detailsIcon: { width: 26, height: 26, borderRadius: 8, backgroundColor: theme.primary + "14", alignItems: "center", justifyContent: "center" },
   detailsLabel: { color: "#747474", fontSize: 11, flexShrink: 0 },
   detailsValue: { color: "#111111", fontSize: 12, fontWeight: "600", flex: 1, textAlign: "right" },
   detailsLast: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: "#ECECEC", marginTop: 2 },
   detailsDescription: { color: "#666666", fontSize: 12, lineHeight: 18 },
 
-  trackButton: { backgroundColor: "#FFFFFF", borderRadius: 10, borderWidth: 1, borderColor: "#E3E3E3", paddingVertical: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  trackButton: { backgroundColor: theme.surface, borderRadius: 10, borderWidth: 1, borderColor: theme.border, paddingVertical: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   trackButtonText: { color: "#9A6201", fontSize: 13, fontWeight: "600" },
 
   senderActions: { gap: 8, marginTop: 4 },
   senderActionBtn: { minHeight: 46 },
-  cancelButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 46, borderRadius: 9, borderWidth: 1, borderColor: "#B4232D", backgroundColor: "#FFFFFF" },
-  cancelButtonDisabled: { borderColor: "#D5D5DC" },
+  cancelButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 46, borderRadius: 9, borderWidth: 1, borderColor: theme.error, backgroundColor: theme.surface },
+  cancelButtonDisabled: { borderColor: theme.border },
   cancelButtonText: { color: "#B4232D", fontSize: 13, fontWeight: "600" },
   cancelButtonTextDisabled: { color: "#A0A0A0" },
 
@@ -553,8 +553,8 @@ const styles = StyleSheet.create({
   driverHint: { color: "#666666", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 10, paddingHorizontal: 12 },
 
   actionOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.42)" },
-  actionSheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 14, borderTopRightRadius: 14, padding: 16, paddingTop: 8, paddingBottom: 20 },
-  actionHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", alignSelf: "center", marginBottom: 14 },
+  actionSheet: { backgroundColor: theme.surface, borderTopLeftRadius: 14, borderTopRightRadius: 14, padding: 16, paddingTop: 8, paddingBottom: 20 },
+  actionHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: "center", marginBottom: 14 },
   actionIcon: { width: 44, height: 44, borderRadius: 9, alignItems: "center", justifyContent: "center", marginBottom: 12, alignSelf: "center" },
   actionTitle: { color: "#111111", fontSize: 17, fontWeight: "600", textAlign: "center" },
   actionDescription: { color: "#666666", fontSize: 13, lineHeight: 19, marginTop: 6, textAlign: "center" },
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
 
   message: { color: "#B4232D", textAlign: "center", fontSize: 13, fontWeight: "600", marginTop: 8 },
 
-  reviewDone: { flexDirection: "row", gap: 10, alignItems: "center", backgroundColor: "#FEF6E2", borderRadius: 10, padding: 12, marginTop: 14 },
+  reviewDone: { flexDirection: "row", gap: 10, alignItems: "center", backgroundColor: theme.warning + "14", borderRadius: 10, padding: 12, marginTop: 14 },
   reviewDoneInfo: { flex: 1 },
   reviewDoneTitle: { color: "#9A6200", fontSize: 13, fontWeight: "600" },
   reviewDoneText: { color: "#9A6200", fontSize: 12, lineHeight: 17, marginTop: 2 },

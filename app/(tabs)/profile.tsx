@@ -182,7 +182,7 @@ export default function ProfileScreen() {
               </View>
             )}
             <View style={[styles.heroAvatarEdit, { backgroundColor: theme.primary }]}>
-              <MaterialIcons name="photo-camera" size={12} color="#FFFFFF" />
+              <MaterialIcons name="photo-camera" size={12} color={theme.surface} />
             </View>
           </Pressable>
           <Text style={[styles.heroName, { color: theme.foreground }]} numberOfLines={1}>{name}</Text>
@@ -318,7 +318,7 @@ export default function ProfileScreen() {
                   </Text>
                 </View>
                 {receivedReviews.length > 0 ? (
-                  <View style={[styles.menuBadge, { backgroundColor: isDark ? theme.pressed : "#E6F4ED" }]}>
+                  <View style={[styles.menuBadge, { backgroundColor: theme.success + "14" }]}>
                     <Text style={[styles.menuBadgeText, { color: theme.success }]}>Validé</Text>
                   </View>
                 ) : (
@@ -466,7 +466,7 @@ export default function ProfileScreen() {
             onPress={() => { setDeleteError(""); setDeleteConfirmOpen(true); }}
             style={({ pressed }) => [styles.actionRow, styles.actionRowLast, pressed && { backgroundColor: theme.pressed }]}
           >
-            <View style={[styles.actionIcon, { backgroundColor: isDark ? theme.pressed : "#FDECEA" }]}>
+            <View style={[styles.actionIcon, { backgroundColor: theme.error + "14" }]}>
               <MaterialIcons name="delete-forever" size={16} color={theme.error} />
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -477,7 +477,7 @@ export default function ProfileScreen() {
             </View>
             {profile?.deletionRequestedAt ? (
               <View style={[styles.menuBadge, { backgroundColor: theme.error }]}>
-                <Text style={[styles.menuBadgeText, { color: "#FFFFFF" }]}>En cours</Text>
+                <Text style={[styles.menuBadgeText, { color: theme.surface }]}>En cours</Text>
               </View>
             ) : (
               <MaterialIcons name="chevron-right" size={16} color={theme.muted} />
@@ -520,7 +520,7 @@ export default function ProfileScreen() {
                     style={({ pressed }) => [styles.vehicleRow, { borderColor: theme.border, backgroundColor: theme.background }, pressed && { backgroundColor: theme.pressed }]}
                   >
                     <View style={[styles.vehicleCheckbox, { borderColor: theme.border, backgroundColor: checked ? theme.primary : "transparent" }]}>
-                      {checked ? <MaterialIcons name="check" size={14} color="#FFFFFF" /> : null}
+                      {checked ? <MaterialIcons name="check" size={14} color={theme.surface} /> : null}
                     </View>
                     <Text style={[styles.vehicleLabel, { color: theme.foreground }]}>{option}</Text>
                     <MaterialIcons name={option === "Vélo" ? "directions-bike" : option === "Moto" ? "two-wheeler" : option === "Tricycle" ? "electric-rickshaw" : "directions-car"} size={20} color={theme.muted} />
@@ -543,7 +543,7 @@ export default function ProfileScreen() {
             <View style={styles.sheetGrip} />
             <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Choisir un pays</Text>
             <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>Votre pays reste inchangé jusqu’à ce que vous en choisissiez un autre ici.</Text>
-            {locationError ? <Text style={styles.error}>{locationError}</Text> : null}
+            {locationError ? <Text style={[styles.error, { color: theme.error }]}>{locationError}</Text> : null}
             <ScrollView style={{ maxHeight: 380, marginTop: 8 }}>
               {(countriesQuery.data ?? []).map((c) => (
                 <Pressable key={c.id} onPress={() => void selectCountry(c.id)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, c.id === profile?.country && { borderColor: theme.primary, backgroundColor: theme.background }, pressed && { opacity: 0.8 }]}>
@@ -573,7 +573,7 @@ export default function ProfileScreen() {
               placeholderTextColor={theme.muted}
               style={[styles.input, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.background, marginTop: 8 }]}
             />
-            {locationError ? <Text style={styles.error}>{locationError}</Text> : null}
+            {locationError ? <Text style={[styles.error, { color: theme.error }]}>{locationError}</Text> : null}
             <ScrollView style={{ maxHeight: 320, marginTop: 8 }} keyboardShouldPersistTaps="handled">
               {citySearchQuery.isFetching ? <Text style={[styles.helper, { textAlign: "center", marginTop: 10 }]}>Recherche…</Text> : null}
               {!citySearchQuery.isFetching && citySearch.trim().length >= 2 && (citySearchQuery.data ?? []).length === 0 ? <Text style={[styles.helper, { textAlign: "center", marginTop: 10 }]}>Aucune ville trouvée.</Text> : null}
@@ -593,12 +593,12 @@ export default function ProfileScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => !requestDeletionMutation.isPending && setDeleteConfirmOpen(false)} />
           <View style={[styles.sheet, isDark && { backgroundColor: theme.surface }]}>
             <View style={styles.sheetGrip} />
-            <View style={styles.deleteIconWrap}><MaterialIcons name="delete-forever" size={26} color="#B4232D" /></View>
+            <View style={styles.deleteIconWrap}><MaterialIcons name="delete-forever" size={26} color={theme.error} /></View>
             <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Supprimer votre compte ?</Text>
             <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>
               Vous aurez 30 jours pour changer d’avis. Pendant ce délai, votre compte sera bloqué et vous pourrez annuler la suppression à tout moment. Passé ce délai, vos données personnelles seront définitivement supprimées.
             </Text>
-            {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
+            {deleteError ? <Text style={[styles.error, { color: theme.error }]}>{deleteError}</Text> : null}
             <TikisButton label="Confirmer la suppression" icon="delete-forever" variant="danger" onPress={() => void confirmAccountDeletion()} loading={requestDeletionMutation.isPending} style={styles.saveButton} />
             <Pressable onPress={() => setDeleteConfirmOpen(false)} disabled={requestDeletionMutation.isPending} style={({ pressed }) => [styles.photoPicker, pressed && styles.pressed]}>
               <Text style={[styles.photoPickerText, { color: theme.muted }]}>Annuler</Text>
@@ -616,13 +616,13 @@ export default function ProfileScreen() {
             <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>Vos informations sont contrôlées avant enregistrement.</Text>
             <Pressable onPress={() => void pickPhoto()} style={({ pressed }) => [styles.photoPicker, pressed && styles.pressed]}>
               <View style={styles.photoPickerIcon}>
-                <MaterialIcons name="add-a-photo" size={22} color="#9A6201" />
+                <MaterialIcons name="add-a-photo" size={22} color={theme.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.photoPickerText}>{photoBase64 || photoUri ? "Changer la photo" : "Ajouter une photo"}</Text>
                 <Text style={styles.photoPickerSub}>Format carré, JPEG/PNG/WebP</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={16} color="#9A6201" />
+              <MaterialIcons name="chevron-right" size={16} color={theme.primary} />
             </Pressable>
             <Text style={[styles.fieldLabel, isDark && { color: theme.muted }]}>NOM COMPLET</Text>
             <TextInput
@@ -631,10 +631,10 @@ export default function ProfileScreen() {
               maxLength={70}
               autoCapitalize="words"
               placeholder="Ex. Mariam ou Mariam Ouédraogo"
-              placeholderTextColor="#B48753"
+              placeholderTextColor={theme.muted}
               style={[styles.input, error ? styles.inputError : null, isDark && { backgroundColor: theme.background, color: theme.foreground, borderColor: theme.border }]}
             />
-            {error ? <Text style={styles.error}>{error}</Text> : <Text style={[styles.helper, isDark && { color: theme.muted }]}>Un nom unique est accepté. Les séparateurs successifs sont retirés automatiquement.</Text>}
+            {error ? <Text style={[styles.error, { color: theme.error }]}>{error}</Text> : <Text style={[styles.helper, isDark && { color: theme.muted }]}>Un nom unique est accepté. Les séparateurs successifs sont retirés automatiquement.</Text>}
             <TikisButton label="Enregistrer les modifications" icon="save" onPress={() => void saveProfile()} loading={updateMutation.isPending} style={styles.saveButton} />
           </View>
         </KeyboardAvoidingView>
@@ -687,14 +687,14 @@ const styles = StyleSheet.create({
 
   // Hero (sans cover — juste un mini bandeau dégradé + avatar par-dessus)
   hero: { borderRadius: 16, padding: 20, paddingTop: 28, alignItems: "center", borderWidth: StyleSheet.hairlineWidth, position: "relative", overflow: "hidden" },
-  heroBand: { position: "absolute", top: 0, left: 0, right: 0, height: 50, backgroundColor: "#9A6201" },
+  heroBand: { position: "absolute", top: 0, left: 0, right: 0, height: 50, backgroundColor: theme.primary },
   heroAvatarWrap: { position: "relative", marginTop: 4, marginBottom: 10 },
   heroAvatar: { width: 88, height: 88, borderRadius: 44, alignItems: "center", justifyContent: "center", borderWidth: 4 },
-  avatarDriver: { backgroundColor: "#111111" },
+  avatarDriver: { backgroundColor: theme.foreground },
   avatarSender: { backgroundColor: "#176C52" },
-  heroAvatarImage: { width: 88, height: 88, borderRadius: 44, borderWidth: 4, borderColor: "#FFFFFF" },
+  heroAvatarImage: { width: 88, height: 88, borderRadius: 44, borderWidth: 4, borderColor: theme.surface },
   heroAvatarText: { color: "#FFFFFF", fontSize: 28, fontWeight: "700" },
-  heroAvatarEdit: { position: "absolute", right: -2, bottom: -2, width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
+  heroAvatarEdit: { position: "absolute", right: -2, bottom: -2, width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: theme.surface },
   heroName: { fontSize: 20, fontWeight: "700" },
   heroPhone: { fontSize: 13, marginTop: 4 },
   heroBadges: { flexDirection: "row", gap: 6, flexWrap: "wrap", justifyContent: "center", marginTop: 10 },
@@ -747,13 +747,13 @@ const styles = StyleSheet.create({
 
   // Modals (inchangés)
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.42)" },
-  sheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, paddingTop: 8, paddingBottom: 24 },
-  sheetGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", alignSelf: "center", marginBottom: 14 },
+  sheet: { backgroundColor: theme.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, paddingTop: 8, paddingBottom: 24 },
+  sheetGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: "center", marginBottom: 14 },
   sheetTitle: { color: "#111111", fontSize: 17, fontWeight: "600" },
   sheetSubtitle: { color: "#666666", fontSize: 12, marginTop: 4 },
 
-  photoPicker: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, backgroundColor: "#F8F0E5", borderRadius: 10, marginTop: 14 },
-  photoPickerIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
+  photoPicker: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, backgroundColor: theme.primary + "14", borderRadius: 10, marginTop: 14 },
+  photoPickerIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center" },
   photoPickerText: { color: "#9A6201", fontSize: 12, fontWeight: "600" },
   photoPickerSub: { color: "#747474", fontSize: 10, marginTop: 2 },
 
@@ -763,12 +763,12 @@ const styles = StyleSheet.create({
   vehicleLabel: { fontSize: 14, fontWeight: "600", flex: 1 },
 
   fieldLabel: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
-  input: { backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: 1, borderColor: "#E3E3E3", paddingHorizontal: 12, paddingVertical: 12, color: "#111111", fontSize: 13, fontWeight: "500" },
+  input: { backgroundColor: theme.surface, borderRadius: 9, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 12, paddingVertical: 12, color: "#111111", fontSize: 13, fontWeight: "500" },
   countryOptionText: { fontSize: 13, fontWeight: "600" },
   countryRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 10, borderWidth: 1, marginBottom: 8 },
   countryRowFlag: { fontSize: 20 },
-  deleteIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: "#FDECEA", alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 4 },
-  inputError: { borderWidth: 1, borderColor: "#B4232D" },
+  deleteIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: theme.error + "14", alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 4 },
+  inputError: { borderWidth: 1, borderColor: theme.error },
   helper: { color: "#747474", fontSize: 10, marginTop: 4 },
   error: { color: "#B4232D", fontSize: 11, fontWeight: "600", marginTop: 4 },
   saveButton: { marginTop: 18 },

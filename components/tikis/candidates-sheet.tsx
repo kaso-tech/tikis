@@ -128,7 +128,7 @@ export function CandidatesSheet({ visible, candidates, deliveryStatus, loadingId
           ]}
         >
           <View {...panResponder.panHandlers} style={styles.headerZone}>
-            <View style={[styles.sheetGrip, { backgroundColor: isDark(theme) ? "#3A3A3A" : "#D5D5DC" }]} />
+            <View style={[styles.sheetGrip, { backgroundColor: theme.border }]} />
             <View style={styles.sheetTop}>
               <View style={styles.headerText}>
                 <Text style={[styles.eyebrow, { color: theme.muted }]}>Candidatures</Text>

@@ -268,11 +268,11 @@ function Chip({ label, count, active, onPress, icon }: { label: string; count?: 
   const { colors: theme } = useThemeColors();
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.chip, active ? { backgroundColor: theme.primary, borderColor: theme.primary } : { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]} accessibilityRole="tab" accessibilityState={{ selected: active }}>
-      {icon ? <MaterialIcons name={icon} size={12} color={active ? "#FFFFFF" : theme.muted} /> : null}
-      <Text style={[styles.chipText, { color: active ? "#FFFFFF" : theme.muted }]}>{label}</Text>
+      {icon ? <MaterialIcons name={icon} size={12} color={active ? theme.surface : theme.muted} /> : null}
+      <Text style={[styles.chipText, { color: active ? theme.surface : theme.muted }]}>{label}</Text>
       {typeof count === "number" ? (
         <View style={[styles.chipCount, { backgroundColor: active ? "rgba(255,255,255,0.22)" : theme.pressed }]}>
-          <Text style={[styles.chipCountText, { color: active ? "#FFFFFF" : theme.primary }]}>{count}</Text>
+          <Text style={[styles.chipCountText, { color: active ? theme.surface : theme.primary }]}>{count}</Text>
         </View>
       ) : null}
     </Pressable>
@@ -307,11 +307,11 @@ function ArchiveRow({ delivery, role, isLast }: { delivery: Delivery; role: "sen
   const amount = delivery.offeredPrice ?? delivery.estimatedPrice;
   const isMonetary = delivery.status === "completed";
   const statusBg: Record<DeliveryStatus, string> = {
-    completed: "#E2F3F4",
-    cancelled: "#FDEBEC",
-    expired: "#FEF6E2",
-    disabled: "#F5F5F5",
-    draft: "#F5F5F5",
+    completed: theme.success + "14",
+    cancelled: theme.error + "14",
+    expired: theme.warning + "14",
+    disabled: theme.background,
+    draft: theme.background,
     open: theme.background,
     pending_confirmation: theme.background,
     active: theme.background,

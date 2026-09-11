@@ -77,7 +77,7 @@ export default function DeliveryMapScreen() {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
         <View style={styles.center}>
-          <MaterialIcons name="lock-outline" size={32} color="#9A6201" />
+          <MaterialIcons name="lock-outline" size={32} color={theme.primary} />
           <Text style={[styles.loadingText, { color: theme.muted, marginTop: 10 }]}>Le suivi en direct est réservé aux expéditeurs.</Text>
           <Pressable onPress={() => router.back()} style={{ marginTop: 16 }}><Text style={{ color: theme.primary, fontWeight: "700" }}>Retour</Text></Pressable>
         </View>
@@ -85,7 +85,7 @@ export default function DeliveryMapScreen() {
     );
   }
 
-  if (deliveryQuery.isLoading || !delivery) return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.center}><ActivityIndicator color="#9A6201" /><Text style={[styles.loadingText, { color: theme.muted }]}>{deliveryQuery.isLoading ? "Chargement de la carte…" : "Livraison introuvable."}</Text></View></SafeAreaView>;
+  if (deliveryQuery.isLoading || !delivery) return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.center}><ActivityIndicator color={theme.primary} /><Text style={[styles.loadingText, { color: theme.muted }]}>{deliveryQuery.isLoading ? "Chargement de la carte…" : "Livraison introuvable."}</Text></View></SafeAreaView>;
 
   const pickup = formatDeliveryDetailPlace(delivery.pickup);
   const dropoff = formatDeliveryDetailPlace(delivery.dropoff);
@@ -109,7 +109,7 @@ export default function DeliveryMapScreen() {
         <Text style={[styles.title, { color: theme.foreground }]} numberOfLines={1}>{delivery.title}</Text>
         <View style={styles.headerStatusRow}>
           {isLive ? <View style={styles.liveDot} /> : null}
-          <Text style={[styles.headerStatusText, { color: isLive ? "#167A55" : theme.muted }]}>{isLive ? "Suivi en direct" : STEPS[step].label}</Text>
+          <Text style={[styles.headerStatusText, { color: isLive ? theme.success : theme.muted }]}>{isLive ? "Suivi en direct" : STEPS[step].label}</Text>
         </View>
       </View>
       <View style={styles.headerPlaceholder} />
@@ -118,7 +118,7 @@ export default function DeliveryMapScreen() {
     {/* Bandeau ETA — l'élément central d'une page de suivi professionnelle */}
     {isLive ? (
       <View style={[styles.etaBanner, { backgroundColor: theme.primary }]}>
-        <View style={styles.etaIconWrap}><MaterialIcons name="local-shipping" size={20} color="#FFFFFF" /></View>
+        <View style={styles.etaIconWrap}><MaterialIcons name="local-shipping" size={20} color={theme.surface} /></View>
         <View style={{ flex: 1 }}>
           <Text style={styles.etaValue}>{eta !== null ? `${eta} min` : "Calcul en cours…"}</Text>
           <Text style={styles.etaLabel}>{remainingKm !== null ? `${remainingKm.toFixed(1)} km restants jusqu’à la destination` : "En attente de la position du livreur"}</Text>
@@ -128,7 +128,7 @@ export default function DeliveryMapScreen() {
 
     <View style={styles.mapWrap}>
       <DeliveryRouteMap pickup={delivery.pickup} dropoff={delivery.dropoff} coordinates={coordinates} driverPosition={livePosition} />
-      {isRouteLoading ? <View style={styles.routeLoading}><ActivityIndicator size="small" color="#9A6201" /><Text style={styles.routeLoadingText}>Calcul de l’itinéraire…</Text></View> : null}
+      {isRouteLoading ? <View style={styles.routeLoading}><ActivityIndicator size="small" color={theme.primary} /><Text style={styles.routeLoadingText}>Calcul de l’itinéraire…</Text></View> : null}
     </View>
 
     {/* Timeline de progression */}
@@ -136,7 +136,7 @@ export default function DeliveryMapScreen() {
       {STEPS.map((s, i) => (
         <View key={s.key} style={styles.timelineStep}>
           <View style={[styles.timelineDot, { backgroundColor: i <= step ? theme.primary : theme.border }]}>
-            <MaterialIcons name={s.icon} size={13} color={i <= step ? "#FFFFFF" : theme.muted} />
+            <MaterialIcons name={s.icon} size={13} color={i <= step ? theme.surface : theme.muted} />
           </View>
           <Text style={[styles.timelineLabel, { color: i <= step ? theme.foreground : theme.muted }]}>{s.label}</Text>
           {i < STEPS.length - 1 ? <View style={[styles.timelineLine, { backgroundColor: i < step ? theme.primary : theme.border }]} /> : null}
@@ -157,15 +157,15 @@ export default function DeliveryMapScreen() {
           </View>
           {delivery.driverPhone ? (
             <Pressable onPress={() => void callDriver()} style={({ pressed }) => [styles.callButton, pressed && styles.pressed]} accessibilityLabel="Appeler le livreur">
-              <MaterialIcons name="call" size={18} color="#FFFFFF" />
+              <MaterialIcons name="call" size={18} color={theme.surface} />
             </Pressable>
           ) : null}
         </View>
       ) : null}
 
-      <View style={styles.placeRow}><View style={[styles.placeIcon, styles.pickupIcon]}><MaterialIcons name="inventory-2" size={16} color="#9A6201" /></View><View style={styles.placeCopy}><Text style={styles.placeLabel}>Récupération</Text><Text style={[styles.placeTitle, { color: theme.foreground }]} numberOfLines={1}>{pickup.title}</Text><Text style={[styles.placeSubtitle, { color: theme.muted }]} numberOfLines={1}>{pickup.subtitle}</Text></View></View>
+      <View style={styles.placeRow}><View style={[styles.placeIcon, styles.pickupIcon]}><MaterialIcons name="inventory-2" size={16} color={theme.primary} /></View><View style={styles.placeCopy}><Text style={styles.placeLabel}>Récupération</Text><Text style={[styles.placeTitle, { color: theme.foreground }]} numberOfLines={1}>{pickup.title}</Text><Text style={[styles.placeSubtitle, { color: theme.muted }]} numberOfLines={1}>{pickup.subtitle}</Text></View></View>
       <View style={[styles.divider, { backgroundColor: theme.border }]} />
-      <View style={styles.placeRow}><View style={[styles.placeIcon, styles.dropoffIcon]}><MaterialIcons name="location-on" size={17} color="#B4232D" /></View><View style={styles.placeCopy}><Text style={styles.placeLabel}>Destination</Text><Text style={[styles.placeTitle, { color: theme.foreground }]} numberOfLines={1}>{dropoff.title}</Text><Text style={[styles.placeSubtitle, { color: theme.muted }]} numberOfLines={1}>{dropoff.subtitle}</Text></View><Text style={[styles.distance, { color: theme.foreground }]}>{delivery.distanceKm.toLocaleString("fr-FR")} km</Text></View>
+      <View style={styles.placeRow}><View style={[styles.placeIcon, styles.dropoffIcon]}><MaterialIcons name="location-on" size={17} color={theme.error} /></View><View style={styles.placeCopy}><Text style={styles.placeLabel}>Destination</Text><Text style={[styles.placeTitle, { color: theme.foreground }]} numberOfLines={1}>{dropoff.title}</Text><Text style={[styles.placeSubtitle, { color: theme.muted }]} numberOfLines={1}>{dropoff.subtitle}</Text></View><Text style={[styles.distance, { color: theme.foreground }]}>{delivery.distanceKm.toLocaleString("fr-FR")} km</Text></View>
     </View>
   </SafeAreaView>;
 }
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   headerTitle: { flex: 1, minWidth: 0 },
   title: { fontSize: 14, fontWeight: "600" },
   headerStatusRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#167A55" },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.success },
   headerStatusText: { fontSize: 11, fontWeight: "600" },
   headerPlaceholder: { width: 40 },
   etaBanner: { flexDirection: "row", alignItems: "center", gap: 12, marginHorizontal: 12, marginTop: 10, padding: 13, borderRadius: 12 },

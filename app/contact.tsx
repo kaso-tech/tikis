@@ -133,7 +133,7 @@ export default function ContactScreen() {
                 <Text style={[styles.counter, { color: theme.muted }]}>{message.length}/1000</Text>
               </View>
 
-              {error ? <Text style={styles.error}>{error}</Text> : <Text style={[styles.helper, { color: theme.muted }]}>Tous les champs sont assainis avant envoi. Les pièces jointes ne sont pas encore prises en charge.</Text>}
+              {error ? <Text style={[styles.error, { color: theme.error }]}>{error}</Text> : <Text style={[styles.helper, { color: theme.muted }]}>Tous les champs sont assainis avant envoi. Les pièces jointes ne sont pas encore prises en charge.</Text>}
 
               <TikisButton label="Envoyer" icon="send" onPress={() => void send()} loading={sending} loadingLabel="Préparation…" disabled={!canSend} />
             </>
