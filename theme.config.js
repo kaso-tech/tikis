@@ -9,6 +9,8 @@ const themeColors = {
   success: { light: '#176C52', dark: '#5FC497' },
   warning: { light: '#A65300', dark: '#E4B257' },
   error: { light: '#A43740', dark: '#F28B93' },
+  trendUp: { light: '#48B889', dark: '#7DD3A8' },
+  trendDown: { light: '#FBBF24', dark: '#FCD34D' },
 };
 
 module.exports = { themeColors };

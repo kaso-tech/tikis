@@ -2,6 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { StyleSheet, Text, View } from "react-native";
 
 import { formatNavigationTarget } from "@/lib/geo-rules";
+import { useThemeColors } from "@/lib/use-theme-colors";
 import type { LocationLabel } from "@/shared/tikis-domain";
 
 type Props = {
@@ -33,6 +34,7 @@ function projectOntoCanvas(
 }
 
 export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }: Props) {
+  const { colors: theme } = useThemeColors();
   const minLat = Math.min(pickup.latitude, dropoff.latitude);
   const maxLat = Math.max(pickup.latitude, dropoff.latitude);
   const minLng = Math.min(pickup.longitude, dropoff.longitude);
@@ -74,10 +76,10 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
         ]}
       />
       <View style={[styles.pickup, { left: projection.originX - 12, top: projection.originY - 12 }]}>
-        <MaterialIcons name="trip-origin" size={14} color="#FFFFFF" />
+        <MaterialIcons name="trip-origin" size={14} color={theme.surface} />
       </View>
       <View style={[styles.dropoff, { left: projection.x - 12, top: projection.y - 12 }]}>
-        <MaterialIcons name="location-on" size={16} color="#B4232D" />
+        <MaterialIcons name="location-on" size={16} color={theme.error} />
       </View>
       {approximate ? (
         <View style={styles.approximate}>
@@ -140,7 +142,7 @@ const styles = StyleSheet.create({
   routeLine: {
     position: "absolute",
     height: 2,
-    backgroundColor: "#9A6201",
+    backgroundColor: theme.primary,
     borderRadius: 1,
   },
   pickup: {
@@ -148,18 +150,18 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: "#9A6201",
+    backgroundColor: theme.primary,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "#FFFFFF",
+    borderColor: theme.surface,
   },
   dropoff: {
     position: "absolute",
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.surface,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
@@ -175,7 +177,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.surface,
   },
   approximateText: {
     color: "#9A6200",
@@ -189,7 +191,7 @@ const styles = StyleSheet.create({
     bottom: 8,
     padding: 8,
     borderRadius: 8,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.surface,
     gap: 3,
   },
   legendRow: {
@@ -201,7 +203,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#9A6201",
+    backgroundColor: theme.primary,
   },
   legendDotDropoff: {
     width: 8,

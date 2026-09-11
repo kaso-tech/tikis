@@ -38,7 +38,7 @@ const TYPE_ICON: Record<Delivery["type"], React.ComponentProps<typeof MaterialIc
 
 const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: string }> = {
   draft: { label: "BROUILLON", color: "#7A6E61", bg: "#EEE8E0" },
-  open: { label: "PUBLIÉE", color: "#9A6201", bg: "#F8E8CE" },
+  open: { label: "PUBLIÉE", color: "#9A6201", bg: theme.primary + "14" },
   pending_confirmation: { label: "ATTRIBUÉE", color: "#7A5600", bg: "#F4E9D2" },
   active: { label: "EN TRANSIT", color: "#176C52", bg: "#DDEFE7" },
   completed: { label: "TERMINÉE", color: "#4F6A5A", bg: "#E6EFE9" },
@@ -536,7 +536,7 @@ export function HomeScreen() {
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 placeholder={isDriver ? "Rechercher une opportunité…" : "Rechercher une livraison…"}
-                placeholderTextColor="#B48753"
+                placeholderTextColor={theme.muted}
                 style={styles.searchInput}
                 returnKeyType="search"
                 clearButtonMode="while-editing"
@@ -703,8 +703,8 @@ function WalletCard({ walletBalance, totalBalance, blockedBalance }: { walletBal
       <View style={styles.walletRow}>
         <Text style={styles.walletAmount}>{formatMoney(walletBalance)}</Text>
         <View style={styles.walletTrend}>
-          <MaterialIcons name="trending-up" size={11} color="#48B889" />
-          <Text style={styles.walletTrendText}>+12%</Text>
+          <MaterialIcons name="trending-up" size={11} color={theme.trendUp} />
+          <Text style={[styles.walletTrendText, { color: theme.trendUp }]}>+12%</Text>
         </View>
       </View>
       <View style={styles.walletDivider} />
@@ -822,7 +822,7 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
               <View style={styles.pinWrap}>
                 <View style={styles.pinShadow} />
                 <View style={[styles.pinCircle, styles.pinCircleEnd]}>
-                  <MaterialIcons name="location-on" size={14} color="#B4232D" />
+                  <MaterialIcons name="location-on" size={14} color={theme.error} />
                 </View>
                 <View style={[styles.pinTriangle, styles.pinTriangleEnd]} />
               </View>
@@ -1030,7 +1030,7 @@ const styles = StyleSheet.create({
 
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
-  sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", marginBottom: 10 },
+  sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, marginBottom: 10 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
   greetingBlock: { flex: 1, minWidth: 0 },
   driverGainsRow: { flexDirection: "row", alignItems: "baseline", gap: 6, flexWrap: "wrap" },
