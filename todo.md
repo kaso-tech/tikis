@@ -587,3 +587,7 @@
 - [x] Refaire le pull de github/main, revalider la version et livrer le dernier checkpoint.
 
 - [x] Corriger les régressions TypeScript du profil et du suivi live introduites par le dernier pull.
+
+- [x] Exécuter le pull de github/main et vérifier l’état synchronisé du dépôt.
+
+- [x] Corriger les erreurs TypeScript issues de la dernière migration des styles et préparer une version livrable validée.

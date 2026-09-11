@@ -19,9 +19,6 @@ import { isValidReviewText, sanitizeReviewText } from "../lib/review-rules";
 import { canReviewDelivery } from "./_test-helpers/review-eligibility";
 import { tikisAdminRouter } from "./admin-router";
 import * as adminDb from "./admin-db";
-import { computeLoyaltyProgress } from "./loyalty";
-import { hashSessionToken, listActiveSessions, recordSession, revokeAllOtherSessions, revokeSession } from "./sessions";
-import { computeDriverEarningsProjection, computeSenderStats } from "./analytics";
 
 const reportReasonSchema = z.enum(["comportement", "sécurité", "paiement", "objet_endommagé", "retard", "autre"]);
 const reportDescriptionSchema = z.string().trim().min(10, "Décrivez le problème en quelques mots (10 caractères minimum).").max(1000);
@@ -300,6 +297,7 @@ export const appRouter = router({
     myProgress: tikisProtectedProcedure.query(async ({ ctx }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       const role = profile.accountType;
+      const { computeLoyaltyProgress } = await import("./loyalty");
       const result = await computeLoyaltyProgress({ profilePhone: profile.phone, role });
       return result.map((entry) => ({
         programId: entry.program.id,
@@ -335,6 +333,7 @@ export const appRouter = router({
       const sessionHeader = ctx.req.headers["x-tikis-session"];
       const token = Array.isArray(sessionHeader) ? sessionHeader[0] : sessionHeader;
       if (!token) return { id: null, created: false };
+      const { recordSession } = await import("./sessions");
       const ipAddress = (ctx.req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim() ?? ctx.req.socket?.remoteAddress ?? undefined;
       return recordSession({ phone: profile.phone, token, deviceName: input?.deviceName, platform: input?.platform, appVersion: input?.appVersion, ipAddress });
     }),
@@ -343,6 +342,7 @@ export const appRouter = router({
       const sessionHeader = ctx.req.headers["x-tikis-session"];
       const token = Array.isArray(sessionHeader) ? sessionHeader[0] : sessionHeader;
       if (!token) return [];
+      const { hashSessionToken, listActiveSessions } = await import("./sessions");
       return listActiveSessions({ phone: profile.phone, currentTokenHash: hashSessionToken(token) });
     }),
     revoke: tikisProtectedProcedure.input(z.object({ sessionId: z.string() })).mutation(async ({ ctx, input }) => {
@@ -350,6 +350,7 @@ export const appRouter = router({
       const sessionHeader = ctx.req.headers["x-tikis-session"];
       const token = Array.isArray(sessionHeader) ? sessionHeader[0] : sessionHeader;
       if (!token) throw new Error("Session non identifiée.");
+      const { hashSessionToken, revokeSession } = await import("./sessions");
       return revokeSession({ phone: profile.phone, sessionId: input.sessionId, currentTokenHash: hashSessionToken(token) });
     }),
     revokeAllOthers: tikisProtectedProcedure.mutation(async ({ ctx }) => {
@@ -357,6 +358,7 @@ export const appRouter = router({
       const sessionHeader = ctx.req.headers["x-tikis-session"];
       const token = Array.isArray(sessionHeader) ? sessionHeader[0] : sessionHeader;
       if (!token) throw new Error("Session non identifiée.");
+      const { hashSessionToken, revokeAllOtherSessions } = await import("./sessions");
       return revokeAllOtherSessions({ phone: profile.phone, currentTokenHash: hashSessionToken(token) });
     }),
   }),
@@ -832,6 +834,7 @@ mySenderStats: tikisProtectedProcedure.query(async ({ ctx }) => {
       }
       const handle = await db.getDb();
       if (!handle) return null;
+      const { computeSenderStats } = await import("./analytics");
       return computeSenderStats(handle, profile.phone);
     }),>>>>>>> 8f09dbb (Checkpoint: Correction des imports dynamiques serveur qui bloquaient les requêtes authentifiées.)
     myDriverEarningsProjection: tikisProtectedProcedure.query(async ({ ctx }) => {
@@ -841,6 +844,7 @@ mySenderStats: tikisProtectedProcedure.query(async ({ ctx }) => {
       }
       const handle = await db.getDb();
       if (!handle) return null;
+      const { computeDriverEarningsProjection } = await import("./analytics");
       return computeDriverEarningsProjection(handle, profile.phone);
     }),
     getForDelivery: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).query(async ({ ctx, input }) => {
