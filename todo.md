@@ -597,3 +597,5 @@
 - [x] Conserver la branche fonctionnelle 74a0acc issue du merge f886394, puis réappliquer les correctifs utiles du commit 4334293 sans reprendre la migration P6 non compilable.
 
 - [ ] Réparer la migration P6 de styles dans la version distante f886394 sans retirer les changements fonctionnels de l’autre agent.
+
+- [x] Synchroniser github/main, valider les dépendances, la compilation, les tests et livrer la dernière version.
