@@ -15,7 +15,8 @@ type Tone = "primary" | "success" | "warning" | "error" | "neutral";
 const operationMeta: Record<WalletOperation, { label: string; icon: React.ComponentProps<typeof MaterialIcons>["name"]; tone: Tone }> = {
   block: { label: "Commission bloquée", icon: "lock-clock", tone: "warning" },
   unblock: { label: "Commission débloquée", icon: "lock-open", tone: "primary" },
-  debit: { label: "Commission prélevée", icon: "north-east", tone: "error" },
+  debit: { label: "Retrait", icon: "north-east", tone: "error" },
+  commission_debit: { label: "Commission prélevée", icon: "north-east", tone: "error" },
   compensation: { label: "Compensation", icon: "sync-alt", tone: "primary" },
   credit: { label: "Crédit", icon: "south-west", tone: "success" },
   refund: { label: "Remboursement", icon: "replay", tone: "success" },
@@ -63,7 +64,7 @@ export default function WalletScreen() {
     .filter((entry) => {
       const date = new Date(entry.createdAt);
       const now = new Date();
-      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && entry.operation === "debit";
+      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && entry.operation === "commission_debit";
     })
     .reduce((sum, entry) => sum + entry.amount, 0);
 
@@ -225,10 +226,10 @@ export default function WalletScreen() {
                   <Text style={styles.referenceValue}>{payment.providerReference}</Text>
                 </View>
                 {requestError ? <Text style={styles.requestError}>{requestError}</Text> : <Text style={styles.modalHint}>Aucun moyen de paiement réel n’est débité dans ce mode.</Text>}
-                <View style={styles.modalActions}>
+                {__DEV__ ? <View style={styles.modalActions}>
                   <TikisButton label="Échouer" variant="secondary" disabled={requestLoading} onPress={() => void settlePayment("failed")} style={styles.modalAction} />
                   <TikisButton label="Simuler réussite" icon="check-circle" loading={requestLoading} disabled={requestLoading} onPress={() => void settlePayment("succeeded")} style={styles.modalAction} />
-                </View>
+                </View> : null}
               </>
             ) : (
               <>
@@ -262,7 +263,7 @@ function iconBgForTone(tone: Tone, theme: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F5F5F5" },
+  safe: { flex: 1, backgroundColor: "#EEEDF3" },
 
   pressed: { opacity: 0.7 },
 
@@ -348,7 +349,7 @@ const styles = StyleSheet.create({
   modalTitle: { color: "#111111", fontSize: 17, fontWeight: "600", textAlign: "center" },
   modalSub: { color: "#666666", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 },
   modalHint: { color: "#666666", fontSize: 10, lineHeight: 14, textAlign: "center", marginTop: 6 },
-  referenceCard: { backgroundColor: "#F5F5F5", borderRadius: 9, padding: 12, marginTop: 14 },
+  referenceCard: { backgroundColor: "#EEEDF3", borderRadius: 9, padding: 12, marginTop: 14 },
   referenceLabel: { color: "#666666", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textAlign: "center" },
   referenceValue: { color: "#111111", fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4, letterSpacing: 0.3 },
   requestError: { color: "#B4232D", fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: 6 },

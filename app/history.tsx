@@ -268,11 +268,11 @@ function Chip({ label, count, active, onPress, icon }: { label: string; count?: 
   const { colors: theme } = useThemeColors();
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.chip, active ? { backgroundColor: theme.primary, borderColor: theme.primary } : { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]} accessibilityRole="tab" accessibilityState={{ selected: active }}>
-      {icon ? <MaterialIcons name={icon} size={12} color={active ? "#FFFFFF" : theme.muted} /> : null}
-      <Text style={[styles.chipText, { color: active ? "#FFFFFF" : theme.muted }]}>{label}</Text>
+      {icon ? <MaterialIcons name={icon} size={12} color={active ? theme.surface : theme.muted} /> : null}
+      <Text style={[styles.chipText, { color: active ? theme.surface : theme.muted }]}>{label}</Text>
       {typeof count === "number" ? (
         <View style={[styles.chipCount, { backgroundColor: active ? "rgba(255,255,255,0.22)" : theme.pressed }]}>
-          <Text style={[styles.chipCountText, { color: active ? "#FFFFFF" : theme.primary }]}>{count}</Text>
+          <Text style={[styles.chipCountText, { color: active ? theme.surface : theme.primary }]}>{count}</Text>
         </View>
       ) : null}
     </Pressable>
@@ -307,14 +307,14 @@ function ArchiveRow({ delivery, role, isLast }: { delivery: Delivery; role: "sen
   const amount = delivery.offeredPrice ?? delivery.estimatedPrice;
   const isMonetary = delivery.status === "completed";
   const statusBg: Record<DeliveryStatus, string> = {
-    completed: "#E2F3F4",
-    cancelled: "#FDEBEC",
-    expired: "#FEF6E2",
-    disabled: "#F5F5F5",
-    draft: "#F5F5F5",
-    open: "#F7EFE5",
-    pending_confirmation: "#F7EFE5",
-    active: "#F7EFE5",
+    completed: theme.success + "14",
+    cancelled: theme.error + "14",
+    expired: theme.warning + "14",
+    disabled: theme.background,
+    draft: theme.background,
+    open: theme.background,
+    pending_confirmation: theme.background,
+    active: theme.background,
   };
   const statusColor: Record<DeliveryStatus, string> = {
     completed: theme.success,
@@ -361,12 +361,12 @@ const styles = StyleSheet.create({
   iconBtn: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", borderWidth: 1 },
   pressed: { opacity: 0.7 },
 
-  pageTitle: { fontSize: 22, fontWeight: "800", letterSpacing: -0.5, marginTop: 6 },
+  pageTitle: { fontSize: 22, fontWeight: "700", letterSpacing: -0.4, marginTop: 6 },
   pageSub: { fontSize: 12, marginTop: 2 },
 
   statsBand: { flexDirection: "row", gap: 6, marginTop: 14 },
   statPill: { flex: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 6, alignItems: "center", borderWidth: 1, gap: 2 },
-  statPillValue: { fontSize: 16, fontWeight: "800", letterSpacing: -0.3 },
+  statPillValue: { fontSize: 16, fontWeight: "700", letterSpacing: -0.2 },
   statPillLabel: { fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
 
   searchRow: { marginTop: 14 },

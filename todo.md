@@ -591,3 +591,9 @@
 - [x] Exécuter le pull de github/main et vérifier l’état synchronisé du dépôt.
 
 - [x] Corriger les erreurs TypeScript issues de la dernière migration des styles et préparer une version livrable validée.
+
+- [x] Vérifier le commit distant 4334293, réaligner le dépôt sur github/main et livrer la version de l’autre agent après validation.
+
+- [x] Conserver la branche fonctionnelle 74a0acc issue du merge f886394, puis réappliquer les correctifs utiles du commit 4334293 sans reprendre la migration P6 non compilable.
+
+- [ ] Réparer la migration P6 de styles dans la version distante f886394 sans retirer les changements fonctionnels de l’autre agent.

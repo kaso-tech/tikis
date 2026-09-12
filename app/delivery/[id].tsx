@@ -16,7 +16,7 @@ import { trpc } from "@/lib/trpc";
 import { deliveryStatusMeta, formatMoney, formatRelativeDate, type DriverCandidate } from "@/shared/tikis-domain";
 
 type FinancialAction = "apply" | "withdraw" | "select" | "confirm" | "complete" | null;
-type SenderAction = "disable" | "reactivate" | "cancel" | null;
+type SenderAction = "disable" | "reactivate" | "cancel" | "unselect" | null;
 
 function DetailRow({ icon, label, value }: { icon: ComponentProps<typeof MaterialIcons>["name"]; label: string; value: string }) {
   return (
@@ -82,6 +82,7 @@ export default function DeliveryDetailScreen() {
   const disableMutation = trpc.deliveries.disable.useMutation();
   const reactivateMutation = trpc.deliveries.reactivate.useMutation();
   const cancelMutation = trpc.deliveries.cancel.useMutation();
+  const unselectMutation = trpc.deliveries.unselectCandidate.useMutation();
   const reviewQuery = trpc.analytics.getForDelivery.useQuery({ deliveryId: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
   const driverReviewsQuery = trpc.reviews.list.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone) });
   const receivedReviewsCount = (driverReviewsQuery.data ?? []).length;
@@ -122,7 +123,7 @@ export default function DeliveryDetailScreen() {
     const commission = selectedCandidate?.commissionBlocked ?? Math.round(commissionBase * (walletQuery.data?.commissionRate ?? 0));
     if (action === "apply") return { title: "Envoyer votre candidature", description: "Cette commission sera temporairement bloquée sur votre Wallet. Elle sera définitivement prélevée uniquement si l’expéditeur vous sélectionne.", amount: commission, label: "Confirmer ma candidature", irreversible: false };
     if (action === "withdraw") return { title: "Retirer votre candidature", description: "Votre candidature sera retirée et la commission temporairement bloquée redeviendra immédiatement disponible.", amount: ownCandidate?.commissionBlocked ?? commission, label: "Retirer ma candidature", irreversible: false };
-    if (action === "select") return { title: delivery.status === "active" ? "Remplacer le livreur" : "Choisir ce livreur", description: delivery.status === "active" ? "Le nouveau livreur devra confirmer sa disponibilité. Sa commission compensera automatiquement celle de l’ancien livreur : Tikis conservera une seule commission." : "Le choix rend la mise en relation effective. La commission bloquée du livreur sera définitivement prélevée et les autres commissions seront libérées.", amount: commission, label: delivery.status === "active" ? "Demander le remplacement" : "Choisir ce livreur", irreversible: true };
+    if (action === "select") return { title: delivery.status === "active" ? "Remplacer le livreur" : "Choisir ce livreur", description: delivery.status === "active" ? "Le nouveau livreur devra confirmer sa disponibilité. Sa commission compensera automatiquement celle de l’ancien livreur : Tikis conservera une seule commission." : "La commission de ce livreur reste réservée jusqu’à ce qu’il confirme sa disponibilité : c’est à ce moment-là qu’elle sera définitivement prélevée et que vos coordonnées deviendront visibles l’un pour l’autre. Les autres commissions bloquées sont libérées immédiatement. Vous pourrez annuler ce choix sans frais tant qu’il n’a pas confirmé.", amount: commission, label: delivery.status === "active" ? "Demander le remplacement" : "Choisir ce livreur", irreversible: delivery.status === "active" };
     if (action === "confirm") return { title: "Confirmer la mission", description: "Votre confirmation autorise le partage des coordonnées avec l’expéditeur et finalise la mise en relation Tikis.", amount: ownCandidate?.commissionBlocked ?? commission, label: "Confirmer la mission", irreversible: true };
     if (action === "complete") return { title: "Terminer la livraison", description: "Confirmez uniquement lorsque la remise et le paiement direct avec l’expéditeur sont finalisés.", amount: 0, label: "Marquer comme terminée", irreversible: false };
     return null;
@@ -132,6 +133,7 @@ export default function DeliveryDetailScreen() {
     if (senderAction === "disable") return { title: "Désactiver la livraison", description: "Elle ne sera plus visible pour de nouveaux livreurs. Les candidatures en cours seront annulées et les commissions temporairement bloquées seront libérées.", confirmLabel: "Désactiver", tone: "warning" as const };
     if (senderAction === "reactivate") return { title: "Activer la livraison", description: "La livraison redeviendra visible pour les livreurs compatibles. Les anciennes candidatures restent annulées afin de leur permettre de se proposer avec les informations actuelles.", confirmLabel: "Activer", tone: "success" as const };
     if (senderAction === "cancel") return { title: "Annuler la livraison", description: "Cette action est réservée aux courses qui n’ont pas encore démarré. La livraison sera conservée dans votre historique avec son statut d’annulation.", confirmLabel: "Annuler la livraison", tone: "danger" as const };
+    if (senderAction === "unselect") return { title: "Annuler le choix du livreur", description: "Ce livreur n’a pas encore confirmé sa disponibilité : votre choix sera annulé sans aucun frais, sa commission bloquée sera intégralement libérée, et la livraison redeviendra ouverte aux candidatures. Le livreur reste candidat et pourra être choisi à nouveau.", confirmLabel: "Annuler le choix", tone: "warning" as const };
     return null;
   }, [senderAction]);
 
@@ -152,6 +154,7 @@ export default function DeliveryDetailScreen() {
   const canDisable = role === "sender" && delivery.status === "open";
   const canReactivate = role === "sender" && delivery.status === "disabled";
   const canCancel = role === "sender" && (delivery.status === "open" || delivery.status === "disabled");
+  const canUnselect = role === "sender" && delivery.status === "pending_confirmation";
   const isActive = delivery.status === "active";
   const isCompleted = delivery.status === "completed";
   const pickupPresentation = formatDeliveryDetailPlace(delivery.pickup);
@@ -172,7 +175,11 @@ export default function DeliveryDetailScreen() {
     try {
       if (action === "apply") {
         if (!actionConfig?.amount) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
-        const result = await applyMutation.mutateAsync({ deliveryId, confirmedCommission: actionConfig.amount, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
+        // Le serveur calcule la commission sur `offerPrice` quand une contre-offre est fournie (server/db.ts,
+        // applyForTikisDelivery) : il faut recalculer sur ce même montant ici, sinon le contrôle de
+        // correspondance côté serveur rejette systématiquement toute candidature avec contre-offre.
+        const confirmedCommission = counterOffer?.amount ? Math.round(counterOffer.amount * (walletQuery.data?.commissionRate ?? 0)) : actionConfig.amount;
+        const result = await applyMutation.mutateAsync({ deliveryId, confirmedCommission, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
         utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
       }
       if (action === "withdraw") {
@@ -203,6 +210,7 @@ export default function DeliveryDetailScreen() {
       if (senderAction === "disable") await disableMutation.mutateAsync({ deliveryId });
       if (senderAction === "reactivate") await reactivateMutation.mutateAsync({ deliveryId });
       if (senderAction === "cancel") await cancelMutation.mutateAsync({ deliveryId });
+      if (senderAction === "unselect") await unselectMutation.mutateAsync({ deliveryId });
       await refreshDelivery();
       setSenderAction(null);
       haptic.success();
@@ -392,6 +400,7 @@ export default function DeliveryDetailScreen() {
                 <Text style={[styles.cancelButtonText, senderProcessing && styles.cancelButtonTextDisabled]}>Annuler la livraison</Text>
               </Pressable>
             ) : null}
+            {canUnselect ? <TikisButton label="Annuler le choix du livreur" icon="undo" variant="secondary" onPress={() => setSenderAction("unselect")} loading={senderProcessing && senderAction === "unselect"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
           </View>
         ) : null}
 
@@ -411,6 +420,7 @@ export default function DeliveryDetailScreen() {
         visible={candidatesSheetOpen}
         candidates={candidates}
         deliveryStatus={delivery.status}
+        deliveryPrice={delivery.offeredPrice ?? delivery.estimatedPrice}
         loadingId={processing ? selectedCandidate?.id ?? null : null}
         onClose={() => setCandidatesSheetOpen(false)}
         onChoose={openCandidateAction}
@@ -441,24 +451,24 @@ function DeliveryActionConfirmationModal({ visible, title, description, confirmL
 }
 
 function DriverActions({ deliveryStatus, ownCandidateStatus, loading, onApply, onWithdraw, onConfirm, onComplete }: { deliveryStatus: string; ownCandidateStatus?: string; loading: boolean; onApply: () => void; onWithdraw: () => void; onConfirm: () => void; onComplete: () => void }) {
-  if (deliveryStatus === "open") return <View style={styles.driverAction}>{ownCandidateStatus === "applied" ? <TikisButton label="Renoncer" variant="ghost" icon="undo" onPress={onWithdraw} loading={loading} disabled={loading} /> : <TikisButton label="Se proposer" icon="add-circle" onPress={onApply} loading={loading} disabled={loading} />}<Text style={styles.driverHint}>{ownCandidateStatus === "applied" ? "Votre candidature est enregistrée. Vous pouvez la retirer tant que vous n’êtes pas sélectionné." : "Postulez au prix client ou proposez votre prix via la modale de confirmation."}</Text></View>;
+  if (deliveryStatus === "open") return <View style={styles.driverAction}>{ownCandidateStatus === "applied" ? <TikisButton label="Se retirer" variant="ghost" icon="undo" onPress={onWithdraw} loading={loading} disabled={loading} /> : <TikisButton label="Se proposer" icon="add-circle" onPress={onApply} loading={loading} disabled={loading} />}<Text style={styles.driverHint}>{ownCandidateStatus === "applied" ? "Votre candidature est enregistrée. Vous pouvez la retirer tant que vous n’êtes pas sélectionné." : "Postulez au prix client ou proposez votre prix via la modale de confirmation."}</Text></View>;
   if (deliveryStatus === "pending_confirmation" && ownCandidateStatus === "selected") return <View style={styles.driverAction}><TikisButton label="Confirmer la course" icon="check-circle" onPress={onConfirm} loading={loading} disabled={loading} /><Text style={styles.driverHint}>Après confirmation, vos coordonnées seront partagées avec l’expéditeur.</Text></View>;
   if (deliveryStatus === "active" && ownCandidateStatus === "confirmed") return <View style={styles.driverAction}><TikisButton label="Marquer comme terminée" icon="task-alt" onPress={onComplete} loading={loading} disabled={loading} /><Text style={styles.driverHint}>À utiliser après remise et paiement direct avec l’expéditeur.</Text></View>;
   return null;
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F5F5F5" },
+  safe: { flex: 1, backgroundColor: "#EEEDF3" },
   content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32, gap: 10 },
 
   topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4 },
-  iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3" },
+  iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
 
-  heroMap: { height: 200, borderRadius: 12, backgroundColor: "#F5F5F5", position: "relative", overflow: "hidden", marginTop: 8 },
-  heroMapInner: { ...StyleSheet.absoluteFillObject, backgroundColor: "#F5F5F5" },
+  heroMap: { height: 200, borderRadius: 12, backgroundColor: "#EEEDF3", position: "relative", overflow: "hidden", marginTop: 8 },
+  heroMapInner: { ...StyleSheet.absoluteFillObject, backgroundColor: "#EEEDF3" },
   heroMapBlock: { position: "absolute", backgroundColor: "#DCDEE3", borderRadius: 5 },
   heroMapRoad: { position: "absolute", backgroundColor: "#FFFFFF", borderRadius: 99 },
-  heroMapMarker: { position: "absolute", width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
+  heroMapMarker: { position: "absolute", width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   heroMapMarkerStart: { top: "30%", left: "18%", backgroundColor: "#9A6201" },
   heroMapMarkerEnd: { top: "60%", right: "22%", backgroundColor: "#FFFFFF", borderColor: "#B4232D" },
   heroMapStatus: { position: "absolute", top: 12, left: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 7 },
@@ -480,7 +490,7 @@ const styles = StyleSheet.create({
   timelineCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, marginTop: 4 },
   timeline: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginTop: 10 },
   timelineStep: { alignItems: "center", width: 70 },
-  timelineDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
+  timelineDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
   timelineDotDone: { backgroundColor: "#9A6201" },
   timelineLine: { flex: 1, height: 1.5, backgroundColor: "#ECECEC", marginTop: 11 },
   timelineLineDone: { backgroundColor: "#9A6201" },
@@ -518,7 +528,7 @@ const styles = StyleSheet.create({
   driverName: { color: "#111111", fontSize: 13, fontWeight: "600", flexShrink: 1 },
   driverMeta: { color: "#666666", fontSize: 11, marginTop: 2 },
   driverActions: { flexDirection: "row", gap: 6 },
-  driverActionBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
+  driverActionBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
 
   candidatesTrigger: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
   candidatesTriggerActive: { borderWidth: 1, borderColor: "#9A6201", borderStyle: "dashed" },

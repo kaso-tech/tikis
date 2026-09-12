@@ -7,10 +7,10 @@ type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 type ButtonPalette = { background: string; foreground: string; border?: string };
 
 const buttonColors: Record<ButtonVariant, ButtonPalette> = {
-  primary: { background: "#FFFFFF", foreground: "#9A6201", border: "#E3E3E3" },
-  secondary: { background: "#FFFFFF", foreground: "#111111", border: "#E3E3E3" },
-  ghost: { background: "#F5F5F5", foreground: "#111111", border: "#E3E3E3" },
-  danger: { background: "#FFFFFF", foreground: "#A43740", border: "#E3E3E3" },
+  primary: { background: "#F7EFE5", foreground: "#9A6201", border: "#E5D2B9" },
+  secondary: { background: "#FFFFFF", foreground: "#111111", border: "#D7D5DE" },
+  ghost: { background: "#E4E3E9", foreground: "#111111", border: "#D0CED7" },
+  danger: { background: "#F8E8E9", foreground: "#B4232D", border: "#E8C7CA" },
 };
 
 export function TikisButton({
@@ -35,7 +35,7 @@ export function TikisButton({
   style?: StyleProp<ViewStyle>;
 }) {
   const palette: ButtonPalette = authStyle && variant === "primary"
-    ? { background: "#9A6201", foreground: "#FFFFFF", border: "#9A6201" }
+    ? { background: "#9A6201", foreground: "#FFFFFF", border: "#754A01" }
     : buttonColors[variant];
   const blocked = disabled || loading;
 
@@ -65,12 +65,12 @@ export function Avatar({ initials, color = "#111111", size = 44 }: { initials: s
 }
 
 export const tikisStyles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F5F5F5" },
+  screen: { flex: 1, backgroundColor: "#EEEDF3" },
   screenContent: { paddingHorizontal: 16, paddingBottom: 104 },
   eyebrow: { color: "#9A6201", fontSize: 12, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },
   title: { color: "#111111", fontSize: 26, lineHeight: 32, fontWeight: "600", letterSpacing: -0.35 },
   subtitle: { color: "#667085", fontSize: 14, lineHeight: 20 },
-  body: { color: "#111111", fontSize: 14, lineHeight: 20 },
+  body: { color: "#252525", fontSize: 14, lineHeight: 20 },
   muted: { color: "#667085", fontSize: 12, lineHeight: 18 },
 });
 
@@ -78,9 +78,9 @@ const styles = StyleSheet.create({
   button: { minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 9, borderWidth: 1, paddingHorizontal: 15, flexDirection: "row", gap: 8 },
   buttonPressed: { opacity: 0.84, transform: [{ scale: 0.98 }] },
   buttonText: { fontSize: 15, fontWeight: "600" },
-  iconButton: { width: 40, height: 40, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3" },
+  iconButton: { width: 40, height: 40, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF", borderWidth: 0 },
   iconButtonPressed: { opacity: 0.68 },
-  card: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 13, borderWidth: 1, borderColor: "#E3E3E3" },
+  card: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 13, borderWidth: 0, elevation: 0 },
   sectionHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   sectionTitle: { fontSize: 17, fontWeight: "600", color: "#111111", letterSpacing: -0.15 },
   sectionAction: { color: "#9A6201", fontSize: 13, fontWeight: "600" },

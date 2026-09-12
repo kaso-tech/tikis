@@ -7,6 +7,7 @@ import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { formatListRouteParts } from "@/lib/geo-rules";
 import { useDriverLocation } from "@/hooks/use-driver-location";
+import { useDriverBasePositionSync } from "@/hooks/use-driver-base-position-sync";
 import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
@@ -113,7 +114,10 @@ export function HomeScreen() {
 
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 5_000, refetchOnMount: "always", refetchOnWindowFocus: true });
   const driverWallet = walletQuery.data?.wallet;
-  const driverJournal = walletQuery.data?.journal ?? [];
+  // Gains de courses = informatifs, calculés depuis les livraisons terminées (jamais depuis le Wallet, qui n'est
+  // jamais crédité par une livraison : le paiement se fait directement entre l'expéditeur et le livreur).
+  const driverEarningsHistoryQuery = trpc.wallet.driverEarningsHistory.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 5_000 });
+  const driverEarningsHistory = driverEarningsHistoryQuery.data ?? [];
 
   const [filter, setFilter] = useState<FilterKey>("open");
   const [searchQuery, setSearchQuery] = useState("");
@@ -150,6 +154,8 @@ export function HomeScreen() {
     completed: new Animated.Value(1),
   }).current;
   const driverLocation = useDriverLocation({ enabled: role === "driver" });
+  // Tient à jour le centre des rayons « alertes » et « affichage » du livreur (cf. app/driver-alerts.tsx).
+  useDriverBasePositionSync(driverLocation.location, role === "driver");
 
   const filteredList = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -248,10 +254,10 @@ export function HomeScreen() {
     { enabled: Boolean(candidateDelivery?.id) },
   );
 
-  const applicationCommission = (delivery: Delivery) => {
+  const applicationCommission = (delivery: Delivery, priceOverride?: number) => {
     const rate = walletQuery.data?.commissionRate;
     if (!Number.isFinite(rate) || !rate || rate <= 0 || rate >= 1) return null;
-    return commissionFor(delivery.offeredPrice ?? delivery.estimatedPrice, { rate, currency: "FCFA" });
+    return commissionFor(priceOverride ?? (delivery.offeredPrice ?? delivery.estimatedPrice), { rate, currency: "FCFA" });
   };
 
   function requestApply(delivery: Delivery) {
@@ -298,7 +304,10 @@ export function HomeScreen() {
   async function handleApply(delivery: Delivery, counterOffer?: { amount: number | null }) {
     setApplyingId(delivery.id);
     try {
-      const confirmedCommission = applicationCommission(delivery);
+      // Le serveur calcule la commission sur `offerPrice` quand une contre-offre est fournie (server/db.ts,
+      // applyForTikisDelivery) : il faut recalculer sur ce même montant ici, sinon le contrôle de
+      // correspondance ajouté côté serveur rejette systématiquement toute candidature avec contre-offre.
+      const confirmedCommission = applicationCommission(delivery, counterOffer?.amount ?? undefined);
       if (confirmedCommission === null) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
       const result = await applyMutation.mutateAsync({ deliveryId: delivery.id, confirmedCommission, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
       utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
@@ -387,7 +396,7 @@ export function HomeScreen() {
   const filterCounts = useMemo(() => Object.fromEntries(filterItems.map((item) => [item.key, deliveries.filter((delivery) => matchesFilter(delivery, item.key, isDriver)).length])) as Record<FilterKey, number>, [deliveries, filterItems, isDriver]);
   const filterTranslateY = filterTransition.interpolate({ inputRange: [0, 1], outputRange: [6, 0] });
   const firstNameDisplay = isDriver ? firstName : "à vous";
-  const todaysEarnings = useMemo(() => isDriver ? deliveryMetricsForDay(driverJournal).earnings : 0, [driverJournal, isDriver]);
+  const todaysEarnings = useMemo(() => isDriver ? deliveryMetricsForDay(driverEarningsHistory).earnings : 0, [driverEarningsHistory, isDriver]);
   const availableOpportunities = useMemo(() => {
     if (!isDriver) return 0;
     return deliveries.filter((delivery) => {
@@ -615,6 +624,7 @@ export function HomeScreen() {
         visible={Boolean(candidateDelivery)}
         candidates={candidatesQuery.data ?? []}
         deliveryStatus={candidateDelivery?.status ?? "open"}
+        deliveryPrice={candidateDelivery ? (candidateDelivery.offeredPrice ?? candidateDelivery.estimatedPrice) : 0}
         loadingId={applyingId}
         onClose={() => setCandidateDelivery(null)}
         onChoose={requestCandidateSelection}
@@ -636,7 +646,7 @@ export function HomeScreen() {
         <ActionConfirmationModal visible title="Annuler cette livraison ?" description="La livraison sera retirée et ne recevra plus de candidatures." confirmLabel="Annuler la livraison" icon="cancel" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void cancelSenderDelivery(pendingAction.delivery)} />
       ) : null}
       {pendingAction?.kind === "withdraw" ? (
-        <ActionConfirmationModal visible title="Renoncer à cette candidature ?" description="Votre candidature sera retirée et la commission réservée redeviendra immédiatement disponible." confirmLabel="Renoncer" icon="undo" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
+        <ActionConfirmationModal visible title="Se retirer de cette candidature ?" description="Votre candidature sera retirée et la commission réservée redeviendra immédiatement disponible." confirmLabel="Se retirer" icon="undo" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
       ) : null}
       {pendingAction?.kind === "confirm" ? (
         <ActionConfirmationModal visible title="Confirmer cette mission ?" description="La commission réservée sera prélevée et la livraison passera en cours." confirmLabel="Confirmer" icon="check-circle" tone="success" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
@@ -848,7 +858,7 @@ function DeliveryRow({
   const driverAction = delivery.status === "completed"
     ? null
     : delivery.ownCandidateStatus === "applied"
-      ? "Renoncer"
+      ? "Se retirer"
       : delivery.ownCandidateStatus === "selected"
         ? "Confirmer"
         : delivery.ownCandidateStatus === "confirmed" || delivery.status === "active"
@@ -925,9 +935,9 @@ function DeliveryRow({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F5F5F5" },
+  safe: { flex: 1, backgroundColor: "#EEEDF3" },
 
-  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5" },
+  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#EEEDF3" },
   mapBlock: { position: "absolute", backgroundColor: "#DCDEE3", borderRadius: 6 },
   mapRoad: { position: "absolute", backgroundColor: "#FFFFFF", borderRadius: 99 },
   mapRoad1: { top: "30%", left: "-10%", right: "-10%", height: 18, transform: [{ rotate: "-12deg" }] },
@@ -943,7 +953,7 @@ const styles = StyleSheet.create({
   fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#F7EFE5", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E5D2B9", zIndex: 10 },
   sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
 
-  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
+  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#EEEDF3", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
   sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", marginBottom: 10 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
@@ -954,8 +964,8 @@ const styles = StyleSheet.create({
   sheetSubtitle: { color: "#666666", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 
   servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#F7EFE5", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E5D2B9" },
-  servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
-  servicePillNeutral: { backgroundColor: "#F5F5F5" },
+  servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE", shadowOpacity: 0, elevation: 0 },
+  servicePillNeutral: { backgroundColor: "#EEEDF3", shadowOpacity: 0, elevation: 0 },
   serviceText: { color: "#9A6201", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   serviceTextOffline: { color: "#111111" },
   onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9A6201" },
@@ -1018,7 +1028,7 @@ const styles = StyleSheet.create({
   row: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 11, borderWidth: 0, borderColor: "transparent" },
   rowSelected: { borderColor: "transparent", backgroundColor: "#FFFFFF" },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 9 },
-  rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
+  rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
   rowThumbDriver: { backgroundColor: "#9A6201" },
   rowMain: { flex: 1, minWidth: 0 },
   rowTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
@@ -1044,7 +1054,7 @@ const styles = StyleSheet.create({
   loadingState: { alignItems: "center", paddingVertical: 32, gap: 8 },
   loadingText: { color: "#666666", fontSize: 12 },
   empty: { alignItems: "center", paddingHorizontal: 24, paddingVertical: 24 },
-  emptyIcon: { width: 60, height: 60, borderRadius: 14, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center", marginBottom: 12 },
+  emptyIcon: { width: 60, height: 60, borderRadius: 14, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center", marginBottom: 12 },
   emptyTitle: { color: "#111111", fontSize: 14, fontWeight: "600", marginBottom: 4 },
   emptyText: { color: "#666666", fontSize: 12, textAlign: "center", lineHeight: 18 },
 

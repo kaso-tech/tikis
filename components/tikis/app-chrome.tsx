@@ -184,7 +184,7 @@ function DrawerRow({ item, active, onPress, isDark }: { item: DrawerItem; active
 
 const styles = StyleSheet.create({
   header: { backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingBottom: 6, flexDirection: "row", alignItems: "center" },
-  headerIcon: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#F5F5F5" },
+  headerIcon: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
   brand: { flex: 1, flexDirection: "row", alignItems: "center", paddingLeft: 11 },
   brandName: { color: "#111111", fontSize: 19, fontWeight: "700", letterSpacing: -0.4 },
   headerBadge: { position: "absolute", right: 3, top: 3, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: "#A43740", alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
@@ -196,8 +196,8 @@ const styles = StyleSheet.create({
   drawerTop: { height: 40, alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   drawerEyebrow: { color: "#667085", fontSize: 10, fontWeight: "600", letterSpacing: 0.9 },
   drawerEyebrowDark: { color: "#C8BCAA" },
-  closeButton: { width: 34, height: 34, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#F5F5F5" },
-  profileBlock: { flexDirection: "row", alignItems: "center", gap: 9, paddingTop: 12, paddingBottom: 11, backgroundColor: "#F5F5F5", borderRadius: 10, paddingHorizontal: 10 },
+  closeButton: { width: 34, height: 34, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
+  profileBlock: { flexDirection: "row", alignItems: "center", gap: 9, paddingTop: 12, paddingBottom: 11, backgroundColor: "#EEEDF3", borderRadius: 10, paddingHorizontal: 10 },
   profileBlockDark: { backgroundColor: "#231A10" },
   profileText: { flex: 1 },
   profileName: { color: "#111111", fontSize: 15, fontWeight: "600" },
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   menuRowActive: { backgroundColor: "#111111" },
   menuRowDark: { backgroundColor: "transparent" },
   menuRowActiveDark: { backgroundColor: "#D7A447" },
-  menuIcon: { width: 32, height: 32, borderRadius: 7, alignItems: "center", justifyContent: "center", backgroundColor: "#F5F5F5" },
+  menuIcon: { width: 32, height: 32, borderRadius: 7, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
   menuIconActive: { backgroundColor: "#9A6201" },
   menuIconDark: { backgroundColor: "#231A10" },
   menuText: { flex: 1 },
