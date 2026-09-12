@@ -2,8 +2,6 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { StyleSheet, Text, View } from "react-native";
 
 import { formatListRouteParts, formatNavigationTarget } from "@/lib/geo-rules";
-import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
-import { createStyles } from "@/lib/create-styles";
 import type { LocationLabel } from "@/shared/tikis-domain";
 
 type Props = {
@@ -35,8 +33,6 @@ function projectOntoCanvas(
 }
 
 export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }: Props) {
-const { colors: theme } = useThemeColors();
-  const styles = useMemo(() => stylesFor(theme), [theme]);
   // Même formateur centralisé que le texte du trajet (delivery-card.tsx) : sans lui, cette légende
   // affichait `pickup.name`/`dropoff.name` bruts, ignorant la règle "Ville → Ville" quand les villes
   // diffèrent — deux libellés différents pour le même trajet, dans le même écran.
@@ -82,14 +78,14 @@ const { colors: theme } = useThemeColors();
         ]}
       />
       <View style={[styles.pickup, { left: projection.originX - 12, top: projection.originY - 12 }]}>
-        <MaterialIcons name="trip-origin" size={14} color={theme.surface} />
+        <MaterialIcons name="trip-origin" size={14} color="#FFFFFF" />
       </View>
       <View style={[styles.dropoff, { left: projection.x - 12, top: projection.y - 12 }]}>
-        <MaterialIcons name="location-on" size={16} color={theme.error} />
+        <MaterialIcons name="location-on" size={16} color="#B4232D" />
       </View>
       {approximate ? (
         <View style={styles.approximate}>
-          <MaterialIcons name="privacy-tip" size={11} color={theme.warning} />
+          <MaterialIcons name="privacy-tip" size={11} color="#9A6200" />
           <Text style={styles.approximateText}>Aperçu indicatif</Text>
         </View>
       ) : null}
@@ -120,10 +116,10 @@ const { colors: theme } = useThemeColors();
 
 export { MapPreviewLeaflet as MapPreview };
 
-const stylesFor = createStyles((theme: ThemedColors) => ({
+const styles = StyleSheet.create({
   frame: {
     borderRadius: 9,
-    backgroundColor: theme.background,
+    backgroundColor: "#EEEDF3",
     overflow: "hidden",
     position: "relative",
   },
@@ -134,7 +130,7 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
     right: 0,
     bottom: 0,
     opacity: 0.45,
-    backgroundColor: theme.background,
+    backgroundColor: "#EEEDF3",
   },
   gridHorizontal: {
     position: "absolute",
@@ -142,13 +138,13 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: theme.border,
+    backgroundColor: "#D7D5DE",
     opacity: 0.45,
   },
   routeLine: {
     position: "absolute",
     height: 2,
-    backgroundColor: theme.primary,
+    backgroundColor: "#007B8B",
     borderRadius: 1,
   },
   pickup: {
@@ -156,22 +152,22 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: theme.primary,
+    backgroundColor: "#007B8B",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: theme.surface,
+    borderColor: "#FFFFFF",
   },
   dropoff: {
     position: "absolute",
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: theme.surface,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: theme.error,
+    borderColor: "#B4232D",
   },
   approximate: {
     position: "absolute",
@@ -183,10 +179,10 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
     paddingHorizontal: 7,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: theme.surface,
+    backgroundColor: "#FFFFFF",
   },
   approximateText: {
-    color: theme.warning,
+    color: "#9A6200",
     fontSize: 10,
     fontWeight: "600",
   },
@@ -197,7 +193,7 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
     bottom: 8,
     padding: 8,
     borderRadius: 8,
-    backgroundColor: theme.surface,
+    backgroundColor: "#FFFFFF",
     gap: 3,
   },
   legendRow: {
@@ -209,29 +205,29 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: theme.primary,
+    backgroundColor: "#007B8B",
   },
   legendDotDropoff: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: theme.error,
+    backgroundColor: "#B4232D",
   },
   legendLabel: {
-    color: theme.foreground,
+    color: "#111111",
     fontSize: 11,
     fontWeight: "600",
     flex: 1,
   },
   legendSub: {
-    color: theme.muted,
+    color: "#666666",
     fontSize: 10,
     lineHeight: 13,
     paddingLeft: 15,
   },
   legendDivider: {
     height: 1,
-    backgroundColor: theme.divider,
+    backgroundColor: "#ECECEC",
     marginVertical: 2,
   },
-}));
+});

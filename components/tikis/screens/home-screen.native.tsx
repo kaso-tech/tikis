@@ -23,8 +23,7 @@ import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompleted
 import { resolveDriverHomeAction } from "@/shared/delivery-home-action";
 import { isOpenDeliveryStale } from "@/shared/delivery-freshness";
 import { deliveryMetricsForDay } from "@/lib/wallet-metrics";
-import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
-import { createStyles } from "@/lib/create-styles";
+import { useThemeColors } from "@/lib/use-theme-colors";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 const SHEET_MIN = 130;
@@ -39,14 +38,14 @@ const TYPE_ICON: Record<Delivery["type"], React.ComponentProps<typeof MaterialIc
 };
 
 const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: string }> = {
-  draft: { label: "BROUILLON", color: theme.muted, bg: theme.background },
-  open: { label: "PUBLIÉE", color: "#9A6201", bg: theme.primary + "14" },
-  pending_confirmation: { label: "ATTRIBUÉE", color: theme.warning, bg: theme.warning + "14" },
+  draft: { label: "BROUILLON", color: "#7A6E61", bg: "#EEE8E0" },
+  open: { label: "PUBLIÉE", color: "#9A6201", bg: "#F8E8CE" },
+  pending_confirmation: { label: "ATTRIBUÉE", color: "#7A5600", bg: "#F4E9D2" },
   active: { label: "EN TRANSIT", color: "#176C52", bg: "#DDEFE7" },
-  completed: { label: "TERMINÉE", color: theme.success, bg: theme.success + "14" },
+  completed: { label: "TERMINÉE", color: "#4F6A5A", bg: "#E6EFE9" },
   disabled: { label: "DÉSACTIVÉE", color: "#A43740", bg: "#F7E6E7" },
   cancelled: { label: "ANNULÉE", color: "#A43740", bg: "#F7E6E7" },
-  expired: { label: "EXPIRÉE", color: theme.muted, bg: theme.background },
+  expired: { label: "EXPIRÉE", color: "#6B6257", bg: "#EEE8E0" },
 };
 
 type FilterKey = "active" | "open" | "pending" | "completed";
@@ -522,7 +521,7 @@ export function HomeScreen() {
               }}
               tintColor="#9A6201"
               colors={["#9A6201"]}
-              progressBackgroundColor="#E3E3E3"
+              progressBackgroundColor="#F7EFE5"
             />
           }
         >
@@ -546,7 +545,7 @@ export function HomeScreen() {
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 placeholder={isDriver ? "Rechercher une opportunité…" : "Rechercher une livraison…"}
-                placeholderTextColor={theme.muted}
+                placeholderTextColor="#B48753"
                 style={styles.searchInput}
                 returnKeyType="search"
                 clearButtonMode="while-editing"
@@ -714,8 +713,8 @@ function WalletCard({ walletBalance, totalBalance, blockedBalance }: { walletBal
       <View style={styles.walletRow}>
         <Text style={styles.walletAmount}>{formatMoney(walletBalance)}</Text>
         <View style={styles.walletTrend}>
-          <MaterialIcons name="trending-up" size={11} color={theme.trendUp} />
-          <Text style={[styles.walletTrendText, { color: theme.trendUp }]}>+12%</Text>
+          <MaterialIcons name="trending-up" size={11} color="#48B889" />
+          <Text style={styles.walletTrendText}>+12%</Text>
         </View>
       </View>
       <View style={styles.walletDivider} />
@@ -833,7 +832,7 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
               <View style={styles.pinWrap}>
                 <View style={styles.pinShadow} />
                 <View style={[styles.pinCircle, styles.pinCircleEnd]}>
-                  <MaterialIcons name="location-on" size={14} color={theme.error} />
+                  <MaterialIcons name="location-on" size={14} color="#B4232D" />
                 </View>
                 <View style={[styles.pinTriangle, styles.pinTriangleEnd]} />
               </View>
@@ -924,7 +923,6 @@ function DeliveryRow({
 }) {
   const [showPickupTooltip, setShowPickupTooltip] = useState(false);
   const { colors: theme } = useThemeColors();
-  const styles = useMemo(() => stylesFor(theme), [theme]);
   const isSender = role === "sender";
   const isDriver = role === "driver";
   const driverAction = delivery.status === "completed"
@@ -943,7 +941,7 @@ function DeliveryRow({
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const dateInfo = formatDeliveryCreationDate(delivery.createdAt, now);
   const dateColor = dateInfo.tone === "primary" ? "#9A6201" : "#747474";
-  const dateBg = dateInfo.tone === "primary" ? theme.primary + "14" : theme.background;
+  const dateBg = dateInfo.tone === "primary" ? "#F8F0E5" : "#F0F0F2";
   const totalDistance = formatDistanceKm(delivery.distanceKm);
   const pickupTitle = locationTitle(delivery.pickup);
   const pickupDistrict = delivery.pickup.district || delivery.pickup.city || "Quartier non renseigné";
@@ -1020,115 +1018,115 @@ function DeliveryRow({
   );
 }
 
-const stylesFor = createStyles((theme: ThemedColors) => ({
-  safe: { flex: 1, backgroundColor: theme.background },
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: "#EEEDF3" },
 
-  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: theme.background },
-  nativeMarkerStart: { width: 32, height: 32, borderRadius: 9, backgroundColor: theme.primary, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: theme.surface },
-  nativeMarkerDriver: { width: 30, height: 30, borderRadius: 15, backgroundColor: theme.foreground, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: theme.surface },
-  nativeMarkerEnd: { width: 32, height: 32, borderRadius: 9, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: theme.error },
+  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#EEEDF3" },
+  nativeMarkerStart: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
+  nativeMarkerDriver: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#111111", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
+  nativeMarkerEnd: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#B4232D" },
 
   pinWrap: { alignItems: "center", width: 36, paddingTop: 0 },
   pinShadow: { position: "absolute", bottom: 0, width: 14, height: 4, borderRadius: 7, backgroundColor: "rgba(0,0,0,0.25)" },
-  pinCircle: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2.5, borderColor: theme.surface, marginBottom: -2 },
-  pinCircleStart: { backgroundColor: theme.primary },
-  pinCircleEnd: { backgroundColor: theme.surface },
+  pinCircle: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2.5, borderColor: "#FFFFFF", marginBottom: -2 },
+  pinCircleStart: { backgroundColor: "#9A6201" },
+  pinCircleEnd: { backgroundColor: "#FFFFFF" },
   pinTriangle: { width: 0, height: 0, borderLeftWidth: 6, borderRightWidth: 6, borderTopWidth: 8, borderLeftColor: "transparent", borderRightColor: "transparent", marginTop: -2 },
-  pinTriangleStart: { borderTopColor: theme.primary },
-  pinTriangleEnd: { borderTopColor: theme.surface },
+  pinTriangleStart: { borderTopColor: "#9A6201" },
+  pinTriangleEnd: { borderTopColor: "#FFFFFF" },
 
-  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: theme.border, zIndex: 10 },
-  sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: theme.primary, alignItems: "center", justifyContent: "center" },
+  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#F7EFE5", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E5D2B9", zIndex: 10 },
+  sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
 
-  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: theme.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
+  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#EEEDF3", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
-  sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, marginBottom: 10 },
+  sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", marginBottom: 10 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
   greetingBlock: { flex: 1, minWidth: 0 },
   driverGainsRow: { flexDirection: "row", alignItems: "baseline", gap: 6, flexWrap: "wrap" },
-  driverGainsValue: { color: theme.primary, fontSize: 14, fontWeight: "700" },
-  sheetTitle: { color: theme.foreground, fontSize: 14, fontWeight: "700", lineHeight: 18 },
-  sheetSubtitle: { color: theme.muted, fontSize: 10.5, marginTop: 1, fontWeight: "500" },
+  driverGainsValue: { color: "#9A6201", fontSize: 14, fontWeight: "700" },
+  sheetTitle: { color: "#111111", fontSize: 14, fontWeight: "700", lineHeight: 18 },
+  sheetSubtitle: { color: "#666666", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 
-  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: theme.surface, flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: theme.border },
-  servicePillOffline: { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
-  servicePillNeutral: { backgroundColor: theme.background },
-  serviceText: { color: theme.primary, fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
-  serviceTextOffline: { color: theme.foreground },
-  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.primary },
-  onlineDotOffline: { backgroundColor: theme.muted },
+  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#F7EFE5", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E5D2B9" },
+  servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE", shadowOpacity: 0, elevation: 0 },
+  servicePillNeutral: { backgroundColor: "#EEEDF3", shadowOpacity: 0, elevation: 0 },
+  serviceText: { color: "#9A6201", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
+  serviceTextOffline: { color: "#111111" },
+  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9A6201" },
+  onlineDotOffline: { backgroundColor: "#747474" },
 
   searchRow: { paddingTop: 10, paddingBottom: 6 },
-  kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: theme.surface, borderRadius: 10, borderWidth: 1, borderColor: theme.border },
+  kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: "#F7EFE5", borderRadius: 10, borderWidth: 1, borderColor: "#E5D2B9" },
   kycBannerCopy: { flex: 1 },
-  kycBannerTitle: { color: theme.primary, fontSize: 12, fontWeight: "700" },
-  kycBannerText: { color: theme.warning, fontSize: 11, marginTop: 2, lineHeight: 16 },
-  searchPill: { height: 40, backgroundColor: theme.surface, borderRadius: 11, borderWidth: 1, borderColor: theme.border, flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
-  searchInput: { flex: 1, color: theme.primary, fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
+  kycBannerTitle: { color: "#9A6201", fontSize: 12, fontWeight: "700" },
+  kycBannerText: { color: "#6B4A1B", fontSize: 11, marginTop: 2, lineHeight: 16 },
+  searchPill: { height: 40, backgroundColor: "#F7EFE5", borderRadius: 11, borderWidth: 1, borderColor: "#E5D2B9", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
+  searchInput: { flex: 1, color: "#9A6201", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
 
-  walletCard: { marginHorizontal: 14, marginTop: 6, marginBottom: 8, backgroundColor: theme.foreground, borderRadius: 12, padding: 14 },
+  walletCard: { marginHorizontal: 14, marginTop: 6, marginBottom: 8, backgroundColor: "#111111", borderRadius: 12, padding: 14 },
   walletEyebrow: { color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
   walletRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginTop: 4, marginBottom: 10 },
-  walletAmount: { color: theme.surface, fontSize: 26, fontWeight: "700", letterSpacing: -0.4 },
+  walletAmount: { color: "#FFFFFF", fontSize: 26, fontWeight: "700", letterSpacing: -0.4 },
   walletTrend: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(72,184,137,0.16)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  walletTrendText: { color: theme.trendUp, fontSize: 11, fontWeight: "700" },
+  walletTrendText: { color: "#48B889", fontSize: 11, fontWeight: "700" },
   walletDivider: { height: 1, backgroundColor: "rgba(255,255,255,0.10)", marginBottom: 10 },
   walletStats: { flexDirection: "row", gap: 12 },
   walletStat: { flex: 1 },
   walletStatLabel: { color: "rgba(255,255,255,0.55)", fontSize: 10 },
-  walletStatValue: { color: theme.surface, fontSize: 13, fontWeight: "700", marginTop: 2 },
+  walletStatValue: { color: "#FFFFFF", fontSize: 13, fontWeight: "700", marginTop: 2 },
 
   filterRow: { flexDirection: "row", gap: 6, paddingBottom: 10, alignItems: "center" },
   filterScroll: { flexGrow: 0 },
-  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, flexDirection: "row", alignItems: "center", gap: 6 },
-  chipActive: { backgroundColor: theme.surface, borderColor: theme.primary },
-  chipText: { color: theme.primary, fontSize: 11, fontWeight: "600" },
-  chipTextActive: { color: theme.primary },
-  chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: theme.primary, alignItems: "center", justifyContent: "center" },
-  chipCountActive: { backgroundColor: theme.primary },
-  chipCountText: { color: theme.surface, fontSize: 10, fontWeight: "700", lineHeight: 12 },
+  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", flexDirection: "row", alignItems: "center", gap: 6 },
+  chipActive: { backgroundColor: "#F7EFE5", borderColor: "#9A6201" },
+  chipText: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
+  chipTextActive: { color: "#9A6201" },
+  chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
+  chipCountActive: { backgroundColor: "#9A6201" },
+  chipCountText: { color: "#F7EFE5", fontSize: 10, fontWeight: "700", lineHeight: 12 },
   tabContent: { minHeight: 1 },
 
   scrollArea: { flex: 1, marginTop: 2 },
   scrollContent: { paddingHorizontal: 14, paddingTop: 6, paddingBottom: 90, gap: 8 },
 
   urgentCard: { borderRadius: 12, padding: 12, gap: 10 },
-  urgentCardSender: { backgroundColor: theme.foreground },
-  urgentCardDriver: { backgroundColor: theme.primary },
+  urgentCardSender: { backgroundColor: "#111111" },
+  urgentCardDriver: { backgroundColor: "#9A6201" },
   urgentHead: { flexDirection: "row", alignItems: "center", gap: 10 },
   urgentThumb: { width: 36, height: 36, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  urgentThumbSender: { backgroundColor: theme.primary },
-  urgentThumbDriver: { backgroundColor: theme.surface },
+  urgentThumbSender: { backgroundColor: "#9A6201" },
+  urgentThumbDriver: { backgroundColor: "#FFFFFF" },
   urgentMeta: { flex: 1, minWidth: 0 },
-  urgentTitle: { color: theme.surface, fontSize: 13, fontWeight: "700" },
+  urgentTitle: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
   urgentSub: { color: "rgba(255,255,255,0.65)", fontSize: 11, marginTop: 2 },
   urgentChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
   urgentChipText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.4 },
   urgentPricing: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
-  urgentPrice: { color: theme.surface, fontSize: 20, fontWeight: "700", letterSpacing: -0.3 },
+  urgentPrice: { color: "#FFFFFF", fontSize: 20, fontWeight: "700", letterSpacing: -0.3 },
   urgentPriceExtra: { color: "rgba(255,255,255,0.6)", fontSize: 10, marginTop: 1 },
   urgentActions: { flexDirection: "row", gap: 7 },
-  urgentBtnWhite: { flex: 1, height: 38, borderRadius: 9, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
-  urgentBtnWhiteText: { color: theme.primary, fontSize: 12, fontWeight: "700" },
+  urgentBtnWhite: { flex: 1, height: 38, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
+  urgentBtnWhiteText: { color: "#9A6201", fontSize: 12, fontWeight: "700" },
 
   listSection: { marginTop: 4, gap: 8 },
-  row: { backgroundColor: theme.surface, borderRadius: 10, padding: 11, borderWidth: 1, borderColor: theme.divider },
-  rowSelected: { borderColor: theme.primary, backgroundColor: theme.primary + "14", borderWidth: 1.5 },
+  row: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 11, borderWidth: 1, borderColor: "#ECECEC" },
+  rowSelected: { borderColor: "#9A6201", backgroundColor: "#FAF6F0", borderWidth: 1.5 },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 9 },
-  rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: theme.background, alignItems: "center", justifyContent: "center" },
-  rowThumbDriver: { backgroundColor: theme.primary },
+  rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
+  rowThumbDriver: { backgroundColor: "#9A6201" },
   rowMain: { flex: 1, minWidth: 0 },
   rowTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
-  rowTitle: { color: theme.foreground, fontSize: 12.5, fontWeight: "600" },
-  rowSub: { color: theme.muted, fontSize: 10.5, marginTop: 1 },
-  rowPrice: { color: theme.foreground, fontSize: 14, fontWeight: "700", textAlign: "right" },
-  rowDetails: { flex: 1, color: theme.foreground, fontSize: 11.5, lineHeight: 16, paddingRight: 8 },
+  rowTitle: { color: "#111111", fontSize: 12.5, fontWeight: "600" },
+  rowSub: { color: "#666666", fontSize: 10.5, marginTop: 1 },
+  rowPrice: { color: "#111111", fontSize: 14, fontWeight: "700", textAlign: "right" },
+  rowDetails: { flex: 1, color: "#111111", fontSize: 11.5, lineHeight: 16, paddingRight: 8 },
   rowDriverDistance: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 3, paddingTop: 1, position: "relative" },
   directionButton: { width: 24, height: 24, alignItems: "center", justifyContent: "center" },
-  rowDriverDistanceText: { color: theme.primary, fontSize: 12.5, fontWeight: "600" },
-  pickupTooltip: { position: "absolute", right: 0, top: 28, minWidth: 168, maxWidth: 236, backgroundColor: theme.foreground, borderRadius: 7, paddingHorizontal: 9, paddingVertical: 7, zIndex: 20 },
+  rowDriverDistanceText: { color: "#9A6201", fontSize: 12.5, fontWeight: "600" },
+  pickupTooltip: { position: "absolute", right: 0, top: 28, minWidth: 168, maxWidth: 236, backgroundColor: "#111111", borderRadius: 7, paddingHorizontal: 9, paddingVertical: 7, zIndex: 20 },
   pickupTooltipLabel: { color: "rgba(255,255,255,0.64)", fontSize: 8, fontWeight: "700", letterSpacing: 0.55 },
-  pickupTooltipText: { color: theme.surface, fontSize: 11, fontWeight: "600", marginTop: 2 },
+  pickupTooltipText: { color: "#FFFFFF", fontSize: 11, fontWeight: "600", marginTop: 2 },
   pickupTooltipDistrict: { color: "rgba(255,255,255,0.68)", fontSize: 10, marginTop: 1 },
   pickupTooltipDivider: { height: 1, backgroundColor: "rgba(255,255,255,0.16)", marginVertical: 6 },
   rowStatusChip: { marginLeft: "auto", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
@@ -1138,20 +1136,20 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
   datePillText: { fontSize: 10.5, fontWeight: "700" },
   rowBottom: { flexDirection: "row", alignItems: "center", marginTop: 8, gap: 10 },
   rowStat: { flexDirection: "row", alignItems: "center", gap: 4 },
-  rowStatText: { color: theme.muted, fontSize: 10.5, fontWeight: "500" },
+  rowStatText: { color: "#666666", fontSize: 10.5, fontWeight: "500" },
   rowActions: { marginLeft: "auto", flexDirection: "row", gap: 6 },
-  rowBtnOutline: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
-  rowBtnOutlineText: { color: theme.foreground, fontSize: 10.5, fontWeight: "600" },
-  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, minWidth: 64, alignItems: "center", flexDirection: "row", gap: 4, justifyContent: "center" },
-  rowBtnFilledText: { color: theme.primary, fontSize: 10.5, fontWeight: "700" },
+  rowBtnOutline: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
+  rowBtnOutlineText: { color: "#111111", fontSize: 10.5, fontWeight: "600" },
+  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", minWidth: 64, alignItems: "center", flexDirection: "row", gap: 4, justifyContent: "center" },
+  rowBtnFilledText: { color: "#9A6201", fontSize: 10.5, fontWeight: "700" },
 
   loadingState: { alignItems: "center", paddingVertical: 32, gap: 8 },
-  loadingText: { color: theme.muted, fontSize: 12 },
+  loadingText: { color: "#666666", fontSize: 12 },
   empty: { alignItems: "center", paddingHorizontal: 24, paddingVertical: 24 },
-  emptyIcon: { width: 60, height: 60, borderRadius: 14, backgroundColor: theme.background, alignItems: "center", justifyContent: "center", marginBottom: 12 },
-  emptyTitle: { color: theme.foreground, fontSize: 14, fontWeight: "600", marginBottom: 4 },
-  emptyText: { color: theme.muted, fontSize: 12, textAlign: "center", lineHeight: 18 },
+  emptyIcon: { width: 60, height: 60, borderRadius: 14, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center", marginBottom: 12 },
+  emptyTitle: { color: "#111111", fontSize: 14, fontWeight: "600", marginBottom: 4 },
+  emptyText: { color: "#666666", fontSize: 12, textAlign: "center", lineHeight: 18 },
 
   pressed: { opacity: 0.7 },
-  scrollTopButton: { position: "absolute", right: 16, bottom: 24, width: 38, height: 38, borderRadius: 10, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, alignItems: "center", justifyContent: "center" },
-}));
+  scrollTopButton: { position: "absolute", right: 16, bottom: 24, width: 38, height: 38, borderRadius: 10, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE", alignItems: "center", justifyContent: "center" },
+});

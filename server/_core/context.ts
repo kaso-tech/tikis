@@ -4,7 +4,6 @@ import { sdk } from "./sdk";
 import { verifyTikisProfileSession } from "../tikis-session";
 import { verifyAdminSession, type AdminRole } from "../admin-auth";
 import { TIKIS_PROFILE_COOKIE } from "./cookies";
-import { COOKIE_NAME } from "../../shared/const";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
@@ -38,25 +37,21 @@ function parseCookies(header: string | undefined): Record<string, string> {
 // le client web s'appuie uniquement sur le cookie httpOnly ci-dessous, jamais lisible ni renvoyable par
 // un script injecté. Ne jamais faire porter ce jeton par le client web via un en-tête/sessionStorage : cela
 // annulerait la protection XSS que ce cookie httpOnly existe précisément pour apporter.
-
-type SessionHeaders = Record<string, string | string[] | undefined>;
-
-export function getTikisSessionTokenFromHeaders(headers: SessionHeaders): string | undefined {
-  const current = headers["x-tikis-session"];
-  const legacy = headers["x-tikis-profile-session"];
-  const token = Array.isArray(current) ? current[0] : current;
-  if (token) return token;
-  return Array.isArray(legacy) ? legacy[0] : legacy;
+export function getTikisSessionTokenFromHeaders(headers: Record<string, string | string[] | undefined>): string | undefined {
+  const headerValue = headers["x-tikis-session"] ?? headers["x-tikis-profile-session"];
+  const headerToken = Array.isArray(headerValue) ? headerValue[0] : headerValue;
+  return headerToken;
 }
 
-export function shouldAuthenticateManusRequest(headers: SessionHeaders): boolean {
+export function shouldAuthenticateManusRequest(headers: Record<string, string | string[] | undefined>): boolean {
   const authorization = headers.authorization;
   const bearer = Array.isArray(authorization) ? authorization[0] : authorization;
-  if (typeof bearer === "string" && bearer.startsWith("Bearer ")) return true;
-  const cookieHeader = headers.cookie;
-  const cookies = parseCookies(Array.isArray(cookieHeader) ? cookieHeader[0] : cookieHeader);
-  return Boolean(cookies[COOKIE_NAME]);
+  if (typeof bearer === "string" && /^Bearer\s+\S+/i.test(bearer)) return true;
+  const cookie = headers.cookie;
+  const cookieValue = Array.isArray(cookie) ? cookie[0] : cookie;
+  return typeof cookieValue === "string" && /(?:^|;\s*)app_session_id=/.test(cookieValue);
 }
+
 function pickTikisSessionToken(opts: CreateExpressContextOptions): string | undefined {
   const headerToken = getTikisSessionTokenFromHeaders(opts.req.headers);
   if (headerToken) return headerToken;

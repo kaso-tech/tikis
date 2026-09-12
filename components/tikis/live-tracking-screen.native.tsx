@@ -154,10 +154,7 @@ function LiveTrackingFocus({
   const mapRef = useRef<MapView | null>(null);
   const liveDeliveryId = delivery.status === "active" ? delivery.id : null;
   const driverPosition = useLiveDeliveryPosition(liveDeliveryId, delivery.status === "active");
-  const driverStatsQuery = trpc.deliveries.driverStats.useQuery(
-    { driverPhone: delivery.driverPhone ?? "" },
-    { enabled: Boolean(delivery.driverPhone), refetchInterval: 60_000 },
-  );
+  const driverStats: DriverStats | null = null;
   const dropoff = formatDeliveryDetailPlace(delivery.dropoff);
   const pickup = formatDeliveryDetailPlace(delivery.pickup);
 
@@ -305,7 +302,7 @@ function LiveTrackingFocus({
         pendingDeliveries={pendingDeliveries}
         todayDeliveries={todayDeliveries}
         driverPosition={driverPosition}
-        driverStats={driverStatsQuery.data ?? null}
+        driverStats={driverStats}
         theme={theme}
         isDriverLive={delivery.status === "active" && Boolean(driverCoord)}
       />
@@ -439,29 +436,6 @@ function DraggableSheet({
       onPanResponderTerminate: () => {
         dragState.current.active = false;
         Animated.spring(panY, { toValue: 0, useNativeDriver: false }).start();
-      },
-    }),
-  ).current;
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 6,
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy < 0) {
-          // Swipe up
-          panY.setValue(Math.max(gestureState.dy, -SHEET_FULL_HEIGHT));
-        } else {
-          // Swipe down
-          panY.setValue(Math.min(gestureState.dy, SHEET_MID_HEIGHT));
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        const dy = gestureState.dy;
-        if (dy < -40 && sheetLevel === "mini") setSheetLevel("mid");
-        else if (dy < -40 && sheetLevel === "mid") setSheetLevel("full");
-        else if (dy > 40 && sheetLevel === "full") setSheetLevel("mid");
-        else if (dy > 40 && sheetLevel === "mid") setSheetLevel("mini");
-        Animated.spring(panY, { toValue: 0, useNativeDriver: false, friction: 9 }).start();
       },
     }),
   ).current;
@@ -808,7 +782,7 @@ const styles = StyleSheet.create({
   deliveryTitle: { fontSize: 13.5, fontWeight: "600" },
   deliveryRoute: { fontSize: 11.5, marginTop: 2 },
   deliveryEta: { alignItems: "flex-end", flexShrink: 0 },
-  deliveryEtaTime: { fontSize: 16, fontWeight: "700", fontVariantNumeric: "tabular-nums" },
+  deliveryEtaTime: { fontSize: 16, fontWeight: "700" },
   deliveryEtaLabel: { fontSize: 10.5, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.4, marginTop: 1 },
 
   // Track preview (timeline)

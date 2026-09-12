@@ -3,11 +3,12 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
-import { createStyles } from "@/lib/create-styles";
+import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
+import { ContactSection } from "@/components/tikis/contact-section";
 import { LoyaltyProgress } from "@/components/tikis/loyalty-progress";
+import { SessionsSection } from "@/components/tikis/sessions-section";
 import { haptic } from "@/lib/haptics";
 import { useTikisLogout } from "@/lib/tikis-logout";
 import { countryFlagEmoji, sanitizeFullName, validateFullName } from "@/lib/registration-rules";
@@ -21,7 +22,6 @@ const COVER_HEIGHT = 200;
 
 export default function ProfileScreen() {
   const { colors: theme, isDark } = useThemeColors();
-  const styles = useMemo(() => stylesFor(theme), [theme]);
   const { role, profile, updateProfile } = useTikisStore();
   const { openLogoutConfirmation } = useTikisLogout();
   const updateMutation = trpc.profiles.update.useMutation();
@@ -176,329 +176,202 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-
-        {/* HERO (style 2 — sans cover) */}
-        <View style={[styles.hero, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <View style={styles.heroBand} />
-          <Pressable onPress={openEditor} style={({ pressed }) => [styles.heroAvatarWrap, pressed && styles.pressed]} accessibilityLabel="Modifier la photo de profil">
-            {photoUri ? (
-              <Image source={{ uri: photoUri }} style={styles.heroAvatarImage} />
-            ) : (
-              <View style={[styles.heroAvatar, driver ? styles.avatarDriver : styles.avatarSender]}>
-                <Text style={styles.heroAvatarText}>{initials}</Text>
-              </View>
-            )}
-            <View style={[styles.heroAvatarEdit, { backgroundColor: theme.primary }]}>
-              <MaterialIcons name="photo-camera" size={12} color={theme.surface} />
+        <View style={styles.coverWrap}>
+          <View style={[styles.cover, isDark && styles.coverDark]}>
+            <View style={styles.coverPattern}>
+              <View style={styles.coverOrbPrimary} />
+              <View style={styles.coverOrbSecondary} />
+              <View style={styles.coverOrbTertiary} />
             </View>
-          </Pressable>
-          <Text style={[styles.heroName, { color: theme.foreground }]} numberOfLines={1}>{name}</Text>
-          <Text style={[styles.heroPhone, { color: theme.muted }]} numberOfLines={1}>{profile?.phone ?? ""}</Text>
-          <View style={styles.heroBadges}>
-            <View style={[styles.badge, { backgroundColor: theme.background }]}>
-              <MaterialIcons name={driver ? "two-wheeler" : "inventory-2"} size={11} color={theme.primary} />
-              <Text style={[styles.badgeText, { color: theme.primary }]}>
-                {driver ? `Livreur · ${(profile?.vehicles ?? []).join(" · ") || "Moto"}` : "Expéditeur"}
-              </Text>
-            </View>
-            <View style={[styles.badge, { backgroundColor: theme.background }]}>
-              <MaterialIcons name="verified" size={11} color={theme.success} />
-              <Text style={[styles.badgeText, { color: theme.success }]}>Identité vérifiée</Text>
-            </View>
+            <View style={styles.coverOverlay} pointerEvents="none" />
           </View>
         </View>
 
-        {/* STATS (3 KPIs) */}
-        <View style={styles.statsRow}>
-          {driver ? (
-            <>
-              <StatBox label="Note" value={driverRating ? driverRating.toString() : "—"} color={theme.primary} />
-              <StatBox label="Courses" value={completed.length.toString()} color={theme.success} />
-              <StatBox label="Ancienneté" value={memberSince} color={theme.muted} small />
-            </>
-          ) : (
-            <>
-              <StatBox label="Envoyées" value={senderDelivered.toString()} color={theme.success} />
-              <StatBox label="Membre" value={memberSince} color={theme.muted} small />
-              <StatBox label="Compte" value="OK" color={theme.success} />
-            </>
-          )}
-        </View>
-
-        {/* QUICK CTAs */}
-        <View style={styles.ctaRow}>
-          <CtaTile
-            icon="lock-outline"
-            label="Sessions"
-            meta="2 appareils"
-            onPress={() => router.push("/sessions" as any)}
-
-          />
-          {driver && profile?.referralCode ? (
-            <CtaTile
-              icon="group-add"
-              label="Parrainage"
-              meta={`Code ${profile.referralCode}`}
-              onPress={() => router.push("/referrals" as any)}
-            />
-          ) : (
-            <CtaTile
-              icon="bookmark"
-              label="Adresses"
-              meta="Vos lieux favoris"
-              onPress={() => router.push("/(tabs)/addresses" as any)}
-            />
-          )}
-        </View>
-
-        {/* CARD: Identité */}
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <View style={styles.cardHeader}>
-            <View style={[styles.cardEmoji, { backgroundColor: theme.background }]}>
-              <Text style={styles.cardEmojiText}>👤</Text>
-            </View>
+        <View style={[styles.identityCard, isDark && { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={styles.avatarRow}>
+            <Pressable onPress={openEditor} style={({ pressed }) => [styles.avatarWrap, pressed && styles.pressed]} accessibilityLabel="Modifier la photo de profil">
+              {photoUri ? (
+                <Image source={{ uri: photoUri }} style={styles.avatarImage} />
+              ) : (
+                <View style={[styles.avatar, driver ? styles.avatarDriver : styles.avatarSender]}>
+                  <Text style={styles.avatarText}>{initials}</Text>
+                </View>
+              )}
+              <View style={styles.avatarEdit}>
+                <MaterialIcons name="photo-camera" size={12} color="#FFFFFF" />
+              </View>
+            </Pressable>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.cardTitle, { color: theme.foreground }]}>Identité</Text>
-              <Text style={[styles.cardSubtitle, { color: theme.muted }]}>Vos informations de profil</Text>
+              <Text style={[styles.name, isDark && { color: theme.foreground }]} numberOfLines={1}>{name}</Text>
+              <View style={[styles.rolePill, driver ? styles.rolePillDriver : styles.rolePillSender]}>
+                <MaterialIcons name={driver ? "two-wheeler" : "inventory-2"} size={11} color={driver ? "#9A6200" : "#007B8B"} />
+                <Text style={[styles.rolePillText, driver ? styles.rolePillTextDriver : styles.rolePillTextSender]}>
+                  {driver ? "LIVREUR VÉRIFIÉ" : "EXPÉDITEUR VÉRIFIÉ"}
+                </Text>
+              </View>
             </View>
-            <Pressable onPress={openEditor} hitSlop={8} style={({ pressed }) => [styles.cardEditBtn, pressed && { opacity: 0.7 }]} accessibilityLabel="Modifier le profil">
-              <MaterialIcons name="edit" size={14} color={theme.primary} />
+            <Pressable onPress={openEditor} style={({ pressed }) => [styles.editButton, pressed && styles.pressed]} accessibilityLabel="Modifier le profil">
+              <MaterialIcons name="edit" size={14} color="#9A6201" />
+              <Text style={styles.editButtonText}>Modifier</Text>
             </Pressable>
           </View>
-          <View style={styles.cardBody}>
-            <InfoRow label="Nom complet" value={name} theme={theme} />
-            <InfoRow label="Téléphone" value={profile?.phone ?? "—"} theme={theme} />
-            <InfoRow label="E-mail" value={(profile as { email?: string | null } | null)?.email ?? "Non renseigné"} theme={theme} />
-            <InfoRow label="Ville" value={profile?.city ?? "Non renseignée"} theme={theme} />
-            <InfoRow
-              label="Pays"
-              value={countriesQuery.data?.find((c) => c.id === profile?.country)?.name ?? "Non renseigné"}
-              theme={theme}
+
+          {driver ? (
+            <View style={styles.ratingStrip}>
+              <View style={styles.ratingStripItem}>
+                <MaterialIcons name="star" size={16} color="#9A6200" />
+                <Text style={[styles.ratingValue, isDark && { color: theme.foreground }]}>{driverRating ?? "—"}</Text>
+                <Text style={styles.ratingLabel}>Note</Text>
+              </View>
+              <View style={styles.ratingDivider} />
+              <View style={styles.ratingStripItem}>
+                <MaterialIcons name="local-shipping" size={16} color="#007B8B" />
+                <Text style={[styles.ratingValue, isDark && { color: theme.foreground }]}>{completed.length}</Text>
+                <Text style={styles.ratingLabel}>Courses</Text>
+              </View>
+              <View style={styles.ratingDivider} />
+              <View style={styles.ratingStripItem}>
+                <MaterialIcons name="account-balance-wallet" size={16} color="#167A55" />
+                <Text style={[styles.ratingValue, isDark && { color: theme.foreground }]} numberOfLines={1}>{formatMoney(availableBalance)}</Text>
+                <Text style={styles.ratingLabel}>Wallet</Text>
+              </View>
+              <View style={styles.ratingDivider} />
+              <View style={styles.ratingStripItem}>
+                <MaterialIcons name="event" size={16} color="#747474" />
+                <Text style={[styles.ratingValue, isDark && { color: theme.foreground }]} numberOfLines={1}>{memberSince}</Text>
+                <Text style={styles.ratingLabel}>Membre</Text>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.ratingStrip}>
+              <View style={styles.ratingStripItem}>
+                <MaterialIcons name="local-shipping" size={16} color="#007B8B" />
+                <Text style={[styles.ratingValue, isDark && { color: theme.foreground }]}>{senderDelivered}</Text>
+                <Text style={styles.ratingLabel}>Envoyées</Text>
+              </View>
+              <View style={styles.ratingDivider} />
+              <View style={styles.ratingStripItem}>
+                <MaterialIcons name="check-circle" size={16} color="#167A55" />
+                <Text style={[styles.ratingValue, isDark && { color: theme.foreground }]}>OK</Text>
+                <Text style={styles.ratingLabel}>Compte</Text>
+              </View>
+              <View style={styles.ratingDivider} />
+              <View style={styles.ratingStripItem}>
+                <MaterialIcons name="event" size={16} color="#747474" />
+                <Text style={[styles.ratingValue, isDark && { color: theme.foreground }]} numberOfLines={1}>{memberSince}</Text>
+                <Text style={styles.ratingLabel}>Membre</Text>
+              </View>
+            </View>
+          )}
+        </View>
+
+        <LoyaltyProgress phone={profile?.phone ?? null} />
+
+        <SessionsSection />
+
+        <ContactSection />
+
+        <Section title="Localisation">
+          <MenuRow
+            icon="public"
+            iconBg="primary"
+            label="Pays"
+            sub={countriesQuery.data?.find((c) => c.id === profile?.country)?.name ?? "Non renseigné"}
+            onPress={() => { setLocationError(""); setCountryEditorOpen(true); }}
+          />
+          <MenuRow
+            icon="location-city"
+            iconBg="primary"
+            label="Ville"
+            sub={profile?.city || "Non renseignée"}
+            onPress={() => {
+              if (!profile?.country) { Alert.alert("Sélectionnez d’abord un pays", "Le pays doit être renseigné avant de choisir une ville."); return; }
+              setLocationError(""); setCitySearch(""); setCityEditorOpen(true);
+            }}
+            last
+          />
+        </Section>
+
+        {driver ? (
+          <Section title="KYC & engins">
+            <MenuRow
+              icon="verified-user"
+              iconBg="primary"
+              label="Vérification d'identité"
+              sub={receivedReviews.length > 0 ? "Profil complet · Recto, verso, selfie" : "Soumettez vos documents pour candidater"}
+              badge={receivedReviews.length > 0 ? { label: "Validé", tone: "success" } : undefined}
+              onPress={() => router.push("/verification" as any)}
+            />
+            <MenuRow
+              icon="two-wheeler"
+              iconBg="amber"
+              label="Mes engins"
+              sub={profile?.vehicles?.length ? profile.vehicles.join(", ") : "Sélectionnez vos engins"}
+              onPress={() => setVehiclesPickerOpen(true)}
+            />
+            <MenuRow
+              icon="notifications-active"
+              iconBg="primary"
+              label="Alertes & périmètre"
+              sub={perimeterSummary}
+              onPress={() => router.push("/driver-alerts" as any)}
               last
             />
-          </View>
-        </View>
-
-        {/* CARD: Activité (driver uniquement — wallet + gains + fidélité) */}
-        {driver ? (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <View style={styles.cardHeader}>
-              <View style={[styles.cardEmoji, { backgroundColor: theme.background }]}>
-                <Text style={styles.cardEmojiText}>📊</Text>
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[styles.cardTitle, { color: theme.foreground }]}>Activité</Text>
-                <Text style={[styles.cardSubtitle, { color: theme.muted }]}>Vos performances sur Tikis</Text>
-              </View>
-            </View>
-            <View style={styles.cardBody}>
-              <InfoRow label="Gains totaux" value={formatMoney(availableBalance)} theme={theme} />
-              <InfoRow label="Courses terminées" value={completed.length.toString()} theme={theme} />
-              <InfoRow label="Avis reçus" value={`${receivedReviews.length}`} theme={theme} last />
-            </View>
-          </View>
+          </Section>
         ) : null}
 
-        {/* CARD: KYC + engins (driver) */}
-        {driver ? (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <View style={styles.cardHeader}>
-              <View style={[styles.cardEmoji, { backgroundColor: theme.background }]}>
-                <Text style={styles.cardEmojiText}>🛡️</Text>
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[styles.cardTitle, { color: theme.foreground }]}>KYC &amp; engins</Text>
-                <Text style={[styles.cardSubtitle, { color: theme.muted }]}>Documents et véhicules</Text>
-              </View>
-            </View>
-            <View style={styles.cardBody}>
-              <Pressable
-                onPress={() => router.push("/verification" as any)}
-                style={({ pressed }) => [styles.actionRow, pressed && { backgroundColor: theme.pressed }]}
-              >
-                <View style={[styles.actionIcon, { backgroundColor: theme.background }]}>
-                  <MaterialIcons name="verified-user" size={16} color={theme.primary} />
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.actionText, { color: theme.foreground }]}>Vérification d'identité</Text>
-                  <Text style={[styles.actionMeta, { color: theme.muted }]} numberOfLines={1}>
-                    {receivedReviews.length > 0 ? "Profil complet · Recto, verso, selfie" : "Soumettez vos documents pour candidater"}
-                  </Text>
-                </View>
-                {receivedReviews.length > 0 ? (
-                  <View style={[styles.menuBadge, { backgroundColor: theme.success + "14" }]}>
-                    <Text style={[styles.menuBadgeText, { color: theme.success }]}>Validé</Text>
-                  </View>
-                ) : (
-                  <MaterialIcons name="chevron-right" size={16} color={theme.muted} />
-                )}
-              </Pressable>
-              <Pressable
-                onPress={() => setVehiclesPickerOpen(true)}
-                style={({ pressed }) => [styles.actionRow, styles.actionRowLast, pressed && { backgroundColor: theme.pressed }]}
-              >
-                <View style={[styles.actionIcon, { backgroundColor: theme.background }]}>
-                  <MaterialIcons name="two-wheeler" size={16} color={theme.primary} />
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.actionText, { color: theme.foreground }]}>Mes engins</Text>
-                  <Text style={[styles.actionMeta, { color: theme.muted }]} numberOfLines={1}>
-                    {profile?.vehicles?.length ? profile.vehicles.join(", ") : "Sélectionnez vos engins"}
-                  </Text>
-                </View>
-                <MaterialIcons name="chevron-right" size={16} color={theme.muted} />
-              </Pressable>
-            </View>
-          </View>
-        ) : null}
+        <Section title="Activité">
+          <MenuRow
+            icon="local-shipping"
+            iconBg="primary"
+            label="Historique des courses"
+            sub={`${completed.length} course${completed.length > 1 ? "s" : ""} terminée${completed.length > 1 ? "s" : ""}`}
+            onPress={() => router.push("/history" as any)}
+          />
+          <MenuRow
+            icon="star-outline"
+            iconBg="primary"
+            label="Mes avis"
+            sub={driver ? `${receivedReviews.length} avis reçu${receivedReviews.length > 1 ? "s" : ""}` : "Évaluations envoyées"}
+            onPress={() => router.push("/reviews" as any)}
+          />
+          {driver && profile?.referralCode ? (
+            <MenuRow
+              icon="group-add"
+              iconBg="primary"
+              label="Parrainage"
+              sub={`Code ${profile.referralCode}`}
+              onPress={() => router.push("/referrals" as any)}
+            />
+          ) : null}
+          {!driver ? (
+            <MenuRow
+              icon="bookmark"
+              iconBg="primary"
+              label="Adresses enregistrées"
+              sub="Vos lieux favoris"
+              onPress={() => router.push("/(tabs)/addresses" as any)}
+              last
+            />
+          ) : null}
+        </Section>
 
-        {/* CARD: Historique + Avis (toujours) */}
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <View style={styles.cardHeader}>
-            <View style={[styles.cardEmoji, { backgroundColor: theme.background }]}>
-              <Text style={styles.cardEmojiText}>📋</Text>
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.cardTitle, { color: theme.foreground }]}>Activité</Text>
-              <Text style={[styles.cardSubtitle, { color: theme.muted }]}>Courses et avis</Text>
-            </View>
-          </View>
-          <View style={styles.cardBody}>
-            <Pressable
-              onPress={() => router.push("/history" as any)}
-              style={({ pressed }) => [styles.actionRow, pressed && { backgroundColor: theme.pressed }]}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: theme.background }]}>
-                <MaterialIcons name="local-shipping" size={16} color={theme.primary} />
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[styles.actionText, { color: theme.foreground }]}>Historique des courses</Text>
-                <Text style={[styles.actionMeta, { color: theme.muted }]} numberOfLines={1}>
-                  {`${completed.length} course${completed.length > 1 ? "s" : ""} terminée${completed.length > 1 ? "s" : ""}`}
-                </Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={16} color={theme.muted} />
-            </Pressable>
-            <Pressable
-              onPress={() => router.push("/reviews" as any)}
-              style={({ pressed }) => [styles.actionRow, styles.actionRowLast, pressed && { backgroundColor: theme.pressed }]}
-            >
-              <View style={[styles.actionIcon, { backgroundColor: theme.background }]}>
-                <MaterialIcons name="star-outline" size={16} color={theme.primary} />
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[styles.actionText, { color: theme.foreground }]}>Mes avis</Text>
-                <Text style={[styles.actionMeta, { color: theme.muted }]} numberOfLines={1}>
-                  {driver ? `${receivedReviews.length} avis reçu${receivedReviews.length > 1 ? "s" : ""}` : "Évaluations envoyées"}
-                </Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={16} color={theme.muted} />
-            </Pressable>
-          </View>
-        </View>
-
-        {/* CARD: Fidélité (driver) */}
-        {driver ? (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <View style={styles.cardHeader}>
-              <View style={[styles.cardEmoji, { backgroundColor: theme.background }]}>
-                <Text style={styles.cardEmojiText}>🎁</Text>
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[styles.cardTitle, { color: theme.foreground }]}>Programme de fidélité</Text>
-                <Text style={[styles.cardSubtitle, { color: theme.muted }]}>Bonus et progression</Text>
-              </View>
-            </View>
-            <View style={styles.cardBody}>
-              <LoyaltyProgress phone={profile?.phone ?? null} />
-            </View>
-          </View>
-        ) : null}
-
-        {/* CARD: Préférences */}
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Pressable
-            onPress={() => router.push("/sessions" as any)}
-            style={({ pressed }) => [styles.actionRow, pressed && { backgroundColor: theme.pressed }]}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: theme.background }]}>
-              <MaterialIcons name="devices" size={16} color={theme.primary} />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.actionText, { color: theme.foreground }]}>Sessions actives</Text>
-              <Text style={[styles.actionMeta, { color: theme.muted }]} numberOfLines={1}>Tous vos appareils connectés</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={16} color={theme.muted} />
-          </Pressable>
-          <Pressable
-            onPress={() => router.push("/help" as any)}
-            style={({ pressed }) => [styles.actionRow, pressed && { backgroundColor: theme.pressed }]}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: theme.background }]}>
-              <MaterialIcons name="help-outline" size={16} color={theme.primary} />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.actionText, { color: theme.foreground }]}>Aide &amp; support</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={16} color={theme.muted} />
-          </Pressable>
-          <Pressable
-            onPress={() => router.push("/legal/terms" as any)}
-            style={({ pressed }) => [styles.actionRow, pressed && { backgroundColor: theme.pressed }]}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: theme.background }]}>
-              <MaterialIcons name="description" size={16} color={theme.primary} />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.actionText, { color: theme.foreground }]}>Conditions d'utilisation</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={16} color={theme.muted} />
-          </Pressable>
-          <Pressable
-            onPress={() => router.push("/privacy" as any)}
-            style={({ pressed }) => [styles.actionRow, styles.actionRowLast, pressed && { backgroundColor: theme.pressed }]}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: theme.background }]}>
-              <MaterialIcons name="privacy-tip" size={16} color={theme.primary} />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.actionText, { color: theme.foreground }]}>Politique de confidentialité</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={16} color={theme.muted} />
-          </Pressable>
-        </View>
-
-        {/* CARD: Zone sensible */}
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Pressable
+        <Section title="Zone sensible">
+          <MenuRow
+            icon="delete-forever"
+            iconBg="dark"
+            label="Supprimer mon compte"
+            sub={profile?.deletionRequestedAt ? "Suppression déjà en cours" : "Suppression différée de 30 jours, annulable"}
+            badge={profile?.deletionRequestedAt ? { label: "En cours", tone: "danger" } : undefined}
             onPress={() => { setDeleteError(""); setDeleteConfirmOpen(true); }}
-            style={({ pressed }) => [styles.actionRow, styles.actionRowLast, pressed && { backgroundColor: theme.pressed }]}
-          >
-            <View style={[styles.actionIcon, { backgroundColor: theme.error + "14" }]}>
-              <MaterialIcons name="delete-forever" size={16} color={theme.error} />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.actionText, { color: theme.error }]}>Supprimer mon compte</Text>
-              <Text style={[styles.actionMeta, { color: theme.muted }]} numberOfLines={1}>
-                {profile?.deletionRequestedAt ? "Suppression déjà en cours" : "Suppression différée de 30 jours, annulable"}
-              </Text>
-            </View>
-            {profile?.deletionRequestedAt ? (
-              <View style={[styles.menuBadge, { backgroundColor: theme.error }]}>
-                <Text style={[styles.menuBadgeText, { color: theme.surface }]}>En cours</Text>
-              </View>
-            ) : (
-              <MaterialIcons name="chevron-right" size={16} color={theme.muted} />
-            )}
-          </Pressable>
-        </View>
+            last
+          />
+        </Section>
 
         <Pressable onPress={openLogoutConfirmation} style={({ pressed }) => [styles.logout, pressed && styles.pressed]}>
-          <MaterialIcons name="logout" size={16} color={theme.error} />
-          <Text style={[styles.logoutText, { color: theme.error }]}>Se déconnecter</Text>
+          <MaterialIcons name="logout" size={16} color="#B4232D" />
+          <Text style={styles.logoutText}>Se déconnecter</Text>
         </Pressable>
-
-        <Text style={[styles.version, { color: theme.muted }]}>Tikis v1.2.4 · build 2026-09-08</Text>
       </ScrollView>
 
       <Modal visible={vehiclesPickerOpen} transparent animationType="slide" onRequestClose={() => !updateVehiclesMutation.isPending && setVehiclesPickerOpen(false)}>
@@ -528,7 +401,7 @@ export default function ProfileScreen() {
                     style={({ pressed }) => [styles.vehicleRow, { borderColor: theme.border, backgroundColor: theme.background }, pressed && { backgroundColor: theme.pressed }]}
                   >
                     <View style={[styles.vehicleCheckbox, { borderColor: theme.border, backgroundColor: checked ? theme.primary : "transparent" }]}>
-                      {checked ? <MaterialIcons name="check" size={14} color={theme.surface} /> : null}
+                      {checked ? <MaterialIcons name="check" size={14} color="#FFFFFF" /> : null}
                     </View>
                     <Text style={[styles.vehicleLabel, { color: theme.foreground }]}>{option}</Text>
                     <MaterialIcons name={option === "Vélo" ? "directions-bike" : option === "Moto" ? "two-wheeler" : option === "Tricycle" ? "electric-rickshaw" : "directions-car"} size={20} color={theme.muted} />
@@ -551,12 +424,12 @@ export default function ProfileScreen() {
             <View style={styles.sheetGrip} />
             <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Choisir un pays</Text>
             <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>Votre pays reste inchangé jusqu’à ce que vous en choisissiez un autre ici.</Text>
-            {locationError ? <Text style={[styles.error, { color: theme.error }]}>{locationError}</Text> : null}
+            {locationError ? <Text style={styles.error}>{locationError}</Text> : null}
             <ScrollView style={{ maxHeight: 380, marginTop: 8 }}>
               {(countriesQuery.data ?? []).map((c) => (
-                <Pressable key={c.id} onPress={() => void selectCountry(c.id)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, c.id === profile?.country && { borderColor: theme.primary, backgroundColor: theme.background }, pressed && { opacity: 0.8 }]}>
+                <Pressable key={c.id} onPress={() => void selectCountry(c.id)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, c.id === profile?.country && { borderColor: theme.primary, backgroundColor: isDark ? theme.pressed : "#E5F6F7" }, pressed && { opacity: 0.8 }]}>
                   <Text style={styles.countryRowFlag}>{countryFlagEmoji(c.id)}</Text>
-                  <Text style={[styles.countryOptionText, { color: theme.foreground, flex: 1 }, c.id === profile?.country && { color: theme.primary, fontWeight: "700" }]}>{c.name}</Text>
+                  <Text style={[styles.countryOptionText, { color: theme.foreground, flex: 1 }, c.id === profile?.country && { color: theme.primary, fontWeight: "800" }]}>{c.name}</Text>
                   {locationSaving === "country" ? null : c.id === profile?.country ? <MaterialIcons name="check-circle" size={20} color={theme.primary} /> : null}
                 </Pressable>
               ))}
@@ -581,7 +454,7 @@ export default function ProfileScreen() {
               placeholderTextColor={theme.muted}
               style={[styles.input, { color: theme.foreground, borderColor: theme.border, backgroundColor: theme.background, marginTop: 8 }]}
             />
-            {locationError ? <Text style={[styles.error, { color: theme.error }]}>{locationError}</Text> : null}
+            {locationError ? <Text style={styles.error}>{locationError}</Text> : null}
             <ScrollView style={{ maxHeight: 320, marginTop: 8 }} keyboardShouldPersistTaps="handled">
               {citySearchQuery.isFetching ? <Text style={[styles.helper, { textAlign: "center", marginTop: 10 }]}>Recherche…</Text> : null}
               {!citySearchQuery.isFetching && citySearch.trim().length >= 2 && (citySearchQuery.data ?? []).length === 0 ? <Text style={[styles.helper, { textAlign: "center", marginTop: 10 }]}>Aucune ville trouvée.</Text> : null}
@@ -601,12 +474,12 @@ export default function ProfileScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => !requestDeletionMutation.isPending && setDeleteConfirmOpen(false)} />
           <View style={[styles.sheet, isDark && { backgroundColor: theme.surface }]}>
             <View style={styles.sheetGrip} />
-            <View style={styles.deleteIconWrap}><MaterialIcons name="delete-forever" size={26} color={theme.error} /></View>
+            <View style={styles.deleteIconWrap}><MaterialIcons name="delete-forever" size={26} color="#B4232D" /></View>
             <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Supprimer votre compte ?</Text>
             <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>
               Vous aurez 30 jours pour changer d’avis. Pendant ce délai, votre compte sera bloqué et vous pourrez annuler la suppression à tout moment. Passé ce délai, vos données personnelles seront définitivement supprimées.
             </Text>
-            {deleteError ? <Text style={[styles.error, { color: theme.error }]}>{deleteError}</Text> : null}
+            {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
             <TikisButton label="Confirmer la suppression" icon="delete-forever" variant="danger" onPress={() => void confirmAccountDeletion()} loading={requestDeletionMutation.isPending} style={styles.saveButton} />
             <Pressable onPress={() => setDeleteConfirmOpen(false)} disabled={requestDeletionMutation.isPending} style={({ pressed }) => [styles.photoPicker, pressed && styles.pressed]}>
               <Text style={[styles.photoPickerText, { color: theme.muted }]}>Annuler</Text>
@@ -624,13 +497,13 @@ export default function ProfileScreen() {
             <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>Vos informations sont contrôlées avant enregistrement.</Text>
             <Pressable onPress={() => void pickPhoto()} style={({ pressed }) => [styles.photoPicker, pressed && styles.pressed]}>
               <View style={styles.photoPickerIcon}>
-                <MaterialIcons name="add-a-photo" size={22} color={theme.primary} />
+                <MaterialIcons name="add-a-photo" size={22} color="#9A6201" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.photoPickerText}>{photoBase64 || photoUri ? "Changer la photo" : "Ajouter une photo"}</Text>
                 <Text style={styles.photoPickerSub}>Format carré, JPEG/PNG/WebP</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={16} color={theme.primary} />
+              <MaterialIcons name="chevron-right" size={16} color="#9A6201" />
             </Pressable>
             <Text style={[styles.fieldLabel, isDark && { color: theme.muted }]}>NOM COMPLET</Text>
             <TextInput
@@ -639,10 +512,10 @@ export default function ProfileScreen() {
               maxLength={70}
               autoCapitalize="words"
               placeholder="Ex. Mariam ou Mariam Ouédraogo"
-              placeholderTextColor={theme.muted}
+              placeholderTextColor="#B48753"
               style={[styles.input, error ? styles.inputError : null, isDark && { backgroundColor: theme.background, color: theme.foreground, borderColor: theme.border }]}
             />
-            {error ? <Text style={[styles.error, { color: theme.error }]}>{error}</Text> : <Text style={[styles.helper, isDark && { color: theme.muted }]}>Un nom unique est accepté. Les séparateurs successifs sont retirés automatiquement.</Text>}
+            {error ? <Text style={styles.error}>{error}</Text> : <Text style={[styles.helper, isDark && { color: theme.muted }]}>Un nom unique est accepté. Les séparateurs successifs sont retirés automatiquement.</Text>}
             <TikisButton label="Enregistrer les modifications" icon="save" onPress={() => void saveProfile()} loading={updateMutation.isPending} style={styles.saveButton} />
           </View>
         </KeyboardAvoidingView>
@@ -651,137 +524,130 @@ export default function ProfileScreen() {
   );
 }
 
-function StatBox({ label, value, color, small }: { label: string; value: string; color: string; small?: boolean }) {
+function CoverAction({ icon, label, onPress, primary }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; label: string; onPress: () => void; primary?: boolean }) {
+  return null;
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   const { colors: theme } = useThemeColors();
-  const styles = useMemo(() => stylesFor(theme), [theme]);
   return (
-    <View style={[styles.statBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-      <Text style={[styles.statValue, small && { fontSize: 13 }]} numberOfLines={1}>{value}</Text>
-      <Text style={[styles.statLabel, { color }]} numberOfLines={1}>{label}</Text>
+    <View style={styles.section}>
+      <Text style={[styles.sectionTitle, { color: theme.muted }]}>{title}</Text>
+      <View style={[styles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>{children}</View>
     </View>
   );
 }
 
-function CtaTile({ icon, label, meta, onPress }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; label: string; meta: string; onPress: () => void }) {
+function MenuRow({ icon, iconBg, label, sub, badge, onPress, last }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; iconBg: "primary" | "amber" | "dark"; label: string; sub?: string; badge?: { label: string; tone: "danger" | "success" }; onPress: () => void; last?: boolean }) {
   const { colors: theme } = useThemeColors();
-  const styles = useMemo(() => stylesFor(theme), [theme]);
+  const iconBgColor = iconBg === "amber" ? theme.warning + "22" : iconBg === "dark" ? "#111111" : theme.primary + "22";
+  const iconColor = iconBg === "primary" ? theme.primary : iconBg === "amber" ? theme.warning : "#FFFFFF";
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.ctaTile, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && { backgroundColor: theme.pressed }]}
-    >
-      <View style={[styles.ctaIcon, { backgroundColor: theme.background }]}>
-        <MaterialIcons name={icon} size={18} color={theme.primary} />
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.menuRow, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border }, pressed && { backgroundColor: theme.pressed }]}>
+      <View style={[styles.menuIcon, { backgroundColor: iconBgColor }]}>
+        <MaterialIcons name={icon} size={16} color={iconColor} />
       </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={[styles.ctaLabel, { color: theme.foreground }]} numberOfLines={1}>{label}</Text>
-        <Text style={[styles.ctaMeta, { color: theme.muted }]} numberOfLines={1}>{meta}</Text>
+      <View style={styles.menuBody}>
+        <Text style={[styles.menuLabel, { color: theme.foreground }]}>{label}</Text>
+        {sub ? <Text style={[styles.menuSub, { color: theme.muted }]}>{sub}</Text> : null}
       </View>
-      <MaterialIcons name="chevron-right" size={16} color={theme.muted} />
+      {badge ? (
+        <View style={[styles.menuBadge, { backgroundColor: badge.tone === "success" ? theme.success + "22" : theme.error }, badge.tone === "danger" && { backgroundColor: theme.error }]}>
+          <Text style={[styles.menuBadgeText, { color: badge.tone === "success" ? theme.success : "#FFFFFF" }]}>{badge.label}</Text>
+        </View>
+      ) : (
+        <MaterialIcons name="chevron-right" size={16} color={theme.muted} />
+      )}
     </Pressable>
   );
 }
 
-function InfoRow({ label, value, theme, last }: { label: string; value: string; theme: ReturnType<typeof useThemeColors>["colors"]; last?: boolean }) {
-  return (
-    <View style={[styles.infoRow, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border }]}>
-      <Text style={[styles.infoLabel, { color: theme.muted }]}>{label}</Text>
-      <Text style={[styles.infoValue, { color: theme.foreground }]} numberOfLines={1}>{value}</Text>
-    </View>
-  );
-}
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: "#EEEDF3" },
+  content: { paddingBottom: 40, gap: 12 },
 
-const stylesFor = createStyles((theme: ThemedColors) => ({
-  safe: { flex: 1 },
-  content: { paddingBottom: 40, paddingHorizontal: 14, paddingTop: 12, gap: 10 },
+  coverWrap: { position: "relative", marginBottom: -36 },
+  cover: { width: "100%", height: COVER_HEIGHT, backgroundColor: "#9A6201", overflow: "hidden", position: "relative" },
+  coverDark: { backgroundColor: "#1F1206" },
+  coverPattern: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#9A6201" },
+  coverOrbPrimary: { position: "absolute", width: 260, height: 260, borderRadius: 130, top: -90, right: -60, backgroundColor: "#D7A447", opacity: 0.45 },
+  coverOrbSecondary: { position: "absolute", width: 180, height: 180, borderRadius: 90, bottom: -50, left: -40, backgroundColor: "#007B8B", opacity: 0.25 },
+  coverOrbTertiary: { position: "absolute", width: 120, height: 120, borderRadius: 60, top: 60, left: 80, backgroundColor: "#FFFFFF", opacity: 0.08 },
+  coverOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.10)" },
 
-  // Hero (sans cover — juste un mini bandeau dégradé + avatar par-dessus)
-  hero: { borderRadius: 16, padding: 20, paddingTop: 28, alignItems: "center", borderWidth: StyleSheet.hairlineWidth, position: "relative", overflow: "hidden" },
-  heroBand: { position: "absolute", top: 0, left: 0, right: 0, height: 50, backgroundColor: theme.primary },
-  heroAvatarWrap: { position: "relative", marginTop: 4, marginBottom: 10 },
-  heroAvatar: { width: 88, height: 88, borderRadius: 44, alignItems: "center", justifyContent: "center", borderWidth: 4 },
-  avatarDriver: { backgroundColor: theme.foreground },
-  avatarSender: { backgroundColor: theme.success },
-  heroAvatarImage: { width: 88, height: 88, borderRadius: 44, borderWidth: 4, borderColor: theme.surface },
-  heroAvatarText: { color: theme.surface, fontSize: 28, fontWeight: "700" },
-  heroAvatarEdit: { position: "absolute", right: -2, bottom: -2, width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: theme.surface },
-  heroName: { fontSize: 20, fontWeight: "700" },
-  heroPhone: { fontSize: 13, marginTop: 4 },
-  heroBadges: { flexDirection: "row", gap: 6, flexWrap: "wrap", justifyContent: "center", marginTop: 10 },
-  badge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
-  badgeText: { fontSize: 11, fontWeight: "600" },
+  identityCard: { marginHorizontal: 14, backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14, paddingTop: 0, gap: 12, borderWidth: 1, borderColor: "#ECECEC" },
+  avatarRow: { flexDirection: "row", alignItems: "flex-end", gap: 12, marginTop: -36 },
+  avatarWrap: { position: "relative" },
+  avatar: { width: 76, height: 76, borderRadius: 38, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 4, borderColor: "#FFFFFF" },
+  avatarDriver: { backgroundColor: "#111111" },
+  avatarSender: { backgroundColor: "#007B8B" },
+  avatarImage: { width: 76, height: 76, borderRadius: 38, borderWidth: 4, borderColor: "#FFFFFF" },
+  avatarText: { color: "#FFFFFF", fontSize: 24, fontWeight: "700" },
+  avatarEdit: { position: "absolute", right: -2, bottom: -2, width: 24, height: 24, borderRadius: 12, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
 
-  // Stats row (3 KPIs)
-  statsRow: { flexDirection: "row", gap: 8 },
-  statBox: { flex: 1, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 10, alignItems: "center", gap: 4, borderWidth: StyleSheet.hairlineWidth },
-  statValue: { fontSize: 18, fontWeight: "700", fontVariantNumeric: "tabular-nums", color: theme.foreground },
-  statLabel: { fontSize: 10.5, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
+  name: { color: "#111111", fontSize: 18, fontWeight: "700", marginTop: 6 },
+  phoneText: { color: "#666666", fontSize: 12, marginTop: 2 },
+  rolePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, backgroundColor: "#F8F0E5", marginTop: 6, alignSelf: "flex-start" },
+  rolePillDriver: { backgroundColor: "#FEF6E2" },
+  rolePillSender: { backgroundColor: "#E2F3F4" },
+  rolePillText: { color: "#9A6201", fontSize: 9, fontWeight: "700", letterSpacing: 0.4 },
+  rolePillTextDriver: { color: "#9A6200" },
+  rolePillTextSender: { color: "#007B8B" },
 
-  // Quick CTAs (2 tiles)
-  ctaRow: { flexDirection: "row", gap: 8 },
-  ctaTile: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
-  ctaIcon: { width: 36, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  ctaLabel: { fontSize: 13, fontWeight: "600" },
-  ctaMeta: { fontSize: 11, marginTop: 2 },
+  editButton: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", alignSelf: "flex-start" },
+  editButtonText: { color: "#9A6201", fontSize: 11, fontWeight: "700" },
 
-  // Cards (thématiques)
-  card: { borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
-  cardHeader: { flexDirection: "row", alignItems: "center", gap: 10, padding: 14, paddingBottom: 8 },
-  cardEmoji: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  cardEmojiText: { fontSize: 16 },
-  cardTitle: { fontSize: 14, fontWeight: "700" },
-  cardSubtitle: { fontSize: 11.5, marginTop: 2 },
-  cardEditBtn: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  cardBody: { paddingHorizontal: 14, paddingBottom: 4 },
+  ratingStrip: { flexDirection: "row", alignItems: "center", backgroundColor: "#FAF7F2", borderRadius: 10, paddingVertical: 10, paddingHorizontal: 4, gap: 4 },
+  ratingStripItem: { flex: 1, alignItems: "center", gap: 2, paddingHorizontal: 4 },
+  ratingValue: { color: "#111111", fontSize: 12, fontWeight: "700", marginTop: 1 },
+  ratingLabel: { color: "#747474", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
+  ratingDivider: { width: 1, alignSelf: "stretch", backgroundColor: "#ECECEC", marginVertical: 4 },
 
-  // Info rows (clé-valeur dans les cards Identité/Activité)
-  infoRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10, gap: 12 },
-  infoLabel: { fontSize: 12, flexShrink: 0 },
-  infoValue: { fontSize: 13, fontWeight: "600", textAlign: "right", flexShrink: 1 },
+  section: { gap: 6, paddingHorizontal: 14 },
+  sectionTitle: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", paddingHorizontal: 2 },
+  sectionCard: { borderRadius: 12, overflow: "hidden", borderWidth: 1 },
+  menuRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11, paddingHorizontal: 12 },
+  menuRowLast: {},
+  menuIcon: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  menuIconAmber: {},
+  menuIconDark: {},
+  menuBody: { flex: 1, minWidth: 0 },
+  menuLabel: { fontSize: 13, fontWeight: "600" },
+  menuSub: { fontSize: 10, marginTop: 1 },
+  menuBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 99 },
+  menuBadgeSuccess: { backgroundColor: "#F8F0E5" },
+  menuBadgeText: { color: "#FFFFFF", fontSize: 9, fontWeight: "700" },
+  menuBadgeTextSuccess: { color: "#167A55" },
 
-  // Action rows (les presses dans les cards Préférences/KYC)
-  actionRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 14 },
-  actionRowLast: { paddingBottom: 14 },
-  actionIcon: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  actionText: { fontSize: 13, fontWeight: "600" },
-  actionMeta: { fontSize: 11, marginTop: 2 },
-  menuBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
-  menuBadgeText: { fontSize: 10, fontWeight: "700" },
+  logout: { flexDirection: "row", alignItems: "center", gap: 8, justifyContent: "center", backgroundColor: "#FFFFFF", borderRadius: 12, paddingVertical: 14, marginTop: 4, marginHorizontal: 14, borderWidth: 1, borderColor: "#ECECEC" },
+  logoutText: { color: "#B4232D", fontSize: 13, fontWeight: "600" },
 
-  // Logout
-  logout: { flexDirection: "row", alignItems: "center", gap: 8, justifyContent: "center", borderRadius: 12, paddingVertical: 14, marginTop: 6, borderWidth: 1 },
-  logoutText: { fontSize: 13, fontWeight: "600" },
-
-  // Version
-  version: { textAlign: "center", fontSize: 11, marginTop: 14 },
-
-  // Modals (inchangés)
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.42)" },
-  sheet: { backgroundColor: theme.surface, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, paddingTop: 8, paddingBottom: 24 },
-  sheetGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: "center", marginBottom: 14 },
-  sheetTitle: { color: theme.foreground, fontSize: 17, fontWeight: "600" },
-  sheetSubtitle: { color: theme.muted, fontSize: 12, marginTop: 4 },
+  sheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, paddingTop: 8, paddingBottom: 24 },
+  sheetGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", alignSelf: "center", marginBottom: 14 },
+  sheetTitle: { color: "#111111", fontSize: 17, fontWeight: "600" },
+  sheetSubtitle: { color: "#666666", fontSize: 12, marginTop: 4 },
 
-  photoPicker: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, backgroundColor: theme.primary + "14", borderRadius: 10, marginTop: 14 },
-  photoPickerIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center" },
-  photoPickerText: { color: theme.primary, fontSize: 12, fontWeight: "600" },
-  photoPickerSub: { color: theme.muted, fontSize: 10, marginTop: 2 },
+  photoPicker: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, backgroundColor: "#F8F0E5", borderRadius: 10, marginTop: 14 },
+  photoPickerIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
+  photoPickerText: { color: "#9A6201", fontSize: 12, fontWeight: "600" },
+  photoPickerSub: { color: "#747474", fontSize: 10, marginTop: 2 },
 
   vehiclesList: { gap: 2, marginTop: 12 },
   vehicleRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 12, borderWidth: 1, borderRadius: 10, marginBottom: 2 },
   vehicleCheckbox: { width: 22, height: 22, borderRadius: 5, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   vehicleLabel: { fontSize: 14, fontWeight: "600", flex: 1 },
 
-  fieldLabel: { color: theme.muted, fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
-  input: { backgroundColor: theme.surface, borderRadius: 9, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 12, paddingVertical: 12, color: theme.foreground, fontSize: 13, fontWeight: "500" },
+  fieldLabel: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
+  input: { backgroundColor: "#F7EFE5", borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 12, paddingVertical: 12, color: "#9A6201", fontSize: 13, fontWeight: "500" },
   countryOptionText: { fontSize: 13, fontWeight: "600" },
   countryRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 10, borderWidth: 1, marginBottom: 8 },
   countryRowFlag: { fontSize: 20 },
-  deleteIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: theme.error + "14", alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 4 },
-  inputError: { borderWidth: 1, borderColor: theme.error },
-  helper: { color: theme.muted, fontSize: 10, marginTop: 4 },
-  error: { color: theme.error, fontSize: 11, fontWeight: "600", marginTop: 4 },
+  deleteIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: "#FDECEA", alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 4 },
+  inputError: { borderWidth: 1, borderColor: "#B4232D" },
+  helper: { color: "#747474", fontSize: 10, marginTop: 4 },
+  error: { color: "#B4232D", fontSize: 11, fontWeight: "600", marginTop: 4 },
   saveButton: { marginTop: 18 },
 
   pressed: { opacity: 0.7 },
-}));
+});

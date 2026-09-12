@@ -224,7 +224,7 @@ function mergeSuggestions(...groups: PlaceSuggestion[][]) {
   return [...unique.values()].slice(0, 12);
 }
 
-function openStreetMapLocation(item: OpenStreetMapPlace): LocationLabel | null {
+function openStreetMapLocation(item: OpenStreetMapPlace, source: LocationLabel["source"] = "search"): LocationLabel | null {
   const latitude = Number(item.lat);
   const longitude = Number(item.lon);
   const address = item.address ?? {};
@@ -232,7 +232,7 @@ function openStreetMapLocation(item: OpenStreetMapPlace): LocationLabel | null {
   const district = contextField(address, "neighbourhood") || contextField(address, "suburb") || contextField(address, "city_district");
   const city = contextField(address, "city") || contextField(address, "town") || contextField(address, "village") || contextField(address, "municipality") || contextField(address, "county");
   const name = item.name || street || district || city;
-  return normalizeLocation({ name, street, district, city, province: contextField(address, "state"), country: contextField(address, "country"), formattedAddress: item.display_name, latitude, longitude, provider: "openstreetmap", source: "search", featureType: item.category === "place" ? "place" : "poi", precision: street || item.category === "amenity" || item.category === "shop" ? "exact" : district ? "area" : city ? "city" : "unknown" });
+  return normalizeLocation({ name, street, district, city, province: contextField(address, "state"), country: contextField(address, "country"), formattedAddress: item.display_name, latitude, longitude, provider: "openstreetmap", source, featureType: item.category === "place" ? "place" : "poi", precision: street || item.category === "amenity" || item.category === "shop" ? "exact" : district ? "area" : city ? "city" : "unknown" });
 }
 
 async function searchOpenStreetMapPlaces(query: string, countryCode?: string) {
@@ -275,7 +275,7 @@ async function reverseOpenStreetMapLocation(latitude: number, longitude: number,
     const response = await fetch(url, { headers: { "User-Agent": "Tikis development place search/1.0", "Accept-Language": "fr" }, signal: controller.signal });
     if (!response.ok) return null;
     const item = await response.json() as OpenStreetMapPlace;
-    const place = openStreetMapLocation({ ...item, lat: String(latitude), lon: String(longitude) });
+    const place = openStreetMapLocation({ ...item, lat: String(latitude), lon: String(longitude) }, "reverse");
     return place ? ensureCountry(place, countryCode) : null;
   } catch {
     return null;
@@ -425,7 +425,7 @@ export async function resolveMapboxPlace(mapboxId: string, sessionToken?: string
 
 export async function reverseGeocodeLocation(latitude: number, longitude: number, countryCode?: string) {
   const cached = await db.getTikisPlaceByCoordinate(latitude, longitude);
-  if (cached) { recordGeographicMetric("reverse", "cache_hit"); return ensureCountry(db.tikisPlaceToLocation(cached), countryCode); }
+  if (cached) { recordGeographicMetric("reverse", "cache_hit"); return { ...ensureCountry(db.tikisPlaceToLocation(cached), countryCode), source: "reverse" as const }; }
   const startedAt = Date.now();
   let mapboxPlace: LocationLabel | null = null;
   let mapboxErrorCause: unknown = null;
@@ -448,13 +448,13 @@ export async function reverseGeocodeLocation(latitude: number, longitude: number
     if (communityPlace && (communityPlace.precision === "exact" || communityPlace.precision === "street" || !mapboxPlace)) {
       const resolved = await rememberResolvedPlace(pinReverseLocationToCoordinate(communityPlace, latitude, longitude));
       recordGeographicMetric("reverse", "success", Date.now() - startedAt);
-      return resolved;
+      return { ...resolved, source: "reverse" as const };
     }
   }
   if (mapboxPlace) {
     const resolved = await rememberResolvedPlace(mapboxPlace);
     recordGeographicMetric("reverse", "success", Date.now() - startedAt);
-    return resolved;
+    return { ...resolved, source: "reverse" as const };
   }
   recordGeographicMetric("reverse", "failure", Date.now() - startedAt);
   if (mapboxErrorCause) throw mapboxErrorCause;

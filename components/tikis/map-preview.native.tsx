@@ -1,4 +1,3 @@
-import { createStyles } from "@/lib/create-styles";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
@@ -55,13 +54,13 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
         </Marker>
         <Marker coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }} anchor={{ x: 0.5, y: 0.85 }}>
           <View style={styles.dropoffMarker}>
-            <MaterialIcons name="location-on" size={16} color={theme.error} />
+            <MaterialIcons name="location-on" size={16} color="#B4232D" />
           </View>
         </Marker>
       </MapView>
       {approximate ? (
         <View style={styles.approximate}>
-          <MaterialIcons name="privacy-tip" size={11} color={theme.warning} />
+          <MaterialIcons name="privacy-tip" size={11} color="#9A6200" />
           <Text style={styles.approximateText}>Aperçu indicatif</Text>
         </View>
       ) : null}
@@ -92,10 +91,10 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
 
 export { MapPreviewLeaflet as MapPreview };
 
-const stylesFor = createStyles((theme: ThemedColors) => ({
+const styles = StyleSheet.create({
   frame: {
     borderRadius: 9,
-    backgroundColor: theme.background,
+    backgroundColor: "#EEEDF3",
     overflow: "hidden",
     position: "relative",
   },
@@ -103,21 +102,21 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: theme.primary,
+    backgroundColor: "#9A6201",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: theme.surface,
+    borderColor: "#FFFFFF",
   },
   dropoffMarker: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: theme.surface,
+    backgroundColor: "#FFFFFF",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: theme.error,
+    borderColor: "#B4232D",
   },
   approximate: {
     position: "absolute",
@@ -129,10 +128,10 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
     paddingHorizontal: 7,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: theme.surface,
+    backgroundColor: "#FFFFFF",
   },
   approximateText: {
-    color: theme.warning,
+    color: "#9A6200",
     fontSize: 10,
     fontWeight: "600",
   },
@@ -143,7 +142,7 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
     bottom: 8,
     padding: 8,
     borderRadius: 8,
-    backgroundColor: theme.surface,
+    backgroundColor: "#FFFFFF",
     gap: 3,
   },
   legendRow: {
@@ -155,29 +154,29 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: theme.primary,
+    backgroundColor: "#9A6201",
   },
   legendDotDropoff: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: theme.error,
+    backgroundColor: "#B4232D",
   },
   legendLabel: {
-    color: theme.foreground,
+    color: "#111111",
     fontSize: 11,
     fontWeight: "600",
     flex: 1,
   },
   legendSub: {
-    color: theme.muted,
+    color: "#666666",
     fontSize: 10,
     lineHeight: 13,
     paddingLeft: 15,
   },
   legendDivider: {
     height: 1,
-    backgroundColor: theme.divider,
+    backgroundColor: "#ECECEC",
     marginVertical: 2,
   },
-}));
+});

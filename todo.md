@@ -564,13 +564,36 @@
 - [x] Revalider la création de livraison et l’absence d’erreur tRPC de session.
 - [x] Enregistrer et livrer la restauration fonctionnelle urgente.
 
-- [ ] Refaire le pull de la branche `main` et vérifier le dernier commit.
-- [ ] Vérifier les dépendances, compiler, tester et construire la console admin.
-- [ ] Relancer Expo et l’API, puis vérifier les services.
-- [ ] Enregistrer, pousser et livrer la dernière version validée.
-- [ ] Aligner les coordonnées du suivi en direct sur le contrat attendu par la carte.
-- [ ] Corriger la comparaison de rôle impossible dans le routeur de livraisons.
-- [ ] Revalider TypeScript, les tests, le build admin et les services après ces corrections.
-- [ ] Rétablir le bundling Metro après l’erreur de génération `.expo/types/router.d.ts`.
-- [ ] Revalider Metro, l’API, `/admin`, TypeScript et les tests après ce correctif.
-- [ ] Isoler le suivi cartographique natif de la route web afin d’éviter le chargement de `react-native-maps` sur web.
+- [x] Refaire le pull de la branche `main` et vérifier le dernier commit.
+- [x] Vérifier les dépendances, compiler, tester et construire la console admin.
+- [x] Relancer Expo et l’API, puis vérifier les services.
+- [x] Enregistrer, pousser et livrer la dernière version validée.
+- [x] Aligner les coordonnées du suivi en direct sur le contrat attendu par la carte.
+- [x] Corriger la comparaison de rôle impossible dans le routeur de livraisons.
+- [x] Revalider TypeScript, les tests, le build admin et les services après ces corrections.
+- [x] Rétablir le bundling Metro après l’erreur de génération `.expo/types/router.d.ts`.
+- [x] Revalider Metro, l’API, `/admin`, TypeScript et les tests après ce correctif.
+- [x] Isoler le suivi cartographique natif de la route web afin d’éviter le chargement de `react-native-maps` sur web.
+
+- [x] Refaire le pull de la branche `main` et vérifier le dernier commit.
+- [x] Vérifier les dépendances, compiler, tester et construire la console admin.
+- [x] Relancer Expo et l’API, puis vérifier les services.
+- [x] Enregistrer, pousser et livrer la dernière version validée.
+- [x] Corriger le chargeur dynamique serveur qui renvoie `undefined` pour `loyalty.myProgress` et `sessions.list`.
+- [x] Revalider les flux authentifiés, TypeScript, les tests, le build admin et les services.
+
+- [x] Synchroniser github/main, installer les dépendances si nécessaire, compiler, tester et livrer la dernière version.
+
+- [x] Refaire le pull de github/main, revalider la version et livrer le dernier checkpoint.
+
+- [x] Corriger les régressions TypeScript du profil et du suivi live introduites par le dernier pull.
+
+- [x] Exécuter le pull de github/main et vérifier l’état synchronisé du dépôt.
+
+- [x] Corriger les erreurs TypeScript issues de la dernière migration des styles et préparer une version livrable validée.
+
+- [x] Vérifier le commit distant 4334293, réaligner le dépôt sur github/main et livrer la version de l’autre agent après validation.
+
+- [x] Conserver la branche fonctionnelle 74a0acc issue du merge f886394, puis réappliquer les correctifs utiles du commit 4334293 sans reprendre la migration P6 non compilable.
+
+- [ ] Réparer la migration P6 de styles dans la version distante f886394 sans retirer les changements fonctionnels de l’autre agent.

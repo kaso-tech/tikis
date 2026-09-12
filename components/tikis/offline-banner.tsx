@@ -23,6 +23,10 @@ export function OfflineBanner() {
 }
 
 function makeStyles(theme: ThemedColors) {
+  const webSticky = Platform.OS === "web"
+    ? ({ position: "sticky", top: 0, zIndex: 50 } as unknown as object)
+    : {};
+
   return StyleSheet.create({
     banner: {
       flexDirection: "row",
@@ -33,7 +37,7 @@ function makeStyles(theme: ThemedColors) {
       backgroundColor: theme.surface,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: theme.border,
-      ...(Platform.OS === "web" ? { position: "sticky" as const, top: 0, zIndex: 50 } : {}),
+      ...webSticky,
     },
     text: { flex: 1, fontSize: 12, color: theme.muted, lineHeight: 16 },
   });

@@ -18,6 +18,14 @@ const ACTIVE_SESSION_WINDOW_DAYS = 30;
 
 export { hashSessionToken, tokenLast4 };
 
+export function isMissingProfileSessionsSchema(error: unknown): boolean {
+  const candidate = error as { code?: unknown; message?: unknown; cause?: unknown } | null;
+  const cause = candidate?.cause as { code?: unknown; message?: unknown } | undefined;
+  const code = cause?.code ?? candidate?.code;
+  const message = cause?.message ?? candidate?.message;
+  return code === "ER_NO_SUCH_TABLE" && typeof message === "string" && /tikis_profile_sessions/i.test(message);
+}
+
 export type Platform = "ios" | "android" | "web" | "unknown";
 
 export type SessionInput = {
@@ -28,13 +36,6 @@ export type SessionInput = {
   appVersion?: string;
   ipAddress?: string;
 };
-
-export function isMissingProfileSessionsSchema(error: unknown): boolean {
-  const candidate = error as { code?: string; message?: string; cause?: { code?: string; message?: string } };
-  const code = candidate?.cause?.code ?? candidate?.code;
-  const message = candidate?.cause?.message ?? candidate?.message ?? "";
-  return code === "ER_NO_SUCH_TABLE" || (message.includes("tikis_profile_sessions") && message.includes("doesn't exist"));
-}
 
 /** Upsert idempotent d'une session : si (phone, tokenHash) existe, on met à jour
  *  lastSeenAt + métadonnées. Sinon on crée. */
@@ -139,10 +140,7 @@ export async function isSessionRevoked(input: { phone: string; token: string }):
     const row = (await db.select({ revokedAt: tikisProfileSessions.revokedAt }).from(tikisProfileSessions).where(and(eq(tikisProfileSessions.phone, input.phone), eq(tikisProfileSessions.tokenHash, tokenHash))).limit(1))[0];
     return Boolean(row?.revokedAt);
   } catch (error) {
-    if (isMissingProfileSessionsSchema(error)) {
-      console.error("[sessions] Table de révocation absente : migration 0030 à appliquer. Vérification temporairement ignorée.");
-      return false;
-    }
+    if (isMissingProfileSessionsSchema(error)) return false;
     throw error;
   }
 }
