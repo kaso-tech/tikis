@@ -607,3 +607,7 @@
 - [x] Refaire le pull de github/main, vérifier les changements distants, valider le projet et livrer le dernier checkpoint.
 
 - [x] Réaligner les contrats de tests de palette avec les tokens déjà présents dans la production après le pull dfe1bf7.
+
+- [x] Refaire le pull de github/main, vérifier les changements distants, valider le projet et livrer le dernier checkpoint.
+
+- [x] Corriger les 15 incompatibilités TypeScript introduites par 75b573f, sans retirer les changements fonctionnels distants.

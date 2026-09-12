@@ -525,7 +525,7 @@ export function HomeScreen() {
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 placeholder={isDriver ? "Rechercher une opportunité…" : "Rechercher une livraison…"}
-                placeholderTextColor="#9A6201"
+                placeholderTextColor={theme.placeholder}
                 style={styles.searchInput}
                 returnKeyType="search"
                 clearButtonMode="while-editing"
