@@ -263,7 +263,8 @@ export function AuthFlow() {
       return;
     }
     haptic.success();
-    router.replace("/(tabs)");
+    setFinishing(false);
+    router.replace("/(tabs)" as any);
   }
 
   const top = stage !== "welcome";
