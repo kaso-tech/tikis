@@ -795,10 +795,11 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
   }, [driverPosition, pickup, selectedDeliveryId, selectedDeliveryStatus]);
 
   return (
-    <View style={styles.mapBg}>
+    <View style={styles.mapBg} pointerEvents="box-none">
       <MapView
         ref={mapRef}
         style={StyleSheet.absoluteFill}
+        pointerEvents="auto"
         initialRegion={region}
         showsCompass={false}
         rotateEnabled={false}

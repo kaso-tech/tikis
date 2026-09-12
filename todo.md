@@ -603,3 +603,7 @@
 - [x] Intégrer le hotfix thème origin/main jusqu’à d1ac147, préserver les correctifs fonctionnels et livrer une version testable.
 
 - [x] Refaire le pull de github/main, vérifier les changements distants, valider le projet et livrer le dernier checkpoint.
+
+- [x] Refaire le pull de github/main, vérifier les changements distants, valider le projet et livrer le dernier checkpoint.
+
+- [x] Réaligner les contrats de tests de palette avec les tokens déjà présents dans la production après le pull dfe1bf7.
