@@ -18,8 +18,6 @@ import { trpc } from "@/lib/trpc";
 import { availableWalletBalance, formatMoney } from "@/shared/tikis-domain";
 import { describePerimeter } from "@/shared/driver-perimeter";
 
-const COVER_HEIGHT = 200;
-
 export default function ProfileScreen() {
   const { colors: theme, isDark } = useThemeColors();
   const { role, profile, updateProfile } = useTikisStore();
@@ -176,17 +174,6 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.coverWrap}>
-          <View style={[styles.cover, isDark && styles.coverDark]}>
-            <View style={styles.coverPattern}>
-              <View style={styles.coverOrbPrimary} />
-              <View style={styles.coverOrbSecondary} />
-              <View style={styles.coverOrbTertiary} />
-            </View>
-            <View style={styles.coverOverlay} pointerEvents="none" />
-          </View>
-        </View>
-
         <View style={[styles.identityCard, isDark && { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.avatarRow}>
             <Pressable onPress={openEditor} style={({ pressed }) => [styles.avatarWrap, pressed && styles.pressed]} accessibilityLabel="Modifier la photo de profil">
@@ -512,7 +499,7 @@ export default function ProfileScreen() {
               maxLength={70}
               autoCapitalize="words"
               placeholder="Ex. Mariam ou Mariam Ouédraogo"
-              placeholderTextColor="#9A6201"
+              placeholderTextColor={theme.placeholder}
               style={[styles.input, error ? styles.inputError : null, isDark && { backgroundColor: theme.background, color: theme.foreground, borderColor: theme.border }]}
             />
             {error ? <Text style={styles.error}>{error}</Text> : <Text style={[styles.helper, isDark && { color: theme.muted }]}>Un nom unique est accepté. Les séparateurs successifs sont retirés automatiquement.</Text>}
@@ -566,17 +553,8 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F5F5F5" },
   content: { paddingBottom: 40, gap: 12 },
 
-  coverWrap: { position: "relative", marginBottom: -36 },
-  cover: { width: "100%", height: COVER_HEIGHT, backgroundColor: "#9A6201", overflow: "hidden", position: "relative" },
-  coverDark: { backgroundColor: "#1F1206" },
-  coverPattern: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#9A6201" },
-  coverOrbPrimary: { position: "absolute", width: 260, height: 260, borderRadius: 130, top: -90, right: -60, backgroundColor: "#D7A447", opacity: 0.45 },
-  coverOrbSecondary: { position: "absolute", width: 180, height: 180, borderRadius: 90, bottom: -50, left: -40, backgroundColor: "#9A6201", opacity: 0.25 },
-  coverOrbTertiary: { position: "absolute", width: 120, height: 120, borderRadius: 60, top: 60, left: 80, backgroundColor: "#FFFFFF", opacity: 0.08 },
-  coverOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.10)" },
-
-  identityCard: { marginHorizontal: 14, backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14, paddingTop: 0, gap: 12, borderWidth: 1, borderColor: "#E3E3E3" },
-  avatarRow: { flexDirection: "row", alignItems: "flex-end", gap: 12, marginTop: -36 },
+  identityCard: { marginHorizontal: 14, marginTop: 14, backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14, gap: 12, borderWidth: 1, borderColor: "#E3E3E3" },
+  avatarRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   avatarWrap: { position: "relative" },
   avatar: { width: 76, height: 76, borderRadius: 38, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 4, borderColor: "#FFFFFF" },
   avatarDriver: { backgroundColor: "#111111" },

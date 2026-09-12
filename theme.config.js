@@ -5,6 +5,7 @@ const themeColors = {
   surface: { light: '#FFFFFF', dark: '#231A10' },
   foreground: { light: '#111111', dark: '#FBF7F0' },
   muted: { light: '#667085', dark: '#C8BCAA' },
+  placeholder: { light: '#66708599', dark: '#C8BCAA99' },
   border: { light: '#E3E3E3', dark: '#4A3823' },
   success: { light: '#176C52', dark: '#5FC497' },
   warning: { light: '#A65300', dark: '#E4B257' },
