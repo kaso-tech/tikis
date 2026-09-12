@@ -21,7 +21,9 @@ export function AppStatusGate({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    if (statusQuery.data) registerProfile(statusQuery.data);
+    if (statusQuery.data && (!profile || statusQuery.data.phone !== profile.phone)) {
+      registerProfile(statusQuery.data);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusQuery.data]);
 
