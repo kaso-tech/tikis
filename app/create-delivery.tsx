@@ -415,7 +415,7 @@ export default function CreateDeliveryScreen() {
                 <Text style={styles.priceCardValue}>{estimate ? `${estimate.toLocaleString("fr-FR")} F` : "—"}</Text>
               </View>
               <View style={styles.priceCardInput}>
-                <TextInput value={offeredPriceInput} onBlur={() => setTouched((current) => ({ ...current, price: true }))} onChangeText={(value) => setOfferedPriceInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} placeholder="Saisir le prix de la course" placeholderTextColor="#B48753" style={styles.priceCardInputText} />
+                <TextInput value={offeredPriceInput} onBlur={() => setTouched((current) => ({ ...current, price: true }))} onChangeText={(value) => setOfferedPriceInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} placeholder="Saisir le prix de la course" placeholderTextColor="#9A6201" style={styles.priceCardInputText} />
                 <Text style={styles.priceCardInputSuffix}>F CFA</Text>
               </View>
               {priceInputError ? (
@@ -473,7 +473,7 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
     <View>
       <Pressable onPress={onPress} style={({ pressed }) => [styles.routeInput, isPickup ? styles.routeInputFrom : styles.routeInputTo, invalid && styles.routeInputInvalid, pressed && styles.pressed]}>
         <View style={[styles.routeInputIcon, isPickup ? styles.routeInputIconFrom : styles.routeInputIconTo]}>
-          <MaterialIcons name={isPickup ? "trip-origin" : "location-on"} size={14} color={isPickup ? "#9A6201" : "#B4232D"} />
+          <MaterialIcons name={isPickup ? "trip-origin" : "location-on"} size={14} color={isPickup ? "#9A6201" : "#A43740"} />
         </View>
         <View style={styles.routeInputContent}>
           <Text style={[styles.routeInputLabel, invalid && styles.routeInputLabelInvalid]}>{label}</Text>
@@ -496,11 +496,11 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
             <MaterialIcons name={showFavoriteInput ? "close" : "star-outline"} size={18} color="#9A6201" />
           </Pressable>
         ) : null}
-        <MaterialIcons name="chevron-right" size={18} color="#747474" />
+        <MaterialIcons name="chevron-right" size={18} color="#667085" />
       </Pressable>
       {showFavoriteInput && value ? (
         <View style={styles.favoriteInputRow}>
-          <TextInput value={favoriteLabel} onChangeText={setFavoriteLabel} placeholder="Nom du favori (ex. Maison, Bureau)" placeholderTextColor="#B48753" style={styles.favoriteInput} maxLength={40} />
+          <TextInput value={favoriteLabel} onChangeText={setFavoriteLabel} placeholder="Nom du favori (ex. Maison, Bureau)" placeholderTextColor="#9A6201" style={styles.favoriteInput} maxLength={40} />
           <Pressable
             onPress={() => { if (onAddFavorite) { onAddFavorite(favoriteLabel.trim() || locationTitle(value) || "Adresse favorite"); setShowFavoriteInput(false); setFavoriteLabel(""); } }}
             style={({ pressed }) => [styles.favoriteSaveBtn, pressed && styles.pressed]}
@@ -515,15 +515,15 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
 }
 
 function Field({ label, icon, keyboardType, error, ...props }: { label: string; icon?: React.ComponentProps<typeof MaterialIcons>["name"]; keyboardType?: "default" | "number-pad" | "decimal-pad"; value: string; onChangeText: (value: string) => void; onBlur?: () => void; placeholder: string; multiline?: boolean; error?: string }) {
-  return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#B4232D" : "#9A6201"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor="#B48753" /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>;
+  return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#A43740" : "#9A6201"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor="#9A6201" /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>;
 }
 
 function MiniNumber({ value, onChangeText, placeholder }: { value: string; onChangeText: (value: string) => void; placeholder: string }) {
-  return <TextInput value={value} onChangeText={(text) => onChangeText(text.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" placeholder={placeholder} placeholderTextColor="#B48753" style={styles.miniInput} />;
+  return <TextInput value={value} onChangeText={(text) => onChangeText(text.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" placeholder={placeholder} placeholderTextColor="#9A6201" style={styles.miniInput} />;
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#EEEDF3" },
+  safe: { flex: 1, backgroundColor: "#F5F5F5" },
   keyboard: { flex: 1 },
   content: { padding: 16, paddingBottom: 24, gap: 14 },
 
@@ -535,93 +535,93 @@ const styles = StyleSheet.create({
   topStep: { color: "#9A6201", fontSize: 11, fontWeight: "700" },
 
   progressWrap: { paddingHorizontal: 16, paddingBottom: 8 },
-  progressTrack: { height: 4, backgroundColor: "#ECECEC", borderRadius: 2, overflow: "hidden" },
+  progressTrack: { height: 4, backgroundColor: "#E3E3E3", borderRadius: 2, overflow: "hidden" },
   progressFill: { height: "100%", backgroundColor: "#9A6201", borderRadius: 2 },
 
-  eyebrow: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 4 },
+  eyebrow: { color: "#667085", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 4 },
   sectionTitle: { color: "#111111", fontSize: 14, fontWeight: "600", marginBottom: 10 },
   section: { gap: 4 },
   routeHeaderRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
-  draftsButton: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9" },
+  draftsButton: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3" },
   draftsButtonText: { color: "#9A6201", fontSize: 11, fontWeight: "700" },
-  routeFavoriteBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", alignItems: "center", justifyContent: "center" },
+  routeFavoriteBtn: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", alignItems: "center", justifyContent: "center" },
   favoriteInputRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 38, paddingTop: 6, paddingRight: 6 },
-  favoriteInput: { flex: 1, backgroundColor: "#F7EFE5", borderRadius: 8, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 10, paddingVertical: 8, color: "#9A6201", fontSize: 12, fontWeight: "500" },
+  favoriteInput: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 8, borderWidth: 1, borderColor: "#E3E3E3", paddingHorizontal: 10, paddingVertical: 8, color: "#9A6201", fontSize: 12, fontWeight: "500" },
   favoriteSaveBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: "#9A6201" },
   favoriteSaveBtnText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
 
   routeCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, gap: 4 },
-  routeInput: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, backgroundColor: "#F7EFE5", borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", borderLeftWidth: 3 },
+  routeInput: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: 1, borderColor: "#E3E3E3", borderLeftWidth: 3 },
   routeInputFrom: { borderLeftColor: "#9A6201" },
-  routeInputTo: { borderLeftColor: "#B4232D" },
-  routeInputInvalid: { borderColor: "#B4232D", borderWidth: 1 },
+  routeInputTo: { borderLeftColor: "#A43740" },
+  routeInputInvalid: { borderColor: "#A43740", borderWidth: 1 },
   routeInputIcon: { width: 24, height: 24, borderRadius: 12, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
-  routeInputIconFrom: { backgroundColor: "#F7EFE5" },
-  routeInputIconTo: { backgroundColor: "#FDEBEC" },
+  routeInputIconFrom: { backgroundColor: "#FFFFFF" },
+  routeInputIconTo: { backgroundColor: "#FFFFFF" },
   routeInputContent: { flex: 1, minWidth: 0 },
-  routeInputLabel: { color: "#747474", fontSize: 9, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase" },
-  routeInputLabelInvalid: { color: "#B4232D" },
+  routeInputLabel: { color: "#667085", fontSize: 9, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase" },
+  routeInputLabelInvalid: { color: "#A43740" },
   routeInputValue: { color: "#9A6201", fontSize: 13, fontWeight: "600", marginTop: 1 },
-  routeInputMeta: { color: "#666666", fontSize: 10, marginTop: 1 },
+  routeInputMeta: { color: "#667085", fontSize: 10, marginTop: 1 },
   routeInputPlaceholder: { color: "#9A6201", fontSize: 12, fontWeight: "500", marginTop: 4 },
-  routeInputIssue: { color: "#B4232D", fontSize: 10, fontWeight: "600", marginTop: 2 },
+  routeInputIssue: { color: "#A43740", fontSize: 10, fontWeight: "600", marginTop: 2 },
 
   routeConnector: { flexDirection: "row", alignItems: "center", gap: 8, paddingLeft: 18, paddingVertical: 4 },
-  routeConnectorLine: { width: 1.5, height: 16, backgroundColor: "#ECECEC" },
-  routeConnectorLineDashed: { backgroundColor: "#ECECEC", opacity: 0.5 },
-  routeConnectorMeta: { color: "#747474", fontSize: 10, fontWeight: "600" },
+  routeConnectorLine: { width: 1.5, height: 16, backgroundColor: "#E3E3E3" },
+  routeConnectorLineDashed: { backgroundColor: "#E3E3E3", opacity: 0.5 },
+  routeConnectorMeta: { color: "#667085", fontSize: 10, fontWeight: "600" },
 
-  routeMiniSummary: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#F8F0E5", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginTop: 4 },
+  routeMiniSummary: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: "#FFFFFF", borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, marginTop: 4 },
   routeMiniSummaryLabel: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
   routeMiniSummaryValue: { color: "#9A6201", fontSize: 13, fontWeight: "700" },
 
-  routeMessage: { color: "#167A55", fontSize: 11, marginTop: 4, lineHeight: 16 },
-  routeWarning: { color: "#9A6200" },
+  routeMessage: { color: "#176C52", fontSize: 11, marginTop: 4, lineHeight: 16 },
+  routeWarning: { color: "#9A6201" },
   retryRoute: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
   retryRouteText: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
-  routeTitle: { color: "#666666", fontSize: 11, marginTop: 6, lineHeight: 16 },
+  routeTitle: { color: "#667085", fontSize: 11, marginTop: 6, lineHeight: 16 },
 
   shortcut: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#FFFFFF", borderRadius: 9, padding: 12 },
-  shortcutText: { flex: 1, color: "#747474", fontSize: 12 },
+  shortcutText: { flex: 1, color: "#667085", fontSize: 12 },
 
   typeGrid: { flexDirection: "row", gap: 8 },
-  typeCard: { flex: 1, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#ECECEC", borderRadius: 10, paddingVertical: 12, paddingHorizontal: 8, alignItems: "center", gap: 4 },
-  typeCardActive: { backgroundColor: "#F7EFE5", borderColor: "#9A6201" },
-  typeIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#F8F0E5", alignItems: "center", justifyContent: "center" },
-  typeIconActive: { backgroundColor: "#F7EFE5" },
+  typeCard: { flex: 1, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", borderRadius: 10, paddingVertical: 12, paddingHorizontal: 8, alignItems: "center", gap: 4 },
+  typeCardActive: { backgroundColor: "#FFFFFF", borderColor: "#9A6201" },
+  typeIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
+  typeIconActive: { backgroundColor: "#FFFFFF" },
   typeLabel: { color: "#111111", fontSize: 11, fontWeight: "600" },
   typeLabelActive: { color: "#9A6201" },
-  typeSub: { color: "#747474", fontSize: 9, fontWeight: "500", textAlign: "center" },
+  typeSub: { color: "#667085", fontSize: 9, fontWeight: "500", textAlign: "center" },
   typeSubActive: { color: "#9A6201" },
 
   vehicleGrid: { flexDirection: "row", gap: 8 },
-  vehicleCard: { flex: 1, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#ECECEC", borderRadius: 10, paddingVertical: 10, alignItems: "center", gap: 4 },
-  vehicleCardActive: { backgroundColor: "#F7EFE5", borderColor: "#9A6201" },
+  vehicleCard: { flex: 1, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", borderRadius: 10, paddingVertical: 10, alignItems: "center", gap: 4 },
+  vehicleCardActive: { backgroundColor: "#FFFFFF", borderColor: "#9A6201" },
   vehicleLabel: { color: "#111111", fontSize: 10, fontWeight: "600" },
   vehicleLabelActive: { color: "#9A6201" },
 
   fieldWrap: { gap: 5 },
   fieldLabel: { color: "#111111", fontSize: 12, fontWeight: "600" },
-  fieldLabelInvalid: { color: "#B4232D" },
-  field: { flexDirection: "row", alignItems: "center", backgroundColor: "#F7EFE5", borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10, gap: 8, borderWidth: 1, borderColor: "#E5D2B9" },
+  fieldLabelInvalid: { color: "#A43740" },
+  field: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 9, paddingHorizontal: 12, paddingVertical: 10, gap: 8, borderWidth: 1, borderColor: "#E3E3E3" },
   fieldMultiline: { alignItems: "flex-start", paddingVertical: 12, minHeight: 80 },
-  fieldInvalid: { borderColor: "#B4232D" },
+  fieldInvalid: { borderColor: "#A43740" },
   fieldIcon: { marginRight: 2 },
   input: { flex: 1, color: "#9A6201", fontSize: 13, fontWeight: "500" },
   inputMultiline: { minHeight: 60, textAlignVertical: "top" },
-  fieldIssue: { color: "#B4232D", fontSize: 11, fontWeight: "500" },
+  fieldIssue: { color: "#A43740", fontSize: 11, fontWeight: "500" },
 
   measureCard: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 12, gap: 10, marginTop: 4 },
   measureTitle: { color: "#111111", fontSize: 12, fontWeight: "600" },
-  measureSubtitle: { color: "#666666", fontSize: 11, lineHeight: 16 },
+  measureSubtitle: { color: "#667085", fontSize: 11, lineHeight: 16 },
   dimensionRow: { flexDirection: "row", gap: 6 },
-  miniInput: { flex: 1, backgroundColor: "#F7EFE5", borderRadius: 8, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 10, paddingVertical: 10, color: "#9A6201", fontSize: 12, fontWeight: "600", textAlign: "center" },
+  miniInput: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 8, borderWidth: 1, borderColor: "#E3E3E3", paddingHorizontal: 10, paddingVertical: 10, color: "#9A6201", fontSize: 12, fontWeight: "600", textAlign: "center" },
 
   priceCard: { backgroundColor: "#9A6201", borderRadius: 12, padding: 14, gap: 10 },
   priceCardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   priceCardLabel: { color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   priceCardValue: { color: "#FFFFFF", fontSize: 20, fontWeight: "700" },
-  priceCardInput: { flexDirection: "row", alignItems: "center", backgroundColor: "#F7EFE5", borderRadius: 8, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 12, paddingVertical: 12, gap: 8 },
+  priceCardInput: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 8, borderWidth: 1, borderColor: "#E3E3E3", paddingHorizontal: 12, paddingVertical: 12, gap: 8 },
   priceCardInputText: { flex: 1, color: "#9A6201", fontSize: 15, fontWeight: "600" },
   priceCardInputSuffix: { color: "#9A6201", fontSize: 12, fontWeight: "600" },
   priceCardHelper: { flexDirection: "row", alignItems: "center", gap: 4 },
@@ -629,15 +629,15 @@ const styles = StyleSheet.create({
   priceError: { color: "#FFFFFF", fontSize: 11, fontWeight: "600", backgroundColor: "rgba(180,35,45,0.4)", borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
 
   publicationLoadingHint: { color: "#9A6201", fontSize: 12, textAlign: "center", marginTop: 4, fontWeight: "600" },
-  publicationHint: { color: "#9A6200", fontSize: 12, textAlign: "center", marginTop: 4, fontWeight: "500" },
-  footerNote: { color: "#747474", fontSize: 10, lineHeight: 14, textAlign: "center", marginTop: 8 },
+  publicationHint: { color: "#9A6201", fontSize: 12, textAlign: "center", marginTop: 4, fontWeight: "500" },
+  footerNote: { color: "#667085", fontSize: 10, lineHeight: 14, textAlign: "center", marginTop: 8 },
 
-  footer: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10, paddingBottom: 18, backgroundColor: "#FFFFFF", borderTopWidth: 1, borderTopColor: "#ECECEC" },
+  footer: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 10, paddingBottom: 18, backgroundColor: "#FFFFFF", borderTopWidth: 1, borderTopColor: "#E3E3E3" },
   footerSummary: { flex: 1 },
-  footerSummaryLabel: { color: "#747474", fontSize: 10, fontWeight: "600" },
+  footerSummaryLabel: { color: "#667085", fontSize: 10, fontWeight: "600" },
   footerSummaryValue: { color: "#111111", fontSize: 14, fontWeight: "700", marginTop: 1 },
   footerCta: { minWidth: 160, minHeight: 44 },
-  draftButton: { width: 44, height: 44, borderRadius: 9, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", alignItems: "center", justifyContent: "center" },
+  draftButton: { width: 44, height: 44, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", alignItems: "center", justifyContent: "center" },
 
   pressed: { opacity: 0.7 },
 });

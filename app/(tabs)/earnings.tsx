@@ -181,7 +181,7 @@ export default function EarningsScreen() {
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={PERIOD_META[key].label}
               >
-                <MaterialIcons name={PERIOD_META[key].icon} size={14} color={active ? "#FFFFFF" : "#747474"} />
+                <MaterialIcons name={PERIOD_META[key].icon} size={14} color={active ? "#FFFFFF" : "#667085"} />
                 <Text style={[styles.periodTabText, active && styles.periodTabTextActive]}>{PERIOD_META[key].label}</Text>
               </Pressable>
             );
@@ -325,7 +325,7 @@ function StatCard({ icon, value, label, tone }: { icon: React.ComponentProps<typ
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#EEEDF3" },
+  safe: { flex: 1, backgroundColor: "#F5F5F5" },
   pressed: { opacity: 0.7 },
   scroll: { padding: 12, paddingBottom: 32, gap: 14 },
 
@@ -353,9 +353,9 @@ const styles = StyleSheet.create({
   periodDescription: { fontSize: 11, lineHeight: 16, paddingHorizontal: 4 },
 
   flowTabs: { flexDirection: "row", gap: 6, paddingHorizontal: 2 },
-  flowTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 8, borderRadius: 9, borderWidth: 1, borderColor: "#D7D5DE", backgroundColor: "#FFFFFF" },
+  flowTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 8, borderRadius: 9, borderWidth: 1, borderColor: "#E3E3E3", backgroundColor: "#FFFFFF" },
   flowTabActive: { backgroundColor: "#9A6201", borderColor: "#9A6201" },
-  flowTabText: { fontSize: 11, fontWeight: "600", color: "#747474" },
+  flowTabText: { fontSize: 11, fontWeight: "600", color: "#667085" },
   flowTabTextActive: { color: "#FFFFFF" },
 
   bonusBanner: { flexDirection: "row", alignItems: "center", gap: 6, padding: 10, borderRadius: 9 },
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, gap: 10 },
   cardHeader: { gap: 2 },
   cardTitle: { color: "#111111", fontSize: 13, fontWeight: "700" },
-  cardSubtitle: { color: "#747474", fontSize: 11, lineHeight: 16 },
+  cardSubtitle: { color: "#667085", fontSize: 11, lineHeight: 16 },
 
   barRow: { gap: 6 },
   barRowDivider: { paddingBottom: 8, borderBottomWidth: 1, marginBottom: 8 },

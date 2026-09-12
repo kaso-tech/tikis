@@ -132,7 +132,7 @@ export function CandidatesSheet({ visible, candidates, deliveryStatus, deliveryP
           ]}
         >
           <View {...panResponder.panHandlers} style={styles.headerZone}>
-            <View style={[styles.sheetGrip, { backgroundColor: isDark(theme) ? "#3A3A3A" : "#D5D5DC" }]} />
+            <View style={[styles.sheetGrip, { backgroundColor: isDark(theme) ? "#3A3A3A" : "#E3E3E3" }]} />
             <View style={styles.sheetTop}>
               <View style={styles.headerText}>
                 <Text style={[styles.eyebrow, { color: theme.muted }]}>Candidatures</Text>
@@ -214,7 +214,7 @@ function CandidateCard({ candidate, deliveryStatus, deliveryPrice, loading, onCh
   const vehiclePrice = candidate.offerPrice ?? deliveryPrice;
   const postedAt = shortRelative(candidate.createdAt);
   const bearingDeg = 0;
-  const certColor = isDark(theme) ? "#5BC0DE" : "#007B8B";
+  const certColor = isDark(theme) ? "#5BC0DE" : "#9A6201";
   const certBg = isDark(theme) ? "rgba(91,192,222,0.18)" : "#E5F4F7";
   const dividerColor = isDark(theme) ? "#262626" : "#E8E8E8";
   const subFg = isDark(theme) ? "#8A8A8A" : "#6B6B6B";

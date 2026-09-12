@@ -114,22 +114,22 @@ export default function ContactScreen() {
                 {REASONS.map((item) => {
                   const active = item.value === reason;
                   return (
-                    <Pressable key={item.value} accessibilityRole="button" accessibilityLabel={`Motif : ${item.label}`} onPress={() => pickReason(item.value)} style={({ pressed }) => [styles.reason, { backgroundColor: theme.surface }, active && { backgroundColor: isDark ? "#312515" : "#F7EFE5", borderWidth: 1, borderColor: isDark ? "#5A3A17" : "#E5D2B9" }, pressed && styles.pressed]}>
+                    <Pressable key={item.value} accessibilityRole="button" accessibilityLabel={`Motif : ${item.label}`} onPress={() => pickReason(item.value)} style={({ pressed }) => [styles.reason, { backgroundColor: theme.surface }, active && { backgroundColor: isDark ? "#171108" : "#FFFFFF", borderWidth: 1, borderColor: isDark ? "#9A6201" : "#E3E3E3" }, pressed && styles.pressed]}>
                       <Text style={[styles.reasonText, { color: theme.foreground }, active && { color: "#9A6201" }]}>{item.label}</Text>
-                      <Text style={[styles.reasonHelper, { color: theme.muted }, active && { color: isDark ? "#B48753" : "#BBBBBB" }]}>{item.helper}</Text>
+                      <Text style={[styles.reasonHelper, { color: theme.muted }, active && { color: isDark ? "#9A6201" : "#BBBBBB" }]}>{item.helper}</Text>
                     </Pressable>
                   );
                 })}
               </View>
 
               <Text style={[styles.label, { color: theme.muted }]}>SUJET</Text>
-              <View style={[styles.inputWrap, { backgroundColor: isDark ? "#312515" : "#F7EFE5", borderColor: isDark ? "#5A3A17" : "#E5D2B9" }]}>
-                <TextInput value={subject} onChangeText={(value) => { setSubject(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={120} placeholder="Décrivez votre sujet en quelques mots" placeholderTextColor="#B48753" style={[styles.input, { color: "#9A6201" }]} />
+              <View style={[styles.inputWrap, { backgroundColor: isDark ? "#171108" : "#FFFFFF", borderColor: isDark ? "#9A6201" : "#E3E3E3" }]}>
+                <TextInput value={subject} onChangeText={(value) => { setSubject(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={120} placeholder="Décrivez votre sujet en quelques mots" placeholderTextColor="#9A6201" style={[styles.input, { color: "#9A6201" }]} />
               </View>
 
               <Text style={[styles.label, { color: theme.muted }]}>VOTRE MESSAGE</Text>
-              <View style={[styles.inputWrap, styles.textareaWrap, { backgroundColor: isDark ? "#312515" : "#F7EFE5", borderColor: isDark ? "#5A3A17" : "#E5D2B9" }]}>
-                <TextInput value={message} onChangeText={(value) => { setMessage(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={1000} multiline placeholder="Donnez-nous le maximum de détails pour vous aider au mieux." placeholderTextColor="#B48753" style={[styles.input, styles.textarea, { color: "#9A6201" }]} textAlignVertical="top" />
+              <View style={[styles.inputWrap, styles.textareaWrap, { backgroundColor: isDark ? "#171108" : "#FFFFFF", borderColor: isDark ? "#9A6201" : "#E3E3E3" }]}>
+                <TextInput value={message} onChangeText={(value) => { setMessage(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={1000} multiline placeholder="Donnez-nous le maximum de détails pour vous aider au mieux." placeholderTextColor="#9A6201" style={[styles.input, styles.textarea, { color: "#9A6201" }]} textAlignVertical="top" />
                 <Text style={[styles.counter, { color: theme.muted }]}>{message.length}/1000</Text>
               </View>
 
@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
   textarea: { minHeight: 110, textAlignVertical: "top" },
   counter: { fontSize: 10, fontWeight: "500", textAlign: "right", marginTop: 4 },
   helper: { fontSize: 11, lineHeight: 16 },
-  error: { color: "#B4232D", fontSize: 12, fontWeight: "600" },
+  error: { color: "#A43740", fontSize: 12, fontWeight: "600" },
   success: { borderRadius: 10, padding: 16, alignItems: "center", gap: 8 },
   successTitle: { fontSize: 15, fontWeight: "600" },
   successText: { fontSize: 12, lineHeight: 18, textAlign: "center" },

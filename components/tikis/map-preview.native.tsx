@@ -54,13 +54,13 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
         </Marker>
         <Marker coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }} anchor={{ x: 0.5, y: 0.85 }}>
           <View style={styles.dropoffMarker}>
-            <MaterialIcons name="location-on" size={16} color="#B4232D" />
+            <MaterialIcons name="location-on" size={16} color="#A43740" />
           </View>
         </Marker>
       </MapView>
       {approximate ? (
         <View style={styles.approximate}>
-          <MaterialIcons name="privacy-tip" size={11} color="#9A6200" />
+          <MaterialIcons name="privacy-tip" size={11} color="#9A6201" />
           <Text style={styles.approximateText}>Aperçu indicatif</Text>
         </View>
       ) : null}
@@ -94,7 +94,7 @@ export { MapPreviewLeaflet as MapPreview };
 const styles = StyleSheet.create({
   frame: {
     borderRadius: 9,
-    backgroundColor: "#EEEDF3",
+    backgroundColor: "#F5F5F5",
     overflow: "hidden",
     position: "relative",
   },
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "#B4232D",
+    borderColor: "#A43740",
   },
   approximate: {
     position: "absolute",
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   approximateText: {
-    color: "#9A6200",
+    color: "#9A6201",
     fontSize: 10,
     fontWeight: "600",
   },
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#B4232D",
+    backgroundColor: "#A43740",
   },
   legendLabel: {
     color: "#111111",
@@ -169,14 +169,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   legendSub: {
-    color: "#666666",
+    color: "#667085",
     fontSize: 10,
     lineHeight: 13,
     paddingLeft: 15,
   },
   legendDivider: {
     height: 1,
-    backgroundColor: "#ECECEC",
+    backgroundColor: "#E3E3E3",
     marginVertical: 2,
   },
 });

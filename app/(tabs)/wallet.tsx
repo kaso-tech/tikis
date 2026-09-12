@@ -27,11 +27,11 @@ const operationMeta: Record<WalletOperation, { label: string; icon: React.Compon
 };
 
 const TONE_COLOR: Record<Tone, string> = {
-  primary: "#007B8B",
-  success: "#167A55",
-  warning: "#9A6200",
-  error: "#B4232D",
-  neutral: "#666666",
+  primary: "#9A6201",
+  success: "#176C52",
+  warning: "#9A6201",
+  error: "#A43740",
+  neutral: "#667085",
 };
 
 export default function WalletScreen() {
@@ -178,7 +178,7 @@ export default function WalletScreen() {
           <View style={[styles.listCard, { backgroundColor: theme.surface }]}><Text style={[styles.emptyText, { color: theme.muted }]}>Le journal financier est momentanément indisponible.</Text></View>
         ) : recentJournal.length === 0 ? (
           <View style={styles.empty}>
-            <View style={styles.emptyIcon}><MaterialIcons name="savings" size={26} color="#747474" /></View>
+            <View style={styles.emptyIcon}><MaterialIcons name="savings" size={26} color="#667085" /></View>
             <Text style={styles.emptyTitle}>Aucun mouvement enregistré</Text>
             <Text style={styles.emptySub}>Vos premières opérations apparaîtront ici après votre premier dépôt ou votre première course.</Text>
           </View>
@@ -237,7 +237,7 @@ export default function WalletScreen() {
                 <Text style={styles.modalTitle}>Recharger mon compte</Text>
                 <Text style={styles.modalSub}>{requestType === "deposit" ? "Initialisez un dépôt de test. Le solde ne sera crédité qu'après la confirmation suivante." : "Initialisez un retrait de test. Le solde ne sera débité qu'après la confirmation suivante."}</Text>
                 <View style={styles.amountWrap}>
-                  <TextInput value={amountInput} onChangeText={(value) => setAmountInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} autoFocus style={styles.amountInput} placeholder="Montant" placeholderTextColor="#B48753" />
+                  <TextInput value={amountInput} onChangeText={(value) => setAmountInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} autoFocus style={styles.amountInput} placeholder="Montant" placeholderTextColor="#9A6201" />
                   <Text style={styles.amountCurrency}>FCFA</Text>
                 </View>
                 {requestError ? <Text style={styles.requestError}>{requestError}</Text> : <Text style={styles.modalHint}>Le montant et le statut de test seront enregistrés dans votre journal financier.</Text>}
@@ -263,7 +263,7 @@ function iconBgForTone(tone: Tone, theme: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#EEEDF3" },
+  safe: { flex: 1, backgroundColor: "#F5F5F5" },
 
   pressed: { opacity: 0.7 },
 
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
 
   balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#9A6201", position: "relative", overflow: "hidden" },
   balanceCardDriver: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#9A6201", borderWidth: 0, overflow: "hidden" },
-  balanceCardSender: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#007B8B", borderWidth: 0, overflow: "hidden" },
+  balanceCardSender: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#9A6201", borderWidth: 0, overflow: "hidden" },
   balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#D7A447", opacity: 0.25, borderRadius: 14 },
   balanceEyebrow: { color: "rgba(255,255,255,0.6)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   balanceEyebrowLight: { color: "rgba(255,255,255,0.7)" },
@@ -302,19 +302,19 @@ const styles = StyleSheet.create({
   quickStats: { flexDirection: "row", gap: 8, paddingHorizontal: 8 },
   quickStat: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 10, paddingVertical: 10, alignItems: "center", gap: 4 },
   quickStatIcon: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  quickStatIconPrimary: { backgroundColor: "#F8F0E5" },
-  quickStatIconSuccess: { backgroundColor: "#E2F3F4" },
-  quickStatIconAmber: { backgroundColor: "#FEF6E2" },
+  quickStatIconPrimary: { backgroundColor: "#FFFFFF" },
+  quickStatIconSuccess: { backgroundColor: "#F5F5F5" },
+  quickStatIconAmber: { backgroundColor: "#FFFFFF" },
   quickStatValue: { color: "#111111", fontSize: 13, fontWeight: "700" },
-  quickStatLabel: { color: "#747474", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
+  quickStatLabel: { color: "#667085", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
 
-  senderInfo: { marginHorizontal: 8, padding: 12, backgroundColor: "#F8F0E5", borderRadius: 10, flexDirection: "row", gap: 10, alignItems: "center" },
+  senderInfo: { marginHorizontal: 8, padding: 12, backgroundColor: "#FFFFFF", borderRadius: 10, flexDirection: "row", gap: 10, alignItems: "center" },
   senderInfoIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   senderInfoText: { flex: 1, color: "#9A6201", fontSize: 11, lineHeight: 16 },
   senderInfoTextBold: { fontWeight: "700" },
 
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 10, marginTop: 6 },
-  sectionTitle: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
+  sectionTitle: { color: "#667085", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
   sectionAction: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
 
   listCard: { borderRadius: 12, overflow: "hidden" },
@@ -339,21 +339,21 @@ const styles = StyleSheet.create({
   empty: { alignItems: "center", paddingVertical: 30, paddingHorizontal: 24, gap: 8 },
   emptyIcon: { width: 56, height: 56, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
   emptyTitle: { color: "#111111", fontSize: 14, fontWeight: "600" },
-  emptySub: { color: "#666666", fontSize: 12, textAlign: "center", lineHeight: 18, maxWidth: 240 },
-  emptyText: { color: "#666666", fontSize: 12, textAlign: "center", padding: 24 },
+  emptySub: { color: "#667085", fontSize: 12, textAlign: "center", lineHeight: 18, maxWidth: 240 },
+  emptyText: { color: "#667085", fontSize: 12, textAlign: "center", padding: 24 },
 
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.42)" },
   modalSheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, paddingTop: 8, paddingBottom: 24 },
-  sheetGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", alignSelf: "center", marginBottom: 14 },
-  modalIcon: { width: 44, height: 44, borderRadius: 9, backgroundColor: "#F8F0E5", alignSelf: "center", alignItems: "center", justifyContent: "center", marginBottom: 12 },
+  sheetGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#E3E3E3", alignSelf: "center", marginBottom: 14 },
+  modalIcon: { width: 44, height: 44, borderRadius: 9, backgroundColor: "#FFFFFF", alignSelf: "center", alignItems: "center", justifyContent: "center", marginBottom: 12 },
   modalTitle: { color: "#111111", fontSize: 17, fontWeight: "600", textAlign: "center" },
-  modalSub: { color: "#666666", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 },
-  modalHint: { color: "#666666", fontSize: 10, lineHeight: 14, textAlign: "center", marginTop: 6 },
-  referenceCard: { backgroundColor: "#EEEDF3", borderRadius: 9, padding: 12, marginTop: 14 },
-  referenceLabel: { color: "#666666", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textAlign: "center" },
+  modalSub: { color: "#667085", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 },
+  modalHint: { color: "#667085", fontSize: 10, lineHeight: 14, textAlign: "center", marginTop: 6 },
+  referenceCard: { backgroundColor: "#F5F5F5", borderRadius: 9, padding: 12, marginTop: 14 },
+  referenceLabel: { color: "#667085", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textAlign: "center" },
   referenceValue: { color: "#111111", fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4, letterSpacing: 0.3 },
-  requestError: { color: "#B4232D", fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: 6 },
-  amountWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "#F7EFE5", borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 12, marginTop: 14 },
+  requestError: { color: "#A43740", fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: 6 },
+  amountWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: 1, borderColor: "#E3E3E3", paddingHorizontal: 12, marginTop: 14 },
   amountInput: { flex: 1, color: "#9A6201", fontSize: 15, fontWeight: "500", minHeight: 46 },
   amountCurrency: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
   modalActions: { flexDirection: "row", gap: 8, marginTop: 16 },

@@ -128,7 +128,7 @@ export function TikisDrawer() {
               accessibilityLabel="Activer le mode sombre"
               value={isDark}
               onValueChange={toggleDarkMode}
-              trackColor={{ false: "#D7CCBA", true: "#D7A447" }}
+              trackColor={{ false: "#E3E3E3", true: "#D7A447" }}
               thumbColor={isDark ? "#FBF7F0" : "#FFFFFF"}
             />
           </View>
@@ -151,7 +151,7 @@ export function TikisDrawer() {
               <Text style={[styles.securityText, isDark && styles.securityTextDark]}>Compte sécurisé par Tikis</Text>
             </View>
             <Pressable accessibilityRole="button" accessibilityLabel="Se déconnecter" onPress={openLogoutConfirmation} style={({ pressed }) => [styles.signOut, isDark && styles.signOutDark, pressed && styles.pressed]}>
-              <MaterialIcons name="logout" size={18} color={isDark ? "#F28B93" : "#B4232D"} />
+              <MaterialIcons name="logout" size={18} color={isDark ? "#F28B93" : "#A43740"} />
               <Text style={[styles.signOutText, isDark && styles.signOutTextDark]}>Se déconnecter</Text>
             </Pressable>
           </View>
@@ -176,7 +176,7 @@ function DrawerRow({ item, active, onPress, isDark }: { item: DrawerItem; active
       {item.badge && item.badge > 0 ? (
         <View style={styles.menuBadge}><Text style={styles.menuBadgeText}>{unreadLabel(item.badge)}</Text></View>
       ) : (
-        <MaterialIcons name="chevron-right" size={18} color={active ? "#C9C9C9" : (isDark ? "#8A7A5F" : "#BBBBBB")} />
+        <MaterialIcons name="chevron-right" size={18} color={active ? "#C9C9C9" : (isDark ? "#667085" : "#BBBBBB")} />
       )}
     </Pressable>
   );
@@ -184,20 +184,20 @@ function DrawerRow({ item, active, onPress, isDark }: { item: DrawerItem; active
 
 const styles = StyleSheet.create({
   header: { backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingBottom: 6, flexDirection: "row", alignItems: "center" },
-  headerIcon: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
+  headerIcon: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#F5F5F5" },
   brand: { flex: 1, flexDirection: "row", alignItems: "center", paddingLeft: 11 },
   brandName: { color: "#111111", fontSize: 19, fontWeight: "700", letterSpacing: -0.4 },
-  headerBadge: { position: "absolute", right: 3, top: 3, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: "#B4232D", alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
+  headerBadge: { position: "absolute", right: 3, top: 3, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: "#A43740", alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
   headerBadgeText: { color: "#FFFFFF", fontWeight: "600", fontSize: 9 },
   drawerRoot: { flex: 1, flexDirection: "row" },
   scrim: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.42)" },
   drawerPanel: { position: "absolute", top: 0, bottom: 0, left: 0, width: DRAWER_WIDTH, maxWidth: "85%", backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingBottom: 14, shadowColor: "transparent", borderRightWidth: 1, borderRightColor: "#E3E3E3" },
   drawerPanelDark: { backgroundColor: "#171108", borderRightColor: "#4A3823" },
   drawerTop: { height: 40, alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
-  drawerEyebrow: { color: "#747474", fontSize: 10, fontWeight: "600", letterSpacing: 0.9 },
+  drawerEyebrow: { color: "#667085", fontSize: 10, fontWeight: "600", letterSpacing: 0.9 },
   drawerEyebrowDark: { color: "#C8BCAA" },
-  closeButton: { width: 34, height: 34, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
-  profileBlock: { flexDirection: "row", alignItems: "center", gap: 9, paddingTop: 12, paddingBottom: 11, backgroundColor: "#EEEDF3", borderRadius: 10, paddingHorizontal: 10 },
+  closeButton: { width: 34, height: 34, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#F5F5F5" },
+  profileBlock: { flexDirection: "row", alignItems: "center", gap: 9, paddingTop: 12, paddingBottom: 11, backgroundColor: "#F5F5F5", borderRadius: 10, paddingHorizontal: 10 },
   profileBlockDark: { backgroundColor: "#231A10" },
   profileText: { flex: 1 },
   profileName: { color: "#111111", fontSize: 15, fontWeight: "600" },
@@ -205,41 +205,41 @@ const styles = StyleSheet.create({
   rolePill: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
   roleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#9A6201" },
   roleDotDark: { backgroundColor: "#D7A447" },
-  roleLabel: { color: "#666666", fontSize: 11, fontWeight: "500" },
+  roleLabel: { color: "#667085", fontSize: 11, fontWeight: "500" },
   roleLabelDark: { color: "#C8BCAA" },
-  themeRow: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, backgroundColor: "#F6F3EE", flexDirection: "row", alignItems: "center", gap: 10 },
+  themeRow: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", gap: 10 },
   themeRowDark: { backgroundColor: "#231A10" },
   themeText: { flex: 1 },
   themeTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },
   themeTitleDark: { color: "#FBF7F0" },
-  themeSub: { color: "#666666", fontSize: 11, marginTop: 2 },
+  themeSub: { color: "#667085", fontSize: 11, marginTop: 2 },
   themeSubDark: { color: "#C8BCAA" },
-  menuLabel: { color: "#747474", fontSize: 10, fontWeight: "600", letterSpacing: 0.9, marginTop: 16, marginBottom: 6 },
+  menuLabel: { color: "#667085", fontSize: 10, fontWeight: "600", letterSpacing: 0.9, marginTop: 16, marginBottom: 6 },
   menuLabelDark: { color: "#C8BCAA" },
   menu: { gap: 2 },
   menuRow: { minHeight: 48, borderRadius: 8, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", gap: 9 },
   menuRowActive: { backgroundColor: "#111111" },
   menuRowDark: { backgroundColor: "transparent" },
   menuRowActiveDark: { backgroundColor: "#D7A447" },
-  menuIcon: { width: 32, height: 32, borderRadius: 7, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
+  menuIcon: { width: 32, height: 32, borderRadius: 7, alignItems: "center", justifyContent: "center", backgroundColor: "#F5F5F5" },
   menuIconActive: { backgroundColor: "#9A6201" },
   menuIconDark: { backgroundColor: "#231A10" },
   menuText: { flex: 1 },
   menuTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },
   menuTitleActive: { color: "#FFFFFF" },
   menuTitleDark: { color: "#FBF7F0" },
-  menuCaption: { color: "#747474", fontSize: 11, marginTop: 1 },
+  menuCaption: { color: "#667085", fontSize: 11, marginTop: 1 },
   menuCaptionActive: { color: "#C9C9C9" },
   menuCaptionDark: { color: "#C8BCAA" },
-  menuBadge: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: "#B4232D", paddingHorizontal: 5, alignItems: "center", justifyContent: "center" },
+  menuBadge: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: "#A43740", paddingHorizontal: 5, alignItems: "center", justifyContent: "center" },
   menuBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "600" },
   drawerFooter: { marginTop: "auto", paddingTop: 12 },
   securityRow: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 10 },
-  securityText: { color: "#666666", fontSize: 11, fontWeight: "500" },
+  securityText: { color: "#667085", fontSize: 11, fontWeight: "500" },
   securityTextDark: { color: "#C8BCAA" },
-  signOut: { height: 42, borderRadius: 8, backgroundColor: "#F8E8E9", alignItems: "center", justifyContent: "center", gap: 7, flexDirection: "row" },
-  signOutDark: { backgroundColor: "#3A1A1D" },
-  signOutText: { color: "#B4232D", fontSize: 12, fontWeight: "600" },
+  signOut: { height: 42, borderRadius: 8, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", gap: 7, flexDirection: "row" },
+  signOutDark: { backgroundColor: "#171108" },
+  signOutText: { color: "#A43740", fontSize: 12, fontWeight: "600" },
   signOutTextDark: { color: "#F28B93" },
   pressed: { opacity: 0.67 },
 });
