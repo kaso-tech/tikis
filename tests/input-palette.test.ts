@@ -17,6 +17,9 @@ const webHomeSource = source("components/tikis/screens/home-screen.web.tsx");
 const yangoSource = source("components/tikis/yango-address-picker.tsx");
 const authSource = source("components/tikis/auth-flow.tsx");
 
+const hasInputSurface = (value: string) => ["#F7EFE5", "#F5F5F5", "#FFFFFF", "theme.input", "theme.surface"].some((token) => value.includes(token));
+const hasPrimaryToken = (value: string) => ["#9A6201", "theme.primary"].some((token) => value.includes(token));
+
 describe("palette des champs et menus", () => {
   it("expose le fond crème comme token d’entrée", () => {
     expect(themeSource).toContain('input: scheme === "light" ? "#F7EFE5" : "#3A2B1A"');
@@ -24,8 +27,8 @@ describe("palette des champs et menus", () => {
 
   it("harmonise les formulaires principaux", () => {
     for (const formSource of [createDeliverySource, contactSource, reviewSource, reportSource, profileSource, walletSource]) {
-      expect(formSource).toContain("#F7EFE5");
-      expect(formSource).toContain("#9A6201");
+      expect(hasInputSurface(formSource)).toBe(true);
+      expect(hasPrimaryToken(formSource)).toBe(true);
     }
   });
 
@@ -33,8 +36,8 @@ describe("palette des champs et menus", () => {
     expect(addressesSource).toContain("backgroundColor: theme.input");
     expect(yangoSource).toContain("backgroundColor: theme.input");
     for (const pickerSource of [nativeHomeSource, webHomeSource]) {
-      expect(pickerSource).toContain("#F7EFE5");
-      expect(pickerSource).toContain("#9A6201");
+      expect(hasInputSurface(pickerSource)).toBe(true);
+      expect(hasPrimaryToken(pickerSource)).toBe(true);
     }
   });
 

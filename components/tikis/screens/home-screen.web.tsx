@@ -30,14 +30,14 @@ const TYPE_ICON: Record<Delivery["type"], React.ComponentProps<typeof MaterialIc
 };
 
 const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: string }> = {
-  draft: { label: "BROUILLON", color: "#7A6E61", bg: "#EEE8E0" },
-  open: { label: "PUBLIÉE", color: "#9A6201", bg: "#F8E8CE" },
-  pending_confirmation: { label: "ATTRIBUÉE", color: "#7A5600", bg: "#F4E9D2" },
-  active: { label: "EN TRANSIT", color: "#176C52", bg: "#DDEFE7" },
-  completed: { label: "TERMINÉE", color: "#4F6A5A", bg: "#E6EFE9" },
-  disabled: { label: "DÉSACTIVÉE", color: "#A43740", bg: "#F7E6E7" },
-  cancelled: { label: "ANNULÉE", color: "#A43740", bg: "#F7E6E7" },
-  expired: { label: "EXPIRÉE", color: "#6B6257", bg: "#EEE8E0" },
+  draft: { label: "BROUILLON", color: "#667085", bg: "#E3E3E3" },
+  open: { label: "PUBLIÉE", color: "#9A6201", bg: "#E3E3E3" },
+  pending_confirmation: { label: "ATTRIBUÉE", color: "#9A6201", bg: "#E3E3E3" },
+  active: { label: "EN TRANSIT", color: "#176C52", bg: "#E3E3E3" },
+  completed: { label: "TERMINÉE", color: "#176C52", bg: "#176C52" },
+  disabled: { label: "DÉSACTIVÉE", color: "#A43740", bg: "#FFFFFF" },
+  cancelled: { label: "ANNULÉE", color: "#A43740", bg: "#FFFFFF" },
+  expired: { label: "EXPIRÉE", color: "#667085", bg: "#E3E3E3" },
 };
 
 type FilterKey = "active" | "open" | "pending" | "completed";
@@ -503,7 +503,7 @@ export function HomeScreen() {
               }}
               tintColor="#9A6201"
               colors={["#9A6201"]}
-              progressBackgroundColor="#F7EFE5"
+              progressBackgroundColor="#FFFFFF"
             />
           }
         >
@@ -520,19 +520,19 @@ export function HomeScreen() {
 
           <View style={styles.searchRow}>
             <View style={styles.searchPill}>
-              <MaterialIcons name="search" size={16} color="#747474" />
+              <MaterialIcons name="search" size={16} color="#667085" />
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 placeholder={isDriver ? "Rechercher une opportunité…" : "Rechercher une livraison…"}
-                placeholderTextColor="#B48753"
+                placeholderTextColor="#9A6201"
                 style={styles.searchInput}
                 returnKeyType="search"
                 clearButtonMode="while-editing"
               />
               {searchQuery.length > 0 ? (
                 <Pressable onPress={() => setSearchQuery("")} hitSlop={8} accessibilityLabel="Effacer la recherche">
-                  <MaterialIcons name="close" size={16} color="#747474" />
+                  <MaterialIcons name="close" size={16} color="#667085" />
                 </Pressable>
               ) : null}
             </View>
@@ -558,7 +558,7 @@ export function HomeScreen() {
           ) : !selected ? (
             <View style={styles.empty}>
               <View style={styles.emptyIcon}>
-                <MaterialIcons name={isDriver ? "local-shipping" : "add"} size={26} color="#747474" />
+                <MaterialIcons name={isDriver ? "local-shipping" : "add"} size={26} color="#667085" />
               </View>
               <Text style={styles.emptyTitle}>{filter === "completed" ? isDriver ? "Aucune livraison terminée aujourd’hui" : "Aucune livraison terminée récemment" : isDriver ? "Aucune opportunité disponible" : "Aucune livraison disponible"}</Text>
               <Text style={styles.emptyText}>
@@ -772,7 +772,7 @@ function MapBackground({ selected, role, driverPosition }: { selected: Delivery 
         </View>
       ) : null}
       <View style={[styles.marker, styles.markerEnd]}>
-        <MaterialIcons name="location-on" size={16} color="#B4232D" />
+        <MaterialIcons name="location-on" size={16} color="#A43740" />
       </View>
     </View>
   );
@@ -867,8 +867,8 @@ function DeliveryRow({
   const vehicleLabel = (delivery.vehicleTypes ?? []).join(" · ") || "Moto";
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const dateInfo = formatDeliveryCreationDate(delivery.createdAt, now);
-  const dateColor = dateInfo.tone === "primary" ? "#9A6201" : "#747474";
-  const dateBg = dateInfo.tone === "primary" ? "#F8F0E5" : "#F0F0F2";
+  const dateColor = dateInfo.tone === "primary" ? "#9A6201" : "#667085";
+  const dateBg = dateInfo.tone === "primary" ? "#FFFFFF" : "#F5F5F5";
   const totalDistance = formatDistanceKm(delivery.distanceKm);
   const driverDistText = driverDistance
     ? `${driverDistance.value} ${driverDistance.unit}`
@@ -901,12 +901,12 @@ function DeliveryRow({
       </View>
       <View style={styles.rowBottom}>
         <View style={styles.rowStat}>
-          <MaterialIcons name="route" size={12} color="#666666" />
+          <MaterialIcons name="route" size={12} color="#667085" />
           <Text style={styles.rowStatText}>{totalDistance.value} {totalDistance.unit}</Text>
         </View>
         {!isDriver ? (
           <View style={styles.rowStat}>
-            <MaterialIcons name="group" size={12} color="#666666" />
+            <MaterialIcons name="group" size={12} color="#667085" />
             <Text style={styles.rowStatText}>{delivery.candidateCount ?? 0} candidat{(delivery.candidateCount ?? 0) > 1 ? "s" : ""}</Text>
           </View>
         ) : null}
@@ -935,9 +935,9 @@ function DeliveryRow({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#EEEDF3" },
+  safe: { flex: 1, backgroundColor: "#F5F5F5" },
 
-  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#EEEDF3" },
+  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5" },
   mapBlock: { position: "absolute", backgroundColor: "#DCDEE3", borderRadius: 6 },
   mapRoad: { position: "absolute", backgroundColor: "#FFFFFF", borderRadius: 99 },
   mapRoad1: { top: "30%", left: "-10%", right: "-10%", height: 18, transform: [{ rotate: "-12deg" }] },
@@ -948,35 +948,35 @@ const styles = StyleSheet.create({
   marker: { position: "absolute", width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
   markerStart: { top: "32%", left: "16%", backgroundColor: "#9A6201" },
   markerDriver: { top: "50%", left: "42%", backgroundColor: "#111111" },
-  markerEnd: { top: "64%", right: "18%", backgroundColor: "#FFFFFF", borderColor: "#B4232D" },
+  markerEnd: { top: "64%", right: "18%", backgroundColor: "#FFFFFF", borderColor: "#A43740" },
 
-  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#F7EFE5", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E5D2B9", zIndex: 10 },
+  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3", zIndex: 10 },
   sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
 
-  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#EEEDF3", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
+  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
-  sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", marginBottom: 10 },
+  sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#E3E3E3", marginBottom: 10 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
   greetingBlock: { flex: 1, minWidth: 0 },
   driverGainsRow: { flexDirection: "row", alignItems: "baseline", gap: 6, flexWrap: "wrap" },
   driverGainsValue: { color: "#9A6201", fontSize: 14, fontWeight: "700" },
   sheetTitle: { color: "#111111", fontSize: 14, fontWeight: "700", lineHeight: 18 },
-  sheetSubtitle: { color: "#666666", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
+  sheetSubtitle: { color: "#667085", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 
-  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#F7EFE5", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E5D2B9" },
-  servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE", shadowOpacity: 0, elevation: 0 },
-  servicePillNeutral: { backgroundColor: "#EEEDF3", shadowOpacity: 0, elevation: 0 },
+  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E3E3E3" },
+  servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", shadowOpacity: 0, elevation: 0 },
+  servicePillNeutral: { backgroundColor: "#F5F5F5", shadowOpacity: 0, elevation: 0 },
   serviceText: { color: "#9A6201", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   serviceTextOffline: { color: "#111111" },
   onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9A6201" },
-  onlineDotOffline: { backgroundColor: "#747474" },
+  onlineDotOffline: { backgroundColor: "#667085" },
 
   searchRow: { paddingTop: 10, paddingBottom: 6 },
-  kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: "#F7EFE5", borderRadius: 10, borderWidth: 1, borderColor: "#E5D2B9" },
+  kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: "#FFFFFF", borderRadius: 10, borderWidth: 1, borderColor: "#E3E3E3" },
   kycBannerCopy: { flex: 1 },
   kycBannerTitle: { color: "#9A6201", fontSize: 12, fontWeight: "700" },
-  kycBannerText: { color: "#6B4A1B", fontSize: 11, marginTop: 2, lineHeight: 16 },
-  searchPill: { height: 40, backgroundColor: "#F7EFE5", borderRadius: 11, borderWidth: 1, borderColor: "#E5D2B9", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
+  kycBannerText: { color: "#9A6201", fontSize: 11, marginTop: 2, lineHeight: 16 },
+  searchPill: { height: 40, backgroundColor: "#FFFFFF", borderRadius: 11, borderWidth: 1, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: "#9A6201", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
 
   walletCard: { marginHorizontal: 14, marginTop: 6, marginBottom: 8, backgroundColor: "#111111", borderRadius: 12, padding: 14 },
@@ -993,13 +993,13 @@ const styles = StyleSheet.create({
 
   filterRow: { flexDirection: "row", gap: 6, paddingBottom: 10, alignItems: "center" },
   filterScroll: { flexGrow: 0 },
-  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", flexDirection: "row", alignItems: "center", gap: 6 },
-  chipActive: { backgroundColor: "#F7EFE5", borderColor: "#9A6201" },
+  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", gap: 6 },
+  chipActive: { backgroundColor: "#FFFFFF", borderColor: "#9A6201" },
   chipText: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
   chipTextActive: { color: "#9A6201" },
   chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
   chipCountActive: { backgroundColor: "#9A6201" },
-  chipCountText: { color: "#F7EFE5", fontSize: 10, fontWeight: "700", lineHeight: 12 },
+  chipCountText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700", lineHeight: 12 },
   tabContent: { minHeight: 1 },
 
   scrollArea: { flex: 1, marginTop: 2 },
@@ -1028,7 +1028,7 @@ const styles = StyleSheet.create({
   row: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 11, borderWidth: 0, borderColor: "transparent" },
   rowSelected: { borderColor: "transparent", backgroundColor: "#FFFFFF" },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 9 },
-  rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
+  rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
   rowThumbDriver: { backgroundColor: "#9A6201" },
   rowMain: { flex: 1, minWidth: 0 },
   rowTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
@@ -1037,26 +1037,26 @@ const styles = StyleSheet.create({
   rowDriverDistanceText: { color: "#9A6201", fontSize: 12.5, fontWeight: "600" },
   rowStatusChip: { marginLeft: "auto", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
   rowStatusText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.35 },
-  rowSub: { color: "#666666", fontSize: 10.5, marginTop: 1 },
+  rowSub: { color: "#667085", fontSize: 10.5, marginTop: 1 },
   rowPrice: { color: "#111111", fontSize: 14, fontWeight: "700" },
   rowDateRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
   datePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   datePillText: { fontSize: 10.5, fontWeight: "700" },
   rowBottom: { flexDirection: "row", alignItems: "center", marginTop: 8, gap: 10 },
   rowStat: { flexDirection: "row", alignItems: "center", gap: 4 },
-  rowStatText: { color: "#666666", fontSize: 10.5, fontWeight: "500" },
+  rowStatText: { color: "#667085", fontSize: 10.5, fontWeight: "500" },
   rowActions: { marginLeft: "auto", flexDirection: "row", gap: 6 },
-  rowBtnOutline: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE" },
+  rowBtnOutline: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3" },
   rowBtnOutlineText: { color: "#111111", fontSize: 10.5, fontWeight: "600" },
-  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", minWidth: 64, alignItems: "center", flexDirection: "row", gap: 4, justifyContent: "center" },
+  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", minWidth: 64, alignItems: "center", flexDirection: "row", gap: 4, justifyContent: "center" },
   rowBtnFilledText: { color: "#9A6201", fontSize: 10.5, fontWeight: "700" },
 
   loadingState: { alignItems: "center", paddingVertical: 32, gap: 8 },
-  loadingText: { color: "#666666", fontSize: 12 },
+  loadingText: { color: "#667085", fontSize: 12 },
   empty: { alignItems: "center", paddingHorizontal: 24, paddingVertical: 24 },
-  emptyIcon: { width: 60, height: 60, borderRadius: 14, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center", marginBottom: 12 },
+  emptyIcon: { width: 60, height: 60, borderRadius: 14, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center", marginBottom: 12 },
   emptyTitle: { color: "#111111", fontSize: 14, fontWeight: "600", marginBottom: 4 },
-  emptyText: { color: "#666666", fontSize: 12, textAlign: "center", lineHeight: 18 },
+  emptyText: { color: "#667085", fontSize: 12, textAlign: "center", lineHeight: 18 },
 
   pressed: { opacity: 0.7 },
 });

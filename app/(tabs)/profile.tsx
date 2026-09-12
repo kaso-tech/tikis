@@ -204,7 +204,7 @@ export default function ProfileScreen() {
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={[styles.name, isDark && { color: theme.foreground }]} numberOfLines={1}>{name}</Text>
               <View style={[styles.rolePill, driver ? styles.rolePillDriver : styles.rolePillSender]}>
-                <MaterialIcons name={driver ? "two-wheeler" : "inventory-2"} size={11} color={driver ? "#9A6200" : "#007B8B"} />
+                <MaterialIcons name={driver ? "two-wheeler" : "inventory-2"} size={11} color={driver ? "#9A6201" : "#9A6201"} />
                 <Text style={[styles.rolePillText, driver ? styles.rolePillTextDriver : styles.rolePillTextSender]}>
                   {driver ? "LIVREUR VÉRIFIÉ" : "EXPÉDITEUR VÉRIFIÉ"}
                 </Text>
@@ -219,25 +219,25 @@ export default function ProfileScreen() {
           {driver ? (
             <View style={styles.ratingStrip}>
               <View style={styles.ratingStripItem}>
-                <MaterialIcons name="star" size={16} color="#9A6200" />
+                <MaterialIcons name="star" size={16} color="#9A6201" />
                 <Text style={[styles.ratingValue, isDark && { color: theme.foreground }]}>{driverRating ?? "—"}</Text>
                 <Text style={styles.ratingLabel}>Note</Text>
               </View>
               <View style={styles.ratingDivider} />
               <View style={styles.ratingStripItem}>
-                <MaterialIcons name="local-shipping" size={16} color="#007B8B" />
+                <MaterialIcons name="local-shipping" size={16} color="#9A6201" />
                 <Text style={[styles.ratingValue, isDark && { color: theme.foreground }]}>{completed.length}</Text>
                 <Text style={styles.ratingLabel}>Courses</Text>
               </View>
               <View style={styles.ratingDivider} />
               <View style={styles.ratingStripItem}>
-                <MaterialIcons name="account-balance-wallet" size={16} color="#167A55" />
+                <MaterialIcons name="account-balance-wallet" size={16} color="#176C52" />
                 <Text style={[styles.ratingValue, isDark && { color: theme.foreground }]} numberOfLines={1}>{formatMoney(availableBalance)}</Text>
                 <Text style={styles.ratingLabel}>Wallet</Text>
               </View>
               <View style={styles.ratingDivider} />
               <View style={styles.ratingStripItem}>
-                <MaterialIcons name="event" size={16} color="#747474" />
+                <MaterialIcons name="event" size={16} color="#667085" />
                 <Text style={[styles.ratingValue, isDark && { color: theme.foreground }]} numberOfLines={1}>{memberSince}</Text>
                 <Text style={styles.ratingLabel}>Membre</Text>
               </View>
@@ -245,19 +245,19 @@ export default function ProfileScreen() {
           ) : (
             <View style={styles.ratingStrip}>
               <View style={styles.ratingStripItem}>
-                <MaterialIcons name="local-shipping" size={16} color="#007B8B" />
+                <MaterialIcons name="local-shipping" size={16} color="#9A6201" />
                 <Text style={[styles.ratingValue, isDark && { color: theme.foreground }]}>{senderDelivered}</Text>
                 <Text style={styles.ratingLabel}>Envoyées</Text>
               </View>
               <View style={styles.ratingDivider} />
               <View style={styles.ratingStripItem}>
-                <MaterialIcons name="check-circle" size={16} color="#167A55" />
+                <MaterialIcons name="check-circle" size={16} color="#176C52" />
                 <Text style={[styles.ratingValue, isDark && { color: theme.foreground }]}>OK</Text>
                 <Text style={styles.ratingLabel}>Compte</Text>
               </View>
               <View style={styles.ratingDivider} />
               <View style={styles.ratingStripItem}>
-                <MaterialIcons name="event" size={16} color="#747474" />
+                <MaterialIcons name="event" size={16} color="#667085" />
                 <Text style={[styles.ratingValue, isDark && { color: theme.foreground }]} numberOfLines={1}>{memberSince}</Text>
                 <Text style={styles.ratingLabel}>Membre</Text>
               </View>
@@ -369,7 +369,7 @@ export default function ProfileScreen() {
         </Section>
 
         <Pressable onPress={openLogoutConfirmation} style={({ pressed }) => [styles.logout, pressed && styles.pressed]}>
-          <MaterialIcons name="logout" size={16} color="#B4232D" />
+          <MaterialIcons name="logout" size={16} color="#A43740" />
           <Text style={styles.logoutText}>Se déconnecter</Text>
         </Pressable>
       </ScrollView>
@@ -427,7 +427,7 @@ export default function ProfileScreen() {
             {locationError ? <Text style={styles.error}>{locationError}</Text> : null}
             <ScrollView style={{ maxHeight: 380, marginTop: 8 }}>
               {(countriesQuery.data ?? []).map((c) => (
-                <Pressable key={c.id} onPress={() => void selectCountry(c.id)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, c.id === profile?.country && { borderColor: theme.primary, backgroundColor: isDark ? theme.pressed : "#E5F6F7" }, pressed && { opacity: 0.8 }]}>
+                <Pressable key={c.id} onPress={() => void selectCountry(c.id)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, c.id === profile?.country && { borderColor: theme.primary, backgroundColor: isDark ? theme.pressed : "#F5F5F5" }, pressed && { opacity: 0.8 }]}>
                   <Text style={styles.countryRowFlag}>{countryFlagEmoji(c.id)}</Text>
                   <Text style={[styles.countryOptionText, { color: theme.foreground, flex: 1 }, c.id === profile?.country && { color: theme.primary, fontWeight: "800" }]}>{c.name}</Text>
                   {locationSaving === "country" ? null : c.id === profile?.country ? <MaterialIcons name="check-circle" size={20} color={theme.primary} /> : null}
@@ -474,7 +474,7 @@ export default function ProfileScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => !requestDeletionMutation.isPending && setDeleteConfirmOpen(false)} />
           <View style={[styles.sheet, isDark && { backgroundColor: theme.surface }]}>
             <View style={styles.sheetGrip} />
-            <View style={styles.deleteIconWrap}><MaterialIcons name="delete-forever" size={26} color="#B4232D" /></View>
+            <View style={styles.deleteIconWrap}><MaterialIcons name="delete-forever" size={26} color="#A43740" /></View>
             <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Supprimer votre compte ?</Text>
             <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>
               Vous aurez 30 jours pour changer d’avis. Pendant ce délai, votre compte sera bloqué et vous pourrez annuler la suppression à tout moment. Passé ce délai, vos données personnelles seront définitivement supprimées.
@@ -512,7 +512,7 @@ export default function ProfileScreen() {
               maxLength={70}
               autoCapitalize="words"
               placeholder="Ex. Mariam ou Mariam Ouédraogo"
-              placeholderTextColor="#B48753"
+              placeholderTextColor="#9A6201"
               style={[styles.input, error ? styles.inputError : null, isDark && { backgroundColor: theme.background, color: theme.foreground, borderColor: theme.border }]}
             />
             {error ? <Text style={styles.error}>{error}</Text> : <Text style={[styles.helper, isDark && { color: theme.muted }]}>Un nom unique est accepté. Les séparateurs successifs sont retirés automatiquement.</Text>}
@@ -563,7 +563,7 @@ function MenuRow({ icon, iconBg, label, sub, badge, onPress, last }: { icon: Rea
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#EEEDF3" },
+  safe: { flex: 1, backgroundColor: "#F5F5F5" },
   content: { paddingBottom: 40, gap: 12 },
 
   coverWrap: { position: "relative", marginBottom: -36 },
@@ -571,40 +571,40 @@ const styles = StyleSheet.create({
   coverDark: { backgroundColor: "#1F1206" },
   coverPattern: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#9A6201" },
   coverOrbPrimary: { position: "absolute", width: 260, height: 260, borderRadius: 130, top: -90, right: -60, backgroundColor: "#D7A447", opacity: 0.45 },
-  coverOrbSecondary: { position: "absolute", width: 180, height: 180, borderRadius: 90, bottom: -50, left: -40, backgroundColor: "#007B8B", opacity: 0.25 },
+  coverOrbSecondary: { position: "absolute", width: 180, height: 180, borderRadius: 90, bottom: -50, left: -40, backgroundColor: "#9A6201", opacity: 0.25 },
   coverOrbTertiary: { position: "absolute", width: 120, height: 120, borderRadius: 60, top: 60, left: 80, backgroundColor: "#FFFFFF", opacity: 0.08 },
   coverOverlay: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.10)" },
 
-  identityCard: { marginHorizontal: 14, backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14, paddingTop: 0, gap: 12, borderWidth: 1, borderColor: "#ECECEC" },
+  identityCard: { marginHorizontal: 14, backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14, paddingTop: 0, gap: 12, borderWidth: 1, borderColor: "#E3E3E3" },
   avatarRow: { flexDirection: "row", alignItems: "flex-end", gap: 12, marginTop: -36 },
   avatarWrap: { position: "relative" },
   avatar: { width: 76, height: 76, borderRadius: 38, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 4, borderColor: "#FFFFFF" },
   avatarDriver: { backgroundColor: "#111111" },
-  avatarSender: { backgroundColor: "#007B8B" },
+  avatarSender: { backgroundColor: "#9A6201" },
   avatarImage: { width: 76, height: 76, borderRadius: 38, borderWidth: 4, borderColor: "#FFFFFF" },
   avatarText: { color: "#FFFFFF", fontSize: 24, fontWeight: "700" },
   avatarEdit: { position: "absolute", right: -2, bottom: -2, width: 24, height: 24, borderRadius: 12, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
 
   name: { color: "#111111", fontSize: 18, fontWeight: "700", marginTop: 6 },
-  phoneText: { color: "#666666", fontSize: 12, marginTop: 2 },
-  rolePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, backgroundColor: "#F8F0E5", marginTop: 6, alignSelf: "flex-start" },
-  rolePillDriver: { backgroundColor: "#FEF6E2" },
-  rolePillSender: { backgroundColor: "#E2F3F4" },
+  phoneText: { color: "#667085", fontSize: 12, marginTop: 2 },
+  rolePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, backgroundColor: "#FFFFFF", marginTop: 6, alignSelf: "flex-start" },
+  rolePillDriver: { backgroundColor: "#FFFFFF" },
+  rolePillSender: { backgroundColor: "#F5F5F5" },
   rolePillText: { color: "#9A6201", fontSize: 9, fontWeight: "700", letterSpacing: 0.4 },
-  rolePillTextDriver: { color: "#9A6200" },
-  rolePillTextSender: { color: "#007B8B" },
+  rolePillTextDriver: { color: "#9A6201" },
+  rolePillTextSender: { color: "#9A6201" },
 
-  editButton: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#F7EFE5", borderWidth: 1, borderColor: "#E5D2B9", alignSelf: "flex-start" },
+  editButton: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", alignSelf: "flex-start" },
   editButtonText: { color: "#9A6201", fontSize: 11, fontWeight: "700" },
 
-  ratingStrip: { flexDirection: "row", alignItems: "center", backgroundColor: "#FAF7F2", borderRadius: 10, paddingVertical: 10, paddingHorizontal: 4, gap: 4 },
+  ratingStrip: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 10, paddingVertical: 10, paddingHorizontal: 4, gap: 4 },
   ratingStripItem: { flex: 1, alignItems: "center", gap: 2, paddingHorizontal: 4 },
   ratingValue: { color: "#111111", fontSize: 12, fontWeight: "700", marginTop: 1 },
-  ratingLabel: { color: "#747474", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
-  ratingDivider: { width: 1, alignSelf: "stretch", backgroundColor: "#ECECEC", marginVertical: 4 },
+  ratingLabel: { color: "#667085", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
+  ratingDivider: { width: 1, alignSelf: "stretch", backgroundColor: "#E3E3E3", marginVertical: 4 },
 
   section: { gap: 6, paddingHorizontal: 14 },
-  sectionTitle: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", paddingHorizontal: 2 },
+  sectionTitle: { color: "#667085", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", paddingHorizontal: 2 },
   sectionCard: { borderRadius: 12, overflow: "hidden", borderWidth: 1 },
   menuRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 11, paddingHorizontal: 12 },
   menuRowLast: {},
@@ -615,38 +615,38 @@ const styles = StyleSheet.create({
   menuLabel: { fontSize: 13, fontWeight: "600" },
   menuSub: { fontSize: 10, marginTop: 1 },
   menuBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 99 },
-  menuBadgeSuccess: { backgroundColor: "#F8F0E5" },
+  menuBadgeSuccess: { backgroundColor: "#FFFFFF" },
   menuBadgeText: { color: "#FFFFFF", fontSize: 9, fontWeight: "700" },
-  menuBadgeTextSuccess: { color: "#167A55" },
+  menuBadgeTextSuccess: { color: "#176C52" },
 
-  logout: { flexDirection: "row", alignItems: "center", gap: 8, justifyContent: "center", backgroundColor: "#FFFFFF", borderRadius: 12, paddingVertical: 14, marginTop: 4, marginHorizontal: 14, borderWidth: 1, borderColor: "#ECECEC" },
-  logoutText: { color: "#B4232D", fontSize: 13, fontWeight: "600" },
+  logout: { flexDirection: "row", alignItems: "center", gap: 8, justifyContent: "center", backgroundColor: "#FFFFFF", borderRadius: 12, paddingVertical: 14, marginTop: 4, marginHorizontal: 14, borderWidth: 1, borderColor: "#E3E3E3" },
+  logoutText: { color: "#A43740", fontSize: 13, fontWeight: "600" },
 
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.42)" },
   sheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, paddingTop: 8, paddingBottom: 24 },
-  sheetGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#D5D5DC", alignSelf: "center", marginBottom: 14 },
+  sheetGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#E3E3E3", alignSelf: "center", marginBottom: 14 },
   sheetTitle: { color: "#111111", fontSize: 17, fontWeight: "600" },
-  sheetSubtitle: { color: "#666666", fontSize: 12, marginTop: 4 },
+  sheetSubtitle: { color: "#667085", fontSize: 12, marginTop: 4 },
 
-  photoPicker: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, backgroundColor: "#F8F0E5", borderRadius: 10, marginTop: 14 },
+  photoPicker: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, backgroundColor: "#FFFFFF", borderRadius: 10, marginTop: 14 },
   photoPickerIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
   photoPickerText: { color: "#9A6201", fontSize: 12, fontWeight: "600" },
-  photoPickerSub: { color: "#747474", fontSize: 10, marginTop: 2 },
+  photoPickerSub: { color: "#667085", fontSize: 10, marginTop: 2 },
 
   vehiclesList: { gap: 2, marginTop: 12 },
   vehicleRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 12, borderWidth: 1, borderRadius: 10, marginBottom: 2 },
   vehicleCheckbox: { width: 22, height: 22, borderRadius: 5, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   vehicleLabel: { fontSize: 14, fontWeight: "600", flex: 1 },
 
-  fieldLabel: { color: "#747474", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
-  input: { backgroundColor: "#F7EFE5", borderRadius: 9, borderWidth: 1, borderColor: "#E5D2B9", paddingHorizontal: 12, paddingVertical: 12, color: "#9A6201", fontSize: 13, fontWeight: "500" },
+  fieldLabel: { color: "#667085", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
+  input: { backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: 1, borderColor: "#E3E3E3", paddingHorizontal: 12, paddingVertical: 12, color: "#9A6201", fontSize: 13, fontWeight: "500" },
   countryOptionText: { fontSize: 13, fontWeight: "600" },
   countryRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 10, borderWidth: 1, marginBottom: 8 },
   countryRowFlag: { fontSize: 20 },
-  deleteIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: "#FDECEA", alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 4 },
-  inputError: { borderWidth: 1, borderColor: "#B4232D" },
-  helper: { color: "#747474", fontSize: 10, marginTop: 4 },
-  error: { color: "#B4232D", fontSize: 11, fontWeight: "600", marginTop: 4 },
+  deleteIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 4 },
+  inputError: { borderWidth: 1, borderColor: "#A43740" },
+  helper: { color: "#667085", fontSize: 10, marginTop: 4 },
+  error: { color: "#A43740", fontSize: 11, fontWeight: "600", marginTop: 4 },
   saveButton: { marginTop: 18 },
 
   pressed: { opacity: 0.7 },

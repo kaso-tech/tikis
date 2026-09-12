@@ -124,12 +124,12 @@ export default function ContactScreen() {
 
               <Text style={[styles.label, { color: theme.muted }]}>SUJET</Text>
               <View style={[styles.inputWrap, { backgroundColor: isDark ? "#171108" : "#FFFFFF", borderColor: isDark ? "#9A6201" : "#E3E3E3" }]}>
-                <TextInput value={subject} onChangeText={(value) => { setSubject(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={120} placeholder="Décrivez votre sujet en quelques mots" placeholderTextColor={theme.placeholder} style={[styles.input, { color: "#9A6201" }]} />
+                <TextInput value={subject} onChangeText={(value) => { setSubject(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={120} placeholder="Décrivez votre sujet en quelques mots" placeholderTextColor="#9A6201" style={[styles.input, { color: "#9A6201" }]} />
               </View>
 
               <Text style={[styles.label, { color: theme.muted }]}>VOTRE MESSAGE</Text>
               <View style={[styles.inputWrap, styles.textareaWrap, { backgroundColor: isDark ? "#171108" : "#FFFFFF", borderColor: isDark ? "#9A6201" : "#E3E3E3" }]}>
-                <TextInput value={message} onChangeText={(value) => { setMessage(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={1000} multiline placeholder="Donnez-nous le maximum de détails pour vous aider au mieux." placeholderTextColor={theme.placeholder} style={[styles.input, styles.textarea, { color: "#9A6201" }]} textAlignVertical="top" />
+                <TextInput value={message} onChangeText={(value) => { setMessage(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={1000} multiline placeholder="Donnez-nous le maximum de détails pour vous aider au mieux." placeholderTextColor="#9A6201" style={[styles.input, styles.textarea, { color: "#9A6201" }]} textAlignVertical="top" />
                 <Text style={[styles.counter, { color: theme.muted }]}>{message.length}/1000</Text>
               </View>
 

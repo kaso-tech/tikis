@@ -415,7 +415,7 @@ export default function CreateDeliveryScreen() {
                 <Text style={styles.priceCardValue}>{estimate ? `${estimate.toLocaleString("fr-FR")} F` : "—"}</Text>
               </View>
               <View style={styles.priceCardInput}>
-                <TextInput value={offeredPriceInput} onBlur={() => setTouched((current) => ({ ...current, price: true }))} onChangeText={(value) => setOfferedPriceInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} placeholder="Saisir le prix de la course" placeholderTextColor={theme.placeholder} style={styles.priceCardInputText} />
+                <TextInput value={offeredPriceInput} onBlur={() => setTouched((current) => ({ ...current, price: true }))} onChangeText={(value) => setOfferedPriceInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} placeholder="Saisir le prix de la course" placeholderTextColor="#9A6201" style={styles.priceCardInputText} />
                 <Text style={styles.priceCardInputSuffix}>F CFA</Text>
               </View>
               {priceInputError ? (
@@ -466,7 +466,6 @@ export default function CreateDeliveryScreen() {
 }
 
 function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { tone: "pickup" | "dropoff"; label: string; value: LocationLabel | null; invalid: boolean; onPress: () => void; onAddFavorite?: (label: string) => void }) {
-  const { colors: theme } = useThemeColors();
   const isPickup = tone === "pickup";
   const [showFavoriteInput, setShowFavoriteInput] = useState(false);
   const [favoriteLabel, setFavoriteLabel] = useState("");
@@ -501,7 +500,7 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
       </Pressable>
       {showFavoriteInput && value ? (
         <View style={styles.favoriteInputRow}>
-          <TextInput value={favoriteLabel} onChangeText={setFavoriteLabel} placeholder="Nom du favori (ex. Maison, Bureau)" placeholderTextColor={theme.placeholder} style={styles.favoriteInput} maxLength={40} />
+          <TextInput value={favoriteLabel} onChangeText={setFavoriteLabel} placeholder="Nom du favori (ex. Maison, Bureau)" placeholderTextColor="#9A6201" style={styles.favoriteInput} maxLength={40} />
           <Pressable
             onPress={() => { if (onAddFavorite) { onAddFavorite(favoriteLabel.trim() || locationTitle(value) || "Adresse favorite"); setShowFavoriteInput(false); setFavoriteLabel(""); } }}
             style={({ pressed }) => [styles.favoriteSaveBtn, pressed && styles.pressed]}
@@ -516,17 +515,15 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
 }
 
 function Field({ label, icon, keyboardType, error, ...props }: { label: string; icon?: React.ComponentProps<typeof MaterialIcons>["name"]; keyboardType?: "default" | "number-pad" | "decimal-pad"; value: string; onChangeText: (value: string) => void; onBlur?: () => void; placeholder: string; multiline?: boolean; error?: string }) {
-  const { colors: theme } = useThemeColors();
-  return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#A43740" : "#9A6201"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor={theme.placeholder} /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>;
+  return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#A43740" : "#9A6201"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor="#9A6201" /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>;
 }
 
 function MiniNumber({ value, onChangeText, placeholder }: { value: string; onChangeText: (value: string) => void; placeholder: string }) {
-  const { colors: theme } = useThemeColors();
-  return <TextInput value={value} onChangeText={(text) => onChangeText(text.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" placeholder={placeholder} placeholderTextColor={theme.placeholder} style={styles.miniInput} />;
+  return <TextInput value={value} onChangeText={(text) => onChangeText(text.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" placeholder={placeholder} placeholderTextColor="#9A6201" style={styles.miniInput} />;
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#EEEDF3" },
+  safe: { flex: 1, backgroundColor: "#F5F5F5" },
   keyboard: { flex: 1 },
   content: { padding: 16, paddingBottom: 24, gap: 14 },
 

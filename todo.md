@@ -599,3 +599,5 @@
 - [ ] Réparer la migration P6 de styles dans la version distante f886394 sans retirer les changements fonctionnels de l’autre agent.
 
 - [x] Synchroniser github/main, valider les dépendances, la compilation, les tests et livrer la dernière version.
+
+- [x] Intégrer le hotfix thème origin/main jusqu’à d1ac147, préserver les correctifs fonctionnels et livrer une version testable.
