@@ -601,3 +601,5 @@
 - [x] Synchroniser github/main, valider les dépendances, la compilation, les tests et livrer la dernière version.
 
 - [x] Intégrer le hotfix thème origin/main jusqu’à d1ac147, préserver les correctifs fonctionnels et livrer une version testable.
+
+- [x] Refaire le pull de github/main, vérifier les changements distants, valider le projet et livrer le dernier checkpoint.

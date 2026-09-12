@@ -263,6 +263,7 @@ export function AuthFlow() {
       return;
     }
     haptic.success();
+    setFinishing(false);
     router.replace("/(tabs)");
   }
 
