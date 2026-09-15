@@ -200,6 +200,7 @@ function isDark(theme: any) {
 }
 
 function TabButton({ label, count, active, onPress, theme }: { label: string; count: number; active: boolean; onPress: () => void; theme: any }) {
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   return (
     <Pressable onPress={onPress} accessibilityRole="tab" accessibilityState={{ selected: active }} style={({ pressed }) => [styles.tab, pressed && styles.pressed]}>
       <Text style={[styles.tabLabel, { color: active ? theme.foreground : theme.muted }]}>{label}</Text>
@@ -210,6 +211,7 @@ function TabButton({ label, count, active, onPress, theme }: { label: string; co
 }
 
 function CandidateCard({ candidate, deliveryStatus, deliveryPrice, loading, onChoose, theme }: { candidate: DriverCandidate; deliveryStatus: string; deliveryPrice: number; loading: boolean; onChoose: () => void; theme: any }) {
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const isSelected = candidate.status === "selected" || candidate.status === "confirmed";
   const label = isSelected ? "En attente" : deliveryStatus === "active" ? "Remplacer" : "Choisir";
   const canChoose = !isSelected && !loading;

@@ -53,6 +53,8 @@ const DRAWER_WIDTH = 308;
 const ANIM_DURATION = 240;
 
 export function TikisDrawer() {
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { isDrawerOpen, closeDrawer } = useTikisNavigation();
@@ -164,6 +166,8 @@ export function TikisDrawer() {
 }
 
 function DrawerRow({ item, active, onPress, isDark }: { item: DrawerItem; active: boolean; onPress: () => void; isDark: boolean }) {
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.menuRow, active && styles.menuRowActive, isDark && styles.menuRowDark, active && isDark && styles.menuRowActiveDark, pressed && styles.pressed]}>
       <View style={[styles.menuIcon, active && styles.menuIconActive, isDark && !active && styles.menuIconDark]}>

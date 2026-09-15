@@ -683,6 +683,7 @@ function CtaTile({ icon, label, meta, onPress }: { icon: React.ComponentProps<ty
 }
 
 function InfoRow({ label, value, theme, last }: { label: string; value: string; theme: ReturnType<typeof useThemeColors>["colors"]; last?: boolean }) {
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   return (
     <View style={[styles.infoRow, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border }]}>
       <Text style={[styles.infoLabel, { color: theme.muted }]}>{label}</Text>
@@ -714,7 +715,7 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
   // Stats row (3 KPIs)
   statsRow: { flexDirection: "row", gap: 8 },
   statBox: { flex: 1, borderRadius: 12, paddingVertical: 14, paddingHorizontal: 10, alignItems: "center", gap: 4, borderWidth: StyleSheet.hairlineWidth },
-  statValue: { fontSize: 18, fontWeight: "700", fontVariantNumeric: "tabular-nums", color: theme.foreground },
+  statValue: { fontSize: 18, fontWeight: "700", fontVariant: ["tabular-nums"], color: theme.foreground },
   statLabel: { fontSize: 10.5, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
 
   // Quick CTAs (2 tiles)

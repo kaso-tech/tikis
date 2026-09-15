@@ -20,6 +20,8 @@ type FinancialAction = "apply" | "withdraw" | "select" | "confirm" | "complete" 
 type SenderAction = "disable" | "reactivate" | "cancel" | "unselect" | null;
 
 function DetailRow({ icon, label, value }: { icon: ComponentProps<typeof MaterialIcons>["name"]; label: string; value: string }) {
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   return (
     <View style={styles.detailsRow}>
       <View style={styles.detailsIcon}><MaterialIcons name={icon} size={16} color={theme.primary} /></View>
@@ -432,6 +434,8 @@ export default function DeliveryDetailScreen() {
 }
 
 function TimelineStep({ label, done }: { label: string; done: boolean }) {
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   return (
     <View style={styles.timelineStep}>
       <View style={[styles.timelineDot, done && styles.timelineDotDone]}>
@@ -443,16 +447,22 @@ function TimelineStep({ label, done }: { label: string; done: boolean }) {
 }
 
 function TimelineLine({ done }: { done: boolean }) {
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   return <View style={[styles.timelineLine, done && styles.timelineLineDone]} />;
 }
 
 function DeliveryActionConfirmationModal({ visible, title, description, confirmLabel, tone, loading, onCancel, onConfirm }: { visible: boolean; title: string; description: string; confirmLabel: string; tone: "success" | "warning" | "danger"; loading: boolean; onCancel: () => void; onConfirm: () => void }) {
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const color = tone === "danger" ? theme.error : tone === "warning" ? theme.warning : theme.success;
   const background = tone === "danger" ? theme.error + "14" : tone === "warning" ? theme.warning + "14" : theme.success + "14";
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}><View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={onCancel} /><View style={styles.actionSheet}><View style={styles.actionHandle} /><View style={[styles.actionIcon, { backgroundColor: background }]}><MaterialIcons name={tone === "danger" ? "warning-amber" : tone === "warning" ? "pause-circle" : "play-circle"} size={24} color={color} /></View><Text style={styles.actionTitle}>{title}</Text><Text style={styles.actionDescription}>{description}</Text><TikisButton label={confirmLabel} variant={tone === "danger" ? "danger" : tone === "warning" ? "secondary" : "primary"} onPress={onConfirm} loading={loading} style={styles.actionConfirm} /><TikisButton label="Conserver la livraison" variant="ghost" onPress={onCancel} disabled={loading} style={styles.actionCancel} /></View></View></Modal>;
 }
 
 function DriverActions({ deliveryStatus, ownCandidateStatus, loading, onApply, onWithdraw, onConfirm, onComplete }: { deliveryStatus: string; ownCandidateStatus?: string; loading: boolean; onApply: () => void; onWithdraw: () => void; onConfirm: () => void; onComplete: () => void }) {
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   if (deliveryStatus === "open") return <View style={styles.driverAction}>{ownCandidateStatus === "applied" ? <TikisButton label="Se retirer" variant="ghost" icon="undo" onPress={onWithdraw} loading={loading} disabled={loading} /> : <TikisButton label="Se proposer" icon="add-circle" onPress={onApply} loading={loading} disabled={loading} />}<Text style={styles.driverHint}>{ownCandidateStatus === "applied" ? "Votre candidature est enregistrée. Vous pouvez la retirer tant que vous n’êtes pas sélectionné." : "Postulez au prix client ou proposez votre prix via la modale de confirmation."}</Text></View>;
   if (deliveryStatus === "pending_confirmation" && ownCandidateStatus === "selected") return <View style={styles.driverAction}><TikisButton label="Confirmer la course" icon="check-circle" onPress={onConfirm} loading={loading} disabled={loading} /><Text style={styles.driverHint}>Après confirmation, vos coordonnées seront partagées avec l’expéditeur.</Text></View>;
   if (deliveryStatus === "active" && ownCandidateStatus === "confirmed") return <View style={styles.driverAction}><TikisButton label="Marquer comme terminée" icon="task-alt" onPress={onComplete} loading={loading} disabled={loading} /><Text style={styles.driverHint}>À utiliser après remise et paiement direct avec l’expéditeur.</Text></View>;

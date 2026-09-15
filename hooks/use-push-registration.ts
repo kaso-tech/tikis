@@ -38,6 +38,9 @@ export type PushPermissionOutcome = "granted" | "denied" | "unsupported" | "regi
 export async function requestPushPermission(): Promise<PushPermissionOutcome> {
   if (Platform.OS === "web") return "unsupported";
   try {
+    // Import différé, comme `getDevicePushToken` : charger expo-notifications au niveau du module
+    // casse le bundle web (cf. correctif b2d6cf2).
+    const Notifications = await import("expo-notifications");
     const current = await Notifications.getPermissionsAsync();
     const granted = current.granted || current.status === "granted"
       ? current

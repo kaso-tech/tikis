@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { StyleSheet, Text, View } from "react-native";
 

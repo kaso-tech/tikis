@@ -1,6 +1,7 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router } from "expo-router";
-import { FlatList, Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Avatar, SurfaceCard } from "@/components/tikis/ui";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { useTikisStore } from "@/lib/tikis-store";

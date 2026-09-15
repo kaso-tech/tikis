@@ -1,3 +1,5 @@
+import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
+import { useMemo } from "react";
 import { createStyles } from "@/lib/create-styles";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { StyleSheet, Text, View } from "react-native";
@@ -14,6 +16,8 @@ type Props = {
 };
 
 export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }: Props) {
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   // Même formateur centralisé que le texte du trajet (delivery-card.tsx) : sans lui, cette légende
   // affichait `pickup.name`/`dropoff.name` bruts, ignorant la règle "Ville → Ville" quand les villes
   // diffèrent — deux libellés différents pour le même trajet, dans le même écran.

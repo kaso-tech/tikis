@@ -196,7 +196,7 @@ export function FavoritePlacesSheet({
                     <MaterialIcons name="edit" size={16} color={theme.primary} />
                     <Text style={[styles.manageText, { color: theme.primary }]}>Renommer</Text>
                   </Pressable>
-                  <Pressable accessibilityRole="button" onPress={() => { setActionError(""); setRemoving(favorite); }} style={({ pressed }) => [styles.manageButton, styles.manageDelete, { backgroundColor: theme.error + "14" }, pressed && styles.pressed]}>
+                  <Pressable accessibilityRole="button" onPress={() => { setActionError(""); setRemoving(favorite); }} style={({ pressed }) => [styles.manageButton, { backgroundColor: theme.error + "14" }, pressed && styles.pressed]}>
                     <MaterialIcons name="delete-outline" size={16} color={theme.error} />
                     <Text style={[styles.manageText, { color: theme.error }]}>Supprimer</Text>
                   </Pressable>

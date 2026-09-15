@@ -468,6 +468,8 @@ export default function CreateDeliveryScreen() {
 }
 
 function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { tone: "pickup" | "dropoff"; label: string; value: LocationLabel | null; invalid: boolean; onPress: () => void; onAddFavorite?: (label: string) => void }) {
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const isPickup = tone === "pickup";
   const [showFavoriteInput, setShowFavoriteInput] = useState(false);
   const [favoriteLabel, setFavoriteLabel] = useState("");
@@ -517,10 +519,14 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
 }
 
 function Field({ label, icon, keyboardType, error, ...props }: { label: string; icon?: React.ComponentProps<typeof MaterialIcons>["name"]; keyboardType?: "default" | "number-pad" | "decimal-pad"; value: string; onChangeText: (value: string) => void; onBlur?: () => void; placeholder: string; multiline?: boolean; error?: string }) {
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#B4232D" : "#9A6201"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor={theme.muted} /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>;
 }
 
 function MiniNumber({ value, onChangeText, placeholder }: { value: string; onChangeText: (value: string) => void; placeholder: string }) {
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   return <TextInput value={value} onChangeText={(text) => onChangeText(text.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" placeholder={placeholder} placeholderTextColor={theme.muted} style={styles.miniInput} />;
 }
 

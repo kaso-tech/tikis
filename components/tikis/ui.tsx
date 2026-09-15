@@ -32,7 +32,7 @@ export function TikisButton({
   loadingLabel?: string;
   disabled?: boolean;
   icon?: React.ComponentProps<typeof MaterialIcons>["name"];
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }) {
   const palette: ButtonPalette = authStyle && variant === "primary"
     ? { background: "#9A6201", foreground: "#FFFFFF", border: "#754A01" }

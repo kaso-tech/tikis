@@ -38,7 +38,9 @@ const TYPE_ICON: Record<Delivery["type"], React.ComponentProps<typeof MaterialIc
   Autre: "local-shipping",
 };
 
-const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: string }> = {
+// Dépend du thème : ne peut donc pas être une constante de module (`theme` n'y existe pas).
+// Même forme que `stylesFor` ci-dessous — une fabrique appelée par chaque composant.
+const statusChipFor = (theme: ThemedColors): Record<DeliveryStatus, { label: string; color: string; bg: string }> => ({
   draft: { label: "BROUILLON", color: theme.muted, bg: theme.background },
   open: { label: "PUBLIÉE", color: "#9A6201", bg: theme.primary + "14" },
   pending_confirmation: { label: "ATTRIBUÉE", color: theme.warning, bg: theme.warning + "14" },
@@ -47,7 +49,7 @@ const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: st
   disabled: { label: "DÉSACTIVÉE", color: "#A43740", bg: "#F7E6E7" },
   cancelled: { label: "ANNULÉE", color: "#A43740", bg: "#F7E6E7" },
   expired: { label: "EXPIRÉE", color: theme.muted, bg: theme.background },
-};
+});
 
 type FilterKey = "active" | "open" | "pending" | "completed";
 type PendingHomeAction =
@@ -103,6 +105,7 @@ function openNavigation(origin: { latitude: number; longitude: number }, pickup:
 export function HomeScreen() {
   const { role, profile } = useTikisStore();
   const { isDark, colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const firstName = profile?.fullName.split(" ")[0] ?? "à vous";
 
   const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 5_000 });
@@ -708,6 +711,8 @@ export function HomeScreen() {
 }
 
 function WalletCard({ walletBalance, totalBalance, blockedBalance }: { walletBalance: number; totalBalance: number; blockedBalance: number }) {
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   return (
     <View style={styles.walletCard}>
       <Text style={styles.walletEyebrow}>SOLDE DISPONIBLE</Text>
@@ -734,6 +739,8 @@ function WalletCard({ walletBalance, totalBalance, blockedBalance }: { walletBal
 }
 
 function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: { selected: Delivery | null | undefined; role: "sender" | "driver"; sheetOverlayHeight: number; driverPosition: { latitude: number; longitude: number } | null }) {
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const mapRef = useRef<MapView>(null);
   const routeMutation = trpc.geography.route.useMutation();
   const routeRequestRef = useRef(routeMutation.mutateAsync);
@@ -856,6 +863,9 @@ function UrgentCard({
   applying: boolean;
   onAction: () => void;
 }) {
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
+  const statusChip = useMemo(() => statusChipFor(theme), [theme]);
   const isSender = role === "sender";
   const senderAction = delivery.status === "open"
     ? (delivery.candidateCount ?? 0) > 0 ? "Candidats" : "Annuler"
@@ -874,8 +884,8 @@ function UrgentCard({
               : `${(delivery.vehicleTypes ?? []).join(" · ") || "Moto"}`}
           </Text>
         </View>
-        {isSender ? <View style={[styles.urgentChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}> 
-          <Text style={[styles.urgentChipText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text>
+        {isSender ? <View style={[styles.urgentChip, { backgroundColor: statusChip[delivery.status].bg }]}> 
+          <Text style={[styles.urgentChipText, { color: statusChip[delivery.status].color }]}>{statusChip[delivery.status].label}</Text>
         </View> : null}
       </View>
       <View style={styles.urgentPricing}>
@@ -925,6 +935,7 @@ function DeliveryRow({
   const [showPickupTooltip, setShowPickupTooltip] = useState(false);
   const { colors: theme } = useThemeColors();
   const styles = useMemo(() => stylesFor(theme), [theme]);
+  const statusChip = useMemo(() => statusChipFor(theme), [theme]);
   const isSender = role === "sender";
   const isDriver = role === "driver";
   const driverAction = delivery.status === "completed"
@@ -973,7 +984,7 @@ function DeliveryRow({
         <View style={styles.rowMain}>
           <View style={styles.rowTitleLine}>
             <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
-            {isDriver ? <View accessibilityLabel={`Direction du point de collecte, à ${driverDistText}`} style={styles.rowDriverDistance}><Pressable onPress={() => setShowPickupTooltip((visible) => !visible)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Afficher les lieux de collecte et destination : ${pickupTitle}, ${pickupDistrict}; destination ${dropoffTitle}, ${dropoffDistrict}`} style={({ pressed }) => [styles.directionButton, pressed && styles.pressed]}><MaterialIcons accessible={false} name="navigation" size={17} color="#9A6201" style={{ transform: [{ rotate: `${compassRotation}deg` }] }} /></Pressable><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text>{showPickupTooltip ? <View style={styles.pickupTooltip}><Text style={styles.pickupTooltipLabel}>COLLECTE</Text><Text style={styles.pickupTooltipText} numberOfLines={1}>{pickupTitle}</Text><Text style={styles.pickupTooltipDistrict} numberOfLines={1}>{pickupDistrict}</Text><View style={styles.pickupTooltipDivider} /><Text style={styles.pickupTooltipLabel}>DESTINATION</Text><Text style={styles.pickupTooltipText} numberOfLines={1}>{dropoffTitle}</Text><Text style={styles.pickupTooltipDistrict} numberOfLines={1}>{dropoffDistrict}</Text></View> : null}</View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text></View> : null}
+            {isDriver ? <View accessibilityLabel={`Direction du point de collecte, à ${driverDistText}`} style={styles.rowDriverDistance}><Pressable onPress={() => setShowPickupTooltip((visible) => !visible)} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Afficher les lieux de collecte et destination : ${pickupTitle}, ${pickupDistrict}; destination ${dropoffTitle}, ${dropoffDistrict}`} style={({ pressed }) => [styles.directionButton, pressed && styles.pressed]}><MaterialIcons accessible={false} name="navigation" size={17} color="#9A6201" style={{ transform: [{ rotate: `${compassRotation}deg` }] }} /></Pressable><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text>{showPickupTooltip ? <View style={styles.pickupTooltip}><Text style={styles.pickupTooltipLabel}>COLLECTE</Text><Text style={styles.pickupTooltipText} numberOfLines={1}>{pickupTitle}</Text><Text style={styles.pickupTooltipDistrict} numberOfLines={1}>{pickupDistrict}</Text><View style={styles.pickupTooltipDivider} /><Text style={styles.pickupTooltipLabel}>DESTINATION</Text><Text style={styles.pickupTooltipText} numberOfLines={1}>{dropoffTitle}</Text><Text style={styles.pickupTooltipDistrict} numberOfLines={1}>{dropoffDistrict}</Text></View> : null}</View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: statusChip[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: statusChip[delivery.status].color }]}>{statusChip[delivery.status].label}</Text></View> : null}
           </View>
           <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff}</Text>
         </View>

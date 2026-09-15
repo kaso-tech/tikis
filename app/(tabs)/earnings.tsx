@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#D7A447", opacity: 0.25, borderRadius: 14 },
   balanceEyebrow: { color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   balanceValueRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
-  balanceValue: { color: theme.surface, fontSize: 28, fontWeight: "700", lineHeight: 34, includeFontPadding: false },
+  balanceValue: { color: "#FFFFFF", fontSize: 28, fontWeight: "700", lineHeight: 34, includeFontPadding: false },
   trendPill: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: "rgba(22,122,85,0.25)", borderRadius: 99 },
   trendPillDown: { backgroundColor: "rgba(180,35,45,0.25)" },
   trendText: { color: "#48B889", fontSize: 10, fontWeight: "700" },

@@ -1,5 +1,5 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MapView from "react-native-maps";
@@ -7,6 +7,8 @@ import { TikisButton } from "@/components/tikis/ui";
 import { SaveAddressDialog } from "@/components/tikis/save-address-dialog";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
 import { useSearchLocationBias } from "@/hooks/use-search-location-bias";
+import { createStyles } from "@/lib/create-styles";
+import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
 import { trpc } from "@/lib/trpc";
 import type { LocationLabel } from "@/shared/tikis-domain";
 
@@ -29,6 +31,8 @@ function distanceMeters(a: Coordinate, b: Coordinate): number {
 }
 
 export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, onUse, onFavorite }: { visible: boolean; targetTitle: string; initialPlace: LocationLabel | null; countryCode?: string; onClose: () => void; onUse: (place: LocationLabel) => void; onFavorite: (place: LocationLabel, label: string) => Promise<void> }) {
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const mapRef = useRef<MapView>(null);
   const reverseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastResolvedRef = useRef<Coordinate | null>(null);
@@ -105,12 +109,10 @@ export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, 
   </View></Modal>;
 }
 
-const baseStyles = StyleSheet.create({
+const stylesFor = createStyles((theme: ThemedColors) => ({
   screen: { flex: 1, backgroundColor: theme.background }, map: { ...StyleSheet.absoluteFillObject },
   centerMarker: { position: "absolute", top: "48%", alignSelf: "center", alignItems: "center", width: 40, height: 52, marginTop: -52 },
   markerShadow: { position: "absolute", bottom: -2, width: 18, height: 5, borderRadius: 9, backgroundColor: "rgba(0,0,0,0.30)" },
   markerCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: theme.primary, alignItems: "center", justifyContent: "center", borderWidth: 2.5, borderColor: theme.surface },
   markerTriangle: { width: 0, height: 0, borderLeftWidth: 7, borderRightWidth: 7, borderTopWidth: 9, borderLeftColor: "transparent", borderRightColor: "transparent", borderTopColor: "#9A6201", marginTop: -2 }, controls: { flex: 1, paddingTop: 12 }, instruction: { alignSelf: "center", color: "#111111", fontSize: 14, fontWeight: "600", paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.92)", overflow: "hidden" }, floatingControls: { position: "absolute", left: 14, right: 14, bottom: 160, flexDirection: "row", justifyContent: "space-between" }, roundButton: { width: 48, height: 48, borderRadius: 9, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center" }, bottomSheet: { marginTop: "auto", backgroundColor: theme.surface, borderTopLeftRadius: 12, borderTopRightRadius: 12, padding: 14, paddingTop: 8 }, sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: "center", marginBottom: 10 }, sheetEyebrow: { color: "#9A6201", fontSize: 10, letterSpacing: 0.7, fontWeight: "600" }, placeTitle: { color: "#111111", fontSize: 16, fontWeight: "600", marginTop: 4 }, placeMeta: { color: "#666666", fontSize: 12, lineHeight: 16, marginTop: 2 }, placePlaceholder: { color: "#666666", fontSize: 13, marginTop: 6 }, resolving: { minHeight: 40, flexDirection: "row", alignItems: "center", gap: 8 }, resolvingText: { color: "#666666", fontSize: 12, fontWeight: "500" }, message: { color: "#9A6201", fontSize: 11, lineHeight: 16, marginTop: 6 }, sheetActions: { flexDirection: "row", gap: 7, marginTop: 12 }, useButton: { flex: 1, minHeight: 44, borderRadius: 8 }, favoriteButton: { width: 48, minHeight: 44, borderRadius: 8, backgroundColor: theme.background, alignItems: "center", justifyContent: "center" }, pressed: { opacity: 0.65 },
-});
-
-const styles = baseStyles;
+}));

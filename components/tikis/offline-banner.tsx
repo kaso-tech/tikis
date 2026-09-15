@@ -1,7 +1,7 @@
 import { useNetworkStatus } from "@/hooks/use-network-status";
 import { type ThemedColors, useThemeColors } from "@/lib/use-theme-colors";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { Platform, StyleSheet, Text, View, type ViewStyle } from "react-native";
 
 export function OfflineBanner() {
   const status = useNetworkStatus();
@@ -33,7 +33,9 @@ function makeStyles(theme: ThemedColors) {
       backgroundColor: theme.surface,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: theme.border,
-      ...(Platform.OS === "web" ? { position: "sticky" as const, top: 0, zIndex: 50 } : {}),
+      // `position: "sticky"` est rendu par react-native-web mais absent du type ViewStyle de RN :
+      // on assume la valeur côté web plutôt que de perdre le bandeau collant.
+      ...(Platform.OS === "web" ? ({ position: "sticky", top: 0, zIndex: 50 } as unknown as ViewStyle) : {}),
     },
     text: { flex: 1, fontSize: 12, color: theme.muted, lineHeight: 16 },
   });
