@@ -625,3 +625,7 @@
 - [x] Corriger la requête analytics incompatible avec only_full_group_by, ajouter une régression et valider les statistiques.
 
 - [x] Corriger le blocage qui rend les onglets et actions inactifs après connexion sur un compte Expéditeur.
+
+- [x] Supprimer les styles shadow* et elevation restants, puis vérifier l’absence de leurs avertissements après redémarrage.
+
+- [x] Corriger la génération SQL analytics TiDB qui qualifie différemment l’expression SELECT et GROUP BY malgré only_full_group_by.

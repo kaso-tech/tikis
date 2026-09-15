@@ -51,6 +51,7 @@ function monthLabel(date: Date): string {
 
 export async function computeSenderStats(db: DbHandle, senderPhone: string, now: Date = new Date()): Promise<SenderStats> {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const completedMonthKey = sql<string>`DATE_FORMAT(\`tikis_deliveries\`.\`completedAt\`, '%Y-%m')`;
 
   // 1) Stats du mois en cours
   const monthRows = await db
@@ -73,14 +74,14 @@ export async function computeSenderStats(db: DbHandle, senderPhone: string, now:
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
   const trendRaw = await db
     .select({
-      monthKey: sql<string>`DATE_FORMAT(${tikisDeliveries.completedAt}, '%Y-%m')`,
+      monthKey: completedMonthKey,
       deliveriesCount: count(),
       totalSpent: sum(tikisDeliveries.offeredPrice),
     })
     .from(tikisDeliveries)
     .where(and(eq(tikisDeliveries.senderPhone, senderPhone), eq(tikisDeliveries.status, "completed"), gte(tikisDeliveries.completedAt, sixMonthsAgo)))
-    .groupBy(sql`DATE_FORMAT(${tikisDeliveries.completedAt}, '%Y-%m')`)
-    .orderBy(sql`DATE_FORMAT(${tikisDeliveries.completedAt}, '%Y-%m')`);
+    .groupBy(completedMonthKey)
+    .orderBy(completedMonthKey);
 
   // Comble les mois sans livraison avec 0
   const trend: SenderMonthlyBucket[] = [];
