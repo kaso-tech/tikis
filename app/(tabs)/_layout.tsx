@@ -22,7 +22,7 @@ export default function TabLayout() {
         tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: theme.muted,
         tabBarLabelStyle: { fontSize: 10, fontWeight: "600", marginTop: 1 },
-        tabBarStyle: { height: 54 + bottomPadding, paddingTop: 5, paddingBottom: bottomPadding, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border, backgroundColor: theme.surface },
+        tabBarStyle: { height: 54 + bottomPadding, paddingTop: 5, paddingBottom: bottomPadding, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border, backgroundColor: theme.surface, zIndex: 10, elevation: 10 },
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Accueil", tabBarIcon: ({ color, size }) => <MaterialIcons name="home-filled" size={size} color={color} /> }} />

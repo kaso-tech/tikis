@@ -623,3 +623,5 @@
 - [x] Corriger les 15 incompatibilités TypeScript de thème introduites par e888d06 sans modifier le correctif MapView.
 
 - [x] Corriger la requête analytics incompatible avec only_full_group_by, ajouter une régression et valider les statistiques.
+
+- [x] Corriger le blocage qui rend les onglets et actions inactifs après connexion sur un compte Expéditeur.

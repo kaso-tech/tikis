@@ -798,7 +798,7 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
     <View style={styles.mapBg} pointerEvents="none">
       <MapView
         ref={mapRef}
-        style={StyleSheet.absoluteFill}
+        style={[StyleSheet.absoluteFill, styles.mapCanvas]}
         pointerEvents="none"
         initialRegion={region}
         showsCompass={false}
@@ -806,8 +806,8 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
         toolbarEnabled={false}
         showsUserLocation={false}
         showsMyLocationButton={false}
-        zoomEnabled
-        scrollEnabled
+        zoomEnabled={false}
+        scrollEnabled={false}
       >
         {selected ? (
           <>
@@ -1022,7 +1022,8 @@ function DeliveryRow({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F5F5F5" },
 
-  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5" },
+  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5", zIndex: 0, elevation: 0 },
+  mapCanvas: { zIndex: 0, elevation: 0 },
   nativeMarkerStart: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
   nativeMarkerDriver: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#111111", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
   nativeMarkerEnd: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#A43740" },
@@ -1039,7 +1040,7 @@ const styles = StyleSheet.create({
   fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3", zIndex: 10 },
   sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
 
-  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
+  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden", zIndex: 2, elevation: 2 },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
   sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#E3E3E3", marginBottom: 10 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
