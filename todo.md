@@ -611,3 +611,9 @@
 - [x] Refaire le pull de github/main, vérifier les changements distants, valider le projet et livrer le dernier checkpoint.
 
 - [x] Corriger les 15 incompatibilités TypeScript introduites par 75b573f, sans retirer les changements fonctionnels distants.
+
+- [x] Analyser, sauvegarder et appliquer uniquement les migrations manuelles 0034 à 0037, puis vérifier les objets de base et les services.
+
+- [x] Créer une nouvelle sauvegarde et appliquer uniquement les migrations TiDB compatibles 0027, 0028, 0029, 0033, 0034, 0035 et 0037, puis vérifier le schéma et les objets.
+
+- [x] Livrer la dernière version validée après les migrations TiDB et créer le checkpoint testable.
