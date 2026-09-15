@@ -60,16 +60,26 @@ curl -X POST -H "Authorization: Bearer $CRON_TOKEN" \
 Ces migrations ne sont **pas** appliquées par `drizzle-kit` : elles portent ce que drizzle-kit ne sait
 pas générer (triggers, index, backfills, enums) et s'appliquent à la main, dans l'ordre des numéros.
 
-Toutes sont écrites pour être **rejouables sans risque** : les appliquer une deuxième fois ne fait rien.
-On peut donc passer tout le dossier en une commande, sans tenir de registre de ce qui a déjà été fait :
+**Ne jamais rejouer le dossier entier en aveugle.** Les migrations antérieures à 0034 font des
+`ALTER TABLE ... ADD COLUMN` sans garde (0023, 0025, 0028, 0031, 0032…) : les repasser échoue sur
+« Duplicate column name ». Ce n'est pas destructeur, mais ça interrompt le lot et brouille le
+diagnostic. Il faut donc n'appliquer que les migrations réellement en attente, dans l'ordre.
+
+Depuis 0034, les migrations sont écrites pour être **rejouables sans risque** (`IF NOT EXISTS`, gardes
+sur `information_schema`, backfills filtrés) : celles-là peuvent être repassées sans dommage, ce qui
+évite d'avoir à savoir précisément où l'on en est.
 
 ```bash
-# Applique toutes les migrations manuelles, dans l'ordre, en s'arrêtant à la première erreur réelle.
-for f in drizzle/manual/*.sql; do
+# N'appliquer que les fichiers en attente, dans l'ordre (exemple pour 0034 → 0037).
+for f in drizzle/manual/003{4,5,6,7}_*.sql; do
   echo "→ $f"
   mysql -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < "$f" || { echo "ÉCHEC sur $f"; break; }
 done
 ```
+
+`0034` contient des triggers et donc des directives `DELIMITER`, qui sont interprétées par le **client
+mysql** et non par le serveur : ce fichier doit passer par la CLI `mysql`, jamais par un driver Node
+(mysql2, drizzle) qui découperait naïvement sur les `;`.
 
 Vérifier ensuite que le schéma du code et celui de la base concordent :
 
