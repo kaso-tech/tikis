@@ -464,9 +464,16 @@ function driverPreferencesToView(row: TikisDriverPreferences): DriverPerimeterPr
 export async function getDriverPerimeterPreferences(profilePhone: string): Promise<DriverPerimeterPreferences> {
   const db = await getDb();
   if (!db) return DEFAULT_DRIVER_PERIMETER;
-  const rows = await db.select().from(tikisDriverPreferences).where(eq(tikisDriverPreferences.profilePhone, profilePhone)).limit(1);
-  const row = rows[0];
-  return row ? driverPreferencesToView(row) : DEFAULT_DRIVER_PERIMETER;
+  try {
+    const rows = await db.select().from(tikisDriverPreferences).where(eq(tikisDriverPreferences.profilePhone, profilePhone)).limit(1);
+    const row = rows[0];
+    return row ? driverPreferencesToView(row) : DEFAULT_DRIVER_PERIMETER;
+  } catch (cause) {
+    // Lecture seule : on dégrade vers les réglages par défaut plutôt que de faire échouer
+    // `deliveries.list`, dont dépend l'écran d'accueil entier du livreur.
+    console.error("[driver-perimeter] Préférences illisibles, réglages par défaut appliqués", cause);
+    return DEFAULT_DRIVER_PERIMETER;
+  }
 }
 
 /** Met à jour les réglages choisis par le livreur. Les champs absents restent inchangés ; un rayon
@@ -529,8 +536,15 @@ async function getCompatibleDrivers(tx: any, vehicleTypes: SelectableVehicleType
 async function getDriverPerimetersByPhone(tx: any, phones: string[]): Promise<Map<string, DriverPerimeterPreferences>> {
   const perimeters = new Map<string, DriverPerimeterPreferences>();
   if (phones.length === 0) return perimeters;
-  const rows = await tx.select().from(tikisDriverPreferences).where(inArray(tikisDriverPreferences.profilePhone, phones));
-  for (const row of rows) perimeters.set(row.profilePhone, driverPreferencesToView(row));
+  try {
+    const rows = await tx.select().from(tikisDriverPreferences).where(inArray(tikisDriverPreferences.profilePhone, phones));
+    for (const row of rows) perimeters.set(row.profilePhone, driverPreferencesToView(row));
+  } catch (cause) {
+    // Lecture de confort : sans elle on applique les réglages par défaut. Une préférence illisible
+    // (table 0037 pas encore appliquée, incident SQL) ne doit pas faire échouer la publication d'une
+    // livraison, qui est l'opération réellement importante pour l'expéditeur à cet instant.
+    console.error("[driver-perimeter] Préférences illisibles, réglages par défaut appliqués", cause);
+  }
   for (const phone of phones) if (!perimeters.has(phone)) perimeters.set(phone, DEFAULT_DRIVER_PERIMETER);
   return perimeters;
 }
@@ -1138,13 +1152,24 @@ export async function checkDistributedRateLimit(scope: string, identifier: strin
   if (!db) return true; // Panne DB : ne jamais bloquer l'usage à cause d'un souci d'infrastructure du rate-limit lui-même.
   const bucket = Math.floor(Date.now() / windowMs);
   const rateLimitKey = `${scope}:${identifier}:${bucket}`.slice(0, 191);
-  await db.insert(tikisRateLimits).values({ rateLimitKey, count: 1 }).onDuplicateKeyUpdate({ set: { count: sql`${tikisRateLimits.count} + 1` } });
-  const row = (await db.select({ count: tikisRateLimits.count }).from(tikisRateLimits).where(eq(tikisRateLimits.rateLimitKey, rateLimitKey)).limit(1))[0];
-  if (Math.random() < 0.01) {
-    const staleBefore = new Date(Date.now() - windowMs * 4);
-    void db.delete(tikisRateLimits).where(lt(tikisRateLimits.updatedAt, staleBefore)).catch(() => {});
+  try {
+    await db.insert(tikisRateLimits).values({ rateLimitKey, count: 1 }).onDuplicateKeyUpdate({ set: { count: sql`${tikisRateLimits.count} + 1` } });
+    const row = (await db.select({ count: tikisRateLimits.count }).from(tikisRateLimits).where(eq(tikisRateLimits.rateLimitKey, rateLimitKey)).limit(1))[0];
+    if (Math.random() < 0.01) {
+      const staleBefore = new Date(Date.now() - windowMs * 4);
+      void db.delete(tikisRateLimits).where(lt(tikisRateLimits.updatedAt, staleBefore)).catch(() => {});
+    }
+    return (row?.count ?? 0) <= maxRequests;
+  } catch (cause) {
+    // Même principe que la panne DB ci-dessus, étendu à l'échec de requête : ce compteur protège le
+    // service, il ne doit jamais être ce qui le fait tomber. Tant que la table `tikis_rate_limits`
+    // (migration manuelle 0036) n'est pas appliquée, chaque INSERT lève — et comme tous les endpoints
+    // géographiques passent par ici (`protectedGeographyProcedure`), l'échec se traduisait par une
+    // recherche d'adresse, un itinéraire et une création de livraison impossibles côté expéditeur.
+    // On laisse donc passer, bruyamment : la protection revient d'elle-même une fois la table créée.
+    console.error("[rate-limit] Compteur distribué indisponible, requête laissée passer", cause);
+    return true;
   }
-  return (row?.count ?? 0) <= maxRequests;
 }
 
 export async function applyForTikisDelivery(input: { id: string; deliveryId: string; driverPhone: string; confirmedCommission: number; offerPrice?: number }) {
