@@ -1,17 +1,18 @@
 -- Durcissement du journal financier (tikis_wallet_ledger).
--- Cette base étant en MySQL (voir drizzle.config.ts), appliquer directement :
+-- Cette base étant en MySQL/TiDB (voir drizzle.config.ts), appliquer directement :
 --   mysql -u <user> -p <database> < drizzle/manual/0034_wallet_ledger_hardening.sql
 --
--- Deux corrections indépendantes, dans cet ordre précis (l'ordre compte : le trigger
--- d'immuabilité ajouté à l'étape 2 interdirait le UPDATE de backfill de l'étape 1) :
+-- Deux corrections indépendantes :
 --
 -- 1. Sépare le débit de commission Tikis (revenu réel de la plateforme) du débit générique
 --    de retrait (argent d'un utilisateur qui sort de son propre Wallet). Auparavant les deux
 --    partageaient la valeur "debit", ce qui gonflait le KPI "commissionRevenue" de l'admin dès
 --    qu'un retrait avait lieu sur la période. Un backfill met à jour l'historique existant.
--- 2. Ajoute l'immuabilité (BEFORE UPDATE / BEFORE DELETE) sur tikis_wallet_ledger, au même titre
---    que tikis_admin_audit_log (0020_admin_console.sql) — ce trigger était documenté comme
---    devant exister (référencé par le commentaire de 0020) mais n'avait en réalité jamais été créé.
+-- 2. Immuabilité du journal financier — voir la note TiDB ci-dessous : ni cette migration ni
+--    aucune autre de ce dossier ne peut l'implémenter par trigger sur cette base.
+--
+-- Les deux étapes de la section 1 sont sûres à rejouer (ALTER vers le même enum, UPDATE dont le
+-- WHERE ne matche plus rien une fois le backfill fait) : ce fichier peut être repassé sans risque.
 
 -- 1a. Nouvelle valeur d'enum.
 ALTER TABLE `tikis_wallet_ledger`
@@ -26,26 +27,26 @@ SET `operation` = 'commission_debit'
 WHERE `operation` = 'debit'
   AND `reason` = 'Commission Tikis prélevée après confirmation de disponibilité';
 
--- 2. Immuabilité du journal financier, même logique que 0020_admin_console.sql pour tikis_admin_audit_log.
-DROP TRIGGER IF EXISTS tikis_wallet_ledger_no_update;
-DROP TRIGGER IF EXISTS tikis_wallet_ledger_no_delete;
-
-DELIMITER $$
-
-CREATE TRIGGER tikis_wallet_ledger_no_update
-BEFORE UPDATE ON tikis_wallet_ledger
-FOR EACH ROW
-BEGIN
-  SIGNAL SQLSTATE '45000'
-    SET MESSAGE_TEXT = 'tikis_wallet_ledger est immuable : la modification d’une écriture du journal financier est interdite.';
-END$$
-
-CREATE TRIGGER tikis_wallet_ledger_no_delete
-BEFORE DELETE ON tikis_wallet_ledger
-FOR EACH ROW
-BEGIN
-  SIGNAL SQLSTATE '45000'
-    SET MESSAGE_TEXT = 'tikis_wallet_ledger est immuable : la suppression d’une écriture du journal financier est interdite.';
-END$$
-
-DELIMITER ;
+-- 2. Immuabilité du journal financier.
+--
+-- NOTE TiDB — AUCUN TRIGGER DANS CE FICHIER, VOLONTAIREMENT.
+-- Cette base est TiDB, qui ne supporte pas les triggers MySQL (CREATE TRIGGER échoue avec une
+-- erreur de syntaxe : TiDB ne reconnaît même pas la construction, ce n'est pas une question de
+-- variante SQL). C'est le même constat, déjà documenté pour tikis_admin_audit_log dans
+-- admin/README.md (migration 0020) : ce fichier avait exactement les mêmes triggers, et ils
+-- n'ont jamais pu être créés sur cette base non plus.
+--
+-- La mitigation retenue est donc au niveau des privilèges plutôt qu'au niveau du schéma : créer
+-- (ou faire créer par l'opérateur de la base) un compte MySQL/TiDB dont les droits sur
+-- `tikis_wallet_ledger` se limitent à INSERT et SELECT — sans UPDATE ni DELETE — et faire
+-- utiliser ce compte par l'application en production. Exemple (à adapter aux identifiants réels,
+-- à exécuter par un compte disposant des privilèges GRANT) :
+--
+--   REVOKE UPDATE, DELETE ON `tikis_wallet_ledger` FROM 'app_user'@'%';
+--
+-- Le code applicatif respecte déjà cette contrainte de son côté : aucun chemin n'émet de clause
+-- SQL UPDATE ou DELETE contre cette table, y compris via `onDuplicateKeyUpdate` (qui compilerait
+-- en UPDATE) — l'idempotence y est assurée par une lecture préalable (SELECT sur
+-- `idempotencyKey`), jamais par un upsert. Voir server/db.ts, fonctions `applyWalletMovement` et
+-- `requestTikisWalletOperation`. La restriction de privilèges ci-dessus est une défense en
+-- profondeur : elle protège contre un bug futur, pas contre une faille déjà identifiée.

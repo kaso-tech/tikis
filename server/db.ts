@@ -953,8 +953,11 @@ export async function requestTikisWalletOperation(profilePhone: string, type: "d
     // `requestId` est fourni par l'appelant (généré une seule fois par soumission) : une relance réseau
     // de la même demande ne doit pas créer une seconde ligne. On vérifie d'abord (comme le fait
     // `applyWalletMovement` partout ailleurs) plutôt que de s'appuyer sur `onDuplicateKeyUpdate`, qui
-    // déclencherait une vraie clause UPDATE — bloquée par le trigger d'immuabilité de `tikis_wallet_ledger`
-    // (drizzle/manual/0034_wallet_ledger_hardening.sql), même pour ré-écrire la même valeur.
+    // compilerait en une vraie clause SQL UPDATE contre `tikis_wallet_ledger` — cette table doit rester
+    // strictement append-only (drizzle/manual/0034_wallet_ledger_hardening.sql). Sur MySQL classique
+    // l'immuabilité serait imposée par trigger ; cette base étant TiDB (qui ne supporte pas les
+    // triggers), la garantie tient uniquement à cette discipline de code plus, en production, à des
+    // privilèges DB restreints à INSERT/SELECT (voir la note dans le fichier de migration).
     const idempotencyKey = `${type}:${profilePhone}:${requestId}`;
     const existing = await tx.select({ id: tikisWalletLedger.id }).from(tikisWalletLedger).where(eq(tikisWalletLedger.idempotencyKey, idempotencyKey)).limit(1);
     if (existing.length > 0) return;
