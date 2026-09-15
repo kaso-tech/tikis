@@ -725,7 +725,7 @@ function MapBackground({ selected, role, driverPosition }: { selected: Delivery 
   }, [driverPosition, dropoff, pickup, selected?.status]);
 
   return (
-    <View style={styles.mapBg} pointerEvents="box-none">
+    <View style={styles.mapBg} pointerEvents="none">
       <View style={[styles.mapBlock, { top: "10%", left: "8%", width: 90, height: 60 }]} />
       <View style={[styles.mapBlock, { top: "16%", right: "12%", width: 70, height: 80 }]} />
       <View style={[styles.mapBlock, { bottom: "20%", left: "6%", width: 100, height: 50 }]} />

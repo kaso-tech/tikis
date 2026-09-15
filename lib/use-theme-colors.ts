@@ -12,7 +12,6 @@ export type ThemedColors = ThemeColorPalette & {
   pressed: string;
   overlay: string;
   divider: string;
-  placeholder: string;
 };
 
 function buildThemed(scheme: ColorScheme): ThemedColors {
@@ -27,11 +26,10 @@ function buildThemed(scheme: ColorScheme): ThemedColors {
     tabIconSelected: base.primary,
     border: base.border,
     input: scheme === "light" ? "#F7EFE5" : "#3A2B1A",
-    placeholder: base.muted,
+    placeholder: scheme === "light" ? "#98A2B3" : "#8C7B68",
     pressed: scheme === "light" ? "#E3DFEA" : "#2A2018",
     overlay: scheme === "light" ? "rgba(0,0,0,0.42)" : "rgba(0,0,0,0.62)",
     divider: scheme === "light" ? "#ECECEC" : "#33271B",
-    placeholder: scheme === "light" ? "#667085" : "#C8BCAA",
   };
 }
 

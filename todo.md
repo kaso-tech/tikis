@@ -617,3 +617,7 @@
 - [x] Créer une nouvelle sauvegarde et appliquer uniquement les migrations TiDB compatibles 0027, 0028, 0029, 0033, 0034, 0035 et 0037, puis vérifier le schéma et les objets.
 
 - [x] Livrer la dernière version validée après les migrations TiDB et créer le checkpoint testable.
+
+- [x] Refaire le pull de github/main, vérifier les changements distants, valider le projet et livrer le dernier checkpoint.
+
+- [x] Corriger les 15 incompatibilités TypeScript de thème introduites par e888d06 sans modifier le correctif MapView.

@@ -415,7 +415,7 @@ export default function CreateDeliveryScreen() {
                 <Text style={styles.priceCardValue}>{estimate ? `${estimate.toLocaleString("fr-FR")} F` : "—"}</Text>
               </View>
               <View style={styles.priceCardInput}>
-                <TextInput value={offeredPriceInput} onBlur={() => setTouched((current) => ({ ...current, price: true }))} onChangeText={(value) => setOfferedPriceInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} placeholder="Saisir le prix de la course" placeholderTextColor="#667085" style={styles.priceCardInputText} />
+                <TextInput value={offeredPriceInput} onBlur={() => setTouched((current) => ({ ...current, price: true }))} onChangeText={(value) => setOfferedPriceInput(sanitizeOfferedPriceInput(value))} keyboardType="number-pad" maxLength={8} placeholder="Saisir le prix de la course" placeholderTextColor={theme.placeholder} style={styles.priceCardInputText} />
                 <Text style={styles.priceCardInputSuffix}>F CFA</Text>
               </View>
               {priceInputError ? (
@@ -500,7 +500,7 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
       </Pressable>
       {showFavoriteInput && value ? (
         <View style={styles.favoriteInputRow}>
-          <TextInput value={favoriteLabel} onChangeText={setFavoriteLabel} placeholder="Nom du favori (ex. Maison, Bureau)" placeholderTextColor="#667085" style={styles.favoriteInput} maxLength={40} />
+          <TextInput value={favoriteLabel} onChangeText={setFavoriteLabel} placeholder="Nom du favori (ex. Maison, Bureau)" placeholderTextColor="#98A2B3" style={styles.favoriteInput} maxLength={40} />
           <Pressable
             onPress={() => { if (onAddFavorite) { onAddFavorite(favoriteLabel.trim() || locationTitle(value) || "Adresse favorite"); setShowFavoriteInput(false); setFavoriteLabel(""); } }}
             style={({ pressed }) => [styles.favoriteSaveBtn, pressed && styles.pressed]}
@@ -515,11 +515,11 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
 }
 
 function Field({ label, icon, keyboardType, error, ...props }: { label: string; icon?: React.ComponentProps<typeof MaterialIcons>["name"]; keyboardType?: "default" | "number-pad" | "decimal-pad"; value: string; onChangeText: (value: string) => void; onBlur?: () => void; placeholder: string; multiline?: boolean; error?: string }) {
-  return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#A43740" : "#9A6201"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor="#667085" /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>;
+  return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#A43740" : "#9A6201"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor="#98A2B3" /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>;
 }
 
 function MiniNumber({ value, onChangeText, placeholder }: { value: string; onChangeText: (value: string) => void; placeholder: string }) {
-  return <TextInput value={value} onChangeText={(text) => onChangeText(text.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" placeholder={placeholder} placeholderTextColor="#667085" style={styles.miniInput} />;
+  return <TextInput value={value} onChangeText={(text) => onChangeText(text.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" placeholder={placeholder} placeholderTextColor="#98A2B3" style={styles.input} />;
 }
 
 const styles = StyleSheet.create({
