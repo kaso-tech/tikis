@@ -540,3 +540,37 @@
 - [x] Revalider TypeScript, les tests, le build admin et les services après les correctifs de synchronisation.
 - [x] Corriger le scénario de test de projection de gains dont la valeur d’entrée ne correspond pas à la formule documentée.
 - [x] Ajouter de façon non destructive la colonne de suppression différée manquante au schéma actif et revalider l’accès géographique.
+- [x] Synchroniser la branche `main` et inventorier les grands changements distants.
+- [x] Installer les dépendances requises et valider TypeScript, les tests et le build admin.
+- [x] Corriger toute incompatibilité introduite par la synchronisation avant publication.
+- [x] Relancer Expo et l’API, puis vérifier Metro, API et console administrateur.
+- [x] Enregistrer, pousser et livrer la version synchronisée validée.
+- [x] Inventorier tous les styles `shadow*` obsolètes de l’application et de la console admin.
+- [x] Remplacer les styles d’ombre obsolètes par le style épuré compatible avec le thème Tikis.
+- [x] Revalider TypeScript, tests, build admin et l’absence d’avertissement `shadow*` après démarrage.
+- [x] Enregistrer et livrer le nettoyage global des styles d’ombre.
+- [x] Auditer l’enregistrement Expo Notifications et l’avertissement affiché sur le web.
+- [x] Limiter l’écoute des changements de jeton push aux plateformes natives.
+- [x] Revalider TypeScript, les tests et les journaux web après redémarrage.
+- [x] Enregistrer et livrer la correction de l’avertissement Expo Notifications.
+- [x] Collecter et qualifier les erreurs tRPC de session visibles dans les journaux.
+- [x] Corriger le contexte ou la vérification de session à l’origine des erreurs.
+- [x] Ajouter ou adapter la régression de session associée.
+- [x] Revalider les services, sessions, compilation, tests et journaux.
+- [x] Enregistrer et livrer la correction des erreurs tRPC de session.
+- [x] Diagnostiquer la table ou colonne de sessions absente qui bloque les requêtes Tikis.
+- [x] Restaurer de manière non destructive le schéma de sessions et sécuriser son accès.
+- [x] Valider le chargement des livraisons, adresses et données protégées avec une session active.
+- [x] Revalider la création de livraison et l’absence d’erreur tRPC de session.
+- [x] Enregistrer et livrer la restauration fonctionnelle urgente.
+
+- [ ] Refaire le pull de la branche `main` et vérifier le dernier commit.
+- [ ] Vérifier les dépendances, compiler, tester et construire la console admin.
+- [ ] Relancer Expo et l’API, puis vérifier les services.
+- [ ] Enregistrer, pousser et livrer la dernière version validée.
+- [ ] Aligner les coordonnées du suivi en direct sur le contrat attendu par la carte.
+- [ ] Corriger la comparaison de rôle impossible dans le routeur de livraisons.
+- [ ] Revalider TypeScript, les tests, le build admin et les services après ces corrections.
+- [ ] Rétablir le bundling Metro après l’erreur de génération `.expo/types/router.d.ts`.
+- [ ] Revalider Metro, l’API, `/admin`, TypeScript et les tests après ce correctif.
+- [ ] Isoler le suivi cartographique natif de la route web afin d’éviter le chargement de `react-native-maps` sur web.

@@ -1,7 +1,7 @@
 /** @type {const} */
 const themeColors = {
   primary: { light: '#9A6201', dark: '#D7A447' },
-  background: { light: '#EEEDF3', dark: '#171108' },
+  background: { light: '#F5F5F5', dark: '#171108' },
   surface: { light: '#FFFFFF', dark: '#231A10' },
   foreground: { light: '#111111', dark: '#FBF7F0' },
   muted: { light: '#667085', dark: '#C8BCAA' },
@@ -9,6 +9,8 @@ const themeColors = {
   success: { light: '#176C52', dark: '#5FC497' },
   warning: { light: '#A65300', dark: '#E4B257' },
   error: { light: '#A43740', dark: '#F28B93' },
+  trendUp: { light: '#48B889', dark: '#7DD3A8' },
+  trendDown: { light: '#FBBF24', dark: '#FCD34D' },
 };
 
 module.exports = { themeColors };

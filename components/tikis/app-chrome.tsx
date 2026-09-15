@@ -1,12 +1,13 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, usePathname } from "expo-router";
-import { useEffect, useRef } from "react";
+import {useEffect, useRef, useMemo} from "react";
 import { Animated, Easing, Modal, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
 import { useThemeContext } from "@/lib/theme-provider";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
+import { createStyles } from "@/lib/create-styles";
 import { useTikisNavigation } from "@/lib/tikis-navigation";
 import { useTikisLogout } from "@/lib/tikis-logout";
 import { useTikisStore } from "@/lib/tikis-store";
@@ -28,6 +29,7 @@ export function TikisHeader() {
   const insets = useSafeAreaInsets();
   const { profile } = useTikisStore();
   const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const notificationsQuery = trpc.notifications.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 8_000 });
   const unread = (notificationsQuery.data ?? []).filter((item) => !item.read).length;
 
@@ -176,70 +178,70 @@ function DrawerRow({ item, active, onPress, isDark }: { item: DrawerItem; active
       {item.badge && item.badge > 0 ? (
         <View style={styles.menuBadge}><Text style={styles.menuBadgeText}>{unreadLabel(item.badge)}</Text></View>
       ) : (
-        <MaterialIcons name="chevron-right" size={18} color={active ? "#C9C9C9" : (isDark ? "#8A7A5F" : "#BBBBBB")} />
+        <MaterialIcons name="chevron-right" size={18} color={active ? theme.muted : (isDark ? theme.primary + "32" : theme.muted)} />
       )}
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  header: { backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingBottom: 6, flexDirection: "row", alignItems: "center" },
-  headerIcon: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
+const stylesFor = createStyles((theme: ThemedColors) => ({
+  header: { backgroundColor: theme.surface, paddingHorizontal: 14, paddingBottom: 6, flexDirection: "row", alignItems: "center" },
+  headerIcon: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: theme.background },
   brand: { flex: 1, flexDirection: "row", alignItems: "center", paddingLeft: 11 },
-  brandName: { color: "#111111", fontSize: 19, fontWeight: "700", letterSpacing: -0.4 },
-  headerBadge: { position: "absolute", right: 3, top: 3, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: "#B4232D", alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
-  headerBadgeText: { color: "#FFFFFF", fontWeight: "600", fontSize: 9 },
+  brandName: { color: theme.foreground, fontSize: 19, fontWeight: "700", letterSpacing: -0.4 },
+  headerBadge: { position: "absolute", right: 3, top: 3, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: theme.error, alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
+  headerBadgeText: { color: theme.surface, fontWeight: "600", fontSize: 9 },
   drawerRoot: { flex: 1, flexDirection: "row" },
   scrim: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.42)" },
-  drawerPanel: { position: "absolute", top: 0, bottom: 0, left: 0, width: DRAWER_WIDTH, maxWidth: "85%", backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingBottom: 14, shadowColor: "transparent", borderRightWidth: 1, borderRightColor: "#E3E3E3" },
-  drawerPanelDark: { backgroundColor: "#171108", borderRightColor: "#4A3823" },
+  drawerPanel: { position: "absolute", top: 0, bottom: 0, left: 0, width: DRAWER_WIDTH, maxWidth: "85%", backgroundColor: theme.surface, paddingHorizontal: 14, paddingBottom: 14, borderRightWidth: 1, borderRightColor: theme.border },
+  drawerPanelDark: { backgroundColor: theme.background, borderRightColor: theme.border },
   drawerTop: { height: 40, alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
-  drawerEyebrow: { color: "#747474", fontSize: 10, fontWeight: "600", letterSpacing: 0.9 },
-  drawerEyebrowDark: { color: "#C8BCAA" },
-  closeButton: { width: 34, height: 34, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
-  profileBlock: { flexDirection: "row", alignItems: "center", gap: 9, paddingTop: 12, paddingBottom: 11, backgroundColor: "#EEEDF3", borderRadius: 10, paddingHorizontal: 10 },
-  profileBlockDark: { backgroundColor: "#231A10" },
+  drawerEyebrow: { color: theme.muted, fontSize: 10, fontWeight: "600", letterSpacing: 0.9 },
+  drawerEyebrowDark: { color: theme.muted },
+  closeButton: { width: 34, height: 34, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: theme.background },
+  profileBlock: { flexDirection: "row", alignItems: "center", gap: 9, paddingTop: 12, paddingBottom: 11, backgroundColor: theme.background, borderRadius: 10, paddingHorizontal: 10 },
+  profileBlockDark: { backgroundColor: theme.surface },
   profileText: { flex: 1 },
-  profileName: { color: "#111111", fontSize: 15, fontWeight: "600" },
-  profileNameDark: { color: "#FBF7F0" },
+  profileName: { color: theme.foreground, fontSize: 15, fontWeight: "600" },
+  profileNameDark: { color: theme.foreground },
   rolePill: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
-  roleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#9A6201" },
-  roleDotDark: { backgroundColor: "#D7A447" },
-  roleLabel: { color: "#666666", fontSize: 11, fontWeight: "500" },
-  roleLabelDark: { color: "#C8BCAA" },
-  themeRow: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, backgroundColor: "#F6F3EE", flexDirection: "row", alignItems: "center", gap: 10 },
-  themeRowDark: { backgroundColor: "#231A10" },
+  roleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.primary },
+  roleDotDark: { backgroundColor: theme.primary },
+  roleLabel: { color: theme.muted, fontSize: 11, fontWeight: "500" },
+  roleLabelDark: { color: theme.muted },
+  themeRow: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, backgroundColor: theme.background, flexDirection: "row", alignItems: "center", gap: 10 },
+  themeRowDark: { backgroundColor: theme.surface },
   themeText: { flex: 1 },
-  themeTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },
-  themeTitleDark: { color: "#FBF7F0" },
-  themeSub: { color: "#666666", fontSize: 11, marginTop: 2 },
-  themeSubDark: { color: "#C8BCAA" },
-  menuLabel: { color: "#747474", fontSize: 10, fontWeight: "600", letterSpacing: 0.9, marginTop: 16, marginBottom: 6 },
-  menuLabelDark: { color: "#C8BCAA" },
+  themeTitle: { color: theme.foreground, fontSize: 13, fontWeight: "600" },
+  themeTitleDark: { color: theme.foreground },
+  themeSub: { color: theme.muted, fontSize: 11, marginTop: 2 },
+  themeSubDark: { color: theme.muted },
+  menuLabel: { color: theme.muted, fontSize: 10, fontWeight: "600", letterSpacing: 0.9, marginTop: 16, marginBottom: 6 },
+  menuLabelDark: { color: theme.muted },
   menu: { gap: 2 },
   menuRow: { minHeight: 48, borderRadius: 8, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", gap: 9 },
-  menuRowActive: { backgroundColor: "#111111" },
+  menuRowActive: { backgroundColor: theme.foreground },
   menuRowDark: { backgroundColor: "transparent" },
-  menuRowActiveDark: { backgroundColor: "#D7A447" },
-  menuIcon: { width: 32, height: 32, borderRadius: 7, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
-  menuIconActive: { backgroundColor: "#9A6201" },
-  menuIconDark: { backgroundColor: "#231A10" },
+  menuRowActiveDark: { backgroundColor: theme.primary },
+  menuIcon: { width: 32, height: 32, borderRadius: 7, alignItems: "center", justifyContent: "center", backgroundColor: theme.background },
+  menuIconActive: { backgroundColor: theme.primary },
+  menuIconDark: { backgroundColor: theme.surface },
   menuText: { flex: 1 },
-  menuTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },
-  menuTitleActive: { color: "#FFFFFF" },
-  menuTitleDark: { color: "#FBF7F0" },
-  menuCaption: { color: "#747474", fontSize: 11, marginTop: 1 },
-  menuCaptionActive: { color: "#C9C9C9" },
-  menuCaptionDark: { color: "#C8BCAA" },
-  menuBadge: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: "#B4232D", paddingHorizontal: 5, alignItems: "center", justifyContent: "center" },
-  menuBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "600" },
+  menuTitle: { color: theme.foreground, fontSize: 13, fontWeight: "600" },
+  menuTitleActive: { color: theme.surface },
+  menuTitleDark: { color: theme.foreground },
+  menuCaption: { color: theme.muted, fontSize: 11, marginTop: 1 },
+  menuCaptionActive: { color: theme.muted },
+  menuCaptionDark: { color: theme.muted },
+  menuBadge: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: theme.error, paddingHorizontal: 5, alignItems: "center", justifyContent: "center" },
+  menuBadgeText: { color: theme.surface, fontSize: 10, fontWeight: "600" },
   drawerFooter: { marginTop: "auto", paddingTop: 12 },
   securityRow: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 10 },
-  securityText: { color: "#666666", fontSize: 11, fontWeight: "500" },
-  securityTextDark: { color: "#C8BCAA" },
-  signOut: { height: 42, borderRadius: 8, backgroundColor: "#F8E8E9", alignItems: "center", justifyContent: "center", gap: 7, flexDirection: "row" },
-  signOutDark: { backgroundColor: "#3A1A1D" },
-  signOutText: { color: "#B4232D", fontSize: 12, fontWeight: "600" },
-  signOutTextDark: { color: "#F28B93" },
+  securityText: { color: theme.muted, fontSize: 11, fontWeight: "500" },
+  securityTextDark: { color: theme.muted },
+  signOut: { height: 42, borderRadius: 8, backgroundColor: theme.error + "14", alignItems: "center", justifyContent: "center", gap: 7, flexDirection: "row" },
+  signOutDark: { backgroundColor: theme.error + "18" },
+  signOutText: { color: theme.error, fontSize: 12, fontWeight: "600" },
+  signOutTextDark: { color: theme.error },
   pressed: { opacity: 0.67 },
-});
+}));

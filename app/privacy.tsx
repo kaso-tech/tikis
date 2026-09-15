@@ -1,0 +1,11 @@
+import { LegalPage } from "@/components/tikis/legal-page";
+
+export default function PrivacyScreen() {
+  return <LegalPage label="Document légal" title="Politique de confidentialité" updatedAt="26 août 2026" sections={[
+    { title: "Données traitées", paragraphs: ["Tikis traite les données nécessaires au fonctionnement de la plateforme : numéro de téléphone, nom complet, type de compte, engins déclarés, informations de livraison, journal des actions et préférences de notification.", "La localisation n’est utilisée que lorsque l’utilisateur active un suivi de course ou y consent explicitement. Dans la version de démonstration, les positions et notifications de suivi sont simulées."] },
+    { title: "Finalités", paragraphs: ["Ces données permettent de créer et sécuriser votre compte, de mettre en relation expéditeurs et livreurs, d’afficher le suivi d’une course, de prévenir la fraude, de gérer les réclamations et d’améliorer la qualité du service.", "Les données ne sont pas utilisées pour vendre des profils personnels à des tiers."] },
+    { title: "Sécurité et conservation", paragraphs: ["Les profils sont validés côté serveur et conservés dans une base de données avec contrainte d’unicité du numéro de téléphone. Les données de formulaire sont assainies et contrôlées avant enregistrement.", "Les données sont conservées pendant la durée nécessaire au compte, à la gestion des courses, aux obligations légales et à la résolution d’éventuels litiges."] },
+    { title: "Partage limité", paragraphs: ["Les coordonnées d’un expéditeur et d’un livreur ne sont rendues accessibles qu’après confirmation de la mission, conformément au parcours de Tikis.", "Des prestataires techniques peuvent intervenir pour l’hébergement, les notifications ou la sécurité, uniquement selon les instructions de Tikis et avec des mesures appropriées de confidentialité."] },
+    { title: "Vos droits et vos choix", paragraphs: ["Vous pouvez demander l’accès, la rectification ou la suppression de vos données, dans les limites des obligations légales applicables. Vous pouvez également gérer les notifications depuis l’application.", "Pour exercer un droit ou signaler une préoccupation relative aux données, contactez l’assistance Tikis depuis votre profil."] },
+  ]} />;
+}

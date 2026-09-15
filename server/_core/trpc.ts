@@ -3,6 +3,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
 import { getTikisProfileByPhone } from "../db";
+import { isSessionRevoked } from "../sessions";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -64,7 +65,6 @@ const requireTikisProfile = t.middleware(async (opts) => {
   const sessionHeader = opts.ctx.req?.headers?.["x-tikis-session"];
   const sessionToken = Array.isArray(sessionHeader) ? sessionHeader[0] : sessionHeader;
   if (sessionToken) {
-    const { isSessionRevoked } = await import("../sessions");
     if (await isSessionRevoked({ phone: opts.ctx.tikisProfilePhone, token: sessionToken })) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Cette session a été déconnectée depuis un autre appareil." });
     }

@@ -1,11 +1,12 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
+import { createStyles } from "@/lib/create-styles";
 import { sanitizeDeliveryText, isAllowedDeliveryText } from "@/lib/tikis-engine";
 
 type ContactReason = "general" | "account" | "delivery" | "payment" | "report" | "other";
@@ -23,7 +24,8 @@ const CONTACT_EMAIL = "support@tikis.app";
 const CONTACT_PHONE = "+226 25 00 00 00";
 
 export default function ContactScreen() {
-  const { colors: theme, isDark } = useThemeColors();
+  const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const [reason, setReason] = useState<ContactReason>("general");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -114,26 +116,26 @@ export default function ContactScreen() {
                 {REASONS.map((item) => {
                   const active = item.value === reason;
                   return (
-                    <Pressable key={item.value} accessibilityRole="button" accessibilityLabel={`Motif : ${item.label}`} onPress={() => pickReason(item.value)} style={({ pressed }) => [styles.reason, { backgroundColor: theme.surface }, active && { backgroundColor: isDark ? "#312515" : "#F7EFE5", borderWidth: 1, borderColor: isDark ? "#5A3A17" : "#E5D2B9" }, pressed && styles.pressed]}>
-                      <Text style={[styles.reasonText, { color: theme.foreground }, active && { color: "#9A6201" }]}>{item.label}</Text>
-                      <Text style={[styles.reasonHelper, { color: theme.muted }, active && { color: isDark ? "#B48753" : "#BBBBBB" }]}>{item.helper}</Text>
+                    <Pressable key={item.value} accessibilityRole="button" accessibilityLabel={`Motif : ${item.label}`} onPress={() => pickReason(item.value)} style={({ pressed }) => [styles.reason, { backgroundColor: theme.surface, borderColor: theme.border }, active && { borderColor: theme.primary, borderWidth: 1 }, pressed && styles.pressed]}>
+                      <Text style={[styles.reasonText, { color: theme.foreground }, active && { color: theme.primary }]}>{item.label}</Text>
+                      <Text style={[styles.reasonHelper, { color: theme.muted }]}>{item.helper}</Text>
                     </Pressable>
                   );
                 })}
               </View>
 
               <Text style={[styles.label, { color: theme.muted }]}>SUJET</Text>
-              <View style={[styles.inputWrap, { backgroundColor: isDark ? "#312515" : "#F7EFE5", borderColor: isDark ? "#5A3A17" : "#E5D2B9" }]}>
-                <TextInput value={subject} onChangeText={(value) => { setSubject(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={120} placeholder="Décrivez votre sujet en quelques mots" placeholderTextColor="#B48753" style={[styles.input, { color: "#9A6201" }]} />
+              <View style={[styles.inputWrap, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <TextInput value={subject} onChangeText={(value) => { setSubject(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={120} placeholder="Décrivez votre sujet en quelques mots" placeholderTextColor={theme.muted} style={[styles.input, { color: theme.foreground }]} />
               </View>
 
               <Text style={[styles.label, { color: theme.muted }]}>VOTRE MESSAGE</Text>
-              <View style={[styles.inputWrap, styles.textareaWrap, { backgroundColor: isDark ? "#312515" : "#F7EFE5", borderColor: isDark ? "#5A3A17" : "#E5D2B9" }]}>
-                <TextInput value={message} onChangeText={(value) => { setMessage(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={1000} multiline placeholder="Donnez-nous le maximum de détails pour vous aider au mieux." placeholderTextColor="#B48753" style={[styles.input, styles.textarea, { color: "#9A6201" }]} textAlignVertical="top" />
+              <View style={[styles.inputWrap, styles.textareaWrap, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <TextInput value={message} onChangeText={(value) => { setMessage(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={1000} multiline placeholder="Donnez-nous le maximum de détails pour vous aider au mieux." placeholderTextColor={theme.muted} style={[styles.input, styles.textarea, { color: theme.foreground }]} textAlignVertical="top" />
                 <Text style={[styles.counter, { color: theme.muted }]}>{message.length}/1000</Text>
               </View>
 
-              {error ? <Text style={styles.error}>{error}</Text> : <Text style={[styles.helper, { color: theme.muted }]}>Tous les champs sont assainis avant envoi. Les pièces jointes ne sont pas encore prises en charge.</Text>}
+              {error ? <Text style={[styles.error, { color: theme.error }]}>{error}</Text> : <Text style={[styles.helper, { color: theme.muted }]}>Tous les champs sont assainis avant envoi. Les pièces jointes ne sont pas encore prises en charge.</Text>}
 
               <TikisButton label="Envoyer" icon="send" onPress={() => void send()} loading={sending} loadingLabel="Préparation…" disabled={!canSend} />
             </>
@@ -144,7 +146,7 @@ export default function ContactScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const stylesFor = createStyles((theme: ThemedColors) => ({
   safe: { flex: 1 },
   header: { minHeight: 64, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: "row", alignItems: "center", gap: 10 },
   back: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center" },
@@ -160,7 +162,7 @@ const styles = StyleSheet.create({
   contactValue: { fontSize: 12, fontWeight: "600", marginTop: 2 },
   label: { fontSize: 10, fontWeight: "600", letterSpacing: 0.6, textTransform: "uppercase", marginTop: 6, marginBottom: 6 },
   reasons: { gap: 7 },
-  reason: { borderRadius: 10, padding: 11 },
+  reason: { borderRadius: 10, padding: 11, borderWidth: StyleSheet.hairlineWidth },
   reasonText: { fontSize: 13, fontWeight: "600" },
   reasonHelper: { fontSize: 11, marginTop: 2 },
   inputWrap: { borderRadius: 9, borderWidth: 1, padding: 12, minHeight: 48, justifyContent: "center" },
@@ -169,9 +171,9 @@ const styles = StyleSheet.create({
   textarea: { minHeight: 110, textAlignVertical: "top" },
   counter: { fontSize: 10, fontWeight: "500", textAlign: "right", marginTop: 4 },
   helper: { fontSize: 11, lineHeight: 16 },
-  error: { color: "#B4232D", fontSize: 12, fontWeight: "600" },
+  error: { color: theme.error, fontSize: 12, fontWeight: "600" },
   success: { borderRadius: 10, padding: 16, alignItems: "center", gap: 8 },
   successTitle: { fontSize: 15, fontWeight: "600" },
   successText: { fontSize: 12, lineHeight: 18, textAlign: "center" },
   pressed: { opacity: 0.67 },
-});
+}));

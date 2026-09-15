@@ -2,6 +2,8 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { StyleSheet, Text, View } from "react-native";
 
 import { formatListRouteParts, formatNavigationTarget } from "@/lib/geo-rules";
+import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
+import { createStyles } from "@/lib/create-styles";
 import type { LocationLabel } from "@/shared/tikis-domain";
 
 type Props = {
@@ -33,6 +35,8 @@ function projectOntoCanvas(
 }
 
 export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }: Props) {
+const { colors: theme } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   // Même formateur centralisé que le texte du trajet (delivery-card.tsx) : sans lui, cette légende
   // affichait `pickup.name`/`dropoff.name` bruts, ignorant la règle "Ville → Ville" quand les villes
   // diffèrent — deux libellés différents pour le même trajet, dans le même écran.
@@ -78,14 +82,14 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
         ]}
       />
       <View style={[styles.pickup, { left: projection.originX - 12, top: projection.originY - 12 }]}>
-        <MaterialIcons name="trip-origin" size={14} color="#FFFFFF" />
+        <MaterialIcons name="trip-origin" size={14} color={theme.surface} />
       </View>
       <View style={[styles.dropoff, { left: projection.x - 12, top: projection.y - 12 }]}>
-        <MaterialIcons name="location-on" size={16} color="#B4232D" />
+        <MaterialIcons name="location-on" size={16} color={theme.error} />
       </View>
       {approximate ? (
         <View style={styles.approximate}>
-          <MaterialIcons name="privacy-tip" size={11} color="#9A6200" />
+          <MaterialIcons name="privacy-tip" size={11} color={theme.warning} />
           <Text style={styles.approximateText}>Aperçu indicatif</Text>
         </View>
       ) : null}
@@ -116,10 +120,10 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
 
 export { MapPreviewLeaflet as MapPreview };
 
-const styles = StyleSheet.create({
+const stylesFor = createStyles((theme: ThemedColors) => ({
   frame: {
     borderRadius: 9,
-    backgroundColor: "#EEEDF3",
+    backgroundColor: theme.background,
     overflow: "hidden",
     position: "relative",
   },
@@ -130,7 +134,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     opacity: 0.45,
-    backgroundColor: "#EEEDF3",
+    backgroundColor: theme.background,
   },
   gridHorizontal: {
     position: "absolute",
@@ -138,13 +142,13 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: "#D7D5DE",
+    backgroundColor: theme.border,
     opacity: 0.45,
   },
   routeLine: {
     position: "absolute",
     height: 2,
-    backgroundColor: "#007B8B",
+    backgroundColor: theme.primary,
     borderRadius: 1,
   },
   pickup: {
@@ -152,22 +156,22 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: "#007B8B",
+    backgroundColor: theme.primary,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "#FFFFFF",
+    borderColor: theme.surface,
   },
   dropoff: {
     position: "absolute",
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.surface,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: "#B4232D",
+    borderColor: theme.error,
   },
   approximate: {
     position: "absolute",
@@ -179,10 +183,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.surface,
   },
   approximateText: {
-    color: "#9A6200",
+    color: theme.warning,
     fontSize: 10,
     fontWeight: "600",
   },
@@ -193,7 +197,7 @@ const styles = StyleSheet.create({
     bottom: 8,
     padding: 8,
     borderRadius: 8,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: theme.surface,
     gap: 3,
   },
   legendRow: {
@@ -205,29 +209,29 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#007B8B",
+    backgroundColor: theme.primary,
   },
   legendDotDropoff: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#B4232D",
+    backgroundColor: theme.error,
   },
   legendLabel: {
-    color: "#111111",
+    color: theme.foreground,
     fontSize: 11,
     fontWeight: "600",
     flex: 1,
   },
   legendSub: {
-    color: "#666666",
+    color: theme.muted,
     fontSize: 10,
     lineHeight: 13,
     paddingLeft: 15,
   },
   legendDivider: {
     height: 1,
-    backgroundColor: "#ECECEC",
+    backgroundColor: theme.divider,
     marginVertical: 2,
   },
-});
+}));

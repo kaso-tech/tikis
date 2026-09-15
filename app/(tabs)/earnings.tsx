@@ -136,14 +136,14 @@ export default function EarningsScreen() {
             <Text style={styles.balanceValue}>{isLoading ? "Chargement…" : formatMoney(totalEarnings)}</Text>
             {comparison.trend !== null ? (
               <View style={[styles.trendPill, comparison.trend < 0 && styles.trendPillDown]}>
-                <MaterialIcons name={comparison.trend >= 0 ? "trending-up" : "trending-down"} size={11} color={comparison.trend >= 0 ? "#48B889" : "#FBBF24"} />
-                <Text style={[styles.trendText, comparison.trend < 0 && styles.trendTextDown]}>
+                <MaterialIcons name={comparison.trend >= 0 ? "trending-up" : "trending-down"} size={11} color={comparison.trend >= 0 ? theme.trendUp : theme.trendDown} />
+                <Text style={[styles.trendText, comparison.trend < 0 && styles.trendTextDown, { color: comparison.trend >= 0 ? theme.trendUp : theme.trendDown }]}>
                   {comparison.trend >= 0 ? "+" : ""}{comparison.trend}% vs 7 j
                 </Text>
               </View>
             ) : (
               <View style={styles.trendPill}>
-                <MaterialIcons name="schedule" size={11} color="#48B889" />
+                <MaterialIcons name="schedule" size={11} color={theme.trendUp} />
                 <Text style={styles.trendText}>Comparaison 7 j</Text>
               </View>
             )}
@@ -181,7 +181,7 @@ export default function EarningsScreen() {
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={PERIOD_META[key].label}
               >
-                <MaterialIcons name={PERIOD_META[key].icon} size={14} color={active ? "#FFFFFF" : "#747474"} />
+                <MaterialIcons name={PERIOD_META[key].icon} size={14} color={active ? theme.surface : theme.muted} />
                 <Text style={[styles.periodTabText, active && styles.periodTabTextActive]}>{PERIOD_META[key].label}</Text>
               </Pressable>
             );
@@ -325,7 +325,7 @@ function StatCard({ icon, value, label, tone }: { icon: React.ComponentProps<typ
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#EEEDF3" },
+  safe: { flex: 1, backgroundColor: "#F5F5F5" },
   pressed: { opacity: 0.7 },
   scroll: { padding: 12, paddingBottom: 32, gap: 14 },
 
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
   balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#D7A447", opacity: 0.25, borderRadius: 14 },
   balanceEyebrow: { color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   balanceValueRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
-  balanceValue: { color: "#FFFFFF", fontSize: 28, fontWeight: "700", lineHeight: 34, includeFontPadding: false },
+  balanceValue: { color: theme.surface, fontSize: 28, fontWeight: "700", lineHeight: 34, includeFontPadding: false },
   trendPill: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: "rgba(22,122,85,0.25)", borderRadius: 99 },
   trendPillDown: { backgroundColor: "rgba(180,35,45,0.25)" },
   trendText: { color: "#48B889", fontSize: 10, fontWeight: "700" },

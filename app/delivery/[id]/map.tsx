@@ -7,7 +7,8 @@ import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
 import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { haptic } from "@/lib/haptics";
-import { useThemeColors } from "@/lib/use-theme-colors";
+import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
+import { createStyles } from "@/lib/create-styles";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 
@@ -45,6 +46,7 @@ function stepIndex(status: string) {
 
 export default function DeliveryMapScreen() {
   const { colors: theme, isDark } = useThemeColors();
+  const styles = useMemo(() => stylesFor(theme), [theme]);
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile, role } = useTikisStore();
   const deliveryQuery = trpc.deliveries.get.useQuery({ id: id ?? fallbackId }, { enabled: Boolean(id && profile?.phone), refetchInterval: 8_000 });
@@ -77,15 +79,15 @@ export default function DeliveryMapScreen() {
     return (
       <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
         <View style={styles.center}>
-          <MaterialIcons name="lock-outline" size={32} color="#9A6201" />
+          <MaterialIcons name="lock-outline" size={32} color={theme.primary} />
           <Text style={[styles.loadingText, { color: theme.muted, marginTop: 10 }]}>Le suivi en direct est réservé aux expéditeurs.</Text>
-          <Pressable onPress={() => router.back()} style={{ marginTop: 16 }}><Text style={{ color: "#007B8B", fontWeight: "700" }}>Retour</Text></Pressable>
+          <Pressable onPress={() => router.back()} style={{ marginTop: 16 }}><Text style={{ color: theme.primary, fontWeight: "700" }}>Retour</Text></Pressable>
         </View>
       </SafeAreaView>
     );
   }
 
-  if (deliveryQuery.isLoading || !delivery) return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.center}><ActivityIndicator color="#9A6201" /><Text style={[styles.loadingText, { color: theme.muted }]}>{deliveryQuery.isLoading ? "Chargement de la carte…" : "Livraison introuvable."}</Text></View></SafeAreaView>;
+  if (deliveryQuery.isLoading || !delivery) return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.center}><ActivityIndicator color={theme.primary} /><Text style={[styles.loadingText, { color: theme.muted }]}>{deliveryQuery.isLoading ? "Chargement de la carte…" : "Livraison introuvable."}</Text></View></SafeAreaView>;
 
   const pickup = formatDeliveryDetailPlace(delivery.pickup);
   const dropoff = formatDeliveryDetailPlace(delivery.dropoff);
@@ -109,7 +111,7 @@ export default function DeliveryMapScreen() {
         <Text style={[styles.title, { color: theme.foreground }]} numberOfLines={1}>{delivery.title}</Text>
         <View style={styles.headerStatusRow}>
           {isLive ? <View style={styles.liveDot} /> : null}
-          <Text style={[styles.headerStatusText, { color: isLive ? "#167A55" : theme.muted }]}>{isLive ? "Suivi en direct" : STEPS[step].label}</Text>
+          <Text style={[styles.headerStatusText, { color: isLive ? theme.success : theme.muted }]}>{isLive ? "Suivi en direct" : STEPS[step].label}</Text>
         </View>
       </View>
       <View style={styles.headerPlaceholder} />
@@ -117,8 +119,8 @@ export default function DeliveryMapScreen() {
 
     {/* Bandeau ETA — l'élément central d'une page de suivi professionnelle */}
     {isLive ? (
-      <View style={[styles.etaBanner, { backgroundColor: "#0B1F3A" }]}>
-        <View style={styles.etaIconWrap}><MaterialIcons name="local-shipping" size={20} color="#FFFFFF" /></View>
+      <View style={[styles.etaBanner, { backgroundColor: theme.primary }]}>
+        <View style={styles.etaIconWrap}><MaterialIcons name="local-shipping" size={20} color={theme.surface} /></View>
         <View style={{ flex: 1 }}>
           <Text style={styles.etaValue}>{eta !== null ? `${eta} min` : "Calcul en cours…"}</Text>
           <Text style={styles.etaLabel}>{remainingKm !== null ? `${remainingKm.toFixed(1)} km restants jusqu’à la destination` : "En attente de la position du livreur"}</Text>
@@ -128,24 +130,24 @@ export default function DeliveryMapScreen() {
 
     <View style={styles.mapWrap}>
       <DeliveryRouteMap pickup={delivery.pickup} dropoff={delivery.dropoff} coordinates={coordinates} driverPosition={livePosition} />
-      {isRouteLoading ? <View style={styles.routeLoading}><ActivityIndicator size="small" color="#9A6201" /><Text style={styles.routeLoadingText}>Calcul de l’itinéraire…</Text></View> : null}
+      {isRouteLoading ? <View style={styles.routeLoading}><ActivityIndicator size="small" color={theme.primary} /><Text style={styles.routeLoadingText}>Calcul de l’itinéraire…</Text></View> : null}
     </View>
 
     {/* Timeline de progression */}
     <View style={[styles.timelineRow, { backgroundColor: theme.surface }]}>
       {STEPS.map((s, i) => (
         <View key={s.key} style={styles.timelineStep}>
-          <View style={[styles.timelineDot, { backgroundColor: i <= step ? "#007B8B" : theme.border }]}>
-            <MaterialIcons name={s.icon} size={13} color={i <= step ? "#FFFFFF" : theme.muted} />
+          <View style={[styles.timelineDot, { backgroundColor: i <= step ? theme.primary : theme.border }]}>
+            <MaterialIcons name={s.icon} size={13} color={i <= step ? theme.surface : theme.muted} />
           </View>
           <Text style={[styles.timelineLabel, { color: i <= step ? theme.foreground : theme.muted }]}>{s.label}</Text>
-          {i < STEPS.length - 1 ? <View style={[styles.timelineLine, { backgroundColor: i < step ? "#007B8B" : theme.border }]} /> : null}
+          {i < STEPS.length - 1 ? <View style={[styles.timelineLine, { backgroundColor: i < step ? theme.primary : theme.border }]} /> : null}
         </View>
       ))}
     </View>
 
     <View style={[styles.bottomPanel, { backgroundColor: theme.surface }]}>
-      {indicative ? <View style={[styles.privacyBanner, { backgroundColor: theme.background }]}><MaterialIcons name="privacy-tip" size={18} color="#8A5A0E" /><Text style={[styles.privacyText, { color: theme.muted }]}>Aperçu indicatif : les coordonnées précises sont protégées jusqu’à la confirmation de la mission.</Text></View> : null}
+      {indicative ? <View style={[styles.privacyBanner, { backgroundColor: theme.background }]}><MaterialIcons name="privacy-tip" size={18} color={theme.primary} /><Text style={[styles.privacyText, { color: theme.muted }]}>Aperçu indicatif : les coordonnées précises sont protégées jusqu’à la confirmation de la mission.</Text></View> : null}
       {routeError ? <Text style={styles.routeError}>Le tracé détaillé est indisponible. La liaison entre les deux points reste affichée.</Text> : null}
 
       {delivery.driverName ? (
@@ -157,36 +159,36 @@ export default function DeliveryMapScreen() {
           </View>
           {delivery.driverPhone ? (
             <Pressable onPress={() => void callDriver()} style={({ pressed }) => [styles.callButton, pressed && styles.pressed]} accessibilityLabel="Appeler le livreur">
-              <MaterialIcons name="call" size={18} color="#FFFFFF" />
+              <MaterialIcons name="call" size={18} color={theme.surface} />
             </Pressable>
           ) : null}
         </View>
       ) : null}
 
-      <View style={styles.placeRow}><View style={[styles.placeIcon, styles.pickupIcon]}><MaterialIcons name="inventory-2" size={16} color="#9A6201" /></View><View style={styles.placeCopy}><Text style={styles.placeLabel}>Récupération</Text><Text style={[styles.placeTitle, { color: theme.foreground }]} numberOfLines={1}>{pickup.title}</Text><Text style={[styles.placeSubtitle, { color: theme.muted }]} numberOfLines={1}>{pickup.subtitle}</Text></View></View>
+      <View style={styles.placeRow}><View style={[styles.placeIcon, styles.pickupIcon]}><MaterialIcons name="inventory-2" size={16} color={theme.primary} /></View><View style={styles.placeCopy}><Text style={styles.placeLabel}>Récupération</Text><Text style={[styles.placeTitle, { color: theme.foreground }]} numberOfLines={1}>{pickup.title}</Text><Text style={[styles.placeSubtitle, { color: theme.muted }]} numberOfLines={1}>{pickup.subtitle}</Text></View></View>
       <View style={[styles.divider, { backgroundColor: theme.border }]} />
-      <View style={styles.placeRow}><View style={[styles.placeIcon, styles.dropoffIcon]}><MaterialIcons name="location-on" size={17} color="#B4232D" /></View><View style={styles.placeCopy}><Text style={styles.placeLabel}>Destination</Text><Text style={[styles.placeTitle, { color: theme.foreground }]} numberOfLines={1}>{dropoff.title}</Text><Text style={[styles.placeSubtitle, { color: theme.muted }]} numberOfLines={1}>{dropoff.subtitle}</Text></View><Text style={[styles.distance, { color: theme.foreground }]}>{delivery.distanceKm.toLocaleString("fr-FR")} km</Text></View>
+      <View style={styles.placeRow}><View style={[styles.placeIcon, styles.dropoffIcon]}><MaterialIcons name="location-on" size={17} color={theme.error} /></View><View style={styles.placeCopy}><Text style={styles.placeLabel}>Destination</Text><Text style={[styles.placeTitle, { color: theme.foreground }]} numberOfLines={1}>{dropoff.title}</Text><Text style={[styles.placeSubtitle, { color: theme.muted }]} numberOfLines={1}>{dropoff.subtitle}</Text></View><Text style={[styles.distance, { color: theme.foreground }]}>{delivery.distanceKm.toLocaleString("fr-FR")} km</Text></View>
     </View>
   </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const stylesFor = createStyles((theme: ThemedColors) => ({
   safe: { flex: 1 },
   header: { height: 62, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 10 },
   back: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   headerTitle: { flex: 1, minWidth: 0 },
   title: { fontSize: 14, fontWeight: "600" },
   headerStatusRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#167A55" },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.success },
   headerStatusText: { fontSize: 11, fontWeight: "600" },
   headerPlaceholder: { width: 40 },
   etaBanner: { flexDirection: "row", alignItems: "center", gap: 12, marginHorizontal: 12, marginTop: 10, padding: 13, borderRadius: 12 },
   etaIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.15)", alignItems: "center", justifyContent: "center" },
-  etaValue: { color: "#FFFFFF", fontSize: 17, fontWeight: "800" },
+  etaValue: { color: theme.surface, fontSize: 17, fontWeight: "700" },
   etaLabel: { color: "rgba(255,255,255,0.72)", fontSize: 11.5, marginTop: 2 },
   mapWrap: { flex: 1, margin: 12, marginBottom: 0, borderRadius: 10, overflow: "hidden" },
   routeLoading: { position: "absolute", top: 14, alignSelf: "center", flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, height: 30, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.95)" },
-  routeLoadingText: { color: "#555555", fontSize: 11, fontWeight: "600" },
+  routeLoadingText: { color: theme.muted, fontSize: 11, fontWeight: "600" },
   timelineRow: { flexDirection: "row", marginHorizontal: 12, marginTop: 10, padding: 12, borderRadius: 10 },
   timelineStep: { flex: 1, alignItems: "center", position: "relative" },
   timelineDot: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
@@ -195,19 +197,19 @@ const styles = StyleSheet.create({
   bottomPanel: { marginTop: 10, padding: 14, paddingBottom: 18 },
   privacyBanner: { flexDirection: "row", gap: 7, padding: 10, borderRadius: 8, marginBottom: 10 },
   privacyText: { flex: 1, fontSize: 11, lineHeight: 16, fontWeight: "500" },
-  routeError: { color: "#9A6200", fontSize: 11, lineHeight: 16, marginBottom: 10 },
+  routeError: { color: theme.warning, fontSize: 11, lineHeight: 16, marginBottom: 10 },
   driverCard: { flexDirection: "row", alignItems: "center", gap: 10, paddingBottom: 12, marginBottom: 12, borderBottomWidth: StyleSheet.hairlineWidth },
-  driverAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: "#007B8B", alignItems: "center", justifyContent: "center" },
-  driverAvatarText: { color: "#FFFFFF", fontWeight: "800", fontSize: 13 },
+  driverAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: theme.primary, alignItems: "center", justifyContent: "center" },
+  driverAvatarText: { color: theme.surface, fontWeight: "700", fontSize: 13 },
   driverName: { fontSize: 14, fontWeight: "700" },
   driverSub: { fontSize: 11, marginTop: 1 },
-  callButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: "#167A55", alignItems: "center", justifyContent: "center" },
+  callButton: { width: 38, height: 38, borderRadius: 19, backgroundColor: theme.success, alignItems: "center", justifyContent: "center" },
   placeRow: { flexDirection: "row", alignItems: "center", gap: 9 },
   placeIcon: { width: 30, height: 30, borderRadius: 7, alignItems: "center", justifyContent: "center" },
-  pickupIcon: { backgroundColor: "#EEEDF3" },
-  dropoffIcon: { backgroundColor: "#FFF3F3" },
+  pickupIcon: { backgroundColor: theme.background },
+  dropoffIcon: { backgroundColor: theme.error + "14" },
   placeCopy: { flex: 1, minWidth: 0 },
-  placeLabel: { color: "#9A9A9A", fontSize: 9, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },
+  placeLabel: { color: theme.muted, fontSize: 9, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },
   placeTitle: { fontSize: 13, fontWeight: "600", marginTop: 2 },
   placeSubtitle: { fontSize: 10, marginTop: 2 },
   divider: { height: 10, width: 1, marginLeft: 14, marginVertical: 3 },
@@ -215,4 +217,4 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: "center", alignItems: "center", gap: 9, padding: 18 },
   loadingText: { fontWeight: "500" },
   pressed: { opacity: 0.67 },
-});
+}));
