@@ -9,8 +9,11 @@ const webHomeSource = readFileSync(join(process.cwd(), "components/tikis/screens
 const deliverySource = readFileSync(join(process.cwd(), "app/delivery/[id].tsx"), "utf8");
 
 describe("palette des boutons hors authentification", () => {
-  it("utilise le fond crème et le texte brun pour le bouton primaire partagé", () => {
-    expect(buttonSource).toContain('primary: { background: "#F7EFE5", foreground: "#9A6201"');
+  it("utilise une surface claire et le texte brun pour le bouton primaire partagé", () => {
+    // Le fond est passé du crème (#F7EFE5) au blanc lors de l'harmonisation du thème ; ce qui compte
+    // et qui est vérifié ici reste l'invariant : hors authentification le bouton primaire est une
+    // surface claire à texte brun, et le flux d'authentification inverse cette palette.
+    expect(buttonSource).toContain('primary: { background: "#FFFFFF", foreground: "#9A6201"');
     expect(buttonSource).toContain('authStyle && variant === "primary"');
     expect(buttonSource).toContain('background: "#9A6201", foreground: "#FFFFFF"');
   });
@@ -20,12 +23,15 @@ describe("palette des boutons hors authentification", () => {
   });
 
   it("applique la même palette aux actions personnalisées hors authentification", () => {
+    // Ces actions passent désormais par les jetons de thème plutôt que par des hex figés : c'est ce
+    // niveau-là qu'on verrouille, pour qu'un écran ne puisse pas redevenir sourd au mode sombre en
+    // réintroduisant une couleur en dur.
     for (const source of [nativeHomeSource, webHomeSource]) {
-      expect(source).toContain('rowBtnFilled: {');
-      expect(source).toContain('backgroundColor: "#F7EFE5"');
-      expect(source).toContain('rowBtnFilledText: { color: "#9A6201"');
+      expect(source).toContain("rowBtnFilled: { paddingHorizontal");
+      expect(source).toContain("backgroundColor: theme.surface");
+      expect(source).toContain("rowBtnFilledText: { color: theme.primary");
     }
-    expect(deliverySource).toContain('trackButton: { backgroundColor: "#F7EFE5"');
-    expect(deliverySource).toContain('trackButtonText: { color: "#9A6201"');
+    expect(deliverySource).toContain("trackButton: { backgroundColor: theme.surface");
+    expect(deliverySource).toContain("trackButtonText: { color: theme.primary");
   });
 });

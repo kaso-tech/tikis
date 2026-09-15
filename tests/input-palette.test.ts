@@ -22,10 +22,12 @@ describe("palette des champs et menus", () => {
     expect(themeSource).toContain('input: scheme === "light" ? "#F7EFE5" : "#3A2B1A"');
   });
 
-  it("harmonise les formulaires principaux", () => {
+  it("harmonise les formulaires principaux sur les jetons de thème", () => {
+    // L'harmonisation du thème a remplacé les hex figés (#F7EFE5 / #9A6201) par les jetons : un
+    // formulaire qui rebasculerait sur des couleurs en dur cesserait de suivre le mode sombre.
     for (const formSource of [createDeliverySource, contactSource, reviewSource, reportSource, profileSource, walletSource]) {
-      expect(formSource).toContain("#F7EFE5");
-      expect(formSource).toContain("#9A6201");
+      expect(formSource).toContain("theme.primary");
+      expect(formSource).not.toContain("#F7EFE5");
     }
   });
 
@@ -33,8 +35,8 @@ describe("palette des champs et menus", () => {
     expect(addressesSource).toContain("backgroundColor: theme.input");
     expect(yangoSource).toContain("backgroundColor: theme.input");
     for (const pickerSource of [nativeHomeSource, webHomeSource]) {
-      expect(pickerSource).toContain("#F7EFE5");
-      expect(pickerSource).toContain("#9A6201");
+      expect(pickerSource).toContain("theme.primary");
+      expect(pickerSource).not.toContain("#F7EFE5");
     }
   });
 

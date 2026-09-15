@@ -55,6 +55,36 @@ curl -X POST -H "Authorization: Bearer $CRON_TOKEN" \
 - Logs audit admin : table `tikis_admin_audit_log` (consultable dans la console admin).
 - Logs error : Sentry (configurer `SENTRY_DSN` en prod).
 
+## Migrations manuelles (`drizzle/manual/`)
+
+Ces migrations ne sont **pas** appliquées par `drizzle-kit` : elles portent ce que drizzle-kit ne sait
+pas générer (triggers, index, backfills, enums) et s'appliquent à la main, dans l'ordre des numéros.
+
+Toutes sont écrites pour être **rejouables sans risque** : les appliquer une deuxième fois ne fait rien.
+On peut donc passer tout le dossier en une commande, sans tenir de registre de ce qui a déjà été fait :
+
+```bash
+# Applique toutes les migrations manuelles, dans l'ordre, en s'arrêtant à la première erreur réelle.
+for f in drizzle/manual/*.sql; do
+  echo "→ $f"
+  mysql -u "$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" < "$f" || { echo "ÉCHEC sur $f"; break; }
+done
+```
+
+Vérifier ensuite que le schéma du code et celui de la base concordent :
+
+```bash
+pnpm db:check-schema        # statique
+DATABASE_URL=... pnpm db:check-schema   # + contrôle live des tables réellement présentes
+```
+
+**Une table manquante ne se voit pas toujours tout de suite** : elle ne casse que le jour où le chemin
+de code qui l'utilise est emprunté, et souvent de façon très large. Deux pannes totales de l'app ont eu
+cette cause (`tikis_profile_sessions` en 0030, vérification de révocation à chaque requête protégée ;
+`tikis_rate_limits` en 0036, compteur appelé avant chaque endpoint géographique). Les chemins concernés
+sont désormais tolérants à l'absence de table, mais la protection réelle n'existe qu'une fois la
+migration appliquée : après tout déploiement, passer le dossier puis `db:check-schema`.
+
 ## Backups DB
 
 À planifier par l'opérateur via la console webdevtoken (section "Backups"). Requis :

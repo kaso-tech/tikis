@@ -21,6 +21,9 @@ describe("contrat de suivi cartographique", () => {
   it("affiche le suivi expéditeur dans la variante web avec un segment d’approche", () => {
     expect(webHome).toContain("useLiveDeliveryPosition");
     expect(webHome).toContain("approachLine");
-    expect(webHome).toContain('backgroundColor: "#176C52"');
+    // Le segment d'approche garde sa couleur distincte du tracé principal, via le jeton `success`
+    // (le tracé, lui, reste sur l'accent brun) — la distinction visuelle est l'invariant.
+    expect(webHome).toContain("approachLine: { position: \"absolute\"");
+    expect(webHome).toContain("backgroundColor: theme.success");
   });
 });
