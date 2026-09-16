@@ -651,3 +651,5 @@
 - [x] Vérifier le correctif Animated.spring du suivi puis vider les caches Metro/Expo pour éliminer tout bundle obsolète.
 
 - [x] Récupérer et intégrer les nouvelles modifications Claude, valider le projet et livrer un checkpoint.
+
+- [x] Synchroniser origin/main, vider le cache Metro Expo SDK 57, reconstruire le bundle et vérifier les services.
