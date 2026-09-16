@@ -649,3 +649,5 @@
 - [x] Réaligner les contrats de tests de palette sur les tokens de thème de la série Claude, sans modifier les écrans de production.
 
 - [x] Vérifier le correctif Animated.spring du suivi puis vider les caches Metro/Expo pour éliminer tout bundle obsolète.
+
+- [x] Récupérer et intégrer les nouvelles modifications Claude, valider le projet et livrer un checkpoint.
