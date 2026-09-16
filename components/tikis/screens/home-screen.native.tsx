@@ -458,10 +458,13 @@ export function HomeScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
       <MapBackground selected={selected} role={role} sheetOverlayHeight={sheetValue.current} driverPosition={role === "driver" ? driverLocation.location : senderLivePosition} />
 
+      <View pointerEvents="auto" style={styles.mapTouchBlocker} />
 
       <Animated.View style={[styles.sheet, { height: sheetHeight }]}>
-        <View {...panResponder.panHandlers} style={styles.sheetHeader}>
-          <View style={styles.sheetGrip} />
+        <View style={styles.sheetHeader}>
+          <View {...panResponder.panHandlers} style={styles.sheetDragHandle} accessibilityRole="adjustable" accessibilityLabel="Faire glisser le panneau de livraisons">
+            <View style={styles.sheetGrip} />
+          </View>
           <View style={styles.sheetTop}>
             <View style={styles.greetingBlock}>
               {isDriver ? (
@@ -1024,6 +1027,7 @@ const styles = StyleSheet.create({
 
   mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5", zIndex: 0 },
   mapCanvas: { zIndex: 0 },
+  mapTouchBlocker: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
   nativeMarkerStart: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
   nativeMarkerDriver: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#111111", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
   nativeMarkerEnd: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#A43740" },
@@ -1042,6 +1046,7 @@ const styles = StyleSheet.create({
 
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden", zIndex: 2, elevation: 2 },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
+  sheetDragHandle: { alignSelf: "stretch", minHeight: 28, alignItems: "center", justifyContent: "center" },
   sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#E3E3E3", marginBottom: 10 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
   greetingBlock: { flex: 1, minWidth: 0 },

@@ -629,3 +629,5 @@
 - [x] Supprimer les styles shadow* et elevation restants, puis vérifier l’absence de leurs avertissements après redémarrage.
 
 - [x] Corriger la génération SQL analytics TiDB qui qualifie différemment l’expression SELECT et GROUP BY malgré only_full_group_by.
+
+- [x] Corriger la capture globale des gestes du panneau qui bloque encore les onglets et boutons Expéditeur après connexion.
