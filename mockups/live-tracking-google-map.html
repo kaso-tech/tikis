@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tikis — Suivi en direct (style Google Maps)</title>
+<style>
+  :root {
+    --primary: #9A6201;
+    --primary-soft: #C2891F;
+    --bg: #F5F5F5;
+    --surface: #FFFFFF;
+    --foreground: #111111;
+    --muted: #667085;
+    --border: #E3E3E3;
+    --success: #176C52;
+    --error: #A43740;
+    --shadow: 0 4px 14px rgba(0,0,0,0.08);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #2A2018;
+    color: var(--foreground);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 12px;
+  }
+
+  .page-title {
+    color: #FBF7F0;
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .page-subtitle {
+    color: #C8BCAA;
+    font-size: 12px;
+    margin-bottom: 24px;
+  }
+
+  /* === Phone frame === */
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: var(--bg);
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5), 0 0 0 8px #1F1206, 0 0 0 9px #4A3823;
+  }
+
+  /* === Map background (mock) === */
+  .map {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 30% 25%, #E5D2B9 0%, transparent 35%),
+      radial-gradient(circle at 75% 65%, #F0E5D2 0%, transparent 40%),
+      linear-gradient(135deg, #F5F0E5 0%, #ECE5D5 100%);
+  }
+
+  /* Mock roads on the map */
+  .map::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(90deg, transparent 49%, #D7CCBA 49%, #D7CCBA 51%, transparent 51%),
+      linear-gradient(0deg, transparent 49%, #D7CCBA 49%, #D7CCBA 51%, transparent 51%);
+    background-size: 80px 80px, 80px 80px;
+    opacity: 0.5;
+  }
+
+  /* Mock main avenue */
+  .map::after {
+    content: "";
+    position: absolute;
+    top: 30%;
+    left: 0;
+    right: 0;
+    height: 14px;
+    background: #FFFFFF;
+    box-shadow: 0 0 0 2px #C8B89A;
+  }
+
+  /* Polyline A→B (mock) */
+  .route {
+    position: absolute;
+    top: 28%;
+    left: 25%;
+    width: 50%;
+    height: 30%;
+  }
+
+  .route svg { width: 100%; height: 100%; overflow: visible; }
+
+  /* Marker pickup A */
+  .marker-a, .marker-b {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 3px solid var(--primary);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 14px;
+    z-index: 5;
+  }
+
+  .marker-b {
+    border-color: var(--success);
+    color: var(--success);
+  }
+
+  /* Driver position (animated dot) */
+  .driver {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: 4px solid #FFFFFF;
+    box-shadow: 0 0 0 2px var(--primary), 0 4px 12px rgba(154, 98, 1, 0.4);
+    top: 42%;
+    left: 48%;
+    z-index: 6;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 2px var(--primary), 0 4px 12px rgba(154, 98, 1, 0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(154, 98, 1, 0.3), 0 4px 12px rgba(154, 98, 1, 0.4); }
+  }
+
+  /* === Top header (floating) === */
+  .header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 56px 14px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 20;
+    background: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.0) 100%);
+  }
+
+  .icon-button {
+    width: 40px;
+    height: 40px;
+    border-radius: 9px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--foreground);
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+
+  .header-title {
+    flex: 1;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--foreground);
+    letter-spacing: -0.2px;
+  }
+
+  /* === FAB (top right) === */
+  .fab-stack {
+    position: absolute;
+    top: 110px;
+    right: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 20;
+  }
+
+  .fab {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--foreground);
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+
+  .fab-primary {
+    background: var(--primary);
+    color: #FFFFFF;
+    border-color: var(--primary);
+  }
+
+  /* === Sheet === */
+  .sheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--surface);
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
+    transition: height 220ms ease-out;
+    overflow: hidden;
+    z-index: 10;
+  }
+
+  .sheet.sheet-mini { height: 132px; }
+  .sheet.sheet-peek { height: 420px; }
+  .sheet.sheet-expanded { height: 720px; }
+
+  .sheet-grip {
+    width: 44px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 8px auto 0;
+  }
+
+  .sheet-content {
+    padding: 14px 16px 18px;
+  }
+
+  /* === Sheet tabs (livraisons en cours) === */
+  .sheet-tabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    margin: 14px -16px 0;
+    padding: 0 16px;
+    scrollbar-width: none;
+  }
+  .sheet-tabs::-webkit-scrollbar { display: none; }
+
+  .tab-chip {
+    flex-shrink: 0;
+    padding: 9px 14px;
+    border-radius: 18px;
+    background: var(--bg);
+    border: 1px solid transparent;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 150ms;
+  }
+
+  .tab-chip.active {
+    background: var(--primary);
+    color: #FFFFFF;
+    border-color: var(--primary);
+  }
+
+  .tab-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: 0.6;
+  }
+
+  /* === Delivery card === */
+  .delivery-card {
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 14px;
+    margin-top: 12px;
+    border: 1px solid var(--border);
+  }
+
+  .delivery-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+
+  .delivery-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: #DDEFE7;
+    color: var(--success);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+  }
+
+  .delivery-price {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--foreground);
+  }
+
+  .delivery-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--foreground);
+    margin-bottom: 4px;
+  }
+
+  .delivery-meta {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+
+  .route-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .route-icon {
+    width: 18px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 4px;
+  }
+
+  .route-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 0 0 1px var(--primary);
+  }
+
+  .route-dot-end {
+    background: var(--success);
+    box-shadow: 0 0 0 1px var(--success);
+  }
+
+  .route-line {
+    width: 2px;
+    flex: 1;
+    background: var(--border);
+    margin: 2px 0;
+    min-height: 16px;
+  }
+
+  .route-info { flex: 1; min-width: 0; }
+
+  .route-label {
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+
+  .route-text {
+    font-size: 13px;
+    color: var(--foreground);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .route-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+
+  /* === ETA bar === */
+  .eta-bar {
+    display: flex;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #FFFFFF;
+    border-radius: 9px;
+    margin-top: 12px;
+    border: 1px solid var(--border);
+  }
+
+  .eta-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .eta-label {
+    font-size: 10px;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .eta-value {
+    font-size: 13px;
+    color: var(--foreground);
+    font-weight: 700;
+  }
+
+  /* === Action buttons === */
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .btn {
+    flex: 1;
+    height: 44px;
+    border-radius: 9px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--foreground);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: #FFFFFF;
+    border-color: var(--primary);
+  }
+
+  /* === Controls (sheet state) === */
+  .controls {
+    margin-top: 24px;
+    display: flex;
+    gap: 8px;
+  }
+
+  .ctrl {
+    padding: 8px 14px;
+    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--foreground);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #111111;
+  }
+
+  .ctrl.active {
+    background: var(--primary);
+    color: #FFFFFF;
+    border-color: var(--primary);
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">Tikis — Suivi en direct (style Google Maps)</div>
+<div class="page-subtitle">Sheet dragable 3 états + switches livraisons en cours · mode Sender / Driver</div>
+
+<div class="phone">
+  <!-- Mock map -->
+  <div class="map"></div>
+
+  <!-- Route polyline (mock) -->
+  <svg style="position: absolute; top: 30%; left: 22%; width: 56%; height: 35%; z-index: 4; pointer-events: none;" viewBox="0 0 200 100">
+    <path d="M 0 80 Q 50 80, 80 40 T 200 10" stroke="#9A6201" stroke-width="3" fill="none" stroke-linecap="round" stroke-dasharray="6,4" />
+  </svg>
+
+  <!-- Markers -->
+  <div class="marker-a" style="top: 56%; left: 20%;">A</div>
+  <div class="driver" style="top: 42%; left: 48%;"></div>
+  <div class="marker-b" style="top: 26%; left: 68%;">B</div>
+
+  <!-- Top header -->
+  <div class="header">
+    <div class="icon-button">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+    </div>
+    <div class="header-title">Suivi en direct</div>
+    <div class="icon-button">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+  </div>
+
+  <!-- FAB stack (top right) -->
+  <div class="fab-stack">
+    <div class="fab" title="Centrer sur moi">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+    </div>
+    <div class="fab" title="Recentrer la carte">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+    </div>
+    <div class="fab fab-primary" title="Contacter le livreur">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+    </div>
+  </div>
+
+  <!-- Sheet (mode PEEK visible par défaut) -->
+  <div class="sheet sheet-peek" id="sheet">
+    <div class="sheet-grip"></div>
+    <div class="sheet-content">
+      <!-- Sheet tabs : livraisons en cours -->
+      <div class="sheet-tabs">
+        <div class="tab-chip active">
+          <span class="tab-dot"></span>
+          Course #1284
+        </div>
+        <div class="tab-chip">
+          <span class="tab-dot"></span>
+          Course #1285
+        </div>
+        <div class="tab-chip">
+          <span class="tab-dot"></span>
+          Course #1287
+        </div>
+      </div>
+
+      <!-- Delivery card -->
+      <div class="delivery-card">
+        <div class="delivery-header">
+          <div>
+            <div class="delivery-title">Plis · Marché de Ouaga</div>
+            <div class="delivery-meta">Course #1284 · démarrée il y a 12 min</div>
+          </div>
+          <div class="delivery-price">2 500 F</div>
+        </div>
+
+        <div class="delivery-status">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"/></svg>
+          EN TRANSIT
+        </div>
+
+        <div style="margin-top: 14px;">
+          <div class="route-row">
+            <div class="route-icon">
+              <div class="route-dot"></div>
+              <div class="route-line"></div>
+            </div>
+            <div class="route-info">
+              <div class="route-label">Point A</div>
+              <div class="route-text">Pharmacie de la Patte d'Oie</div>
+              <div class="route-sub">Av. Kwame Nkrumah, Ouagadougou</div>
+            </div>
+          </div>
+          <div class="route-row">
+            <div class="route-icon">
+              <div class="route-dot route-dot-end"></div>
+            </div>
+            <div class="route-info">
+              <div class="route-label">Destination</div>
+              <div class="route-text">Résidence Wali</div>
+              <div class="route-sub">Quartier Patte d'Oie, Ouagadougou</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ETA bar -->
+        <div class="eta-bar">
+          <div class="eta-item">
+            <div class="eta-label">ETA</div>
+            <div class="eta-value">8 min</div>
+          </div>
+          <div class="eta-item">
+            <div class="eta-label">Distance</div>
+            <div class="eta-value">3,2 km</div>
+          </div>
+          <div class="eta-item">
+            <div class="eta-label">Livreur</div>
+            <div class="eta-value">Issouf</div>
+          </div>
+        </div>
+
+        <!-- Action buttons -->
+        <div class="actions">
+          <button class="btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            Appeler
+          </button>
+          <button class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            Message
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- State controls -->
+<div class="controls">
+  <button class="ctrl" data-state="mini">Mini</button>
+  <button class="ctrl active" data-state="peek">Peek</button>
+  <button class="ctrl" data-state="expanded">Expanded</button>
+</div>
+
+<script>
+  const sheet = document.getElementById('sheet');
+  const ctrls = document.querySelectorAll('.ctrl');
+  ctrls.forEach(c => c.addEventListener('click', () => {
+    ctrls.forEach(x => x.classList.remove('active'));
+    c.classList.add('active');
+    sheet.classList.remove('sheet-mini', 'sheet-peek', 'sheet-expanded');
+    sheet.classList.add('sheet-' + c.dataset.state);
+  }));
+
+  // Tab chip switch
+  const tabs = document.querySelectorAll('.tab-chip');
+  tabs.forEach(t => t.addEventListener('click', () => {
+    tabs.forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+  }));
+</script>
+
+</body>
+</html>
