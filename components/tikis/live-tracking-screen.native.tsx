@@ -397,7 +397,6 @@ function DraggableSheet({
       useNativeDriver: false,
       tension: 220,
       friction: 22,
-      mass: 0.8,
     }).start();
   }, [sheetLevel, sheetBaseHeight]);
 

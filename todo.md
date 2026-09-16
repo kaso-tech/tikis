@@ -635,3 +635,5 @@
 - [x] Migrer Expo SDK 54 vers SDK 57 pour rendre le projet compatible avec Expo Go actuel, puis valider le bundle et les tests.
 
 - [x] Empêcher expo-notifications de s’enregistrer automatiquement dans Expo Go SDK 57, conserver le support natif en development build et valider le bundle.
+
+- [x] Corriger la configuration Animated.spring du suivi incompatible avec Expo SDK 57 afin de rétablir l’onglet Suivi.
