@@ -120,6 +120,10 @@ export interface Delivery {
   vehicleTypes: SelectableVehicleType[];
   createdAt: string;
   scheduledAt: string;
+  /** Horodatage du choix d'un livreur par l'expéditeur (jalon « Attribuée »). */
+  selectedAt?: string;
+  /** Horodatage de la confirmation du livreur (jalon « En cours »). */
+  confirmedAt?: string;
   completedAt?: string;
   senderName: string;
   senderPhone?: string;
