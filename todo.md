@@ -631,3 +631,5 @@
 - [x] Corriger la génération SQL analytics TiDB qui qualifie différemment l’expression SELECT et GROUP BY malgré only_full_group_by.
 
 - [x] Corriger la capture globale des gestes du panneau qui bloque encore les onglets et boutons Expéditeur après connexion.
+
+- [ ] Migrer Expo SDK 54 vers SDK 57 pour rendre le projet compatible avec Expo Go actuel, puis valider le bundle et les tests.
