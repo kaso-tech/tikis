@@ -106,7 +106,7 @@ export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, 
 }
 
 const baseStyles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F5F5F5" }, map: { ...StyleSheet.absoluteFillObject },
+  screen: { flex: 1, backgroundColor: "#F5F5F5" }, map: { ...StyleSheet.absoluteFill },
   centerMarker: { position: "absolute", top: "48%", alignSelf: "center", alignItems: "center", width: 40, height: 52, marginTop: -52 },
   markerShadow: { position: "absolute", bottom: -2, width: 18, height: 5, borderRadius: 9, backgroundColor: "rgba(0,0,0,0.30)" },
   markerCircle: { width: 36, height: 36, borderRadius: 18, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 2.5, borderColor: "#FFFFFF", shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 4 },

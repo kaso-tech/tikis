@@ -597,3 +597,53 @@
 - [x] Conserver la branche fonctionnelle 74a0acc issue du merge f886394, puis réappliquer les correctifs utiles du commit 4334293 sans reprendre la migration P6 non compilable.
 
 - [ ] Réparer la migration P6 de styles dans la version distante f886394 sans retirer les changements fonctionnels de l’autre agent.
+
+- [x] Synchroniser github/main, valider les dépendances, la compilation, les tests et livrer la dernière version.
+
+- [x] Intégrer le hotfix thème origin/main jusqu’à d1ac147, préserver les correctifs fonctionnels et livrer une version testable.
+
+- [x] Refaire le pull de github/main, vérifier les changements distants, valider le projet et livrer le dernier checkpoint.
+
+- [x] Refaire le pull de github/main, vérifier les changements distants, valider le projet et livrer le dernier checkpoint.
+
+- [x] Réaligner les contrats de tests de palette avec les tokens déjà présents dans la production après le pull dfe1bf7.
+
+- [x] Refaire le pull de github/main, vérifier les changements distants, valider le projet et livrer le dernier checkpoint.
+
+- [x] Corriger les 15 incompatibilités TypeScript introduites par 75b573f, sans retirer les changements fonctionnels distants.
+
+- [x] Analyser, sauvegarder et appliquer uniquement les migrations manuelles 0034 à 0037, puis vérifier les objets de base et les services.
+
+- [x] Créer une nouvelle sauvegarde et appliquer uniquement les migrations TiDB compatibles 0027, 0028, 0029, 0033, 0034, 0035 et 0037, puis vérifier le schéma et les objets.
+
+- [x] Livrer la dernière version validée après les migrations TiDB et créer le checkpoint testable.
+
+- [x] Refaire le pull de github/main, vérifier les changements distants, valider le projet et livrer le dernier checkpoint.
+
+- [x] Corriger les 15 incompatibilités TypeScript de thème introduites par e888d06 sans modifier le correctif MapView.
+
+- [x] Corriger la requête analytics incompatible avec only_full_group_by, ajouter une régression et valider les statistiques.
+
+- [x] Corriger le blocage qui rend les onglets et actions inactifs après connexion sur un compte Expéditeur.
+
+- [x] Supprimer les styles shadow* et elevation restants, puis vérifier l’absence de leurs avertissements après redémarrage.
+
+- [x] Corriger la génération SQL analytics TiDB qui qualifie différemment l’expression SELECT et GROUP BY malgré only_full_group_by.
+
+- [x] Corriger la capture globale des gestes du panneau qui bloque encore les onglets et boutons Expéditeur après connexion.
+
+- [x] Migrer Expo SDK 54 vers SDK 57 pour rendre le projet compatible avec Expo Go actuel, puis valider le bundle et les tests.
+
+- [x] Empêcher expo-notifications de s’enregistrer automatiquement dans Expo Go SDK 57, conserver le support natif en development build et valider le bundle.
+
+- [x] Corriger la configuration Animated.spring du suivi incompatible avec Expo SDK 57 afin de rétablir l’onglet Suivi.
+
+- [x] Refaire le pull de github/main, vérifier les changements distants, valider le projet et livrer le dernier checkpoint.
+
+- [x] Vérifier et intégrer explicitement le commit 90e103f de l’autre agent sans réintroduire de régression SDK 57.
+
+- [x] Rétablir le token centralisé placeholder pour corriger les 12 erreurs TypeScript de la branche réconciliée.
+
+- [x] Corriger les helpers de création de livraison qui référencent le thème hors de leur portée après la réconciliation SDK 57.
+
+- [x] Réaligner les contrats de tests de palette sur les tokens de thème de la série Claude, sans modifier les écrans de production.

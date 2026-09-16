@@ -17,7 +17,6 @@ import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format"
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
-import { SenderHomeKpiCards } from "@/components/tikis/sender-home-kpi-cards";
 import { RateDeliveryDialog } from "@/components/tikis/rate-delivery-dialog";
 import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
 import { resolveDriverHomeAction } from "@/shared/delivery-home-action";
@@ -458,10 +457,13 @@ export function HomeScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
       <MapBackground selected={selected} role={role} sheetOverlayHeight={sheetValue.current} driverPosition={role === "driver" ? driverLocation.location : senderLivePosition} />
 
+      <View pointerEvents="auto" style={styles.mapTouchBlocker} />
 
       <Animated.View style={[styles.sheet, { height: sheetHeight }]}>
-        <View {...panResponder.panHandlers} style={styles.sheetHeader}>
-          <View style={styles.sheetGrip} />
+        <View style={styles.sheetHeader}>
+          <View {...panResponder.panHandlers} style={styles.sheetDragHandle} accessibilityRole="adjustable" accessibilityLabel="Faire glisser le panneau de livraisons">
+            <View style={styles.sheetGrip} />
+          </View>
           <View style={styles.sheetTop}>
             <View style={styles.greetingBlock}>
               {isDriver ? (
@@ -535,8 +537,6 @@ export function HomeScreen() {
               <MaterialIcons name="chevron-right" size={18} color="#9A6201" />
             </Pressable>
           ) : null}
-
-          {role === "sender" ? <SenderHomeKpiCards /> : null}
 
           <View style={styles.searchRow}>
             <View style={styles.searchPill}>
@@ -798,7 +798,7 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
     <View style={styles.mapBg} pointerEvents="none">
       <MapView
         ref={mapRef}
-        style={StyleSheet.absoluteFill}
+        style={[StyleSheet.absoluteFill, styles.mapCanvas]}
         pointerEvents="none"
         initialRegion={region}
         showsCompass={false}
@@ -806,8 +806,8 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
         toolbarEnabled={false}
         showsUserLocation={false}
         showsMyLocationButton={false}
-        zoomEnabled
-        scrollEnabled
+        zoomEnabled={false}
+        scrollEnabled={false}
       >
         {selected ? (
           <>
@@ -1022,7 +1022,9 @@ function DeliveryRow({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#F5F5F5" },
 
-  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5" },
+  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5", zIndex: 0 },
+  mapCanvas: { zIndex: 0 },
+  mapTouchBlocker: { ...StyleSheet.absoluteFill, zIndex: 1 },
   nativeMarkerStart: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
   nativeMarkerDriver: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#111111", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
   nativeMarkerEnd: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#A43740" },
@@ -1039,8 +1041,9 @@ const styles = StyleSheet.create({
   fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3", zIndex: 10 },
   sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
 
-  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
+  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden", zIndex: 2, elevation: 2 },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
+  sheetDragHandle: { alignSelf: "stretch", minHeight: 28, alignItems: "center", justifyContent: "center" },
   sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#E3E3E3", marginBottom: 10 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
   greetingBlock: { flex: 1, minWidth: 0 },
@@ -1050,8 +1053,8 @@ const styles = StyleSheet.create({
   sheetSubtitle: { color: "#667085", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 
   servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E3E3E3" },
-  servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", shadowOpacity: 0, elevation: 0 },
-  servicePillNeutral: { backgroundColor: "#F5F5F5", shadowOpacity: 0, elevation: 0 },
+  servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3" },
+  servicePillNeutral: { backgroundColor: "#F5F5F5" },
   serviceText: { color: "#9A6201", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   serviceTextOffline: { color: "#111111" },
   onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9A6201" },

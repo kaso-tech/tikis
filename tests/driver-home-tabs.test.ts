@@ -24,7 +24,7 @@ describe("onglets de l’accueil livreur", () => {
     expect(source).toContain("const filterCounts = useMemo");
     expect(source).toContain("accessibilityRole=\"tab\"");
     expect(source).toContain("styles.chipCount");
-    expect(source).toContain('backgroundColor: "#F7EFE5"');
+    expect(source).toContain('backgroundColor: "#FFFFFF"');
     expect(source).toContain('color: "#9A6201"');
   });
 });

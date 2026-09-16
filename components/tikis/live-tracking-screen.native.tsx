@@ -283,6 +283,16 @@ function LiveTrackingFocus({
         <View style={styles.fabStack} pointerEvents="box-none">
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Contacter le livreur"
+            onPress={() => {
+              if (delivery.driverPhone) void Linking.openURL(`tel:${delivery.driverPhone}`);
+            }}
+            style={({ pressed }) => [styles.fab, styles.fabPrimary, { backgroundColor: theme.primary, borderColor: theme.primary }, pressed && { opacity: 0.85 }]}
+          >
+            <MaterialIcons name="call" size={18} color="#FFFFFF" />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
             accessibilityLabel="Centrer la carte"
             onPress={() => {
               if (!region || !mapRef.current) return;
@@ -397,7 +407,6 @@ function DraggableSheet({
       useNativeDriver: false,
       tension: 220,
       friction: 22,
-      mass: 0.8,
     }).start();
   }, [sheetLevel, sheetBaseHeight]);
 
@@ -501,6 +510,40 @@ function DraggableSheet({
           </Pressable>
         </View>
 
+        {/* Livraison chips (switch direct entre les livraisons de l'onglet actif) */}
+        {visibleDeliveries.length > 1 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.deliveryChipsRow}
+            style={styles.deliveryChipsScroll}
+          >
+            {visibleDeliveries.map((d) => {
+              const dIsLive = d.status === "active" && Boolean(driverCoord);
+              const isSelected = d.id === selectedDelivery?.id;
+              return (
+                <Pressable
+                  key={d.id}
+                  onPress={() => setSelectedDeliveryId(d.id)}
+                  style={({ pressed }) => [
+                    styles.deliveryChip,
+                    { backgroundColor: isSelected ? theme.primary : theme.surface, borderColor: isSelected ? theme.primary : theme.border },
+                    pressed && { opacity: 0.85 },
+                  ]}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={`Course ${d.title ?? d.type}`}
+                >
+                  <View style={[styles.deliveryChipDot, { backgroundColor: dIsLive ? theme.success : (isSelected ? theme.background : theme.muted) }]} />
+                  <Text style={[styles.deliveryChipText, { color: isSelected ? theme.background : theme.foreground }]} numberOfLines={1}>
+                    {d.title ?? d.type}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : null}
+
         <ScrollView
           style={styles.sheetScroll}
           contentContainerStyle={styles.sheetContent}
@@ -602,13 +645,33 @@ function DraggableSheet({
           {/* Status info (visible mid + full) */}
           {sheetLevel !== "mini" && selectedDelivery ? (
             <View style={styles.statusBlock}>
-              <Text style={[styles.statusLabel, { color: theme.muted }]}>{statusLabel}</Text>
-              <Text style={[styles.statusValue, { color: theme.foreground }]}>
-                {selectedIsLive && selectedEtaMinutes > 0 ? `${selectedEtaMinutes} min` : "—"}
-              </Text>
+              {/* Grille ETA / Distance / Livreur (style Google Maps) */}
+              <View style={[styles.etaGrid, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                <View style={styles.etaItem}>
+                  <Text style={[styles.etaLabel, { color: theme.muted }]}>ETA</Text>
+                  <Text style={[styles.etaValue, { color: theme.foreground }]}>
+                    {selectedIsLive && selectedEtaMinutes > 0 ? `${selectedEtaMinutes} min` : "—"}
+                  </Text>
+                </View>
+                <View style={[styles.etaDivider, { backgroundColor: theme.border }]} />
+                <View style={styles.etaItem}>
+                  <Text style={[styles.etaLabel, { color: theme.muted }]}>Distance</Text>
+                  <Text style={[styles.etaValue, { color: theme.foreground }]}>
+                    {selectedDelivery ? formatDistance(selectedDelivery.distanceKm) : "—"}
+                  </Text>
+                </View>
+                <View style={[styles.etaDivider, { backgroundColor: theme.border }]} />
+                <View style={styles.etaItem}>
+                  <Text style={[styles.etaLabel, { color: theme.muted }]}>Livreur</Text>
+                  <Text style={[styles.etaValue, { color: theme.foreground }]} numberOfLines={1}>
+                    {selectedDelivery?.driverName ?? "—"}
+                  </Text>
+                </View>
+              </View>
+              <Text style={[styles.statusLabel, { color: theme.muted, marginTop: 10 }]}>{statusLabel}</Text>
               <Text style={[styles.statusSub, { color: theme.muted }]}>{statusSub}</Text>
               {selectedIsLive ? (
-                <View style={[styles.liveTag, { backgroundColor: theme.background }]}>
+                <View style={[styles.liveTag, { backgroundColor: theme.background, marginTop: 6 }]}>
                   <View style={[styles.liveTagPulse, { backgroundColor: theme.success }]} />
                   <Text style={[styles.liveTagText, { color: theme.success }]}>Position en direct</Text>
                 </View>
@@ -753,6 +816,7 @@ const styles = StyleSheet.create({
   // FAB stack (right side, above sheet)
   fabStack: { position: "absolute", right: 16, bottom: 420, gap: 8 },
   fab: { width: 46, height: 46, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
+  fabPrimary: { elevation: 4, shadowColor: "#000", shadowOpacity: 0.18, shadowRadius: 6, shadowOffset: { width: 0, height: 2 } },
 
   // Markers
   markerPickup: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", borderWidth: 3 },
@@ -770,6 +834,13 @@ const styles = StyleSheet.create({
   sheetTabs: { flexDirection: "row", marginHorizontal: 14, marginTop: 4, borderRadius: 10, padding: 3, gap: 2 },
   sheetTab: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: "center" },
   sheetTabText: { fontSize: 12.5, fontWeight: "600" },
+
+  // Delivery chips (switch direct entre livraisons)
+  deliveryChipsScroll: { marginTop: 8, maxHeight: 36 },
+  deliveryChipsRow: { paddingHorizontal: 14, gap: 8 },
+  deliveryChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, maxWidth: 200 },
+  deliveryChipDot: { width: 7, height: 7, borderRadius: 4 },
+  deliveryChipText: { fontSize: 12.5, fontWeight: "600", flexShrink: 1 },
 
   sheetScroll: { flex: 1, marginTop: 10 },
   sheetContent: { paddingHorizontal: 14, paddingBottom: 8, gap: 8 },
@@ -805,6 +876,13 @@ const styles = StyleSheet.create({
   statusLabel: { fontSize: 10.5, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
   statusValue: { fontSize: 24, fontWeight: "700" },
   statusSub: { fontSize: 12.5, textAlign: "center", lineHeight: 17 },
+
+  // ETA grid (ETA / Distance / Livreur — style Google Maps)
+  etaGrid: { flexDirection: "row", alignItems: "stretch", width: "100%", borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, paddingVertical: 10, paddingHorizontal: 4 },
+  etaItem: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
+  etaDivider: { width: StyleSheet.hairlineWidth, marginVertical: 4 },
+  etaLabel: { fontSize: 9.5, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 3 },
+  etaValue: { fontSize: 13, fontWeight: "700" },
   liveTag: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, alignSelf: "center" },
   liveTagPulse: { width: 6, height: 6, borderRadius: 3 },
   liveTagText: { fontSize: 11, fontWeight: "700" },

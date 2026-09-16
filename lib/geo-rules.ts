@@ -130,7 +130,7 @@ export const detailedPlaceLabel = (location: LocationLabel) => {
 /** @deprecated Utiliser formatDeliveryDetailPlace. */
 export const displayLocation = (location: LocationLabel) => {
   const formatted = formatDeliveryDetailPlace(location);
-  return `${formatted.title}${formatted.subtitle ? ` · ${formatted.subtitle.replaceAll(" / ", " · ")}` : ""}`;
+  return `${formatted.title}${formatted.subtitle ? ` · ${formatted.subtitle.split(" / ").join(" · ")}` : ""}`;
 };
 
 export function geodesicDistanceKm(origin: Pick<LocationLabel, "latitude" | "longitude">, destination: Pick<LocationLabel, "latitude" | "longitude">) {

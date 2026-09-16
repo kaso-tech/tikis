@@ -47,7 +47,7 @@ export function ActionConfirmationModal({
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0, 0, 0, 0.42)" },
-  backdrop: { ...StyleSheet.absoluteFillObject },
+  backdrop: { ...StyleSheet.absoluteFill },
   sheet: { borderTopLeftRadius: 14, borderTopRightRadius: 14, paddingHorizontal: 18, paddingBottom: 24, paddingTop: 10 },
   handle: { width: 38, height: 4, borderRadius: 2, alignSelf: "center", marginBottom: 14 },
   iconWrap: { width: 44, height: 44, alignItems: "center", justifyContent: "center", borderRadius: 10, marginBottom: 12 },
