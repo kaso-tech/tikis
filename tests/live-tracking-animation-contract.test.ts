@@ -8,13 +8,17 @@ const trackingSource = readFileSync(
 );
 
 describe("contrat d’animation du suivi", () => {
-  it("n’associe pas mass au modèle Animated.spring tension/friction", () => {
-    const animation = trackingSource.match(
-      /Animated\.spring\(sheetBaseHeight,\s*\{([\s\S]*?)\}\)\.start\(\);/,
-    )?.[1];
+  it("réinitialise panY avec une animation temporelle compatible", () => {
+    expect(trackingSource).toMatch(
+      /Animated\.timing\(panY,\s*\{\s*toValue: 0,\s*duration: 200,\s*useNativeDriver: false\s*\}\)\.start\(\);/,
+    );
+    expect(trackingSource).not.toMatch(/mass\s*:/);
+  });
 
-    expect(animation).toContain("tension: 220");
-    expect(animation).toContain("friction: 22");
-    expect(animation).not.toMatch(/mass\s*:/);
+  it("anime la hauteur du panneau sans option physique incompatible", () => {
+    expect(trackingSource).toMatch(
+      /Animated\.timing\(sheetBaseHeight,\s*\{[\s\S]*?useNativeDriver: false,[\s\S]*?\}\)\.start\(\);/,
+    );
+    expect(trackingSource).not.toMatch(/Animated\.spring\([^)]*mass\s*:/);
   });
 });

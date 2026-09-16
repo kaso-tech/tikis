@@ -653,3 +653,5 @@
 - [x] Récupérer et intégrer les nouvelles modifications Claude, valider le projet et livrer un checkpoint.
 
 - [x] Synchroniser origin/main, vider le cache Metro Expo SDK 57, reconstruire le bundle et vérifier les services.
+- [x] Aligner le test du contrat d’animation du suivi sur la transition temporelle introduite par github/main, puis revalider la suite.
+- [x] Aligner expo-build-properties sur la version attendue par Expo SDK 57 et revalider après installation.

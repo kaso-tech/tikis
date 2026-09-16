@@ -69,8 +69,8 @@ importers:
         specifier: ~57.0.5
         version: 57.0.5(expo-asset@57.0.17(expo@57.0.23)(react-native@0.86.3(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)(typescript@6.0.3))(expo@57.0.23)(react-native@0.86.3(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
       expo-build-properties:
-        specifier: ^57.0.19
-        version: 57.0.19(expo@57.0.23)
+        specifier: ^57.0.20
+        version: 57.0.20(expo@57.0.23)
       expo-clipboard:
         specifier: ~57.0.2
         version: 57.0.2(expo@57.0.23)(react-native@0.86.3(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
@@ -3774,8 +3774,8 @@ packages:
       react: '*'
       react-native: '*'
 
-  expo-build-properties@57.0.19:
-    resolution: {integrity: sha512-+RIcm7S7yyFnd+uhMOu6ncBVaU951TyJjOvyfLGXz/5n9ZFoswaCewdpPNEZXelcCNV4cp27oh/X/pncuAefZQ==}
+  expo-build-properties@57.0.20:
+    resolution: {integrity: sha512-rQ3Xt5slDXJQL+vevO1AsYAiCQsIq8c8bz1JfSK/UstPr3Md8fypaS/wcp6f67yZu4CzQSuPFC0hR46raHLTzg==}
     peerDependencies:
       expo: '*'
 
@@ -7379,7 +7379,7 @@ snapshots:
       prompts: 2.4.2
       resolve-from: 5.0.0
       sandbox-cli-detector: 0.2.0
-      semver: 7.7.3
+      semver: 7.8.5
       send: 0.19.2
       slugify: 1.6.6
       stacktrace-parser: 0.1.11
@@ -7420,7 +7420,7 @@ snapshots:
       debug: 4.4.3
       getenv: 2.0.0
       glob: 13.0.0
-      semver: 7.7.3
+      semver: 7.8.5
       slugify: 1.6.6
       xcode: 3.0.1
       xml2js: 0.6.0
@@ -7440,7 +7440,7 @@ snapshots:
       getenv: 2.0.0
       glob: 13.0.0
       resolve-workspace-root: 2.0.0
-      semver: 7.7.3
+      semver: 7.8.5
       slugify: 1.6.6
     transitivePeerDependencies:
       - supports-color
@@ -7488,7 +7488,7 @@ snapshots:
       ignore: 5.3.2
       minimatch: 10.2.6
       resolve-from: 5.0.0
-      semver: 7.7.3
+      semver: 7.8.5
     transitivePeerDependencies:
       - supports-color
 
@@ -7696,7 +7696,7 @@ snapshots:
       debug: 4.4.3
       expo-modules-autolinking: 57.0.13(typescript@6.0.3)
       resolve-from: 5.0.0
-      semver: 7.7.3
+      semver: 7.8.5
     transitivePeerDependencies:
       - supports-color
       - typescript
@@ -7943,7 +7943,7 @@ snapshots:
       '@opentelemetry/instrumentation': 0.57.1(@opentelemetry/api@1.9.1)
       '@opentelemetry/semantic-conventions': 1.28.0
       forwarded-parse: 2.1.2
-      semver: 7.7.3
+      semver: 7.8.5
     transitivePeerDependencies:
       - supports-color
 
@@ -8076,7 +8076,7 @@ snapshots:
       '@types/shimmer': 1.2.0
       import-in-the-middle: 1.15.0
       require-in-the-middle: 7.5.2
-      semver: 7.7.3
+      semver: 7.8.5
       shimmer: 1.2.1
     transitivePeerDependencies:
       - supports-color
@@ -8088,7 +8088,7 @@ snapshots:
       '@types/shimmer': 1.2.0
       import-in-the-middle: 1.15.0
       require-in-the-middle: 7.5.2
-      semver: 7.7.3
+      semver: 7.8.5
       shimmer: 1.2.1
     transitivePeerDependencies:
       - supports-color
@@ -8100,7 +8100,7 @@ snapshots:
       '@types/shimmer': 1.2.0
       import-in-the-middle: 1.15.0
       require-in-the-middle: 7.5.2
-      semver: 7.7.3
+      semver: 7.8.5
       shimmer: 1.2.1
     transitivePeerDependencies:
       - supports-color
@@ -8400,7 +8400,7 @@ snapshots:
       metro: 0.84.5
       metro-config: 0.84.5
       metro-core: 0.84.5
-      semver: 7.7.3
+      semver: 7.8.5
     optionalDependencies:
       '@react-native/metro-config': 0.86.3(@babel/core@7.28.5)
     transitivePeerDependencies:
@@ -10253,12 +10253,12 @@ snapshots:
       react: 19.2.3
       react-native: 0.86.3(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(@types/react@19.2.18)(react@19.2.3)
 
-  expo-build-properties@57.0.19(expo@57.0.23):
+  expo-build-properties@57.0.20(expo@57.0.23):
     dependencies:
       '@expo/schema-utils': 57.0.2
       expo: 57.0.23(@babel/core@7.28.5)(@expo/dom-webview@57.0.1)(@expo/metro-runtime@57.0.15)(expo-router@57.0.21)(react-dom@19.2.3(react@19.2.3))(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native-worklets@0.10.1(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(react-native@0.86.3(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.3(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
       resolve-from: 5.0.0
-      semver: 7.7.3
+      semver: 7.8.5
 
   expo-clipboard@57.0.2(expo@57.0.23)(react-native@0.86.3(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3):
     dependencies:
@@ -11599,7 +11599,7 @@ snapshots:
     dependencies:
       hosted-git-info: 7.0.2
       proc-log: 4.2.0
-      semver: 7.7.3
+      semver: 7.8.5
       validate-npm-package-name: 5.0.1
 
   nth-check@2.1.1:
@@ -11958,7 +11958,7 @@ snapshots:
       react: 19.2.3
       react-native: 0.86.3(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(@types/react@19.2.18)(react@19.2.3)
       react-native-reanimated: 4.5.1(react-native-worklets@0.10.1(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(react-native@0.86.3(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.3(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
-      semver: 7.7.3
+      semver: 7.8.5
       tailwindcss: 3.4.19(tsx@4.21.0)(yaml@2.8.2)
     optionalDependencies:
       react-native-safe-area-context: 5.7.0(react-native@0.86.3(@babel/core@7.28.5)(@react-native/metro-config@0.86.3(@babel/core@7.28.5))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
