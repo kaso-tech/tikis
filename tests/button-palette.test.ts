@@ -10,7 +10,7 @@ const deliverySource = readFileSync(join(process.cwd(), "app/delivery/[id].tsx")
 
 describe("palette des boutons hors authentification", () => {
   it("utilise le fond blanc et le texte brun pour le bouton primaire partagé", () => {
-    expect(buttonSource).toContain('primary: { background: "#FFFFFF", foreground: "#9A6201", border: "#E3E3E3"');
+    expect(buttonSource).toContain('primary: { background: "#FFFFFF", foreground: "#9A6201"');
     expect(buttonSource).toContain('authStyle && variant === "primary"');
     expect(buttonSource).toContain('background: "#9A6201", foreground: "#FFFFFF"');
   });

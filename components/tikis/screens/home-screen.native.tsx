@@ -17,7 +17,6 @@ import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format"
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
-import { SenderHomeKpiCards } from "@/components/tikis/sender-home-kpi-cards";
 import { RateDeliveryDialog } from "@/components/tikis/rate-delivery-dialog";
 import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
 import { resolveDriverHomeAction } from "@/shared/delivery-home-action";
@@ -538,8 +537,6 @@ export function HomeScreen() {
               <MaterialIcons name="chevron-right" size={18} color="#9A6201" />
             </Pressable>
           ) : null}
-
-          {role === "sender" ? <SenderHomeKpiCards /> : null}
 
           <View style={styles.searchRow}>
             <View style={styles.searchPill}>

@@ -466,6 +466,7 @@ export default function CreateDeliveryScreen() {
 }
 
 function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { tone: "pickup" | "dropoff"; label: string; value: LocationLabel | null; invalid: boolean; onPress: () => void; onAddFavorite?: (label: string) => void }) {
+  const { colors: theme } = useThemeColors();
   const isPickup = tone === "pickup";
   const [showFavoriteInput, setShowFavoriteInput] = useState(false);
   const [favoriteLabel, setFavoriteLabel] = useState("");
@@ -500,7 +501,7 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
       </Pressable>
       {showFavoriteInput && value ? (
         <View style={styles.favoriteInputRow}>
-          <TextInput value={favoriteLabel} onChangeText={setFavoriteLabel} placeholder="Nom du favori (ex. Maison, Bureau)" placeholderTextColor="#98A2B3" style={styles.favoriteInput} maxLength={40} />
+          <TextInput value={favoriteLabel} onChangeText={setFavoriteLabel} placeholder="Nom du favori (ex. Maison, Bureau)" placeholderTextColor={theme.placeholder} style={styles.favoriteInput} maxLength={40} />
           <Pressable
             onPress={() => { if (onAddFavorite) { onAddFavorite(favoriteLabel.trim() || locationTitle(value) || "Adresse favorite"); setShowFavoriteInput(false); setFavoriteLabel(""); } }}
             style={({ pressed }) => [styles.favoriteSaveBtn, pressed && styles.pressed]}
@@ -515,11 +516,13 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
 }
 
 function Field({ label, icon, keyboardType, error, ...props }: { label: string; icon?: React.ComponentProps<typeof MaterialIcons>["name"]; keyboardType?: "default" | "number-pad" | "decimal-pad"; value: string; onChangeText: (value: string) => void; onBlur?: () => void; placeholder: string; multiline?: boolean; error?: string }) {
-  return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#A43740" : "#9A6201"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor="#98A2B3" /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>;
+  const { colors: theme } = useThemeColors();
+  return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#A43740" : "#9A6201"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor={theme.placeholder} /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>;
 }
 
 function MiniNumber({ value, onChangeText, placeholder }: { value: string; onChangeText: (value: string) => void; placeholder: string }) {
-  return <TextInput value={value} onChangeText={(text) => onChangeText(text.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" placeholder={placeholder} placeholderTextColor="#98A2B3" style={styles.input} />;
+  const { colors: theme } = useThemeColors();
+  return <TextInput value={value} onChangeText={(text) => onChangeText(text.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" placeholder={placeholder} placeholderTextColor={theme.placeholder} style={styles.miniInput} />;
 }
 
 const styles = StyleSheet.create({
@@ -528,7 +531,7 @@ const styles = StyleSheet.create({
   content: { padding: 16, paddingBottom: 24, gap: 14 },
 
   topBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8, gap: 8 },
-  iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
+  iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
   iconBtnSpacer: { width: 36 },
   topTitleWrap: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   topTitle: { color: "#111111", fontSize: 15, fontWeight: "600" },

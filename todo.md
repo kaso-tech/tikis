@@ -637,3 +637,13 @@
 - [x] Empêcher expo-notifications de s’enregistrer automatiquement dans Expo Go SDK 57, conserver le support natif en development build et valider le bundle.
 
 - [x] Corriger la configuration Animated.spring du suivi incompatible avec Expo SDK 57 afin de rétablir l’onglet Suivi.
+
+- [x] Refaire le pull de github/main, vérifier les changements distants, valider le projet et livrer le dernier checkpoint.
+
+- [x] Vérifier et intégrer explicitement le commit 90e103f de l’autre agent sans réintroduire de régression SDK 57.
+
+- [x] Rétablir le token centralisé placeholder pour corriger les 12 erreurs TypeScript de la branche réconciliée.
+
+- [x] Corriger les helpers de création de livraison qui référencent le thème hors de leur portée après la réconciliation SDK 57.
+
+- [x] Réaligner les contrats de tests de palette sur les tokens de thème de la série Claude, sans modifier les écrans de production.

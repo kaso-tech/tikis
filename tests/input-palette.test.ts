@@ -22,9 +22,9 @@ describe("palette des champs et menus", () => {
     expect(themeSource).toContain('input: scheme === "light" ? "#F7EFE5" : "#3A2B1A"');
   });
 
-  it("harmonise les formulaires principaux", () => {
+  it("harmonise les formulaires principaux avec les surfaces du thème", () => {
     for (const formSource of [createDeliverySource, contactSource, reviewSource, reportSource, profileSource, walletSource]) {
-      expect(formSource).toMatch(/#F7EFE5|#FFFFFF/);
+      expect(formSource).toMatch(/#FFFFFF|backgroundColor: theme\.input/);
       expect(formSource).toContain("#9A6201");
     }
   });

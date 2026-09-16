@@ -826,17 +826,6 @@ export const appRouter = router({
     }),
   }),
   analytics: router({
-
-mySenderStats: tikisProtectedProcedure.query(async ({ ctx }) => {
-      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
-      if (profile.accountType !== "sender") {
-        return null;
-      }
-      const handle = await db.getDb();
-      if (!handle) return null;
-      const { computeSenderStats } = await import("./analytics");
-      return computeSenderStats(handle, profile.phone);
-    }),>>>>>>> 8f09dbb (Checkpoint: Correction des imports dynamiques serveur qui bloquaient les requêtes authentifiées.)
     myDriverEarningsProjection: tikisProtectedProcedure.query(async ({ ctx }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") {
