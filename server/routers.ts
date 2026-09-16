@@ -826,16 +826,6 @@ export const appRouter = router({
     }),
   }),
   analytics: router({
-    mySenderStats: tikisProtectedProcedure.query(async ({ ctx }) => {
-      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
-      if (profile.accountType !== "sender") {
-        return null;
-      }
-      const handle = await db.getDb();
-      if (!handle) return null;
-      const { computeSenderStats } = await import("./analytics");
-      return computeSenderStats(handle, profile.phone);
-    }),
     myDriverEarningsProjection: tikisProtectedProcedure.query(async ({ ctx }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") {
