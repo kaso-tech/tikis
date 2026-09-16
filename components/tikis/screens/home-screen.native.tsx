@@ -1027,7 +1027,7 @@ const styles = StyleSheet.create({
 
   mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5", zIndex: 0 },
   mapCanvas: { zIndex: 0 },
-  mapTouchBlocker: { ...StyleSheet.absoluteFillObject, zIndex: 1 },
+  mapTouchBlocker: { ...StyleSheet.absoluteFill, zIndex: 1 },
   nativeMarkerStart: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
   nativeMarkerDriver: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#111111", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
   nativeMarkerEnd: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#A43740" },

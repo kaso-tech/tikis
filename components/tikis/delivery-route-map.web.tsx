@@ -28,7 +28,7 @@ export function DeliveryRouteMap({ pickup, dropoff, coordinates, routeSource, dr
 
 const styles = StyleSheet.create({
   container: { flex: 1, overflow: "hidden", position: "relative" },
-  grid: { ...StyleSheet.absoluteFillObject, opacity: 0.28 },
+  grid: { ...StyleSheet.absoluteFill, opacity: 0.28 },
   route: { position: "absolute", height: 6, borderRadius: 4, width: "65%", top: "51%", left: "17%", transform: [{ rotate: "-17deg" }] },
   start: { position: "absolute", left: "15%", top: "62%", width: 30, height: 30, borderRadius: 7, alignItems: "center", justifyContent: "center" },
   destination: { position: "absolute", right: "15%", top: "31%", width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },

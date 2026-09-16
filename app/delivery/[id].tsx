@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
   iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
 
   heroMap: { height: 200, borderRadius: 12, backgroundColor: "#F5F5F5", position: "relative", overflow: "hidden", marginTop: 8 },
-  heroMapInner: { ...StyleSheet.absoluteFillObject, backgroundColor: "#F5F5F5" },
+  heroMapInner: { ...StyleSheet.absoluteFill, backgroundColor: "#F5F5F5" },
   heroMapBlock: { position: "absolute", backgroundColor: "#DCDEE3", borderRadius: 5 },
   heroMapRoad: { position: "absolute", backgroundColor: "#FFFFFF", borderRadius: 99 },
   heroMapMarker: { position: "absolute", width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },

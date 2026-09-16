@@ -632,4 +632,4 @@
 
 - [x] Corriger la capture globale des gestes du panneau qui bloque encore les onglets et boutons Expéditeur après connexion.
 
-- [ ] Migrer Expo SDK 54 vers SDK 57 pour rendre le projet compatible avec Expo Go actuel, puis valider le bundle et les tests.
+- [x] Migrer Expo SDK 54 vers SDK 57 pour rendre le projet compatible avec Expo Go actuel, puis valider le bundle et les tests.
