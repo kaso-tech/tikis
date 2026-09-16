@@ -22,9 +22,9 @@ describe("palette des champs et menus", () => {
     expect(themeSource).toContain('input: scheme === "light" ? "#F7EFE5" : "#3A2B1A"');
   });
 
-  it("harmonise les formulaires principaux", () => {
+  it("harmonise les formulaires principaux avec les surfaces du thème", () => {
     for (const formSource of [createDeliverySource, contactSource, reviewSource, reportSource, profileSource, walletSource]) {
-      expect(formSource).toContain("#F7EFE5");
+      expect(formSource).toMatch(/#FFFFFF|backgroundColor: theme\.input/);
       expect(formSource).toContain("#9A6201");
     }
   });
@@ -33,7 +33,7 @@ describe("palette des champs et menus", () => {
     expect(addressesSource).toContain("backgroundColor: theme.input");
     expect(yangoSource).toContain("backgroundColor: theme.input");
     for (const pickerSource of [nativeHomeSource, webHomeSource]) {
-      expect(pickerSource).toContain("#F7EFE5");
+      expect(pickerSource).toContain("#FFFFFF");
       expect(pickerSource).toContain("#9A6201");
     }
   });

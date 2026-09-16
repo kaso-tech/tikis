@@ -8,6 +8,7 @@ export type ThemedColors = ThemeColorPalette & {
   icon: string;
   border: string;
   input: string;
+  placeholder: string;
   pressed: string;
   overlay: string;
   divider: string;
@@ -25,6 +26,7 @@ function buildThemed(scheme: ColorScheme): ThemedColors {
     tabIconSelected: base.primary,
     border: base.border,
     input: scheme === "light" ? "#F7EFE5" : "#3A2B1A",
+    placeholder: base.muted,
     pressed: scheme === "light" ? "#E3DFEA" : "#2A2018",
     overlay: scheme === "light" ? "rgba(0,0,0,0.42)" : "rgba(0,0,0,0.62)",
     divider: scheme === "light" ? "#ECECEC" : "#33271B",

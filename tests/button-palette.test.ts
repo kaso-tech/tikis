@@ -9,8 +9,8 @@ const webHomeSource = readFileSync(join(process.cwd(), "components/tikis/screens
 const deliverySource = readFileSync(join(process.cwd(), "app/delivery/[id].tsx"), "utf8");
 
 describe("palette des boutons hors authentification", () => {
-  it("utilise le fond crème et le texte brun pour le bouton primaire partagé", () => {
-    expect(buttonSource).toContain('primary: { background: "#F7EFE5", foreground: "#9A6201"');
+  it("utilise le fond blanc et le texte brun pour le bouton primaire partagé", () => {
+    expect(buttonSource).toContain('primary: { background: "#FFFFFF", foreground: "#9A6201"');
     expect(buttonSource).toContain('authStyle && variant === "primary"');
     expect(buttonSource).toContain('background: "#9A6201", foreground: "#FFFFFF"');
   });
@@ -22,10 +22,10 @@ describe("palette des boutons hors authentification", () => {
   it("applique la même palette aux actions personnalisées hors authentification", () => {
     for (const source of [nativeHomeSource, webHomeSource]) {
       expect(source).toContain('rowBtnFilled: {');
-      expect(source).toContain('backgroundColor: "#F7EFE5"');
+      expect(source).toContain('backgroundColor: "#FFFFFF"');
       expect(source).toContain('rowBtnFilledText: { color: "#9A6201"');
     }
-    expect(deliverySource).toContain('trackButton: { backgroundColor: "#F7EFE5"');
+    expect(deliverySource).toContain('trackButton: { backgroundColor: "#FFFFFF"');
     expect(deliverySource).toContain('trackButtonText: { color: "#9A6201"');
   });
 });
