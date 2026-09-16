@@ -393,9 +393,6 @@ function DraggableSheet({
 
   useEffect(() => {
     Animated.spring(sheetBaseHeight, {
-      // `tension`/`friction` et `stiffness`/`damping`/`mass` sont deux modèles de spring distincts :
-      // RN.SpringAnimation refuse d'en mélanger un paramètre (invariant à la construction). `mass`
-      // appartient au second modèle et n'a rien à faire ici.
       toValue: sheetLevel === "mini" ? SHEET_MIN_HEIGHT : sheetLevel === "mid" ? SHEET_MID_HEIGHT : SHEET_FULL_HEIGHT,
       useNativeDriver: false,
       tension: 220,
@@ -432,8 +429,6 @@ function DraggableSheet({
         else if ((dy < -30 || fastSwipeUp) && sheetLevel === "mid") setSheetLevel("full");
         else if ((dy > 30 || fastSwipeDown) && sheetLevel === "full") setSheetLevel("mid");
         else if ((dy > 30 || fastSwipeDown) && sheetLevel === "mid") setSheetLevel("mini");
-        // Reset panY (la transition de sheetBaseHeight prend le relais)
-        // Même modèle que le spring de sheetBaseHeight ci-dessus (tension/friction, sans mass — voir la note).
         Animated.spring(panY, { toValue: 0, useNativeDriver: false, tension: 220, friction: 22 }).start();
       },
       onPanResponderTerminate: () => {
