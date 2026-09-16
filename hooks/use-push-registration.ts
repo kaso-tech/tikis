@@ -1,11 +1,25 @@
 import { useEffect } from "react";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
-import * as Notifications from "expo-notifications";
 import { trpc } from "@/lib/trpc";
 import { logger } from "@/lib/logger";
 
 const PUSH_TOKEN_KEY = "tikis.push.token";
+type NotificationsModule = typeof import("expo-notifications");
+
+function isExpoGo() {
+  return Constants.executionEnvironment === "storeClient" || Constants.appOwnership === "expo";
+}
+
+async function loadNotifications(): Promise<NotificationsModule | null> {
+  if (Platform.OS === "web" || isExpoGo()) return null;
+  try {
+    return await import("expo-notifications");
+  } catch (cause) {
+    logger.warn("[push:hook]", "Module de notifications indisponible", cause);
+    return null;
+  }
+}
 
 type Storage = { getItem: (key: string) => Promise<string | null>; setItem: (key: string, value: string) => Promise<void>; removeItem: (key: string) => Promise<void> };
 
@@ -37,7 +51,8 @@ export type PushPermissionOutcome = "granted" | "denied" | "unsupported" | "regi
  *  pour lui, et l'OS ne redemande jamais après un refus — d'où le retour explicite `denied`, que
  *  l'écran de réglages traduit en invitation à ouvrir les paramètres système. */
 export async function requestPushPermission(): Promise<PushPermissionOutcome> {
-  if (Platform.OS === "web") return "unsupported";
+  const Notifications = await loadNotifications();
+  if (!Notifications) return "unsupported";
   try {
     const current = await Notifications.getPermissionsAsync();
     const granted = current.granted || current.status === "granted"
@@ -59,11 +74,8 @@ export async function requestPushPermission(): Promise<PushPermissionOutcome> {
 }
 
 async function getDevicePushToken(): Promise<{ token: string; platform: "ios" | "android" | "web" } | null> {
-  if (Platform.OS === "web") return null;
-  if (Constants.appOwnership === "expo") {
-    // Expo Go : pas de push distant, le simulateur local suffit.
-    return null;
-  }
+  const Notifications = await loadNotifications();
+  if (!Notifications) return null;
   try {
     const response = await Notifications.getDevicePushTokenAsync();
     const token = response.data as unknown as string;
