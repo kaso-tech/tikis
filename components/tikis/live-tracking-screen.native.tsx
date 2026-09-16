@@ -13,6 +13,13 @@ import type { Delivery, LocationLabel } from "@/shared/tikis-domain";
 import { formatMoney } from "@/shared/tikis-domain";
 
 const AVG_SPEED_KMH = 22;
+const DELIVERY_EXPIRATION_MS = 24 * 60 * 60 * 1000;
+
+function isDeliveryExpired(d: { createdAt: string }, now: Date): boolean {
+  const created = new Date(d.createdAt).getTime();
+  if (!Number.isFinite(created)) return false;
+  return now.getTime() - created > DELIVERY_EXPIRATION_MS;
+}
 
 function estimateEtaMinutes(distanceKm: number): number {
   if (distanceKm <= 0) return 0;
@@ -56,17 +63,8 @@ export default function LiveTrackingTikisScreen() {
     refetchInterval: 15_000,
   });
 
-  const activeDeliveries = useMemo(() => (deliveriesQuery.data ?? []).filter((d) => d.status === "active"), [deliveriesQuery.data]);
-  const pendingDeliveries = useMemo(() => (deliveriesQuery.data ?? []).filter((d) => d.status === "pending_confirmation"), [deliveriesQuery.data]);
-  const todayDeliveries = useMemo(() => {
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    return (deliveriesQuery.data ?? []).filter((d) => {
-      if (!d.createdAt) return false;
-      const t = new Date(d.createdAt).getTime();
-      return t >= start.getTime() && (d.status === "completed" || d.status === "active" || d.status === "pending_confirmation");
-    });
-  }, [deliveriesQuery.data]);
+  const activeDeliveries = useMemo(() => (deliveriesQuery.data ?? []).filter((d) => d.status === "active" && !isDeliveryExpired(d, new Date())), [deliveriesQuery.data]);
+  const pendingDeliveries = useMemo(() => (deliveriesQuery.data ?? []).filter((d) => d.status === "pending_confirmation" && !isDeliveryExpired(d, new Date())), [deliveriesQuery.data]);
 
   const tracked = useMemo(() => activeDeliveries[0] ?? pendingDeliveries[0] ?? null, [activeDeliveries, pendingDeliveries]);
 
@@ -101,7 +99,6 @@ export default function LiveTrackingTikisScreen() {
       delivery={tracked}
       activeDeliveries={activeDeliveries}
       pendingDeliveries={pendingDeliveries}
-      todayDeliveries={todayDeliveries}
       theme={theme}
       isDark={isDark}
       onBack={() => router.back()}
@@ -138,7 +135,6 @@ function LiveTrackingFocus({
   delivery,
   activeDeliveries,
   pendingDeliveries,
-  todayDeliveries,
   theme,
   isDark,
   onBack,
@@ -146,7 +142,6 @@ function LiveTrackingFocus({
   delivery: Delivery;
   activeDeliveries: Delivery[];
   pendingDeliveries: Delivery[];
-  todayDeliveries: Delivery[];
   theme: ReturnType<typeof useThemeColors>["colors"];
   isDark: boolean;
   onBack: () => void;
@@ -254,18 +249,10 @@ function LiveTrackingFocus({
             >
               <MaterialIcons name="arrow-back" size={20} color={theme.foreground} />
             </Pressable>
-            <View style={[styles.topbarTabs, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <View style={[styles.topbarTab, { backgroundColor: theme.primary }]}>
-                <Text style={[styles.topbarTabTextActive, { color: theme.background }]}>En cours</Text>
-                <View style={[styles.topbarTabCountActive, { backgroundColor: "rgba(255,255,255,0.25)" }]}>
-                  <Text style={[styles.topbarTabCountActiveText, { color: theme.background }]}>{activeDeliveries.length}</Text>
-                </View>
-              </View>
-              <View style={styles.topbarTab}>
-                <Text style={[styles.topbarTabText, { color: theme.muted }]}>Aujourd'hui</Text>
-              </View>
-              <View style={styles.topbarTab}>
-                <Text style={[styles.topbarTabText, { color: theme.muted }]}>Historique</Text>
+            <View style={[styles.topbarTitleWrap, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <Text style={[styles.topbarTitle, { color: theme.foreground }]}>Suivi en direct</Text>
+              <View style={[styles.topbarCount, { backgroundColor: theme.primary }]}>
+                <Text style={[styles.topbarCountText, { color: theme.background }]}>{activeDeliveries.length}</Text>
               </View>
             </View>
             <Pressable
@@ -310,7 +297,6 @@ function LiveTrackingFocus({
         tracked={delivery}
         activeDeliveries={activeDeliveries}
         pendingDeliveries={pendingDeliveries}
-        todayDeliveries={todayDeliveries}
         driverPosition={driverPosition}
         driverStats={driverStats}
         theme={theme}
@@ -353,7 +339,6 @@ function DraggableSheet({
   tracked,
   activeDeliveries,
   pendingDeliveries,
-  todayDeliveries,
   driverPosition,
   driverStats,
   theme,
@@ -362,13 +347,12 @@ function DraggableSheet({
   tracked: Delivery;
   activeDeliveries: Delivery[];
   pendingDeliveries: Delivery[];
-  todayDeliveries: Delivery[];
   driverPosition: { latitude: number; longitude: number; heading: number; recordedAt: string } | null;
   driverStats: DriverStats | null;
   theme: ReturnType<typeof useThemeColors>["colors"];
   isDriverLive: boolean;
 }) {
-  const [tab, setTab] = useState<"active" | "waiting" | "today">("active");
+  const [tab, setTab] = useState<"active" | "waiting">("active");
   const [selectedDeliveryId, setSelectedDeliveryId] = useState<string>(tracked.id);
   const [sheetLevel, setSheetLevel] = useState<"mini" | "mid" | "full">("mid");
 
@@ -385,9 +369,8 @@ function DraggableSheet({
 
   const visibleDeliveries: Delivery[] = useMemo(() => {
     if (tab === "active") return activeDeliveries;
-    if (tab === "waiting") return pendingDeliveries;
-    return todayDeliveries;
-  }, [tab, activeDeliveries, pendingDeliveries, todayDeliveries]);
+    return pendingDeliveries;
+  }, [tab, activeDeliveries, pendingDeliveries]);
 
   const selectedDelivery: Delivery | undefined = useMemo(() => {
     if (selectedDeliveryId && visibleDeliveries.some((d) => d.id === selectedDeliveryId)) {
@@ -402,11 +385,10 @@ function DraggableSheet({
   const dragState = useRef<{ active: boolean }>({ active: false });
 
   useEffect(() => {
-    Animated.spring(sheetBaseHeight, {
+    Animated.timing(sheetBaseHeight, {
       toValue: sheetLevel === "mini" ? SHEET_MIN_HEIGHT : sheetLevel === "mid" ? SHEET_MID_HEIGHT : SHEET_FULL_HEIGHT,
+      duration: 220,
       useNativeDriver: false,
-      tension: 220,
-      friction: 22,
     }).start();
   }, [sheetLevel, sheetBaseHeight]);
 
@@ -424,8 +406,8 @@ function DraggableSheet({
       },
       onPanResponderMove: (_, gestureState) => {
         if (!dragState.current.active) return;
-        // Clamp entre -50 et +50 par rapport à la base pour éviter le drift
-        const clamped = Math.max(-50, Math.min(50, gestureState.dy));
+        // Clamp entre -30 et +30 par rapport à la base pour limiter l'overshoot
+        const clamped = Math.max(-30, Math.min(30, gestureState.dy));
         panY.setValue(clamped);
       },
       onPanResponderRelease: (_, gestureState) => {
@@ -439,12 +421,12 @@ function DraggableSheet({
         else if ((dy < -30 || fastSwipeUp) && sheetLevel === "mid") setSheetLevel("full");
         else if ((dy > 30 || fastSwipeDown) && sheetLevel === "full") setSheetLevel("mid");
         else if ((dy > 30 || fastSwipeDown) && sheetLevel === "mid") setSheetLevel("mini");
-        // Reset panY (la transition de sheetBaseHeight prend le relais)
-        Animated.spring(panY, { toValue: 0, useNativeDriver: false, tension: 220, friction: 22, mass: 0.8 }).start();
+        // Reset panY avec timing lineaire (pas de spring qui peut osciller)
+        Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start();
       },
       onPanResponderTerminate: () => {
         dragState.current.active = false;
-        Animated.spring(panY, { toValue: 0, useNativeDriver: false }).start();
+        Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start();
       },
     }),
   ).current;
@@ -500,49 +482,7 @@ function DraggableSheet({
               En attente{tab === "waiting" ? ` ${pendingDeliveries.length}` : ""}
             </Text>
           </Pressable>
-          <Pressable
-            onPress={() => setTab("today")}
-            style={[styles.sheetTab, tab === "today" && { backgroundColor: theme.surface }]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: tab === "today" }}
-          >
-            <Text style={[styles.sheetTabText, { color: tab === "today" ? theme.primary : theme.muted }]}>Aujourd'hui</Text>
-          </Pressable>
         </View>
-
-        {/* Livraison chips (switch direct entre les livraisons de l'onglet actif) */}
-        {visibleDeliveries.length > 1 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.deliveryChipsRow}
-            style={styles.deliveryChipsScroll}
-          >
-            {visibleDeliveries.map((d) => {
-              const dIsLive = d.status === "active" && Boolean(driverCoord);
-              const isSelected = d.id === selectedDelivery?.id;
-              return (
-                <Pressable
-                  key={d.id}
-                  onPress={() => setSelectedDeliveryId(d.id)}
-                  style={({ pressed }) => [
-                    styles.deliveryChip,
-                    { backgroundColor: isSelected ? theme.primary : theme.surface, borderColor: isSelected ? theme.primary : theme.border },
-                    pressed && { opacity: 0.85 },
-                  ]}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: isSelected }}
-                  accessibilityLabel={`Course ${d.title ?? d.type}`}
-                >
-                  <View style={[styles.deliveryChipDot, { backgroundColor: dIsLive ? theme.success : (isSelected ? theme.background : theme.muted) }]} />
-                  <Text style={[styles.deliveryChipText, { color: isSelected ? theme.background : theme.foreground }]} numberOfLines={1}>
-                    {d.title ?? d.type}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        ) : null}
 
         <ScrollView
           style={styles.sheetScroll}
@@ -812,6 +752,10 @@ const styles = StyleSheet.create({
   topbarTabTextActive: { fontSize: 12, fontWeight: "700" },
   topbarTabCountActive: { paddingHorizontal: 5, borderRadius: 8, minWidth: 18, alignItems: "center" },
   topbarTabCountActiveText: { fontSize: 10, fontWeight: "700" },
+  topbarTitleWrap: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth },
+  topbarTitle: { fontSize: 15, fontWeight: "600" },
+  topbarCount: { paddingHorizontal: 8, borderRadius: 10, minWidth: 22, height: 22, alignItems: "center", justifyContent: "center" },
+  topbarCountText: { fontSize: 11, fontWeight: "700" },
 
   // FAB stack (right side, above sheet)
   fabStack: { position: "absolute", right: 16, bottom: 420, gap: 8 },
@@ -835,12 +779,12 @@ const styles = StyleSheet.create({
   sheetTab: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: "center" },
   sheetTabText: { fontSize: 12.5, fontWeight: "600" },
 
-  // Delivery chips (switch direct entre livraisons)
-  deliveryChipsScroll: { marginTop: 8, maxHeight: 36 },
-  deliveryChipsRow: { paddingHorizontal: 14, gap: 8 },
-  deliveryChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, maxWidth: 200 },
-  deliveryChipDot: { width: 7, height: 7, borderRadius: 4 },
-  deliveryChipText: { fontSize: 12.5, fontWeight: "600", flexShrink: 1 },
+  // Delivery chips (switch direct entre livraisons) - SUPPRIMÉ : trop de listes parallèles
+  deliveryChipsScroll: { display: "none" },
+  deliveryChipsRow: { display: "none" },
+  deliveryChip: { display: "none" },
+  deliveryChipDot: { display: "none" },
+  deliveryChipText: { display: "none" },
 
   sheetScroll: { flex: 1, marginTop: 10 },
   sheetContent: { paddingHorizontal: 14, paddingBottom: 8, gap: 8 },
