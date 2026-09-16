@@ -80,7 +80,7 @@ export function useTikisLogout() {
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: "center", padding: 24 },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(8,22,42,0.56)" },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(8,22,42,0.56)" },
   dialog: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 24, borderWidth: 1, borderColor: "#E3E3E3" },
   icon: { width: 52, height: 52, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "#FFF1F1" },
   title: { color: "#0B1F3A", fontSize: 22, fontWeight: "900", marginTop: 17 },

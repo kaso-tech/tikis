@@ -14,8 +14,9 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 const THEME_PREFERENCE_KEY = "tikis.theme-preference";
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const systemScheme = useSystemColorScheme() ?? "light";
-  const [colorScheme, setColorSchemeState] = useState<ColorScheme>(systemScheme);
+  const systemScheme = useSystemColorScheme();
+  const initialScheme: ColorScheme = systemScheme === "dark" ? "dark" : "light";
+  const [colorScheme, setColorSchemeState] = useState<ColorScheme>(initialScheme);
 
   const applyScheme = useCallback((scheme: ColorScheme) => {
     nativewindColorScheme.set(scheme);
