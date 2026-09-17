@@ -445,11 +445,10 @@ function DraggableSheet({
   const dragState = useRef<{ active: boolean }>({ active: false });
 
   useEffect(() => {
-    Animated.spring(sheetBaseHeight, {
+    Animated.timing(sheetBaseHeight, {
       toValue: sheetHeightFor(sheetLevel),
+      duration: 220,
       useNativeDriver: false,
-      tension: 220,
-      friction: 22,
     }).start();
   }, [sheetLevel, sheetBaseHeight]);
 
@@ -492,11 +491,11 @@ function DraggableSheet({
         else if ((dy < -30 || fastSwipeUp) && level === "mid") onSheetLevelChangeRef.current("full");
         else if ((dy > 30 || fastSwipeDown) && level === "full") onSheetLevelChangeRef.current("mid");
         else if ((dy > 30 || fastSwipeDown) && level === "mid") onSheetLevelChangeRef.current("mini");
-        Animated.spring(panY, { toValue: 0, useNativeDriver: false, tension: 220, friction: 22 }).start();
+        Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start();
       },
       onPanResponderTerminate: () => {
         dragState.current.active = false;
-        Animated.spring(panY, { toValue: 0, useNativeDriver: false }).start();
+        Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start();
       },
     }),
   ).current;
