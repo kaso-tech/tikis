@@ -5,7 +5,7 @@ import type { LocationLabel } from "@/shared/tikis-domain";
 
 type Coordinate = { latitude: number; longitude: number };
 
-export function DeliveryRouteMap({ pickup, dropoff, coordinates, routeSource, driverPosition }: { pickup: LocationLabel; dropoff: LocationLabel; coordinates: Coordinate[]; routeSource?: "routes" | "provisional"; driverPosition?: { latitude: number; longitude: number; heading?: number | null } | null }) {
+export function DeliveryRouteMap({ pickup, dropoff, coordinates, routeSource, driverPosition }: { pickup: LocationLabel; dropoff: LocationLabel; coordinates: Coordinate[]; routeSource?: "routes" | "provisional"; driverPosition?: { latitude: number; longitude: number; heading?: number | null } | null; /** Ignorés sur le web : l'aperçu n'est pas une vraie carte. */ approachCoordinates?: Coordinate[]; bottomInset?: number }) {
   const { colors: theme } = useThemeColors();
   const hasRoute = coordinates.length >= 2;
   const isFallback = routeSource === "provisional" || !hasRoute;

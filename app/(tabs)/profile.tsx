@@ -414,7 +414,7 @@ export default function ProfileScreen() {
             {locationError ? <Text style={styles.error}>{locationError}</Text> : null}
             <ScrollView style={{ maxHeight: 380, marginTop: 8 }}>
               {(countriesQuery.data ?? []).map((c) => (
-                <Pressable key={c.id} onPress={() => void selectCountry(c.id)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, c.id === profile?.country && { borderColor: theme.primary, backgroundColor: isDark ? theme.pressed : "#F5F5F5" }, pressed && { opacity: 0.8 }]}>
+                <Pressable key={c.id} onPress={() => void selectCountry(c.id)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, c.id === profile?.country && { borderColor: theme.primary, backgroundColor: isDark ? theme.pressed : "#FAFAFA" }, pressed && { opacity: 0.8 }]}>
                   <Text style={styles.countryRowFlag}>{countryFlagEmoji(c.id)}</Text>
                   <Text style={[styles.countryOptionText, { color: theme.foreground, flex: 1 }, c.id === profile?.country && { color: theme.primary, fontWeight: "800" }]}>{c.name}</Text>
                   {locationSaving === "country" ? null : c.id === profile?.country ? <MaterialIcons name="check-circle" size={20} color={theme.primary} /> : null}
@@ -550,7 +550,7 @@ function MenuRow({ icon, iconBg, label, sub, badge, onPress, last }: { icon: Rea
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F5F5F5" },
+  safe: { flex: 1, backgroundColor: "#FAFAFA" },
   content: { paddingBottom: 40, gap: 12 },
 
   identityCard: { marginHorizontal: 14, marginTop: 14, backgroundColor: "#FFFFFF", borderRadius: 14, padding: 14, gap: 12, borderWidth: 1, borderColor: "#E3E3E3" },
@@ -567,7 +567,7 @@ const styles = StyleSheet.create({
   phoneText: { color: "#667085", fontSize: 12, marginTop: 2 },
   rolePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99, backgroundColor: "#FFFFFF", marginTop: 6, alignSelf: "flex-start" },
   rolePillDriver: { backgroundColor: "#FFFFFF" },
-  rolePillSender: { backgroundColor: "#F5F5F5" },
+  rolePillSender: { backgroundColor: "#FAFAFA" },
   rolePillText: { color: "#9A6201", fontSize: 9, fontWeight: "700", letterSpacing: 0.4 },
   rolePillTextDriver: { color: "#9A6201" },
   rolePillTextSender: { color: "#9A6201" },

@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
+// L'écran jumeau accessible depuis l'onglet du footer a été supprimé : le suivi
+// en direct vit désormais uniquement dans cette page. Le contrat la suit.
 const trackingSource = readFileSync(
-  resolve(process.cwd(), "components/tikis/live-tracking-screen.native.tsx"),
+  resolve(process.cwd(), "app/delivery/[id]/map.tsx"),
   "utf8",
 );
 

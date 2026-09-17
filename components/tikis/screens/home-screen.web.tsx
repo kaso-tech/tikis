@@ -14,7 +14,7 @@ import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
 import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
-import { resolveDriverHomeAction } from "@/shared/delivery-home-action";
+import { resolveDriverHomeAction, resolveSenderHomeAction, senderHomeActionLabel } from "@/shared/delivery-home-action";
 import { isOpenDeliveryStale } from "@/shared/delivery-freshness";
 import { deliveryMetricsForDay } from "@/lib/wallet-metrics";
 import { useThemeColors } from "@/lib/use-theme-colors";
@@ -357,17 +357,31 @@ export function HomeScreen() {
     }
   }
 
+  /** L'action de la carte côté expéditeur. Le libellé du bouton lit le même
+   *  résolveur : tant qu'ils étaient écrits deux fois et sans cas par défaut,
+   *  une livraison qu'aucune des deux listes ne couvrait donnait un bouton
+   *  visible qui ne faisait rien. */
   function handleSenderAction(delivery: Delivery) {
-    if (delivery.status === "open" && delivery.candidateCount === 0) {
-      setPendingAction({ kind: "cancel", delivery });
-      return;
-    }
-    if (delivery.status === "open" && (delivery.candidateCount ?? 0) > 0) {
-      setCandidateDelivery(delivery);
-      return;
-    }
-    if (delivery.status === "active" || delivery.status === "pending_confirmation") {
-      router.push(`/delivery/${delivery.id}` as any);
+    switch (resolveSenderHomeAction(delivery)) {
+      case "candidates":
+        setCandidateDelivery(delivery);
+        return;
+      case "cancel":
+        setPendingAction({ kind: "cancel", delivery });
+        return;
+      case "track":
+        // « Suivre » mène au suivi en direct. La fiche livraison reste
+        // accessible par le bouton « Détails » juste à côté.
+        router.push(`/delivery/${delivery.id}/map` as any);
+        return;
+      case "rate":
+        // Pas de dialogue de notation sur le web : la fiche livraison le porte.
+        router.push(`/delivery/${delivery.id}` as any);
+        return;
+      default:
+        // Aucun cas particulier : la fiche livraison reste une réponse utile.
+        // Un bouton visible ne doit jamais ne rien faire.
+        router.push(`/delivery/${delivery.id}` as any);
     }
   }
 
@@ -868,7 +882,7 @@ function DeliveryRow({
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const dateInfo = formatDeliveryCreationDate(delivery.createdAt, now);
   const dateColor = dateInfo.tone === "primary" ? "#9A6201" : "#667085";
-  const dateBg = dateInfo.tone === "primary" ? "#FFFFFF" : "#F5F5F5";
+  const dateBg = dateInfo.tone === "primary" ? "#9A620114" : "#FFFFFF";
   const totalDistance = formatDistanceKm(delivery.distanceKm);
   const driverDistText = driverDistance
     ? `${driverDistance.value} ${driverDistance.unit}`
@@ -923,10 +937,21 @@ function DeliveryRow({
               {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.rowBtnFilledText}>{driverAction}</Text>}
             </Pressable>
           ) : (() => {
-            const senderAction = delivery.status === "open" ? (delivery.candidateCount ?? 0) > 0 ? "Candidats" : "Annuler" : (delivery.status === "active" || delivery.status === "pending_confirmation") ? "Suivre" : null;
-            return senderAction ? <Pressable onPress={onApply} disabled={applying} style={({ pressed }) => [styles.rowBtnFilled, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}>
-              {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.rowBtnFilledText}>{senderAction}</Text>}
-            </Pressable> : null;
+            // Même résolveur que `handleSenderAction` : le libellé ne peut plus
+            // annoncer une action que le gestionnaire ne connaît pas.
+            const senderAction = senderHomeActionLabel(resolveSenderHomeAction(delivery));
+            if (!senderAction) return null;
+            return (
+              <Pressable
+                onPress={onApply}
+                disabled={applying}
+                accessibilityRole="button"
+                accessibilityLabel={`${senderAction} — ${delivery.title}`}
+                style={({ pressed }) => [styles.rowBtnFilled, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
+              >
+                {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.rowBtnFilledText}>{senderAction}</Text>}
+              </Pressable>
+            );
           })()}
         </View>
       </View>
@@ -935,9 +960,9 @@ function DeliveryRow({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F5F5F5" },
+  safe: { flex: 1, backgroundColor: "#FAFAFA" },
 
-  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5" },
+  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#FAFAFA" },
   mapBlock: { position: "absolute", backgroundColor: "#DCDEE3", borderRadius: 6 },
   mapRoad: { position: "absolute", backgroundColor: "#FFFFFF", borderRadius: 99 },
   mapRoad1: { top: "30%", left: "-10%", right: "-10%", height: 18, transform: [{ rotate: "-12deg" }] },
@@ -953,7 +978,7 @@ const styles = StyleSheet.create({
   fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3", zIndex: 10 },
   sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
 
-  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#F5F5F5", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
+  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
   sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#E3E3E3", marginBottom: 10 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
@@ -963,20 +988,20 @@ const styles = StyleSheet.create({
   sheetTitle: { color: "#111111", fontSize: 14, fontWeight: "700", lineHeight: 18 },
   sheetSubtitle: { color: "#667085", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 
-  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E3E3E3" },
-  servicePillOffline: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", shadowOpacity: 0, elevation: 0 },
-  servicePillNeutral: { backgroundColor: "#F5F5F5", shadowOpacity: 0, elevation: 0 },
+  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#FAFAFA", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E3E3E3" },
+  servicePillOffline: { backgroundColor: "#FAFAFA", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", shadowOpacity: 0, elevation: 0 },
+  servicePillNeutral: { backgroundColor: "#FAFAFA", shadowOpacity: 0, elevation: 0 },
   serviceText: { color: "#9A6201", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   serviceTextOffline: { color: "#111111" },
   onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9A6201" },
   onlineDotOffline: { backgroundColor: "#667085" },
 
   searchRow: { paddingTop: 10, paddingBottom: 6 },
-  kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: "#FFFFFF", borderRadius: 10, borderWidth: 1, borderColor: "#E3E3E3" },
+  kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: "#FAFAFA", borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3" },
   kycBannerCopy: { flex: 1 },
   kycBannerTitle: { color: "#9A6201", fontSize: 12, fontWeight: "700" },
   kycBannerText: { color: "#9A6201", fontSize: 11, marginTop: 2, lineHeight: 16 },
-  searchPill: { height: 40, backgroundColor: "#FFFFFF", borderRadius: 11, borderWidth: 1, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
+  searchPill: { height: 40, backgroundColor: "#FAFAFA", borderRadius: 11, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: "#9A6201", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
 
   walletCard: { marginHorizontal: 14, marginTop: 6, marginBottom: 8, backgroundColor: "#111111", borderRadius: 12, padding: 14 },
@@ -993,8 +1018,8 @@ const styles = StyleSheet.create({
 
   filterRow: { flexDirection: "row", gap: 6, paddingBottom: 10, alignItems: "center" },
   filterScroll: { flexGrow: 0 },
-  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", gap: 6 },
-  chipActive: { backgroundColor: "#FFFFFF", borderColor: "#9A6201" },
+  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#FAFAFA", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", gap: 6 },
+  chipActive: { backgroundColor: "#9A620114", borderColor: "#9A6201", borderWidth: 1 },
   chipText: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
   chipTextActive: { color: "#9A6201" },
   chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
@@ -1025,10 +1050,12 @@ const styles = StyleSheet.create({
   urgentBtnWhiteText: { color: "#9A6201", fontSize: 12, fontWeight: "700" },
 
   listSection: { marginTop: 4, gap: 8 },
-  row: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 11, borderWidth: 0, borderColor: "transparent" },
+  // Le sheet est blanc : une carte blanche y disparaîtrait. Les cartes sont
+  // en retrait, et ce qu'elles contiennent repasse en blanc.
+  row: { backgroundColor: "#FAFAFA", borderRadius: 12, padding: 11, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3" },
   rowSelected: { borderColor: "transparent", backgroundColor: "#FFFFFF" },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 9 },
-  rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center" },
+  rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#FFFFFF", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", alignItems: "center", justifyContent: "center" },
   rowThumbDriver: { backgroundColor: "#9A6201" },
   rowMain: { flex: 1, minWidth: 0 },
   rowTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
@@ -1040,7 +1067,7 @@ const styles = StyleSheet.create({
   rowSub: { color: "#667085", fontSize: 10.5, marginTop: 1 },
   rowPrice: { color: "#111111", fontSize: 14, fontWeight: "700" },
   rowDateRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
-  datePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  datePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3" },
   datePillText: { fontSize: 10.5, fontWeight: "700" },
   rowBottom: { flexDirection: "row", alignItems: "center", marginTop: 8, gap: 10 },
   rowStat: { flexDirection: "row", alignItems: "center", gap: 4 },
@@ -1054,7 +1081,7 @@ const styles = StyleSheet.create({
   loadingState: { alignItems: "center", paddingVertical: 32, gap: 8 },
   loadingText: { color: "#667085", fontSize: 12 },
   empty: { alignItems: "center", paddingHorizontal: 24, paddingVertical: 24 },
-  emptyIcon: { width: 60, height: 60, borderRadius: 14, backgroundColor: "#F5F5F5", alignItems: "center", justifyContent: "center", marginBottom: 12 },
+  emptyIcon: { width: 60, height: 60, borderRadius: 14, backgroundColor: "#FAFAFA", alignItems: "center", justifyContent: "center", marginBottom: 12 },
   emptyTitle: { color: "#111111", fontSize: 14, fontWeight: "600", marginBottom: 4 },
   emptyText: { color: "#667085", fontSize: 12, textAlign: "center", lineHeight: 18 },
 
