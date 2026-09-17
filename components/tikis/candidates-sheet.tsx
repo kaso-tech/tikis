@@ -1,6 +1,7 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Dimensions, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SchemeColors } from "@/lib/_core/theme";
 import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
 import { createStyles } from "@/lib/create-styles";
 import { formatMoney, isDriverCertified, type DriverCandidate } from "@/shared/tikis-domain";
@@ -16,6 +17,13 @@ type Props = {
    *  l'admin, une reconstruction suppose un taux fixe et affiche un montant erroné dès qu'il change. */
   deliveryPrice: number;
   loadingId?: string | null;
+  /** La requête est en cours : sans cette distinction le sheet annonçait « en
+   *  attente de candidatures » alors qu'il n'avait pas encore de réponse. */
+  isLoading?: boolean;
+  /** Message d'erreur de la requête : un échec réseau ne doit pas se lire
+   *  comme une absence de candidat. */
+  errorMessage?: string | null;
+  onRetry?: () => void;
   onClose: () => void;
   onChoose: (candidate: DriverCandidate) => void;
 };
@@ -51,7 +59,7 @@ function nextSnap(current: number, velocityY: number): number {
   return SHEET_PEEK;
 }
 
-export function CandidatesSheet({ visible, candidates, deliveryStatus, deliveryPrice, loadingId, onClose, onChoose }: Props) {
+export function CandidatesSheet({ visible, candidates, deliveryStatus, deliveryPrice, loadingId, isLoading, errorMessage, onRetry, onClose, onChoose }: Props) {
   const { colors: theme } = useThemeColors();
   const styles = useMemo(() => stylesFor(theme), [theme]);
   const [tab, setTab] = useState<Tab>("all");
@@ -139,9 +147,13 @@ export function CandidatesSheet({ visible, candidates, deliveryStatus, deliveryP
               <View style={styles.headerText}>
                 <Text style={[styles.eyebrow, { color: theme.muted }]}>Candidatures</Text>
                 <Text style={[styles.title, { color: theme.foreground }]} numberOfLines={1}>
-                  {candidates.length === 0
-                    ? "En attente de livreurs"
-                    : `${candidates.length} livreur${candidates.length > 1 ? "s" : ""} proposent leur service`}
+                  {errorMessage
+                    ? "Liste indisponible"
+                    : isLoading
+                      ? "Chargement des candidatures…"
+                      : candidates.length === 0
+                        ? "En attente de livreurs"
+                        : `${candidates.length} livreur${candidates.length > 1 ? "s" : ""} proposent leur service`}
                 </Text>
               </View>
               <Pressable onPress={closeSheet} style={({ pressed }) => [styles.close, { backgroundColor: isDark(theme) ? theme.surface : theme.background }, pressed && styles.pressed]} accessibilityLabel="Fermer">
@@ -180,12 +192,32 @@ export function CandidatesSheet({ visible, candidates, deliveryStatus, deliveryP
             <ScrollView contentContainerStyle={styles.emptyWrap}>
               <View style={styles.empty}>
                 <View style={[styles.emptyIcon, { backgroundColor: theme.surface }]}>
-                  <MaterialIcons name="schedule" size={26} color={theme.muted} />
+                  <MaterialIcons
+                    name={errorMessage ? "cloud-off" : isLoading ? "hourglass-empty" : "schedule"}
+                    size={26}
+                    color={errorMessage ? theme.error : theme.muted}
+                  />
                 </View>
-                <Text style={[styles.emptyTitle, { color: theme.foreground }]}>En attente de candidatures</Text>
-                <Text style={[styles.emptyText, { color: theme.muted }]}>
-                  Votre livraison a été publiée. Les livreurs compatibles apparaîtront ici dès qu’ils proposeront leur service.
+                <Text style={[styles.emptyTitle, { color: theme.foreground }]}>
+                  {errorMessage ? "Liste des candidatures indisponible" : isLoading ? "Chargement…" : "En attente de candidatures"}
                 </Text>
+                <Text style={[styles.emptyText, { color: theme.muted }]}>
+                  {errorMessage
+                    ? errorMessage
+                    : isLoading
+                      ? "Les candidatures reçues pour cette livraison arrivent."
+                      : "Votre livraison a été publiée. Les livreurs compatibles apparaîtront ici dès qu’ils proposeront leur service."}
+                </Text>
+                {errorMessage && onRetry ? (
+                  <Pressable
+                    onPress={onRetry}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [styles.retry, { borderColor: theme.border, backgroundColor: theme.surface }, pressed && styles.pressed]}
+                  >
+                    <MaterialIcons name="refresh" size={16} color={theme.foreground} />
+                    <Text style={[styles.retryText, { color: theme.foreground }]}>Réessayer</Text>
+                  </Pressable>
+                ) : null}
               </View>
             </ScrollView>
           )}
@@ -195,8 +227,11 @@ export function CandidatesSheet({ visible, candidates, deliveryStatus, deliveryP
   );
 }
 
+/** Comparé au jeton réel du thème sombre : la valeur codée en dur ici ne
+ *  correspondait à aucun `foreground` de la palette, donc `isDark` renvoyait
+ *  toujours faux et les variantes sombres de cette feuille n'ont jamais servi. */
 function isDark(theme: any) {
-  return theme.foreground === "#F5F5F5";
+  return theme.foreground === SchemeColors.dark.foreground;
 }
 
 function TabButton({ label, count, active, onPress, theme }: { label: string; count: number; active: boolean; onPress: () => void; theme: any }) {
@@ -335,6 +370,8 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
   listContent: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 24, gap: 5 },
   emptyWrap: { flexGrow: 1, justifyContent: "center" },
   empty: { alignItems: "center", paddingVertical: 50, paddingHorizontal: 30, gap: 6 },
+  retry: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 14, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth },
+  retryText: { fontSize: 12.5, fontWeight: "600" },
   emptyIcon: { width: 64, height: 64, borderRadius: 16, alignItems: "center", justifyContent: "center", marginBottom: 12 },
   emptyTitle: { fontSize: 15, fontWeight: "600" },
   emptyText: { fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 },

@@ -4,7 +4,7 @@ import type { LocationLabel } from "@/shared/tikis-domain";
 
 /** Le composant n'existe qu'en variantes de plateforme (`.native.tsx` / `.web.tsx`) : Metro les résout
  *  à la compilation du bundle, mais TypeScript a besoin de cette déclaration pour le spécificateur nu
- *  `@/components/tikis/place-picker`. Même dispositif que live-tracking-screen.d.ts. */
+ *  `@/components/tikis/place-picker`. Même dispositif que address-map-picker. */
 type PlacePickerProps = {
   label: string;
   tone: "pickup" | "dropoff";

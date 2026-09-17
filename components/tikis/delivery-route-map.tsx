@@ -7,8 +7,8 @@ import type { LocationLabel } from "@/shared/tikis-domain";
 type Coordinate = { latitude: number; longitude: number };
 type DriverPosition = { latitude: number; longitude: number; heading?: number | null };
 
-export function DeliveryRouteMap({ pickup, dropoff, coordinates, routeSource, driverPosition }: { pickup: LocationLabel; dropoff: LocationLabel; coordinates: Coordinate[]; routeSource?: "routes" | "provisional"; driverPosition?: DriverPosition | null }) {
+export function DeliveryRouteMap({ pickup, dropoff, coordinates, routeSource, driverPosition, approachCoordinates, bottomInset }: { pickup: LocationLabel; dropoff: LocationLabel; coordinates: Coordinate[]; routeSource?: "routes" | "provisional"; driverPosition?: DriverPosition | null; approachCoordinates?: Coordinate[]; bottomInset?: number }) {
   const RouteMap = Platform.OS === "web" ? WebDeliveryRouteMap : NativeDeliveryRouteMap;
   if (!RouteMap) return null;
-  return <RouteMap pickup={pickup} dropoff={dropoff} coordinates={coordinates} routeSource={routeSource} driverPosition={driverPosition} />;
+  return <RouteMap pickup={pickup} dropoff={dropoff} coordinates={coordinates} routeSource={routeSource} driverPosition={driverPosition} approachCoordinates={approachCoordinates} bottomInset={bottomInset} />;
 }

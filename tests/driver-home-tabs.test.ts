@@ -24,9 +24,14 @@ describe("onglets de l’accueil livreur", () => {
     expect(source).toContain("const filterCounts = useMemo");
     expect(source).toContain("accessibilityRole=\"tab\"");
     expect(source).toContain("styles.chipCount");
-    // L'onglet actif et sa pastille de comptage sont désormais thémés (surface + accent) plutôt que
-    // peints en crème/brun figés : c'est l'intention qu'on verrouille, pas la valeur hexadécimale.
-    expect(source).toContain("chipActive: { backgroundColor: theme.surface, borderColor: theme.primary }");
+    // L'onglet actif et sa pastille de comptage sont thémés (accent) plutôt que peints en
+    // crème/brun figés : c'est l'intention qu'on verrouille, pas la valeur exacte. Depuis que la
+    // feuille d'accueil est blanche, l'onglet actif porte un fond teinté en plus de sa bordure —
+    // un fond `surface` y serait invisible.
+    const chipActive = source.slice(source.indexOf("chipActive: {"), source.indexOf("chipActive: {") + 140);
+    expect(chipActive).toContain("borderColor: theme.primary");
+    expect(chipActive).toContain("theme.primary +");
+    expect(chipActive).not.toMatch(/#[0-9A-Fa-f]{6}/);
     expect(source).toContain("chipCount: { minWidth: 18");
     expect(source).toContain("backgroundColor: theme.primary");
   });

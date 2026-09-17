@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Dimensions, Linking, PanResponder, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import MapView, { Marker, Polyline, type Region } from "react-native-maps";
@@ -19,7 +19,7 @@ import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
 import { RateDeliveryDialog } from "@/components/tikis/rate-delivery-dialog";
 import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
-import { resolveDriverHomeAction } from "@/shared/delivery-home-action";
+import { resolveDriverHomeAction, resolveSenderHomeAction, senderHomeActionLabel } from "@/shared/delivery-home-action";
 import { isOpenDeliveryStale } from "@/shared/delivery-freshness";
 import { deliveryMetricsForDay } from "@/lib/wallet-metrics";
 import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
@@ -374,17 +374,29 @@ export function HomeScreen() {
     }
   }
 
+  /** L'action de la carte côté expéditeur. Le libellé du bouton est calculé au
+   *  même endroit que l'action : tant qu'ils étaient écrits deux fois, un statut
+   *  qu'une seule des deux listes connaissait donnait un bouton sans effet. */
   function handleSenderAction(delivery: Delivery) {
-    if (delivery.status === "open" && delivery.candidateCount === 0) {
-      setPendingAction({ kind: "cancel", delivery });
-      return;
-    }
-    if (delivery.status === "open" && (delivery.candidateCount ?? 0) > 0) {
-      setCandidateDelivery(delivery);
-      return;
-    }
-    if (delivery.status === "active" || delivery.status === "pending_confirmation") {
-      router.push(`/delivery/${delivery.id}` as any);
+    switch (resolveSenderHomeAction(delivery)) {
+      case "candidates":
+        setCandidateDelivery(delivery);
+        return;
+      case "cancel":
+        setPendingAction({ kind: "cancel", delivery });
+        return;
+      case "track":
+        // « Suivre » mène au suivi en direct. La fiche livraison reste accessible
+        // par le bouton « Détails » juste à côté : deux intentions différentes.
+        router.push(`/delivery/${delivery.id}/map` as any);
+        return;
+      case "rate":
+        setRateDeliveryId(delivery.id);
+        return;
+      default:
+        // Aucun cas particulier : la fiche livraison reste une réponse utile.
+        // Un bouton visible ne doit jamais ne rien faire.
+        router.push(`/delivery/${delivery.id}` as any);
     }
   }
 
@@ -625,7 +637,6 @@ export function HomeScreen() {
                   onPress={() => setSelectedId(delivery.id)}
                   onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
                   onApply={() => handleSenderAction(delivery)}
-                  onRate={() => setRateDeliveryId(delivery.id)}
                 />
               ))}
             </View>
@@ -647,7 +658,6 @@ export function HomeScreen() {
                   onPress={() => setSelectedId(delivery.id)}
                   onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
                   onApply={() => handleSenderAction(delivery)}
-                  onRate={() => setRateDeliveryId(delivery.id)}
                 />
               ))}
             </View>
@@ -665,6 +675,9 @@ export function HomeScreen() {
         candidates={candidatesQuery.data ?? []}
         deliveryStatus={candidateDelivery?.status ?? "open"}
         deliveryPrice={candidateDelivery ? (candidateDelivery.offeredPrice ?? candidateDelivery.estimatedPrice) : 0}
+        isLoading={candidatesQuery.isLoading}
+        errorMessage={candidatesQuery.error?.message ?? null}
+        onRetry={() => void candidatesQuery.refetch()}
         loadingId={actioningId}
         onClose={() => setCandidateDelivery(null)}
         onChoose={requestCandidateSelection}
@@ -754,17 +767,41 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
     return fitRegionFor(selected.pickup, selected.dropoff);
   }, [selected]);
 
+  // Le recadrage lisait `driverPosition` et `sheetOverlayHeight` dans ses
+  // dépendances : la carte se replaçait à chaque point GPS reçu et à chaque
+  // glissement du sheet, donc tout déplacement au doigt était annulé dans la
+  // seconde. On garde la référence à jour sans la mettre en dépendance.
+  const driverPositionRef = useRef(driverPosition);
+  driverPositionRef.current = driverPosition;
+  const sheetOverlayHeightRef = useRef(sheetOverlayHeight);
+  sheetOverlayHeightRef.current = sheetOverlayHeight;
+
+  /** `true` dès que l'utilisateur a déplacé ou zoomé la carte : à partir de là
+   *  elle lui appartient, et seul le bouton de recentrage la reprend. */
+  const [userMovedMap, setUserMovedMap] = useState(false);
+  const fittedDeliveryId = useRef<string | null>(null);
+
+  const fitToSelection = useCallback((animated: boolean) => {
+    if (!selected) return;
+    const driver = driverPositionRef.current;
+    const points = driver && selected.status === "active"
+      ? [driver, selected.pickup, selected.dropoff]
+      : [selected.pickup, selected.dropoff];
+    mapRef.current?.fitToCoordinates(points, {
+      edgePadding: { top: 84, left: 24, right: 24, bottom: Math.max(170, sheetOverlayHeightRef.current + 24) },
+      animated,
+    });
+  }, [selected]);
+
+  // Cadrage automatique une seule fois par course sélectionnée.
   useEffect(() => {
     if (!selected) return;
-    const timer = setTimeout(() => {
-      const points = driverPosition && selected.status === "active" ? [driverPosition, selected.pickup, selected.dropoff] : [selected.pickup, selected.dropoff];
-      mapRef.current?.fitToCoordinates(points, {
-        edgePadding: { top: 84, left: 24, right: 24, bottom: Math.max(170, sheetOverlayHeight + 24) },
-        animated: true,
-      });
-    }, 220);
+    if (fittedDeliveryId.current === selected.id) return;
+    fittedDeliveryId.current = selected.id;
+    setUserMovedMap(false);
+    const timer = setTimeout(() => fitToSelection(true), 220);
     return () => clearTimeout(timer);
-  }, [driverPosition, region, selected, sheetOverlayHeight]);
+  }, [fitToSelection, selected]);
 
   useEffect(() => {
     routeRequestRef.current = routeMutation.mutateAsync;
@@ -812,6 +849,10 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
         showsMyLocationButton={false}
         zoomEnabled
         scrollEnabled
+        pitchEnabled={false}
+        moveOnMarkerPress={false}
+        onPanDrag={() => setUserMovedMap(true)}
+        onRegionChangeComplete={(_region, details) => { if (details?.isGesture) setUserMovedMap(true); }}
       >
         {selected ? (
           <>
@@ -845,59 +886,16 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
           </>
         ) : null}
       </MapView>
-    </View>
-  );
-}
-
-function UrgentCard({
-  delivery,
-  role,
-  applying,
-  onAction,
-}: {
-  delivery: Delivery;
-  role: "sender" | "driver";
-  applying: boolean;
-  onAction: () => void;
-}) {
-  const { colors: theme } = useThemeColors();
-  const styles = useMemo(() => stylesFor(theme), [theme]);
-  const statusChip = useMemo(() => statusChipFor(theme), [theme]);
-  const isSender = role === "sender";
-  const senderAction = delivery.status === "open"
-    ? (delivery.candidateCount ?? 0) > 0 ? "Candidats" : "Annuler"
-    : delivery.status === "active" ? "Suivre" : null;
-  return (
-    <View style={[styles.urgentCard, isSender ? styles.urgentCardSender : styles.urgentCardDriver]}>
-      <View style={styles.urgentHead}>
-        <View style={[styles.urgentThumb, isSender ? styles.urgentThumbSender : styles.urgentThumbDriver]}>
-          <MaterialIcons name={TYPE_ICON[delivery.type] ?? "local-shipping"} size={18} color={isSender ? "#FFFFFF" : "#9A6201"} />
-        </View>
-        <View style={styles.urgentMeta}>
-          <Text style={styles.urgentTitle} numberOfLines={1}>{delivery.title}</Text>
-          <Text style={styles.urgentSub} numberOfLines={1}>
-            {isSender
-              ? `${delivery.driverName ?? "Livreur en attente"} · ${formatDistanceKm(delivery.distanceKm).value} ${formatDistanceKm(delivery.distanceKm).unit}`
-              : `${(delivery.vehicleTypes ?? []).join(" · ") || "Moto"}`}
-          </Text>
-        </View>
-        {isSender ? <View style={[styles.urgentChip, { backgroundColor: statusChip[delivery.status].bg }]}> 
-          <Text style={[styles.urgentChipText, { color: statusChip[delivery.status].color }]}>{statusChip[delivery.status].label}</Text>
-        </View> : null}
-      </View>
-      <View style={styles.urgentPricing}>
-        <View>
-          <Text style={styles.urgentPrice}>{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</Text>
-          <Text style={styles.urgentPriceExtra}>{isSender ? "est. client" : "rémunération nette"}</Text>
-        </View>
-      </View>
-      <View style={styles.urgentActions}>
-        {isSender && senderAction ? (
-          <Pressable onPress={onAction} disabled={applying} style={({ pressed }) => [styles.urgentBtnWhite, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}>
-            {applying ? <ActivityIndicator size="small" color="#111111" /> : <><MaterialIcons name={senderAction === "Candidats" ? "group" : senderAction === "Annuler" ? "close" : "my-location"} size={15} color="#111111" /><Text style={styles.urgentBtnWhiteText}>{senderAction}</Text></>}
-          </Pressable>
-        ) : null}
-      </View>
+      {selected && userMovedMap ? (
+        <Pressable
+          onPress={() => { setUserMovedMap(false); fitToSelection(true); }}
+          accessibilityRole="button"
+          accessibilityLabel="Recentrer la carte sur la course"
+          style={({ pressed }) => [styles.fab, { bottom: Math.max(170, sheetOverlayHeight + 24) + 14 }, pressed && styles.pressed]}
+        >
+          <MaterialIcons name="my-location" size={20} color={theme.foreground} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }
@@ -914,7 +912,6 @@ function DeliveryRow({
   onPress,
   onDetails,
   onApply,
-  onRate,
 }: {
   delivery: Delivery;
   role: "sender" | "driver";
@@ -927,7 +924,6 @@ function DeliveryRow({
   onPress: () => void;
   onDetails: () => void;
   onApply: () => void;
-  onRate?: () => void;
 }) {
   const [showPickupTooltip, setShowPickupTooltip] = useState(false);
   const { colors: theme } = useThemeColors();
@@ -951,7 +947,7 @@ function DeliveryRow({
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const dateInfo = formatDeliveryCreationDate(delivery.createdAt, now);
   const dateColor = dateInfo.tone === "primary" ? "#9A6201" : "#747474";
-  const dateBg = dateInfo.tone === "primary" ? theme.primary + "14" : theme.background;
+  const dateBg = dateInfo.tone === "primary" ? theme.primary + "14" : theme.surface;
   const totalDistance = formatDistanceKm(delivery.distanceKm);
   const pickupTitle = locationTitle(delivery.pickup);
   const pickupDistrict = delivery.pickup.district || delivery.pickup.city || "Quartier non renseigné";
@@ -973,7 +969,7 @@ function DeliveryRow({
   }, [showPickupTooltip]);
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, { backgroundColor: theme.surface, borderColor: theme.border }, selected && [styles.rowSelected, { borderColor: theme.primary, backgroundColor: theme.primary + "14" }], pressed && { backgroundColor: theme.pressed }]}>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, selected && styles.rowSelected, pressed && { backgroundColor: theme.pressed }]}>
       <View style={styles.rowTop}>
         <View style={[styles.rowThumb, isSender ? null : styles.rowThumbDriver]}>
           <MaterialIcons name={TYPE_ICON[delivery.type] ?? "local-shipping"} size={15} color={isSender ? "#111111" : "#FFFFFF"} />
@@ -1008,19 +1004,22 @@ function DeliveryRow({
               {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.rowBtnFilledText}>{driverAction}</Text>}
             </Pressable>
           ) : (() => {
-            const senderAction = delivery.status === "open" ? (delivery.candidateCount ?? 0) > 0 ? "Candidats" : "Annuler" : (delivery.status === "active" || delivery.status === "pending_confirmation") ? "Suivre" : null;
-            const canRate = delivery.status === "completed" && Boolean(delivery.driverPhone);
-            if (senderAction) {
-              return <Pressable onPress={onApply} disabled={applying} style={({ pressed }) => [styles.rowBtnFilled, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}>
+            // Même résolveur que `handleSenderAction` : le libellé ne peut plus
+            // annoncer une action que le gestionnaire ne connaît pas, ni le
+            // gestionnaire rester muet sur un libellé affiché.
+            const senderAction = senderHomeActionLabel(resolveSenderHomeAction(delivery));
+            if (!senderAction) return null;
+            return (
+              <Pressable
+                onPress={onApply}
+                disabled={applying}
+                accessibilityRole="button"
+                accessibilityLabel={`${senderAction} — ${delivery.title}`}
+                style={({ pressed }) => [styles.rowBtnFilled, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
+              >
                 {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.rowBtnFilledText}>{senderAction}</Text>}
-              </Pressable>;
-            }
-            if (canRate) {
-              return <Pressable onPress={onRate} style={({ pressed }) => [styles.rowBtnFilled, pressed && styles.pressed]}>
-                <Text style={styles.rowBtnFilledText}>Noter</Text>
-              </Pressable>;
-            }
-            return null;
+              </Pressable>
+            );
           })()}
         </View>
       </View>
@@ -1045,7 +1044,7 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
   pinTriangleStart: { borderTopColor: theme.primary },
   pinTriangleEnd: { borderTopColor: theme.surface },
 
-  fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: theme.border, zIndex: 10 },
+  fab: { position: "absolute", right: 14, width: 50, height: 50, borderRadius: 14, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: theme.border, zIndex: 10 },
   sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: theme.primary, alignItems: "center", justifyContent: "center" },
 
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: theme.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
@@ -1058,20 +1057,19 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
   sheetTitle: { color: theme.foreground, fontSize: 14, fontWeight: "700", lineHeight: 18 },
   sheetSubtitle: { color: theme.muted, fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 
-  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: theme.surface, flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: theme.border },
-  servicePillOffline: { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
-  servicePillNeutral: { backgroundColor: theme.background },
+  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: theme.background, flexDirection: "row", alignItems: "center", gap: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
+  servicePillOffline: { backgroundColor: theme.background, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
   serviceText: { color: theme.primary, fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   serviceTextOffline: { color: theme.foreground },
   onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.primary },
   onlineDotOffline: { backgroundColor: theme.muted },
 
   searchRow: { paddingTop: 10, paddingBottom: 6 },
-  kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: theme.surface, borderRadius: 10, borderWidth: 1, borderColor: theme.border },
+  kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: theme.background, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
   kycBannerCopy: { flex: 1 },
   kycBannerTitle: { color: theme.primary, fontSize: 12, fontWeight: "700" },
   kycBannerText: { color: theme.warning, fontSize: 11, marginTop: 2, lineHeight: 16 },
-  searchPill: { height: 40, backgroundColor: theme.surface, borderRadius: 11, borderWidth: 1, borderColor: theme.border, flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
+  searchPill: { height: 40, backgroundColor: theme.background, borderRadius: 11, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: theme.primary, fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
 
   walletCard: { marginHorizontal: 14, marginTop: 6, marginBottom: 8, backgroundColor: theme.foreground, borderRadius: 12, padding: 14 },
@@ -1088,8 +1086,8 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
 
   filterRow: { flexDirection: "row", gap: 6, paddingBottom: 10, alignItems: "center" },
   filterScroll: { flexGrow: 0 },
-  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, flexDirection: "row", alignItems: "center", gap: 6 },
-  chipActive: { backgroundColor: theme.surface, borderColor: theme.primary },
+  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: theme.background, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, flexDirection: "row", alignItems: "center", gap: 6 },
+  chipActive: { backgroundColor: theme.primary + "14", borderColor: theme.primary, borderWidth: 1 },
   chipText: { color: theme.primary, fontSize: 11, fontWeight: "600" },
   chipTextActive: { color: theme.primary },
   chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: theme.primary, alignItems: "center", justifyContent: "center" },
@@ -1100,30 +1098,15 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
   scrollArea: { flex: 1, marginTop: 2 },
   scrollContent: { paddingHorizontal: 14, paddingTop: 6, paddingBottom: 90, gap: 8 },
 
-  urgentCard: { borderRadius: 12, padding: 12, gap: 10 },
-  urgentCardSender: { backgroundColor: theme.foreground },
-  urgentCardDriver: { backgroundColor: theme.primary },
-  urgentHead: { flexDirection: "row", alignItems: "center", gap: 10 },
-  urgentThumb: { width: 36, height: 36, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  urgentThumbSender: { backgroundColor: theme.primary },
-  urgentThumbDriver: { backgroundColor: theme.surface },
-  urgentMeta: { flex: 1, minWidth: 0 },
-  urgentTitle: { color: theme.surface, fontSize: 13, fontWeight: "700" },
-  urgentSub: { color: "rgba(255,255,255,0.65)", fontSize: 11, marginTop: 2 },
-  urgentChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
-  urgentChipText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.4 },
-  urgentPricing: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
-  urgentPrice: { color: theme.surface, fontSize: 20, fontWeight: "700", letterSpacing: -0.3 },
-  urgentPriceExtra: { color: "rgba(255,255,255,0.6)", fontSize: 10, marginTop: 1 },
-  urgentActions: { flexDirection: "row", gap: 7 },
-  urgentBtnWhite: { flex: 1, height: 38, borderRadius: 9, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
-  urgentBtnWhiteText: { color: theme.primary, fontSize: 12, fontWeight: "700" },
 
   listSection: { marginTop: 4, gap: 8 },
-  row: { backgroundColor: theme.surface, borderRadius: 10, padding: 11, borderWidth: 1, borderColor: theme.divider },
+  // Le sheet est blanc : une carte blanche y disparaîtrait. Les cartes sont
+  // donc en retrait (`background`), et ce qu'elles contiennent repasse en
+  // blanc — trois niveaux lisibles, dans les deux thèmes.
+  row: { backgroundColor: theme.background, borderRadius: 12, padding: 11, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
   rowSelected: { borderColor: theme.primary, backgroundColor: theme.primary + "14", borderWidth: 1.5 },
   rowTop: { flexDirection: "row", alignItems: "center", gap: 9 },
-  rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: theme.background, alignItems: "center", justifyContent: "center" },
+  rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: theme.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, alignItems: "center", justifyContent: "center" },
   rowThumbDriver: { backgroundColor: theme.primary },
   rowMain: { flex: 1, minWidth: 0 },
   rowTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
@@ -1142,7 +1125,7 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
   rowStatusChip: { marginLeft: "auto", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
   rowStatusText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.35 },
   rowDateRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
-  datePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  datePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border },
   datePillText: { fontSize: 10.5, fontWeight: "700" },
   rowBottom: { flexDirection: "row", alignItems: "center", marginTop: 8, gap: 10 },
   rowStat: { flexDirection: "row", alignItems: "center", gap: 4 },
