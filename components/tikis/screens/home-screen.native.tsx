@@ -148,6 +148,9 @@ export function HomeScreen() {
   const sheetValue = useRef(SHEET_PEEK);
   const dragStartHeight = useRef(SHEET_PEEK);
   const lastSheetSnap = useRef(SHEET_PEEK);
+  /** Palier sur lequel la feuille s'est arrêtée. La carte s'y recadre : c'est
+   *  lui qui dit quelle hauteur d'écran lui reste réellement. */
+  const [sheetSnap, setSheetSnap] = useState(SHEET_PEEK);
   const filterTransition = useRef(new Animated.Value(1)).current;
   const previousDeliveryStatuses = useRef<Record<string, DeliveryStatus> | null>(null);
   const badgeScales = useRef<Record<FilterKey, Animated.Value>>({
@@ -156,7 +159,10 @@ export function HomeScreen() {
     active: new Animated.Value(1),
     completed: new Animated.Value(1),
   }).current;
-  const driverLocation = useDriverLocation({ enabled: role === "driver" });
+  // Activée pour les deux rôles : l'expéditeur en a besoin pour se situer sur la
+  // carte quand aucune course n'est sélectionnée. La synchronisation de position
+  // vers le serveur, elle, reste réservée au livreur (ligne suivante).
+  const driverLocation = useDriverLocation({ enabled: true });
   // Tient à jour le centre des rayons « alertes » et « affichage » du livreur (cf. app/driver-alerts.tsx).
   useDriverBasePositionSync(driverLocation.location, role === "driver");
   const deviceHeading = useDeviceHeading(role === "driver");
@@ -230,8 +236,6 @@ export function HomeScreen() {
     });
   }, [deviceHeading, driverLocation.location, role, selected?.id, selected?.status]);
 
-  const otherDeliveries = useMemo(() => filteredList.filter((d) => d.id !== selected?.id).slice(0, 5), [filteredList, selected?.id]);
-
   useEffect(() => {
     const listener = sheetHeight.addListener(({ value }) => { sheetValue.current = value; });
     return () => sheetHeight.removeListener(listener);
@@ -260,6 +264,7 @@ export function HomeScreen() {
         lastSheetSnap.current = target;
         haptic.selection();
       }
+      setSheetSnap(target);
       animateSheetTo(target);
     },
   })).current;
@@ -468,7 +473,13 @@ export function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
-      <MapBackground selected={selected} role={role} sheetOverlayHeight={sheetValue.current} driverPosition={role === "driver" ? driverLocation.location : senderLivePosition} />
+      <MapBackground
+        selected={selected}
+        role={role}
+        sheetSnap={sheetSnap}
+        driverPosition={role === "driver" ? driverLocation.location : senderLivePosition}
+        userLocation={driverLocation.location}
+      />
 
       <Animated.View style={[styles.sheet, { height: sheetHeight }]}>
         <View style={styles.sheetHeader}>
@@ -640,26 +651,6 @@ export function HomeScreen() {
             </View>
           )}
 
-          {!isDriver && otherDeliveries.length > 0 ? (
-            <View style={styles.listSection}>
-              {otherDeliveries.map((delivery) => (
-                <DeliveryRow
-                  key={delivery.id}
-                  delivery={delivery}
-                  role={role}
-                  selected={false}
-                  driverDistance={isDriver ? driverLocation.distanceTo(delivery.pickup) : null}
-                  driverLocationStatus={isDriver ? driverLocation.status : null}
-                  compassRotation={isDriver ? compassRotationToTarget(driverLocation.location, delivery.pickup, deviceHeading) : 0}
-                  applying={actioningId === delivery.id}
-                  now={now}
-                  onPress={() => setSelectedId(delivery.id)}
-                  onDetails={() => router.push(`/delivery/${delivery.id}` as any)}
-                  onApply={() => handleSenderAction(delivery)}
-                />
-              ))}
-            </View>
-          ) : null}
           </Animated.View>
         </ScrollView>
       </Animated.View>
@@ -741,7 +732,7 @@ function WalletCard({ walletBalance, totalBalance, blockedBalance }: { walletBal
   );
 }
 
-function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: { selected: Delivery | null | undefined; role: "sender" | "driver"; sheetOverlayHeight: number; driverPosition: { latitude: number; longitude: number } | null }) {
+function MapBackground({ selected, role, sheetSnap, driverPosition, userLocation }: { selected: Delivery | null | undefined; role: "sender" | "driver"; sheetSnap: number; driverPosition: { latitude: number; longitude: number } | null; userLocation: { latitude: number; longitude: number } | null }) {
   const mapRef = useRef<MapView>(null);
   const routeMutation = trpc.geography.route.useMutation();
   const routeRequestRef = useRef(routeMutation.mutateAsync);
@@ -759,41 +750,57 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
   }, [selected]);
 
   const driverPositionRef = useRef(driverPosition);
-  const sheetOverlayHeightRef = useRef(sheetOverlayHeight);
+  const userLocationRef = useRef(userLocation);
   useEffect(() => {
     driverPositionRef.current = driverPosition;
-    sheetOverlayHeightRef.current = sheetOverlayHeight;
-  }, [driverPosition, sheetOverlayHeight]);
+    userLocationRef.current = userLocation;
+  }, [driverPosition, userLocation]);
 
   /** `true` dès que l'utilisateur a déplacé ou zoomé la carte : à partir de là
    *  elle lui appartient, et seul le bouton de recentrage la reprend. */
   const [userMovedMap, setUserMovedMap] = useState(false);
-  const fittedDeliveryId = useRef<string | null>(null);
 
-  const fitToSelection = useCallback((animated: boolean) => {
-    if (!selected) return;
+  /** Les marges réservées autour du tracé : la barre du haut, et la hauteur que
+   *  la feuille occupe réellement. Elles étaient plancherées à 170 px en bas,
+   *  donc la carte laissait de l'espace mort quand la feuille était repliée. */
+  const edgePaddingFor = useCallback((snap: number) => ({
+    top: 88,
+    left: 20,
+    right: 20,
+    bottom: snap + 20,
+  }), []);
+
+  const fitToSelection = useCallback((animated: boolean, snap: number) => {
     const driver = driverPositionRef.current;
+    if (!selected) {
+      // Sans course sélectionnée, la carte se cale sur l'utilisateur.
+      const user = userLocationRef.current;
+      if (!user) return;
+      mapRef.current?.animateToRegion({ ...user, latitudeDelta: 0.012, longitudeDelta: 0.012 }, animated ? 400 : 0);
+      return;
+    }
     const points = driver && selected.status === "active"
       ? [driver, selected.pickup, selected.dropoff]
       : [selected.pickup, selected.dropoff];
-    mapRef.current?.fitToCoordinates(points, {
-      edgePadding: { top: 84, left: 24, right: 24, bottom: Math.max(170, sheetOverlayHeightRef.current + 24) },
-      animated,
-    });
-  }, [selected]);
+    mapRef.current?.fitToCoordinates(points, { edgePadding: edgePaddingFor(snap), animated });
+  }, [edgePaddingFor, selected]);
 
-  // Cadrage automatique une seule fois par course sélectionnée. Il lisait
-  // `driverPosition` et `sheetOverlayHeight` dans ses dépendances : la carte se
-  // replaçait à chaque point GPS reçu et à chaque glissement du sheet, donc tout
-  // déplacement au doigt était annulé dans la seconde.
+  // Recadrage sur deux événements seulement : un changement de course, et un
+  // changement de palier de la feuille — c'est là que l'espace disponible bouge.
+  // Au palier déployé il ne reste pas de carte à cadrer, on ne touche à rien.
+  // Le cadrage ne suit ni les points GPS ni le glissement continu du doigt :
+  // il le faisait, et tout déplacement manuel était annulé dans la seconde.
+  const lastFitKey = useRef<string | null>(null);
+  const hasUserLocation = Boolean(userLocation);
   useEffect(() => {
-    if (!selected) return;
-    if (fittedDeliveryId.current === selected.id) return;
-    fittedDeliveryId.current = selected.id;
+    if (sheetSnap >= SHEET_EXPANDED) return;
+    const key = `${selected?.id ?? (hasUserLocation ? "user" : "none")}:${sheetSnap}`;
+    if (lastFitKey.current === key) return;
+    lastFitKey.current = key;
     setUserMovedMap(false);
-    const timer = setTimeout(() => fitToSelection(true), 220);
+    const timer = setTimeout(() => fitToSelection(true, sheetSnap), 240);
     return () => clearTimeout(timer);
-  }, [fitToSelection, selected]);
+  }, [fitToSelection, hasUserLocation, selected?.id, sheetSnap]);
 
   useEffect(() => {
     routeRequestRef.current = routeMutation.mutateAsync;
@@ -846,11 +853,18 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
         onPanDrag={() => setUserMovedMap(true)}
         onRegionChangeComplete={(_region, details) => { if (details?.isGesture) setUserMovedMap(true); }}
       >
+        {!selected && userLocation ? (
+          <Marker coordinate={userLocation} anchor={{ x: 0.5, y: 0.5 }} title="Votre position">
+            <View style={styles.userMarkerHalo}>
+              <View style={styles.userMarkerDot} />
+            </View>
+          </Marker>
+        ) : null}
         {selected ? (
           <>
             {approachCoordinates.length > 1 ? <Polyline coordinates={approachCoordinates} strokeColor="#176C52" strokeWidth={4} lineCap="round" /> : null}
             {routeCoordinates.length > 1 ? <Polyline coordinates={routeCoordinates} strokeColor="#9A6201" strokeWidth={4} lineCap="round" /> : null}
-            <Marker coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={{ x: 0.5, y: 1 }} centerOffset={{ x: 0, y: -22 }}>
+            <Marker coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={{ x: 0.5, y: 1 }}>
               <View style={styles.pinWrap}>
                 <View style={styles.pinShadow} />
                 <View style={[styles.pinCircle, styles.pinCircleStart]}>
@@ -866,7 +880,7 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
                 </View>
               </Marker>
             ) : null}
-            <Marker coordinate={{ latitude: selected.dropoff.latitude, longitude: selected.dropoff.longitude }} anchor={{ x: 0.5, y: 1 }} centerOffset={{ x: 0, y: -22 }}>
+            <Marker coordinate={{ latitude: selected.dropoff.latitude, longitude: selected.dropoff.longitude }} anchor={{ x: 0.5, y: 1 }}>
               <View style={styles.pinWrap}>
                 <View style={styles.pinShadow} />
                 <View style={[styles.pinCircle, styles.pinCircleEnd]}>
@@ -878,12 +892,12 @@ function MapBackground({ selected, role, sheetOverlayHeight, driverPosition }: {
           </>
         ) : null}
       </MapView>
-      {selected && userMovedMap ? (
+      {userMovedMap && (selected || userLocation) ? (
         <Pressable
-          onPress={() => { setUserMovedMap(false); fitToSelection(true); }}
+          onPress={() => { setUserMovedMap(false); fitToSelection(true, sheetSnap); }}
           accessibilityRole="button"
           accessibilityLabel="Recentrer la carte sur la course"
-          style={({ pressed }) => [styles.fab, { bottom: Math.max(170, sheetOverlayHeight + 24) + 14 }, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.fab, { bottom: sheetSnap + 20 }, pressed && styles.pressed]}
         >
           <MaterialIcons name="my-location" size={20} color="#111111" />
         </Pressable>
@@ -1075,6 +1089,8 @@ const styles = StyleSheet.create({
   nativeMarkerDriver: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#111111", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
   nativeMarkerEnd: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#A43740" },
 
+  userMarkerHalo: { width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(154,98,1,0.18)", alignItems: "center", justifyContent: "center" },
+  userMarkerDot: { width: 13, height: 13, borderRadius: 7, backgroundColor: "#9A6201", borderWidth: 2.5, borderColor: "#FFFFFF" },
   pinWrap: { alignItems: "center", width: 36, paddingTop: 0 },
   pinShadow: { position: "absolute", bottom: 0, width: 14, height: 4, borderRadius: 7, backgroundColor: "rgba(0,0,0,0.25)" },
   pinCircle: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2.5, borderColor: "#FFFFFF", marginBottom: -2 },

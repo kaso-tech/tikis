@@ -28,7 +28,7 @@ export function DeliveryRouteMap({
   routeSource,
   driverPosition,
   approachCoordinates,
-  bottomInset = 82,
+  bottomInset = 0,
 }: {
   pickup: LocationLabel;
   dropoff: LocationLabel;
@@ -64,8 +64,11 @@ export function DeliveryRouteMap({
   const fitToRoute = useCallback((animated: boolean) => {
     const driver = driverPositionRef.current;
     const points = driver ? [...route, { latitude: driver.latitude, longitude: driver.longitude }] : route;
+    // Marges au plus juste : le cadrage doit zoomer autant que l'espace le
+    // permet. Les 52 px de côté et le plancher de 82 px en bas laissaient de
+    // l'espace mort autour du tracé, donc une carte inutilement dézoomée.
     mapRef.current?.fitToCoordinates(points, {
-      edgePadding: { top: 72, right: 52, bottom: Math.max(82, bottomInsetRef.current + 24), left: 52 },
+      edgePadding: { top: 28, right: 24, bottom: Math.max(28, bottomInsetRef.current + 20), left: 24 },
       animated,
     });
   }, [route]);
@@ -106,7 +109,7 @@ export function DeliveryRouteMap({
           onPress={() => { setUserMovedMap(false); fitToRoute(true); }}
           accessibilityRole="button"
           accessibilityLabel="Recentrer la carte sur le trajet"
-          style={({ pressed }) => [styles.recenter, { backgroundColor: theme.surface, borderColor: theme.border, bottom: Math.max(82, bottomInset + 24) + 14 }, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [styles.recenter, { backgroundColor: theme.surface, borderColor: theme.border, bottom: bottomInset + 16 }, pressed && { opacity: 0.7 }]}
         >
           <MaterialIcons name="my-location" size={18} color={theme.foreground} />
         </Pressable>
