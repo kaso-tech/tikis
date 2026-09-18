@@ -526,7 +526,7 @@ function MiniNumber({ value, onChangeText, placeholder }: { value: string; onCha
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FAFAFA" },
+  safe: { flex: 1, backgroundColor: "#F0F3F8" },
   keyboard: { flex: 1 },
   content: { padding: 16, paddingBottom: 24, gap: 14 },
 

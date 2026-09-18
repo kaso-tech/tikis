@@ -263,7 +263,7 @@ function iconBgForTone(tone: Tone, theme: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FAFAFA" },
+  safe: { flex: 1, backgroundColor: "#F0F3F8" },
 
   pressed: { opacity: 0.7 },
 
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   quickStat: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 10, paddingVertical: 10, alignItems: "center", gap: 4 },
   quickStatIcon: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   quickStatIconPrimary: { backgroundColor: "#FFFFFF" },
-  quickStatIconSuccess: { backgroundColor: "#FAFAFA" },
+  quickStatIconSuccess: { backgroundColor: "#F0F3F8" },
   quickStatIconAmber: { backgroundColor: "#FFFFFF" },
   quickStatValue: { color: "#111111", fontSize: 13, fontWeight: "700" },
   quickStatLabel: { color: "#667085", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   modalTitle: { color: "#111111", fontSize: 17, fontWeight: "600", textAlign: "center" },
   modalSub: { color: "#667085", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 },
   modalHint: { color: "#667085", fontSize: 10, lineHeight: 14, textAlign: "center", marginTop: 6 },
-  referenceCard: { backgroundColor: "#FAFAFA", borderRadius: 9, padding: 12, marginTop: 14 },
+  referenceCard: { backgroundColor: "#F0F3F8", borderRadius: 9, padding: 12, marginTop: 14 },
   referenceLabel: { color: "#667085", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textAlign: "center" },
   referenceValue: { color: "#111111", fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4, letterSpacing: 0.3 },
   requestError: { color: "#A43740", fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: 6 },

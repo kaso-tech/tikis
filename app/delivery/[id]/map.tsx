@@ -17,6 +17,7 @@ import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
 import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { formatDistanceKm } from "@/lib/date-format";
 import { haptic } from "@/lib/haptics";
+import { nextSheetLevel, sheetDragOffset, type SheetLevel } from "@/lib/sheet-gesture";
 import {
   arrivalClockTime,
   buildMilestones,
@@ -43,7 +44,6 @@ const SHEET_MIN_HEIGHT = 112;
 const SHEET_MID_HEIGHT = Math.min(380, SCREEN_HEIGHT * 0.45);
 const SHEET_FULL_HEIGHT = Math.min(640, SCREEN_HEIGHT * 0.78);
 
-type SheetLevel = "mini" | "mid" | "full";
 
 function sheetHeightFor(level: SheetLevel): number {
   return level === "mini" ? SHEET_MIN_HEIGHT : level === "mid" ? SHEET_MID_HEIGHT : SHEET_FULL_HEIGHT;
@@ -214,15 +214,9 @@ export default function DeliveryTrackingScreen() {
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 4,
-      onPanResponderMove: (_, gesture) => { panY.setValue(Math.max(-50, Math.min(50, gesture.dy))); },
+      onPanResponderMove: (_, gesture) => { panY.setValue(sheetDragOffset(gesture.dy)); },
       onPanResponderRelease: (_, gesture) => {
-        const level = sheetLevelRef.current;
-        const up = gesture.dy < -30 || (gesture.vy < -0.5 && level !== "full");
-        const down = gesture.dy > 30 || (gesture.vy > 0.5 && level !== "mini");
-        if (up && level === "mini") setSheetLevel("mid");
-        else if (up && level === "mid") setSheetLevel("full");
-        else if (down && level === "full") setSheetLevel("mid");
-        else if (down && level === "mid") setSheetLevel("mini");
+        setSheetLevel(nextSheetLevel(sheetLevelRef.current, gesture.dy, gesture.vy));
         Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start();
       },
       onPanResponderTerminate: () => { Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start(); },
