@@ -15,30 +15,25 @@ import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
 import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
 import { resolveDriverHomeAction, resolveSenderHomeAction, senderHomeActionLabel } from "@/shared/delivery-home-action";
+import { deliveryCardContext, deliveryCardSignal, deliveryCardStateLabel, deliveryCardTone } from "@/lib/delivery-card";
 import { isOpenDeliveryStale } from "@/shared/delivery-freshness";
 import { deliveryMetricsForDay } from "@/lib/wallet-metrics";
 import { useThemeColors } from "@/lib/use-theme-colors";
+
+/** Le ton renvoyé par `deliveryCardTone`, traduit en couleur. La couleur reste
+ *  ici : la logique de carte dit l'état, elle ne peint pas. */
+const TONE_COLOR: Record<ReturnType<typeof deliveryCardTone>, string> = {
+  open: "#9A6201",
+  assigned: "#A65300",
+  active: "#176C52",
+  done: "#667085",
+  idle: "#667085",
+};
 
 const SHEET_MIN = 130;
 const SHEET_PEEK = 420;
 const SHEET_EXPANDED = 720;
 
-const TYPE_ICON: Record<Delivery["type"], React.ComponentProps<typeof MaterialIcons>["name"]> = {
-  Plis: "inventory-2",
-  Personne: "person",
-  Autre: "local-shipping",
-};
-
-const STATUS_CHIP: Record<DeliveryStatus, { label: string; color: string; bg: string }> = {
-  draft: { label: "BROUILLON", color: "#667085", bg: "#E3E3E3" },
-  open: { label: "PUBLIÉE", color: "#9A6201", bg: "#E3E3E3" },
-  pending_confirmation: { label: "ATTRIBUÉE", color: "#9A6201", bg: "#E3E3E3" },
-  active: { label: "EN TRANSIT", color: "#176C52", bg: "#E3E3E3" },
-  completed: { label: "TERMINÉE", color: "#176C52", bg: "#176C52" },
-  disabled: { label: "DÉSACTIVÉE", color: "#A43740", bg: "#FFFFFF" },
-  cancelled: { label: "ANNULÉE", color: "#A43740", bg: "#FFFFFF" },
-  expired: { label: "EXPIRÉE", color: "#667085", bg: "#E3E3E3" },
-};
 
 type FilterKey = "active" | "open" | "pending" | "completed";
 type PendingHomeAction =
@@ -792,58 +787,6 @@ function MapBackground({ selected, role, driverPosition }: { selected: Delivery 
   );
 }
 
-function UrgentCard({
-  delivery,
-  role,
-  applying,
-  now,
-  onAction,
-}: {
-  delivery: Delivery;
-  role: "sender" | "driver";
-  applying: boolean;
-  now: number;
-  onAction: () => void;
-}) {
-  const isSender = role === "sender";
-  const senderAction = delivery.status === "open"
-    ? (delivery.candidateCount ?? 0) > 0 ? "Candidats" : "Annuler"
-    : delivery.status === "active" ? "Suivre" : null;
-  return (
-    <View style={[styles.urgentCard, isSender ? styles.urgentCardSender : styles.urgentCardDriver]}>
-      <View style={styles.urgentHead}>
-        <View style={[styles.urgentThumb, isSender ? styles.urgentThumbSender : styles.urgentThumbDriver]}>
-          <MaterialIcons name={TYPE_ICON[delivery.type] ?? "local-shipping"} size={18} color={isSender ? "#FFFFFF" : "#9A6201"} />
-        </View>
-        <View style={styles.urgentMeta}>
-          <Text style={styles.urgentTitle} numberOfLines={1}>{delivery.title}</Text>
-          <Text style={styles.urgentSub} numberOfLines={1}>
-            {isSender
-              ? `${delivery.driverName ?? "Livreur en attente"} · ${formatDistanceKm(delivery.distanceKm).value} ${formatDistanceKm(delivery.distanceKm).unit}`
-              : `${(delivery.vehicleTypes ?? []).join(" · ") || "Moto"}`}
-          </Text>
-        </View>
-        {isSender ? <View style={[styles.urgentChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}> 
-          <Text style={[styles.urgentChipText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text>
-        </View> : null}
-      </View>
-      <View style={styles.urgentPricing}>
-        <View>
-          <Text style={styles.urgentPrice}>{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</Text>
-          <Text style={styles.urgentPriceExtra}>{isSender ? "est. client" : "rémunération nette"}</Text>
-        </View>
-      </View>
-      <View style={styles.urgentActions}>
-        {isSender && senderAction ? (
-          <Pressable onPress={onAction} disabled={applying} style={({ pressed }) => [styles.urgentBtnWhite, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}>
-            {applying ? <ActivityIndicator size="small" color="#111111" /> : <><MaterialIcons name={senderAction === "Candidats" ? "group" : senderAction === "Annuler" ? "close" : "my-location"} size={15} color="#111111" /><Text style={styles.urgentBtnWhiteText}>{senderAction}</Text></>}
-          </Pressable>
-        ) : null}
-      </View>
-    </View>
-  );
-}
-
 function DeliveryRow({
   delivery,
   role,
@@ -867,7 +810,6 @@ function DeliveryRow({
   onDetails: () => void;
   onApply: () => void;
 }) {
-  const isSender = role === "sender";
   const isDriver = role === "driver";
   const driverAction = delivery.status === "completed"
     ? null
@@ -878,82 +820,137 @@ function DeliveryRow({
         : delivery.ownCandidateStatus === "confirmed" || delivery.status === "active"
           ? "Démarrer"
           : "Postuler";
-  const vehicleLabel = (delivery.vehicleTypes ?? []).join(" · ") || "Moto";
+
   const route = formatListRouteParts(delivery.pickup, delivery.dropoff);
   const dateInfo = formatDeliveryCreationDate(delivery.createdAt, now);
-  const dateColor = dateInfo.tone === "primary" ? "#9A6201" : "#667085";
-  const dateBg = dateInfo.tone === "primary" ? "#9A620114" : "#FFFFFF";
   const totalDistance = formatDistanceKm(delivery.distanceKm);
+  const tripLine = `${(delivery.vehicleTypes ?? []).join(" · ") || "Moto"} · ${totalDistance.value} ${totalDistance.unit}`;
+  const price = formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice);
+  const tone = deliveryCardTone(delivery.status);
+  const toneColor = TONE_COLOR[tone];
+  const signal = deliveryCardSignal(delivery);
+  const context = deliveryCardContext(delivery);
+
   const driverDistText = driverDistance
     ? `${driverDistance.value} ${driverDistance.unit}`
     : driverLocationStatus === "loading" || driverLocationStatus === "idle"
       ? "…"
       : driverLocationStatus === "denied"
-        ? "GPS off"
+        ? "GPS désactivé"
         : "—";
 
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, selected && styles.rowSelected, pressed && styles.pressed]}>
-      <View style={styles.rowTop}>
-        <View style={[styles.rowThumb, isSender ? null : styles.rowThumbDriver]}>
-          <MaterialIcons name={TYPE_ICON[delivery.type] ?? "local-shipping"} size={15} color={isSender ? "#111111" : "#FFFFFF"} />
-        </View>
-        <View style={styles.rowMain}>
-          <View style={styles.rowTitleLine}>
-            <Text style={styles.rowTitle} numberOfLines={1}>{delivery.title}</Text>
-            {isDriver ? <View style={styles.rowDriverDistance}><MaterialIcons name="explore" size={15} color="#9A6201" /><Text style={styles.rowDriverDistanceText}>À {driverDistText}</Text></View> : isSender ? <View style={[styles.rowStatusChip, { backgroundColor: STATUS_CHIP[delivery.status].bg }]}><Text style={[styles.rowStatusText, { color: STATUS_CHIP[delivery.status].color }]}>{STATUS_CHIP[delivery.status].label}</Text></View> : null}
+  // ---------- Registre (livreur) ----------
+  if (isDriver) {
+    return (
+      <Pressable
+        onPress={onPress}
+        accessibilityLabel={`${route.pickup} vers ${route.dropoff}, ${price}, à ${driverDistText}`}
+        style={({ pressed }) => [styles.card, styles.cardCompact, selected && styles.cardSelected, pressed && styles.cardPressed]}
+      >
+        <View style={[styles.cardRail, { backgroundColor: toneColor }]} />
+        <View style={styles.compactBody}>
+          <View style={styles.compactRoute}>
+            <Text style={styles.compactFrom} numberOfLines={1}>{route.pickup}</Text>
+            <Text style={styles.compactArrow}>→</Text>
+            <Text style={styles.compactTo} numberOfLines={1}>{route.dropoff}</Text>
           </View>
-          <Text style={styles.rowSub} numberOfLines={1}>{route.pickup} → {route.dropoff} · {vehicleLabel}</Text>
-        </View>
-        <Text style={styles.rowPrice}>{formatMoney(delivery.offeredPrice ?? delivery.estimatedPrice)}</Text>
-      </View>
-      <View style={styles.rowDateRow}>
-        <View style={[styles.datePill, { backgroundColor: dateBg }]}>
-          <MaterialIcons name={dateInfo.icon} size={11} color={dateColor} />
-          <Text style={[styles.datePillText, { color: dateColor }]}>{dateInfo.primary}</Text>
-        </View>
-      </View>
-      <View style={styles.rowBottom}>
-        <View style={styles.rowStat}>
-          <MaterialIcons name="route" size={12} color="#667085" />
-          <Text style={styles.rowStatText}>{totalDistance.value} {totalDistance.unit}</Text>
-        </View>
-        {!isDriver ? (
-          <View style={styles.rowStat}>
-            <MaterialIcons name="group" size={12} color="#667085" />
-            <Text style={styles.rowStatText}>{delivery.candidateCount ?? 0} candidat{(delivery.candidateCount ?? 0) > 1 ? "s" : ""}</Text>
+          <Text style={styles.compactMeta} numberOfLines={1}>{tripLine} · {dateInfo.primary.toLocaleLowerCase("fr")}</Text>
+          <View style={styles.compactDistance}>
+            <MaterialIcons name="explore" size={15} color="#9A6201" />
+            <Text style={styles.compactDistanceText} numberOfLines={1}>à {driverDistText} de vous</Text>
           </View>
-        ) : null}
-        <View style={styles.rowActions}>
-          <Pressable onPress={onDetails} style={({ pressed }) => [styles.rowBtnOutline, pressed && styles.pressed]}>
-            <Text style={styles.rowBtnOutlineText}>Détails</Text>
-          </Pressable>
-          {isDriver ? (
+        </View>
+        <View style={styles.compactRight}>
+          <Text style={styles.compactPrice}>{price}</Text>
+          {driverAction ? (
             <Pressable
               onPress={onApply}
               disabled={applying}
-              style={({ pressed }) => [styles.rowBtnFilled, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={`${driverAction} — ${delivery.title}`}
+              style={({ pressed }) => [applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
             >
-              {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.rowBtnFilledText}>{driverAction}</Text>}
+              {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.compactAction}>{driverAction}</Text>}
             </Pressable>
-          ) : (() => {
-            // Même résolveur que `handleSenderAction` : le libellé ne peut plus
-            // annoncer une action que le gestionnaire ne connaît pas.
-            const senderAction = senderHomeActionLabel(resolveSenderHomeAction(delivery));
-            if (!senderAction) return null;
-            return (
-              <Pressable
-                onPress={onApply}
-                disabled={applying}
-                accessibilityRole="button"
-                accessibilityLabel={`${senderAction} — ${delivery.title}`}
-                style={({ pressed }) => [styles.rowBtnFilled, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
-              >
-                {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.rowBtnFilledText}>{senderAction}</Text>}
-              </Pressable>
-            );
-          })()}
+          ) : (
+            <Pressable onPress={onDetails} hitSlop={6} accessibilityRole="button" style={({ pressed }) => [pressed && styles.pressed]}>
+              <Text style={styles.compactAction}>Ouvrir</Text>
+            </Pressable>
+          )}
         </View>
+      </Pressable>
+    );
+  }
+
+  // ---------- Trajet (expéditeur) ----------
+  const senderAction = resolveSenderHomeAction(delivery);
+  const senderLabel = senderHomeActionLabel(senderAction);
+  const isCancel = senderAction === "cancel";
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityLabel={`${route.pickup} vers ${route.dropoff}, ${price}, ${deliveryCardStateLabel(delivery.status)}`}
+      style={({ pressed }) => [styles.card, styles.cardTrip, selected && styles.cardSelected, pressed && styles.cardPressed]}
+    >
+      <View style={[styles.cardRail, { backgroundColor: toneColor }]} />
+
+      <View style={styles.tripHead}>
+        <View style={styles.tripRail}>
+          <View style={styles.tripDot} />
+          <View style={styles.tripLine} />
+          <View style={styles.tripPin} />
+        </View>
+        <View style={styles.tripStops}>
+          <Text style={styles.tripStop} numberOfLines={1}>{route.pickup}</Text>
+          <Text style={styles.tripStop} numberOfLines={1}>{route.dropoff}</Text>
+        </View>
+        <View style={styles.tripFigures}>
+          <Text style={styles.tripPrice}>{price}</Text>
+          <Text style={styles.tripTrip} numberOfLines={1}>{tripLine}</Text>
+        </View>
+      </View>
+
+      {signal ? (
+        <View style={[styles.tripSignal, { backgroundColor: toneColor + "1A" }]}>
+          <MaterialIcons name={signal.kind === "candidates" ? "group" : "two-wheeler"} size={15} color={toneColor} />
+          <Text style={[styles.tripSignalText, { color: toneColor }]} numberOfLines={1}>{signal.text}</Text>
+        </View>
+      ) : null}
+
+      <Text style={styles.tripMeta} numberOfLines={1}>
+        <Text style={[styles.tripState, { color: toneColor }]}>{deliveryCardStateLabel(delivery.status)}</Text>
+        {`  ·  ${dateInfo.primary.toLocaleLowerCase("fr")}  ·  ${context}`}
+      </Text>
+
+      <View style={styles.tripFoot}>
+        <Pressable onPress={onDetails} hitSlop={6} accessibilityRole="button" style={({ pressed }) => [pressed && styles.pressed]}>
+          <Text style={styles.tripGhost}>Détails</Text>
+        </Pressable>
+        {senderLabel && isCancel ? (
+          // Annuler ne redevient un bouton que lorsqu'il n'y a pas d'action utile
+          // à côté : une action destructrice ne doit jamais être la plus visible.
+          <Pressable
+            onPress={onApply}
+            disabled={applying}
+            accessibilityRole="button"
+            accessibilityLabel={`Annuler — ${delivery.title}`}
+            style={({ pressed }) => [styles.tripCtaQuiet, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
+          >
+            {applying ? <ActivityIndicator size="small" color="#A43740" /> : <Text style={styles.tripCtaQuietText}>Annuler</Text>}
+          </Pressable>
+        ) : senderLabel ? (
+          <Pressable
+            onPress={onApply}
+            disabled={applying}
+            accessibilityRole="button"
+            accessibilityLabel={`${senderLabel} — ${delivery.title}`}
+            style={({ pressed }) => [styles.tripCta, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
+          >
+            {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.tripCtaText}>{senderLabel}</Text>}
+          </Pressable>
+        ) : null}
       </View>
     </Pressable>
   );
@@ -1030,53 +1027,56 @@ const styles = StyleSheet.create({
   scrollArea: { flex: 1, marginTop: 2 },
   scrollContent: { paddingHorizontal: 14, paddingTop: 6, paddingBottom: 90, gap: 8 },
 
-  urgentCard: { borderRadius: 12, padding: 12, gap: 10 },
-  urgentCardSender: { backgroundColor: "#111111" },
-  urgentCardDriver: { backgroundColor: "#9A6201" },
-  urgentHead: { flexDirection: "row", alignItems: "center", gap: 10 },
-  urgentThumb: { width: 36, height: 36, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  urgentThumbSender: { backgroundColor: "#9A6201" },
-  urgentThumbDriver: { backgroundColor: "#FFFFFF" },
-  urgentMeta: { flex: 1, minWidth: 0 },
-  urgentTitle: { color: "#FFFFFF", fontSize: 13, fontWeight: "700" },
-  urgentSub: { color: "rgba(255,255,255,0.65)", fontSize: 11, marginTop: 2 },
-  urgentChip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
-  urgentChipText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.4 },
-  urgentPricing: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
-  urgentPrice: { color: "#FFFFFF", fontSize: 20, fontWeight: "700", letterSpacing: -0.3 },
-  urgentPriceExtra: { color: "rgba(255,255,255,0.6)", fontSize: 10, marginTop: 1 },
-  urgentActions: { flexDirection: "row", gap: 7 },
-  urgentBtnWhite: { flex: 1, height: 38, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
-  urgentBtnWhiteText: { color: "#9A6201", fontSize: 12, fontWeight: "700" },
+
+  // ---------- Carte « Trajet » (expéditeur) et « Registre » (livreur) ----------
+  card: {
+    position: "relative", overflow: "hidden", backgroundColor: "#F0F3F8",
+    borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3",
+  },
+  cardPressed: { backgroundColor: "#E7ECF4" },
+  // La sélection cerne la carte au lieu de la repeindre : la liste ne change plus
+  // de couleur autour de l'élément choisi.
+  cardSelected: { borderColor: "#9A6201", borderWidth: 1.5 },
+  cardRail: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3 },
+
+  cardTrip: { paddingVertical: 13, paddingLeft: 17, paddingRight: 14, gap: 11 },
+  tripHead: { flexDirection: "row", alignItems: "flex-start", gap: 11 },
+  tripRail: { width: 12, alignItems: "center", paddingTop: 5, alignSelf: "stretch" },
+  tripDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 2.5, borderColor: "#9A6201" },
+  tripLine: { flex: 1, width: 1.5, minHeight: 16, backgroundColor: "#E3E3E3", marginVertical: 2 },
+  tripPin: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#A43740" },
+  tripStops: { flex: 1, minWidth: 0, gap: 10 },
+  tripStop: { fontSize: 14.5, fontWeight: "600", lineHeight: 17, color: "#111111" },
+  tripFigures: { flexShrink: 0, alignItems: "flex-end", gap: 10 },
+  tripPrice: { fontSize: 16, fontWeight: "800", lineHeight: 17, color: "#111111", fontVariant: ["tabular-nums"] },
+  tripTrip: { fontSize: 11.5, lineHeight: 14, color: "#667085", fontVariant: ["tabular-nums"] },
+  tripSignal: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 9 },
+  tripSignalText: { flex: 1, fontSize: 12, fontWeight: "600" },
+  tripMeta: { fontSize: 11.5, color: "#667085" },
+  tripState: { fontWeight: "700" },
+  tripFoot: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#E3E3E3" },
+  tripGhost: { fontSize: 12.5, fontWeight: "600", color: "#667085" },
+  tripCta: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#9A6201", minWidth: 96, alignItems: "center" },
+  tripCtaText: { fontSize: 12.5, fontWeight: "700", color: "#9A6201" },
+  tripCtaQuiet: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#A43740", minWidth: 96, alignItems: "center" },
+  tripCtaQuietText: { fontSize: 12.5, fontWeight: "700", color: "#A43740" },
+
+  cardCompact: { flexDirection: "row", alignItems: "center", gap: 11, paddingVertical: 11, paddingLeft: 15, paddingRight: 12 },
+  compactBody: { flex: 1, minWidth: 0, gap: 3 },
+  compactRoute: { flexDirection: "row", alignItems: "baseline", gap: 6 },
+  compactFrom: { flexShrink: 1, minWidth: 0, fontSize: 13.5, fontWeight: "600", color: "#111111" },
+  compactArrow: { flexShrink: 0, fontSize: 13.5, color: "#667085" },
+  compactTo: { flexShrink: 1, minWidth: 0, fontSize: 13.5, fontWeight: "600", color: "#111111" },
+  compactMeta: { fontSize: 11.5, color: "#667085" },
+  compactDistance: { flexDirection: "row", alignItems: "center", gap: 5, position: "relative" },
+  compactDistanceText: { fontSize: 11.5, fontWeight: "700", color: "#9A6201" },
+  compactRight: { flexShrink: 0, alignItems: "flex-end", gap: 8 },
+  compactPrice: { fontSize: 14.5, fontWeight: "800", color: "#111111", fontVariant: ["tabular-nums"] },
+  compactAction: { fontSize: 11.5, fontWeight: "700", color: "#9A6201" },
 
   listSection: { marginTop: 4, gap: 8 },
   // Le sheet est blanc : une carte blanche y disparaîtrait. Les cartes sont
   // en retrait, et ce qu'elles contiennent repasse en blanc.
-  row: { backgroundColor: "#F0F3F8", borderRadius: 12, padding: 11, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3" },
-  rowSelected: { borderColor: "transparent", backgroundColor: "#FFFFFF" },
-  rowTop: { flexDirection: "row", alignItems: "center", gap: 9 },
-  rowThumb: { width: 30, height: 30, borderRadius: 8, backgroundColor: "#FFFFFF", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", alignItems: "center", justifyContent: "center" },
-  rowThumbDriver: { backgroundColor: "#9A6201" },
-  rowMain: { flex: 1, minWidth: 0 },
-  rowTitleLine: { flexDirection: "row", alignItems: "center", gap: 6 },
-  rowTitle: { color: "#111111", fontSize: 12.5, fontWeight: "600" },
-  rowDriverDistance: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 3, paddingTop: 1 },
-  rowDriverDistanceText: { color: "#9A6201", fontSize: 12.5, fontWeight: "600" },
-  rowStatusChip: { marginLeft: "auto", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
-  rowStatusText: { fontSize: 9, fontWeight: "700", letterSpacing: 0.35 },
-  rowSub: { color: "#667085", fontSize: 10.5, marginTop: 1 },
-  rowPrice: { color: "#111111", fontSize: 14, fontWeight: "700" },
-  rowDateRow: { flexDirection: "row", alignItems: "center", marginTop: 8 },
-  datePill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3" },
-  datePillText: { fontSize: 10.5, fontWeight: "700" },
-  rowBottom: { flexDirection: "row", alignItems: "center", marginTop: 8, gap: 10 },
-  rowStat: { flexDirection: "row", alignItems: "center", gap: 4 },
-  rowStatText: { color: "#667085", fontSize: 10.5, fontWeight: "500" },
-  rowActions: { marginLeft: "auto", flexDirection: "row", gap: 6 },
-  rowBtnOutline: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3" },
-  rowBtnOutlineText: { color: "#111111", fontSize: 10.5, fontWeight: "600" },
-  rowBtnFilled: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 7, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", minWidth: 64, alignItems: "center", flexDirection: "row", gap: 4, justifyContent: "center" },
-  rowBtnFilledText: { color: "#9A6201", fontSize: 10.5, fontWeight: "700" },
 
   loadingState: { alignItems: "center", paddingVertical: 32, gap: 8 },
   loadingText: { color: "#667085", fontSize: 12 },

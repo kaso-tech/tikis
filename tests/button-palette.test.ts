@@ -20,10 +20,14 @@ describe("palette des boutons hors authentification", () => {
   });
 
   it("applique la même palette aux actions personnalisées hors authentification", () => {
+    // Les cartes de l'accueil ont changé de forme — « Trajet » côté expéditeur,
+    // « Registre » côté livreur — mais pas de palette : l'action primaire y reste
+    // blanche à texte brun, l'emphase passant par la bordure.
     for (const source of [nativeHomeSource, webHomeSource]) {
-      expect(source).toContain('rowBtnFilled: {');
-      expect(source).toContain('backgroundColor: "#FFFFFF"');
-      expect(source).toContain('rowBtnFilledText: { color: "#9A6201"');
+      expect(source).toContain('tripCta: {');
+      expect(source).toContain('backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#9A6201"');
+      expect(source).toContain('tripCtaText: { fontSize: 12.5, fontWeight: "700", color: "#9A6201" }');
+      expect(source).toContain('compactAction: { fontSize: 11.5, fontWeight: "700", color: "#9A6201" }');
     }
     expect(deliverySource).toContain('trackButton: { backgroundColor: "#FFFFFF"');
     expect(deliverySource).toContain('trackButtonText: { color: "#9A6201"');
