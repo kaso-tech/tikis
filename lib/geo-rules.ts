@@ -74,10 +74,20 @@ function isPublicPlaceName(location: LocationPresentation) {
   return !isGenericName(location) && (location.featureType === "poi" || !location.featureType);
 }
 
+/**
+ * Le libellé local d’un lieu, dans l’ordre de préférence de la logique métier
+ * (« Règle métier principale des listes de livraison », même ville) :
+ *
+ *   1. nom du lieu public — 2. quartier — 3. rue — 4. ville
+ *
+ * La rue passait avant le quartier, au motif qu’elle est plus précise. C’est
+ * l’inverse de la règle retenue : dans une liste, « Karpala » se comprend
+ * immédiatement là où « Rue 14.38 » demande un effort. La précision est le
+ * besoin de la page de détail et de la navigation, pas celui de la liste.
+ */
 function localPart(location: LocationPresentation) {
   if (isPublicPlaceName(location)) return location.name;
-  // Une rue constitue un repère plus précis qu’un quartier pour une adresse explicitement classée.
-  return location.street || location.district || (!isGenericName(location) ? location.name : undefined) || location.city || location.province || location.formattedAddress || "Lieu sélectionné";
+  return location.district || location.street || (!isGenericName(location) ? location.name : undefined) || location.city || location.province || location.formattedAddress || "Lieu sélectionné";
 }
 
 export function locationTitle(location: LocationPresentation) {
@@ -86,7 +96,7 @@ export function locationTitle(location: LocationPresentation) {
 }
 
 export function locationSubtitle(location: LocationPresentation) {
-  return distinctParts([location.street, location.district, location.city, location.province, location.country])
+  return distinctParts([location.district, location.street, location.city, location.province, location.country])
     .filter((part) => !samePart(part, locationTitle(location)))
     .join(" · ") || location.formattedAddress || "Lieu à confirmer";
 }

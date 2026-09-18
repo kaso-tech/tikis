@@ -7,7 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
 import { haptic } from "@/lib/haptics";
 import { trpc } from "@/lib/trpc";
-import { formatListRouteParts, geodesicDistanceKm, locationTitle } from "@/lib/geo-rules";
+import { formatDeliveryDetailPlace, formatListRouteParts, geodesicDistanceKm } from "@/lib/geo-rules";
 import { useDriverLocation } from "@/hooks/use-driver-location";
 import { useDriverBasePositionSync } from "@/hooks/use-driver-base-position-sync";
 import { useDeviceHeading } from "@/hooks/use-device-heading";
@@ -1003,10 +1003,14 @@ function DeliveryRow({
   const dateColor = dateInfo.tone === "primary" ? "#9A6201" : "#667085";
   const dateBg = dateInfo.tone === "primary" ? "#9A620114" : "#FFFFFF";
   const totalDistance = formatDistanceKm(delivery.distanceKm);
-  const pickupTitle = locationTitle(delivery.pickup);
-  const pickupDistrict = delivery.pickup.district || delivery.pickup.city || "Quartier non renseigné";
-  const dropoffTitle = locationTitle(delivery.dropoff);
-  const dropoffDistrict = delivery.dropoff.district || delivery.dropoff.city || "Quartier non renseigné";
+  // L'infobulle composait elle-même « titre + quartier », alors que le choix de
+  // ce qu'on montre et dans quel ordre appartient à la logique des lieux.
+  const pickupPlace = formatDeliveryDetailPlace(delivery.pickup);
+  const dropoffPlace = formatDeliveryDetailPlace(delivery.dropoff);
+  const pickupTitle = pickupPlace.title;
+  const pickupDistrict = pickupPlace.subtitle;
+  const dropoffTitle = dropoffPlace.title;
+  const dropoffDistrict = dropoffPlace.subtitle;
   const deliveryDetails = [delivery.type, delivery.passengers ? `${delivery.passengers} pers.` : null, `${totalDistance.value} ${totalDistance.unit}`, dimensions, vehicleLabel].filter(Boolean).join(" · ");
   const driverDistText = driverDistance
     ? `${driverDistance.value} ${driverDistance.unit}`
