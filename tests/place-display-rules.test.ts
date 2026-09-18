@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { formatDeliveryDetailPlace, formatListRoute, formatFavoritePlace } from "../lib/geo-rules";
 
 /**
- * Les cas de « Logique métier — Gestion des lieux Tikis », §7 (même ville),
+ * Les cas de docs/logique-metier-lieux.md : §7 (même ville),
  * §8 (villes différentes), §10 (page de détail) et §21 (cas A à G).
  *
  * L'ordre attendu dans une liste est : nom du lieu public, puis quartier, puis

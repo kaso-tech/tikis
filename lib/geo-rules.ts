@@ -1,3 +1,14 @@
+/**
+ * Règles géographiques Tikis : normalisation des lieux, libellés d’affichage,
+ * distances et estimation de prix.
+ *
+ * Les libellés suivent docs/logique-metier-lieux.md. Cette logique est
+ * volontairement centralisée ici : aucun écran ne décide lui-même quelles
+ * informations d’un lieu afficher, dans quel ordre, ni quel repli utiliser
+ * (voir §14 « Unification du formatage »). Toute évolution de l’ordre
+ * d’affichage se fait dans ce fichier, et le document est mis à jour avec.
+ */
+
 import type { DeliveryType, LocationLabel, LocationPresentation, SelectableVehicleType } from "@/shared/tikis-domain";
 
 const safeWhitespace = /\s+/g;
@@ -66,9 +77,13 @@ function isGenericName(location: LocationPresentation) {
 
 /**
  * Un nom de lieu ne prime sur le quartier que s'il s'agit d'un lieu public susceptible d'être
- * connu de tous (ex. « Maison du Peuple »), identifié ici par featureType "poi". Les anciens
- * enregistrements sans featureType conservent leur nom pour ne pas dégrader leur affichage.
+ * connu de tous (ex. « Maison du Peuple »), identifié ici par featureType "poi".
  * Une adresse explicitement classée rue/adresse ne prime pas sur le quartier.
+ *
+ * Écart assumé au document : les enregistrements antérieurs à `featureType` n'en portent pas,
+ * et rien ne permet alors de dire si leur nom désigne un lieu public. Ils gardent leur nom
+ * plutôt que de tomber sur le quartier, faute de quoi des lieux correctement nommés
+ * perdraient leur libellé. Les lieux enregistrés depuis portent tous un `featureType`.
  */
 function isPublicPlaceName(location: LocationPresentation) {
   return !isGenericName(location) && (location.featureType === "poi" || !location.featureType);
@@ -76,7 +91,7 @@ function isPublicPlaceName(location: LocationPresentation) {
 
 /**
  * Le libellé local d’un lieu, dans l’ordre de préférence de la logique métier
- * (« Règle métier principale des listes de livraison », même ville) :
+ * (docs/logique-metier-lieux.md §7.1, deux lieux d’une même ville) :
  *
  *   1. nom du lieu public — 2. quartier — 3. rue — 4. ville
  *
