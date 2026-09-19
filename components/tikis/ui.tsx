@@ -22,6 +22,7 @@ export function TikisButton({
   loadingLabel,
   disabled = false,
   icon,
+  compact = false,
   style,
 }: {
   authStyle?: boolean;
@@ -32,6 +33,9 @@ export function TikisButton({
   loadingLabel?: string;
   disabled?: boolean;
   icon?: React.ComponentProps<typeof MaterialIcons>["name"];
+  /** Rogne les marges internes et la graisse pour qu'une rangée de trois actions
+   *  tienne sur une ligne de téléphone. La palette, elle, ne change pas. */
+  compact?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
   const palette: ButtonPalette = authStyle && variant === "primary"
@@ -39,8 +43,10 @@ export function TikisButton({
     : buttonColors[variant];
   const blocked = disabled || loading;
 
-  return <Pressable accessibilityRole="button" accessibilityState={{ disabled: blocked, busy: loading }} disabled={blocked} onPress={() => { haptic.light(); onPress(); }} style={({ pressed }) => [styles.button, { backgroundColor: palette.background, borderColor: palette.border ?? palette.background }, style, (pressed || blocked) && styles.buttonPressed]}>
-    {loading ? <><ActivityIndicator color={palette.foreground} /><Text style={[styles.buttonText, { color: palette.foreground }]}>{loadingLabel ?? "Traitement en cours…"}</Text></> : <>{icon ? <MaterialIcons name={icon} size={18} color={palette.foreground} /> : null}<Text style={[styles.buttonText, { color: palette.foreground }]}>{label}</Text></>}
+  const textStyle = [styles.buttonText, compact && styles.buttonTextCompact, { color: palette.foreground }];
+
+  return <Pressable accessibilityRole="button" accessibilityState={{ disabled: blocked, busy: loading }} disabled={blocked} onPress={() => { haptic.light(); onPress(); }} style={({ pressed }) => [styles.button, compact && styles.buttonCompact, { backgroundColor: palette.background, borderColor: palette.border ?? palette.background }, style, (pressed || blocked) && styles.buttonPressed]}>
+    {loading ? <><ActivityIndicator color={palette.foreground} /><Text style={textStyle} numberOfLines={1}>{loadingLabel ?? (compact ? "…" : "Traitement en cours…")}</Text></> : <>{icon ? <MaterialIcons name={icon} size={compact ? 16 : 18} color={palette.foreground} /> : null}<Text style={textStyle} numberOfLines={1}>{label}</Text></>}
   </Pressable>;
 }
 
@@ -77,7 +83,9 @@ export const tikisStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   button: { minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 9, borderWidth: 1, paddingHorizontal: 15, flexDirection: "row", gap: 8 },
   buttonPressed: { opacity: 0.84, transform: [{ scale: 0.98 }] },
+  buttonCompact: { minHeight: 44, paddingHorizontal: 10, gap: 5 },
   buttonText: { fontSize: 15, fontWeight: "600" },
+  buttonTextCompact: { fontSize: 13.5 },
   iconButton: { width: 40, height: 40, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3" },
   iconButtonPressed: { opacity: 0.68 },
   card: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 13, borderWidth: 1, borderColor: "#E3E3E3" },

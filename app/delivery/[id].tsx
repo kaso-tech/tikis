@@ -391,16 +391,22 @@ export default function DeliveryDetailScreen() {
 
         {role === "sender" ? (
           <View style={styles.senderActions}>
-            {canEdit ? <TikisButton label="Modifier la livraison" icon="edit" variant="secondary" onPress={() => router.push({ pathname: "/create-delivery", params: { deliveryId } } as any)} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
-            {canReactivate ? <TikisButton label="Activer la livraison" icon="play-circle" onPress={() => setSenderAction("reactivate")} loading={senderProcessing && senderAction === "reactivate"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
-            {canDisable ? <TikisButton label="Désactiver la livraison" icon="pause-circle" variant="secondary" onPress={() => setSenderAction("disable")} loading={senderProcessing && senderAction === "disable"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
+            {canEdit ? <TikisButton compact label="Modifier" icon="edit" variant="secondary" onPress={() => router.push({ pathname: "/create-delivery", params: { deliveryId } } as any)} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
+            {canReactivate ? <TikisButton compact label="Activer" icon="play-circle" onPress={() => setSenderAction("reactivate")} loading={senderProcessing && senderAction === "reactivate"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
+            {canDisable ? <TikisButton compact label="Désactiver" icon="pause-circle" variant="secondary" onPress={() => setSenderAction("disable")} loading={senderProcessing && senderAction === "disable"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
             {canCancel ? (
-              <Pressable onPress={() => setSenderAction("cancel")} disabled={senderProcessing} style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed, senderProcessing && styles.cancelButtonDisabled]}>
+              <Pressable
+                onPress={() => setSenderAction("cancel")}
+                disabled={senderProcessing}
+                accessibilityRole="button"
+                accessibilityLabel="Annuler la livraison"
+                style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed, senderProcessing && styles.cancelButtonDisabled]}
+              >
                 <MaterialIcons name="cancel" size={16} color={senderProcessing ? "#A0A0A0" : "#A43740"} />
-                <Text style={[styles.cancelButtonText, senderProcessing && styles.cancelButtonTextDisabled]}>Annuler la livraison</Text>
+                <Text style={[styles.cancelButtonText, senderProcessing && styles.cancelButtonTextDisabled]} numberOfLines={1}>Annuler</Text>
               </Pressable>
             ) : null}
-            {canUnselect ? <TikisButton label="Annuler le choix du livreur" icon="undo" variant="secondary" onPress={() => setSenderAction("unselect")} loading={senderProcessing && senderAction === "unselect"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
+            {canUnselect ? <TikisButton compact label="Annuler le choix du livreur" icon="undo" variant="secondary" onPress={() => setSenderAction("unselect")} loading={senderProcessing && senderAction === "unselect"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
           </View>
         ) : null}
 
@@ -551,11 +557,11 @@ const styles = StyleSheet.create({
   trackButton: { backgroundColor: "#FFFFFF", borderRadius: 10, borderWidth: 1, borderColor: "#E3E3E3", paddingVertical: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
   trackButtonText: { color: "#9A6201", fontSize: 13, fontWeight: "600" },
 
-  senderActions: { gap: 8, marginTop: 4 },
-  senderActionBtn: { minHeight: 46 },
-  cancelButton: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, minHeight: 46, borderRadius: 9, borderWidth: 1, borderColor: "#A43740", backgroundColor: "#FFFFFF" },
+  senderActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  senderActionBtn: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 104 },
+  cancelButton: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 104, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, minHeight: 44, paddingHorizontal: 10, borderRadius: 9, borderWidth: 1, borderColor: "#A43740", backgroundColor: "#FFFFFF" },
   cancelButtonDisabled: { borderColor: "#E3E3E3" },
-  cancelButtonText: { color: "#A43740", fontSize: 13, fontWeight: "600" },
+  cancelButtonText: { color: "#A43740", fontSize: 13.5, fontWeight: "600" },
   cancelButtonTextDisabled: { color: "#A0A0A0" },
 
   driverAction: { marginTop: 16 },
