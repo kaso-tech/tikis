@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { and, count, desc, eq, gte, like, lte, or, sql } from "drizzle-orm";
-import { countryDraftIssue } from "../shared/iso-countries";
+import { countryDraftIssue, countryPlanWarning } from "../shared/iso-countries";
 import { getDb } from "./db";
 import * as db from "./db";
 import {
@@ -544,7 +544,14 @@ export async function adminListCountries() {
   // vérifiée : la console les signale au lieu de les laisser passer pour bonnes.
   return rows
     .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((row) => ({ ...row, issue: countryDraftIssue({ id: row.id, name: row.name, dialCode: row.dialCode }) }));
+    .map((row) => ({
+      ...row,
+      issue: countryDraftIssue({ id: row.id, name: row.name, dialCode: row.dialCode }),
+      planWarning: countryPlanWarning({
+        id: row.id, name: row.name, dialCode: row.dialCode,
+        digits: row.digits, groups: row.groups.split(",").map(Number),
+      }),
+    }));
 }
 
 export async function adminUpsertCountry(input: { id: string; name: string; dialCode: string; digits: number; groups: number[]; timeZones: string[]; enabled: boolean; sortOrder: number }) {

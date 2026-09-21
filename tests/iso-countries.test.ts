@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { COUNTRIES } from "../lib/registration-rules";
-import { countryDraftIssue, countryNameMatches, ISO_COUNTRIES, isoCountry, isoCountryByName } from "../shared/iso-countries";
+import { COUNTRIES, DEFAULT_COUNTRY, findCountryForPhone, formatLocalPhone, isValidInternationalPhone } from "../lib/registration-rules";
+import { countryDraftIssue, countryNameMatches, countryPlanWarning, ISO_COUNTRIES, isoCountry, isoCountryByName } from "../shared/iso-countries";
 import { isCoordinateInCountry, listSupportedCountries } from "../server/_test-helpers/geo-fence";
 
 describe("référence des codes pays", () => {
@@ -104,5 +104,60 @@ describe("ce que la confusion de code entraînait", () => {
   it("la vérification de pays d’un lieu ne se saute plus pour un pays ajouté depuis la console", () => {
     const geography = readFileSync(join(process.cwd(), "server/geography.ts"), "utf8");
     expect(geography).toContain("countryNameMatches(known.id, place.country)");
+  });
+});
+
+describe("plans de numérotation du Bénin et du Niger", () => {
+  const benin = COUNTRIES.find((country) => country.id === "BJ")!;
+  const niger = COUNTRIES.find((country) => country.id === "NE")!;
+
+  it("propose les deux pays à l’inscription", () => {
+    expect(benin).toMatchObject({ name: "Bénin", dialCode: "+229", digits: 10 });
+    expect(niger).toMatchObject({ name: "Niger", dialCode: "+227", digits: 8 });
+    // Les ajouter en tête ne doit pas déplacer le pays par défaut.
+    expect(DEFAULT_COUNTRY.id).toBe("BF");
+  });
+
+  it("accepte un numéro béninois, qui commence par zéro depuis la renumérotation", () => {
+    // La règle « premier chiffre non nul » rejetait tous les numéros du Bénin.
+    expect(isValidInternationalPhone("0197000000", benin)).toBe(true);
+    expect(isValidInternationalPhone("0166112233", benin)).toBe(true);
+    expect(formatLocalPhone("0197000000", benin)).toBe("01 97 00 00 00");
+  });
+
+  it("refuse toujours un numéro trop court, ou fait de zéros", () => {
+    expect(isValidInternationalPhone("97000000", benin)).toBe(false);
+    expect(isValidInternationalPhone("0000000000", benin)).toBe(false);
+  });
+
+  it("garde la règle stricte là où le plan ne commence pas par zéro", () => {
+    expect(isValidInternationalPhone("90000000", niger)).toBe(true);
+    expect(isValidInternationalPhone("09000000", niger)).toBe(false);
+    expect(formatLocalPhone("90112233", niger)).toBe("90 11 22 33");
+  });
+
+  it("reconnaît les deux indicatifs, sans les confondre avec un autre pays", () => {
+    expect(findCountryForPhone("+2290197000000").id).toBe("BJ");
+    expect(findCountryForPhone("+22790112233").id).toBe("NE");
+    expect(findCountryForPhone("+2347012345678").id).not.toBe("NE");
+  });
+
+  it("avertit sans bloquer quand le nombre de chiffres ne suit pas le plan connu", () => {
+    const warning = countryPlanWarning({ id: "BJ", name: "Bénin", dialCode: "+229", digits: 8 });
+    expect(warning).toContain("10 chiffres, pas 8");
+    expect(warning).toContain("novembre 2024");
+    expect(countryPlanWarning({ id: "BJ", name: "Bénin", dialCode: "+229", digits: 10 })).toBeNull();
+    // Un pays dont le plan n'est pas dans la référence ne déclenche rien.
+    expect(countryPlanWarning({ id: "MA", name: "Maroc", dialCode: "+212", digits: 9 })).toBeNull();
+  });
+
+  it("signale un découpage inhabituel une fois la longueur juste", () => {
+    expect(countryPlanWarning({ id: "NE", name: "Niger", dialCode: "+227", digits: 8, groups: [4, 4] }))
+      .toContain("2,2,2,2");
+  });
+
+  it("l’application dérive la règle du zéro initial du pays, pas de la console", () => {
+    const db = readFileSync(join(process.cwd(), "server/db.ts"), "utf8");
+    expect(db).toContain("allowsLeadingZero: isoCountry(row.id)?.allowsLeadingZero");
   });
 });

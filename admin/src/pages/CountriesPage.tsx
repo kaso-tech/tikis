@@ -1,10 +1,10 @@
-import { countryDraftIssue, isoCountry } from "../../../shared/iso-countries";
+import { countryDraftIssue, countryPlanWarning, isoCountry } from "../../../shared/iso-countries";
 import { countryFlagEmoji } from "../../../lib/registration-rules";
 import { useEffect, useState } from "react";
 import { trpc } from "../lib/trpc";
 import { useAdminAuth } from "../lib/auth";
 
-type Country = { id: string; name: string; dialCode: string; digits: number; groups: string; timeZones: string; enabled: boolean; sortOrder: number; issue?: string | null };
+type Country = { id: string; name: string; dialCode: string; digits: number; groups: string; timeZones: string; enabled: boolean; sortOrder: number; issue?: string | null; planWarning?: string | null };
 
 const emptyDraft = { id: "", name: "", dialCode: "+", digits: "8", groups: "2,2,2,2", timeZones: "", sortOrder: "0" };
 
@@ -43,6 +43,16 @@ export default function CountriesPage() {
     setDraft({ id: country.id, name: country.name, dialCode: country.dialCode, digits: String(country.digits), groups: country.groups, timeZones: country.timeZones, sortOrder: String(country.sortOrder) });
     setFormOpen(true);
   }
+
+  // Avertissement seul : un plan de numérotation change, l'administrateur doit
+  // pouvoir enregistrer la nouvelle réalité avant que la référence la connaisse.
+  const planWarning = countryPlanWarning({
+    id: draft.id,
+    name: draft.name,
+    dialCode: draft.dialCode,
+    digits: Number(draft.digits) || undefined,
+    groups: draft.groups.split(",").map((g) => Number(g.trim())).filter((n) => Number.isFinite(n) && n > 0),
+  });
 
   async function save() {
     setError(""); setSuccess("");
@@ -94,6 +104,7 @@ export default function CountriesPage() {
                 <td style={{ fontWeight: 600 }}>
                   {countryFlagEmoji(country.id)} {country.name} <span style={{ color: "var(--muted)", fontWeight: 400 }}>({country.id})</span>
                   {country.issue ? <div style={{ marginTop: 4, fontWeight: 500, fontSize: 12, color: "var(--danger, #A43740)" }}>⚠ {country.issue}</div> : null}
+                  {country.planWarning ? <div style={{ marginTop: 4, fontWeight: 500, fontSize: 12, color: "var(--warning, #9A6201)" }}>⚠ {country.planWarning}</div> : null}
                 </td>
                 <td>{country.dialCode}</td>
                 <td style={{ fontSize: 12, color: "var(--muted)" }}>{country.digits} chiffres · {country.groups}</td>
@@ -128,7 +139,11 @@ export default function CountriesPage() {
           <label className="field-label">Nom du pays</label>
           <input className="input" value={draft.name} onChange={(e) => setDraft((s) => ({ ...s, name: e.target.value }))} style={{ marginBottom: 10 }} />
           <div className="grid grid-2" style={{ marginBottom: 10 }}>
-            <div><label className="field-label">Nombre de chiffres</label><input className="input" inputMode="numeric" value={draft.digits} onChange={(e) => setDraft((s) => ({ ...s, digits: e.target.value.replace(/[^0-9]/g, "") }))} /></div>
+            <div>
+              <label className="field-label">Nombre de chiffres</label>
+              <input className="input" inputMode="numeric" value={draft.digits} onChange={(e) => setDraft((s) => ({ ...s, digits: e.target.value.replace(/[^0-9]/g, "") }))} />
+              {planWarning ? <div style={{ marginTop: 4, fontSize: 12, color: "var(--warning, #9A6201)" }}>⚠ {planWarning}</div> : null}
+            </div>
             <div><label className="field-label">Groupes d’affichage (ex. 2,2,2,2)</label><input className="input" value={draft.groups} onChange={(e) => setDraft((s) => ({ ...s, groups: e.target.value }))} /></div>
           </div>
           <label className="field-label">Fuseaux horaires (séparés par virgule, ex. Africa/Ouagadougou)</label>

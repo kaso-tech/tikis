@@ -1,3 +1,4 @@
+import { isoCountry } from "../shared/iso-countries";
 import { randomUUID } from "crypto";
 import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
@@ -881,6 +882,10 @@ export async function listSupportedCountries(onlyEnabled = true) {
   return rows.sort((a, b) => a.sortOrder - b.sortOrder).map((row) => ({
     id: row.id, name: row.name, flag: row.id, dialCode: row.dialCode, digits: row.digits,
     groups: row.groups.split(",").map(Number), timeZones: row.timeZones.split(","), enabled: row.enabled,
+    // Règle structurelle, pas une valeur d'exploitation : elle ne se saisit pas
+    // dans la console, elle se déduit du pays. Sans elle, la validation du
+    // numéro rejetterait tous les numéros béninois, qui commencent par 01.
+    allowsLeadingZero: isoCountry(row.id)?.allowsLeadingZero ?? false,
   }));
 }
 

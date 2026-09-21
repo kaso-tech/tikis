@@ -8,11 +8,15 @@ export type CountrySpec = {
   digits: number;
   groups: number[];
   timeZones: string[];
+  /** Le plan national commence par un zéro significatif (cf. shared/iso-countries.ts). */
+  allowsLeadingZero?: boolean;
 };
 
 export const COUNTRIES: CountrySpec[] = [
+  { id: "BJ", name: "Bénin", flag: "BJ", dialCode: "+229", digits: 10, groups: [2, 2, 2, 2, 2], timeZones: ["Africa/Porto-Novo"], allowsLeadingZero: true },
   { id: "BF", name: "Burkina Faso", flag: "BF", dialCode: "+226", digits: 8, groups: [2, 2, 2, 2], timeZones: ["Africa/Ouagadougou"] },
   { id: "CI", name: "Côte d’Ivoire", flag: "CI", dialCode: "+225", digits: 10, groups: [2, 2, 2, 2, 2], timeZones: ["Africa/Abidjan"] },
+  { id: "NE", name: "Niger", flag: "NE", dialCode: "+227", digits: 8, groups: [2, 2, 2, 2], timeZones: ["Africa/Niamey"] },
   { id: "ML", name: "Mali", flag: "ML", dialCode: "+223", digits: 8, groups: [2, 2, 2, 2], timeZones: ["Africa/Bamako"] },
   { id: "SN", name: "Sénégal", flag: "SN", dialCode: "+221", digits: 9, groups: [2, 3, 2, 2], timeZones: ["Africa/Dakar"] },
   { id: "TG", name: "Togo", flag: "TG", dialCode: "+228", digits: 8, groups: [2, 2, 2, 2], timeZones: ["Africa/Lome"] },
@@ -20,7 +24,8 @@ export const COUNTRIES: CountrySpec[] = [
   { id: "FR", name: "France", flag: "FR", dialCode: "+33", digits: 9, groups: [1, 2, 2, 2, 2], timeZones: ["Europe/Paris"] },
 ];
 
-export const DEFAULT_COUNTRY = COUNTRIES[0];
+/** Le pays par défaut reste le Burkina Faso, quel que soit l'ordre de la liste. */
+export const DEFAULT_COUNTRY = COUNTRIES.find((country) => country.id === "BF") ?? COUNTRIES[0];
 
 /** Convertit un code pays ISO (ex. "BF") en emoji drapeau, sans dépendre d'une donnée par pays :
  *  chaque lettre est mappée sur son "regional indicator symbol" Unicode. */
@@ -70,7 +75,13 @@ export function normalizedInternationalPhone(value: string, country: CountrySpec
 
 export function isValidInternationalPhone(value: string, country: CountrySpec) {
   const localNumber = sanitizePhoneInput(value, country);
-  return localNumber.length === country.digits && /^[1-9]\d*$/.test(localNumber);
+  if (localNumber.length !== country.digits) return false;
+  // Le premier chiffre devait être non nul, pour écarter un préfixe
+  // d'acheminement saisi par erreur. Au Bénin, où tous les numéros commencent
+  // par « 01 » depuis la renumérotation, cette règle les rejetait tous. On
+  // exige donc seulement qu'un numéro ne soit pas une suite de zéros.
+  const pattern = country.allowsLeadingZero ? /^\d*[1-9]\d*$/ : /^[1-9]\d*$/;
+  return pattern.test(localNumber);
 }
 
 const NAME_PATTERN = /^[\p{L}]+(?:[ '-][\p{L}]+)*$/u;

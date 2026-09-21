@@ -12,10 +12,12 @@
  * Les deux confusions qui reviennent : le Bénin est **BJ** (BN = Brunei), et le
  * Niger est **NE** (NG = Nigeria, NI = Nicaragua).
  *
- * Cette table ne porte que ce dont on est sûr et qui ne bouge pas : le code, le
- * nom et l'indicatif. Le nombre de chiffres, les groupes d'affichage et les
- * fuseaux restent saisis par l'administrateur, qui les connaît mieux que nous
- * et qui peut les vérifier sur place.
+ * Le code, le nom et l'indicatif ne bougent pas : ils sont vérifiés durement.
+ * Le plan de numérotation, lui, change — le Bénin est passé de 8 à 10 chiffres
+ * fin 2024 — donc `digits` et `groups` ne sont renseignés que là où on les
+ * connaît, et seulement pour avertir : c'est l'administrateur qui tranche, et
+ * qui doit pouvoir corriger le jour où un pays renumérote à son tour. Les
+ * fuseaux restent entièrement à lui.
  */
 
 export type IsoCountry = {
@@ -27,26 +29,39 @@ export type IsoCountry = {
   dialCode: string;
   /** Autres graphies acceptées à la saisie (sans accent, abréviations). */
   aliases?: string[];
+  /** Longueur du numéro national, quand le plan de numérotation est connu. */
+  digits?: number;
+  /** Découpage d'affichage correspondant. La somme vaut `digits`. */
+  groups?: number[];
+  /**
+   * Vrai lorsque le plan national commence par un zéro significatif. Au Bénin,
+   * tous les numéros commencent par « 01 » depuis la renumérotation : la règle
+   * générale, qui refuse un premier chiffre nul pour écarter les préfixes
+   * d'acheminement saisis par erreur, y rejetterait tous les numéros.
+   */
+  allowsLeadingZero?: boolean;
+  /** Ce qu'il faut savoir sur ce plan, affiché tel quel à l'administrateur. */
+  digitsNote?: string;
 };
 
 export const ISO_COUNTRIES: IsoCountry[] = [
   // Afrique de l'Ouest
-  { id: "BJ", name: "Bénin", dialCode: "+229" },
-  { id: "BF", name: "Burkina Faso", dialCode: "+226" },
+  { id: "BJ", name: "Bénin", dialCode: "+229", digits: 10, groups: [2, 2, 2, 2, 2], allowsLeadingZero: true, digitsNote: "Depuis la renumérotation de novembre 2024, les numéros béninois font 10 chiffres et commencent par 01." },
+  { id: "BF", name: "Burkina Faso", dialCode: "+226", digits: 8, groups: [2, 2, 2, 2] },
   { id: "CV", name: "Cabo Verde", dialCode: "+238", aliases: ["cap vert", "cap-vert"] },
-  { id: "CI", name: "Côte d’Ivoire", dialCode: "+225", aliases: ["cote d ivoire", "cote divoire"] },
+  { id: "CI", name: "Côte d’Ivoire", dialCode: "+225", aliases: ["cote d ivoire", "cote divoire"], digits: 10, groups: [2, 2, 2, 2, 2] },
   { id: "GM", name: "Gambie", dialCode: "+220" },
-  { id: "GH", name: "Ghana", dialCode: "+233" },
+  { id: "GH", name: "Ghana", dialCode: "+233", digits: 9, groups: [2, 3, 4] },
   { id: "GN", name: "Guinée", dialCode: "+224", aliases: ["guinee conakry"] },
   { id: "GW", name: "Guinée-Bissau", dialCode: "+245" },
   { id: "LR", name: "Liberia", dialCode: "+231", aliases: ["libéria"] },
-  { id: "ML", name: "Mali", dialCode: "+223" },
+  { id: "ML", name: "Mali", dialCode: "+223", digits: 8, groups: [2, 2, 2, 2] },
   { id: "MR", name: "Mauritanie", dialCode: "+222" },
-  { id: "NE", name: "Niger", dialCode: "+227" },
+  { id: "NE", name: "Niger", dialCode: "+227", digits: 8, groups: [2, 2, 2, 2] },
   { id: "NG", name: "Nigeria", dialCode: "+234", aliases: ["nigéria"] },
-  { id: "SN", name: "Sénégal", dialCode: "+221" },
+  { id: "SN", name: "Sénégal", dialCode: "+221", digits: 9, groups: [2, 3, 2, 2] },
   { id: "SL", name: "Sierra Leone", dialCode: "+232" },
-  { id: "TG", name: "Togo", dialCode: "+228" },
+  { id: "TG", name: "Togo", dialCode: "+228", digits: 8, groups: [2, 2, 2, 2] },
   // Afrique centrale
   { id: "CM", name: "Cameroun", dialCode: "+237" },
   { id: "CF", name: "République centrafricaine", dialCode: "+236", aliases: ["centrafrique"] },
@@ -62,7 +77,7 @@ export const ISO_COUNTRIES: IsoCountry[] = [
   { id: "MA", name: "Maroc", dialCode: "+212" },
   { id: "DZ", name: "Algérie", dialCode: "+213" },
   { id: "TN", name: "Tunisie", dialCode: "+216" },
-  { id: "FR", name: "France", dialCode: "+33" },
+  { id: "FR", name: "France", dialCode: "+33", digits: 9, groups: [1, 2, 2, 2, 2] },
 ];
 
 /** Réduit un nom à sa forme comparable : sans accent, sans ponctuation, en minuscules. */
@@ -127,5 +142,28 @@ export function countryDraftIssue(draft: CountryDraft): string | null {
     return `L’indicatif de « ${known.name} » est ${known.dialCode}, pas ${dial}.`;
   }
 
+  return null;
+}
+
+export type CountryPlanDraft = CountryDraft & { digits?: number; groups?: number[] };
+
+/**
+ * Ce qui paraît douteux dans le plan de numérotation saisi, ou `null`.
+ *
+ * Simple avertissement, jamais un refus : un plan change, et l'administrateur
+ * doit pouvoir enregistrer la nouvelle réalité avant que cette table la
+ * connaisse.
+ */
+export function countryPlanWarning(draft: CountryPlanDraft): string | null {
+  const known = isoCountry(draft.id);
+  if (!known?.digits) return null;
+
+  if (typeof draft.digits === "number" && draft.digits !== known.digits) {
+    const note = known.digitsNote ? ` ${known.digitsNote}` : "";
+    return `Les numéros de « ${known.name} » font ${known.digits} chiffres, pas ${draft.digits}.${note}`;
+  }
+  if (draft.groups && known.groups && draft.groups.join(",") !== known.groups.join(",")) {
+    return `Le découpage habituel pour « ${known.name} » est ${known.groups.join(",")}.`;
+  }
   return null;
 }

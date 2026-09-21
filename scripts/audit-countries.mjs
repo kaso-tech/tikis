@@ -19,15 +19,15 @@ import path from "node:path";
 import url from "node:url";
 
 const __dirname = path.dirname(url.fileURLToPath(import.meta.url));
-const { ISO_COUNTRIES, countryDraftIssue, isoCountryByName } = await import(
+const { ISO_COUNTRIES, countryDraftIssue, countryPlanWarning, isoCountryByName } = await import(
   url.pathToFileURL(path.join(__dirname, "..", "shared", "iso-countries.ts")).href
 ).catch(async () => {
   // Le script tourne en JS pur : on relit la table depuis le source TypeScript
   // plutôt que d'en garder une copie qui divergerait.
   const fs = await import("node:fs");
   const source = fs.readFileSync(path.join(__dirname, "..", "shared", "iso-countries.ts"), "utf8");
-  const entries = [...source.matchAll(/\{ id: "([A-Z]{2})", name: "([^"]+)", dialCode: "(\+\d+)"/g)]
-    .map(([, id, name, dialCode]) => ({ id, name, dialCode }));
+  const entries = [...source.matchAll(/\{ id: "([A-Z]{2})", name: "([^"]+)", dialCode: "(\+\d+)"(?:[^}]*?digits: (\d+))?/g)]
+    .map(([, id, name, dialCode, digits]) => ({ id, name, dialCode, digits: digits ? Number(digits) : undefined }));
   const normalize = (value) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z]+/g, " ").trim().toLowerCase();
   const byName = (name) => entries.find((entry) => normalize(entry.name) === normalize(name));
   return {
@@ -41,6 +41,11 @@ const { ISO_COUNTRIES, countryDraftIssue, isoCountryByName } = await import(
       if (dialCode && dialCode !== known.dialCode) return `L’indicatif de « ${known.name} » est ${known.dialCode}, pas ${dialCode}.`;
       return null;
     },
+    countryPlanWarning: ({ id, digits }) => {
+      const known = entries.find((entry) => entry.id === id.toUpperCase());
+      if (!known?.digits || typeof digits !== "number" || digits === known.digits) return null;
+      return `Les numéros de « ${known.name} » font ${known.digits} chiffres, pas ${digits}.`;
+    },
   };
 });
 
@@ -53,14 +58,17 @@ if (!process.env.DATABASE_URL) {
 const mysql = await import("mysql2/promise");
 const conn = await mysql.createConnection(process.env.DATABASE_URL);
 try {
-  const [rows] = await conn.query("SELECT id, name, dialCode, enabled FROM tikis_supported_countries ORDER BY sortOrder");
+  const [rows] = await conn.query("SELECT id, name, dialCode, digits, `groups`, enabled FROM tikis_supported_countries ORDER BY sortOrder");
   const broken = [];
+  const warned = [];
   for (const row of rows) {
     const issue = countryDraftIssue({ id: row.id, name: row.name, dialCode: row.dialCode });
-    if (issue) broken.push({ row, issue, suggestion: isoCountryByName(row.name) });
+    if (issue) { broken.push({ row, issue, suggestion: isoCountryByName(row.name) }); continue; }
+    const planWarning = countryPlanWarning({ id: row.id, name: row.name, dialCode: row.dialCode, digits: row.digits });
+    if (planWarning) warned.push({ row, planWarning });
   }
 
-  console.log(`${rows.length} pays en base, ${broken.length} à corriger.\n`);
+  console.log(`${rows.length} pays en base, ${broken.length} à corriger, ${warned.length} au plan de numérotation douteux.\n`);
   for (const { row, issue, suggestion } of broken) {
     const [[used]] = await conn.query("SELECT COUNT(*) AS n FROM tikis_profiles WHERE country = ?", [row.id]);
     console.log(`✖ ${row.name} (${row.id}) — ${issue}`);
@@ -75,6 +83,11 @@ try {
       console.log("  Vérifiez aussi le nombre de chiffres et les fuseaux horaires, que ce script ne contrôle pas.");
     }
     console.log("");
+  }
+  for (const { row, planWarning } of warned) {
+    console.log(`⚠ ${row.name} (${row.id}) — ${planWarning}`);
+    console.log(`  UPDATE tikis_supported_countries SET digits = <n>, \`groups\` = '<a,b,c>' WHERE id = '${row.id}';`);
+    console.log("  Le code et l’indicatif sont justes : une simple mise à jour suffit, sans toucher aux profils.\n");
   }
   process.exit(broken.length > 0 ? 1 : 0);
 } finally {
