@@ -125,7 +125,7 @@ export function CandidatesSheet({ visible, candidates, deliveryStatus, deliveryP
   if (!visible) return null;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View style={[StyleSheet.absoluteFill, styles.overlay]} pointerEvents="box-none">
       <Animated.View
         style={[styles.backdrop, { backgroundColor: theme.overlay, opacity: translateY.interpolate({ inputRange: [0, SCREEN_H], outputRange: [1, 0], extrapolate: "clamp" }) }]}
         pointerEvents="auto"
@@ -343,6 +343,15 @@ function CandidateCard({ candidate, deliveryStatus, deliveryPrice, loading, onCh
 }
 
 const styles = StyleSheet.create({
+  /**
+   * Cette feuille se pose par-dessus un écran qui a déjà sa propre feuille.
+   * Sur l'accueil, celle des livraisons porte `zIndex: 2, elevation: 2` : sans
+   * rang à elle, la liste des candidatures s'ouvrait dessous, cachée par un
+   * fond blanc opaque — le bouton « Candidats » semblait ne rien faire. Le web
+   * n'a pas ce jeton de profondeur sur sa feuille, d'où un défaut invisible au
+   * navigateur et bien réel sur téléphone.
+   */
+  overlay: { zIndex: 60, elevation: 24 },
   root: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, justifyContent: "flex-end" },
   backdrop: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0 },
   sheet: { width: "100%", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },

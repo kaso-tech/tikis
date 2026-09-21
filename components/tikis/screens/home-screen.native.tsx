@@ -662,6 +662,9 @@ export function HomeScreen() {
         deliveryStatus={candidateDelivery?.status ?? "open"}
         deliveryPrice={candidateDelivery ? (candidateDelivery.offeredPrice ?? candidateDelivery.estimatedPrice) : 0}
         loadingId={actioningId}
+        isLoading={candidatesQuery.isLoading}
+        errorMessage={candidatesQuery.error ? "La liste n'a pas pu être chargée. Vérifiez votre connexion." : null}
+        onRetry={() => void candidatesQuery.refetch()}
         onClose={() => setCandidateDelivery(null)}
         onChoose={requestCandidateSelection}
       />
@@ -1005,11 +1008,20 @@ function DeliveryRow({
             >
               {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.compactAction}>{driverAction}</Text>}
             </Pressable>
-          ) : (
-            <Pressable onPress={onDetails} hitSlop={6} accessibilityRole="button" style={({ pressed }) => [pressed && styles.pressed]}>
-              <Text style={styles.compactAction}>Ouvrir</Text>
-            </Pressable>
-          )}
+          ) : null}
+          {/* « Ouvrir » ne s'affichait qu'à défaut d'action, c'est-à-dire sur
+              les seules courses terminées : tant qu'il restait « Postuler » à
+              faire, le livreur n'avait aucun chemin vers la fiche. La fiche
+              est pourtant ce qui lui dit s'il veut de la course. */}
+          <Pressable
+            onPress={onDetails}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={`Détails — ${delivery.title}`}
+            style={({ pressed }) => [pressed && styles.pressed]}
+          >
+            <Text style={styles.compactGhost}>Détails</Text>
+          </Pressable>
         </View>
       </Pressable>
     );
@@ -1196,9 +1208,10 @@ const styles = StyleSheet.create({
   compactMeta: { fontSize: 11.5, color: "#667085" },
   compactDistance: { flexDirection: "row", alignItems: "center", gap: 5, position: "relative" },
   compactDistanceText: { fontSize: 11.5, fontWeight: "700", color: "#9A6201" },
-  compactRight: { flexShrink: 0, alignItems: "flex-end", gap: 8 },
+  compactRight: { flexShrink: 0, alignItems: "flex-end", gap: 6 },
   compactPrice: { fontSize: 14.5, fontWeight: "800", color: "#111111", fontVariant: ["tabular-nums"] },
   compactAction: { fontSize: 11.5, fontWeight: "700", color: "#9A6201" },
+  compactGhost: { fontSize: 11.5, fontWeight: "600", color: "#667085" },
 
   listSection: { marginTop: 4, gap: 8 },
   // Le sheet est blanc : une carte blanche y disparaîtrait. Les cartes sont
