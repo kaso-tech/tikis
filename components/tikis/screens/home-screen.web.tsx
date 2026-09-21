@@ -16,6 +16,7 @@ import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
 import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
 import { resolveDriverHomeAction, resolveSenderHomeAction, senderHomeActionLabel } from "@/shared/delivery-home-action";
+import { sortDriverOpportunities } from "@/shared/driver-opportunities";
 import { deliveryCardContext, deliveryCardSignal, deliveryCardStateLabel, deliveryCardTone } from "@/lib/delivery-card";
 import { isOpenDeliveryStale } from "@/shared/delivery-freshness";
 import { deliveryMetricsForDay } from "@/lib/wallet-metrics";
@@ -74,14 +75,6 @@ function badgeFilterForDelivery(delivery: Delivery, isDriver: boolean): FilterKe
   if (delivery.status === "active") return "active";
   if (delivery.status === "completed" && matchesFilter(delivery, "completed", isDriver)) return "completed";
   return null;
-}
-
-function driverSortPriority(d: Delivery): number {
-  if (d.ownCandidateStatus === "confirmed" || d.status === "active") return 0;
-  if (d.ownCandidateStatus === "selected" || d.status === "pending_confirmation") return 1;
-  if (d.ownCandidateStatus === "applied") return 2;
-  if (d.status === "open") return 3;
-  return 4;
 }
 
 function projectOntoCanvas(
@@ -163,7 +156,9 @@ export function HomeScreen() {
       return haystack.includes(q);
     };
     if (role === "driver") {
-      return [...deliveries].filter(matches).sort((a, b) => driverSortPriority(a) - driverSortPriority(b) || a.distanceKm - b.distanceKm);
+      // Le classement est celui du serveur, emprunté au même module : la copie
+      // locale triait les annonces par distance du trajet et ignorait donc le prix.
+      return sortDriverOpportunities(deliveries.filter(matches));
     }
     return deliveries.filter(matches);
   }, [deliveries, filter, role, searchQuery]);

@@ -3,6 +3,7 @@ import { COOKIE_NAME } from "../shared/const";
 import { randomInt, randomUUID } from "node:crypto";
 import * as db from "./db";
 import { publishDeliveryPositionBroadcast, publishDeliveryStatusBroadcast, syncDeliveryRealtimeMembers } from "./supabase-realtime";
+import { sortDriverOpportunities } from "../shared/driver-opportunities";
 import { concealPlaceForDriver } from "./_test-helpers/delivery-visibility";
 import { isCoordinateInCountry } from "./_test-helpers/geo-fence";
 import { storagePut } from "./storage";
@@ -509,10 +510,13 @@ export const appRouter = router({
       const compatible = deliveries.filter((delivery) => delivery.driverId === profile.phone || candidatesByDelivery.has(delivery.id) || delivery.vehicleTypes.some((vehicle) => {
         try { return JSON.parse(profile.vehicles).includes(vehicle); } catch { return false; }
       }));
-      return compatible.map((delivery) => {
+      // L'ordre est arrêté ici, une fois `ownCandidateStatus` connu : c'est lui qui
+      // distingue une annonce d'une course déjà engagée. Le classement lui-même
+      // vit dans `shared/`, pour que les deux écrans d'accueil s'y réfèrent.
+      return sortDriverOpportunities(compatible.map((delivery) => {
         const candidate = candidatesByDelivery.get(delivery.id);
         return { ...deliveryForProfile(delivery, profile), ...(candidate ? { ownCandidateStatus: candidate.status } : {}) };
-      });
+      }));
     }),
     get: tikisProtectedProcedure.input(z.object({ id: z.string().uuid() })).query(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);

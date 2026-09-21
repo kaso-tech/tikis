@@ -2,6 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { StyleSheet, Text, View } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 
+import { DropoffMarker, PickupMarker, PIN_ANCHOR } from "@/components/tikis/map-markers";
 import { formatListRouteParts, formatNavigationTarget } from "@/lib/geo-rules";
 import type { LocationLabel } from "@/shared/tikis-domain";
 
@@ -10,9 +11,11 @@ type Props = {
   dropoff: LocationLabel;
   height?: number;
   approximate?: boolean;
+  /** La légende double les adresses quand l'écran les affiche déjà juste en dessous. */
+  showLegend?: boolean;
 };
 
-export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }: Props) {
+export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate, showLegend = true }: Props) {
   // Même formateur centralisé que le texte du trajet (delivery-card.tsx) : sans lui, cette légende
   // affichait `pickup.name`/`dropoff.name` bruts, ignorant la règle "Ville → Ville" quand les villes
   // diffèrent — deux libellés différents pour le même trajet, dans le même écran.
@@ -47,15 +50,11 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
           strokeWidth={3}
           lineCap="round"
         />
-        <Marker coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }} anchor={{ x: 0.5, y: 0.5 }}>
-          <View style={styles.pickupMarker}>
-            <MaterialIcons name="trip-origin" size={14} color="#FFFFFF" />
-          </View>
+        <Marker coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }} anchor={PIN_ANCHOR}>
+          <PickupMarker />
         </Marker>
-        <Marker coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }} anchor={{ x: 0.5, y: 0.85 }}>
-          <View style={styles.dropoffMarker}>
-            <MaterialIcons name="location-on" size={16} color="#A43740" />
-          </View>
+        <Marker coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }} anchor={PIN_ANCHOR}>
+          <DropoffMarker />
         </Marker>
       </MapView>
       {approximate ? (
@@ -64,6 +63,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
           <Text style={styles.approximateText}>Aperçu indicatif</Text>
         </View>
       ) : null}
+      {showLegend ? (
       <View style={styles.legend}>
         <View style={styles.legendRow}>
           <View style={styles.legendDotPickup} />
@@ -85,6 +85,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
           {formatNavigationTarget(dropoff)}
         </Text>
       </View>
+      ) : null}
     </View>
   );
 }
@@ -97,26 +98,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0F3F8",
     overflow: "hidden",
     position: "relative",
-  },
-  pickupMarker: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#9A6201",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-  },
-  dropoffMarker: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#A43740",
   },
   approximate: {
     position: "absolute",

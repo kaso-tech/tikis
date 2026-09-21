@@ -1,3 +1,4 @@
+import { DropoffMarker, PickupMarker } from "@/components/tikis/map-markers";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -9,6 +10,8 @@ type Props = {
   dropoff: LocationLabel;
   height?: number;
   approximate?: boolean;
+  /** La légende double les adresses quand l'écran les affiche déjà juste en dessous. */
+  showLegend?: boolean;
 };
 
 function projectOntoCanvas(
@@ -32,7 +35,7 @@ function projectOntoCanvas(
   };
 }
 
-export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }: Props) {
+export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate, showLegend = true }: Props) {
   // Même formateur centralisé que le texte du trajet (delivery-card.tsx) : sans lui, cette légende
   // affichait `pickup.name`/`dropoff.name` bruts, ignorant la règle "Ville → Ville" quand les villes
   // diffèrent — deux libellés différents pour le même trajet, dans le même écran.
@@ -77,11 +80,11 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
           },
         ]}
       />
-      <View style={[styles.pickup, { left: projection.originX - 12, top: projection.originY - 12 }]}>
-        <MaterialIcons name="trip-origin" size={14} color="#FFFFFF" />
+      <View style={[styles.marker, { left: projection.originX - 19, top: projection.originY - 37 }]}>
+        <PickupMarker />
       </View>
-      <View style={[styles.dropoff, { left: projection.x - 12, top: projection.y - 12 }]}>
-        <MaterialIcons name="location-on" size={16} color="#A43740" />
+      <View style={[styles.marker, { left: projection.x - 19, top: projection.y - 37 }]}>
+        <DropoffMarker />
       </View>
       {approximate ? (
         <View style={styles.approximate}>
@@ -89,6 +92,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
           <Text style={styles.approximateText}>Aperçu indicatif</Text>
         </View>
       ) : null}
+      {showLegend ? (
       <View style={styles.legend}>
         <View style={styles.legendRow}>
           <View style={styles.legendDotPickup} />
@@ -110,6 +114,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate }
           {formatNavigationTarget(dropoff)}
         </Text>
       </View>
+      ) : null}
     </View>
   );
 }
@@ -147,28 +152,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#9A6201",
     borderRadius: 1,
   },
-  pickup: {
-    position: "absolute",
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#9A6201",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-  },
-  dropoff: {
-    position: "absolute",
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#A43740",
-  },
+  // Les marqueurs sont ancrés par leur pointe : on place leur coin haut-gauche.
+  marker: { position: "absolute" },
   approximate: {
     position: "absolute",
     top: 8,
