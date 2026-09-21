@@ -38,6 +38,7 @@ const env = {
   androidPackage: bundleId,
   googleMapsAndroidKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY,
   googleMapsIosKey: process.env.GOOGLE_MAPS_IOS_API_KEY,
+  easProjectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID,
 };
 
 const config: ExpoConfig = {
@@ -93,12 +94,13 @@ const config: ExpoConfig = {
     output: "static",
     favicon: "./assets/images/favicon.png",
   },
+  extra: env.easProjectId ? { eas: { projectId: env.easProjectId } } : undefined,
   plugins: [
     [
       "expo-notifications",
       {
         color: "#9A6201",
-        defaultChannel: "tikis-delivery-tracking",
+        defaultChannel: "tikis-transactional",
       },
     ],
     "expo-router",
