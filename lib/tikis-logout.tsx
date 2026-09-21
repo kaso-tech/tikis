@@ -9,14 +9,16 @@ import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { clearTikisSessionToken } from "@/lib/tikis-session";
 import { clearSupabaseSession } from "@/lib/supabase-tracking";
+import { clearStoredPushRegistration, getStoredPushRegistration } from "@/hooks/use-push-registration";
 
 type LogoutContextValue = { openLogoutConfirmation: () => void };
 const LogoutContext = createContext<LogoutContextValue | null>(null);
 
 export function TikisLogoutProvider({ children }: { children: React.ReactNode }) {
-  const { logout } = useTikisStore();
+  const { logout, profile } = useTikisStore();
   const { closeDrawer } = useTikisNavigation();
   const logoutMutation = trpc.auth.logout.useMutation();
+  const unregisterPushMutation = trpc.notifications.unregisterPushToken.useMutation();
   const [visible, setVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -24,10 +26,15 @@ export function TikisLogoutProvider({ children }: { children: React.ReactNode })
     if (loading) return;
     setLoading(true);
     try {
+      const storedPush = await getStoredPushRegistration();
+      if (storedPush && (profile?.phone === storedPush.phone || !profile?.phone)) {
+        await unregisterPushMutation.mutateAsync({ token: storedPush.token });
+      }
       await logoutMutation.mutateAsync();
     } catch {
       // The local session still needs to be cleared when the server is unavailable.
     } finally {
+      await clearStoredPushRegistration();
       await clearTikisSessionToken();
       await clearSupabaseSession();
       logout();

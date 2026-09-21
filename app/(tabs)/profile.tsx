@@ -330,6 +330,12 @@ export default function ProfileScreen() {
 
           <Section title="Sécurité">
             <MenuRow
+              icon="notifications"
+              label="Notifications"
+              sub="Gérer les notifications de cet appareil"
+              onPress={() => router.push("/notification-settings" as any)}
+            />
+            <MenuRow
               icon="devices"
               label="Appareils connectés"
               sub="Voir et déconnecter vos sessions"

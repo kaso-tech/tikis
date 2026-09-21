@@ -1,6 +1,6 @@
 import { isoCountry } from "../shared/iso-countries";
 import { randomUUID } from "crypto";
-import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, TikisDriverPreferences, tikisDriverPreferences, tikisFavoritePlaces, tikisKycSubmissions, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisPushTokens, tikisRateLimits, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, tikisYengapayWebhookEvents, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
@@ -859,17 +859,19 @@ export async function applyWalletMovement(tx: any, movement: WalletMovement) {
 }
 
 async function appendDeliveryEvent(tx: any, event: DeliveryEventInput) {
+  const eventId = randomUUID();
   await tx.insert(tikisDeliveryEvents).values({
-    id: randomUUID(), deliveryId: event.deliveryId, eventType: event.eventType, status: event.status ?? null,
+    id: eventId, deliveryId: event.deliveryId, eventType: event.eventType, status: event.status ?? null,
     actorPhone: event.actorPhone ?? null, recipientPhone: event.recipientPhone, title: event.title, body: event.body,
     tone: event.tone, metadata: null, idempotencyKey: event.idempotencyKey,
   }).onDuplicateKeyUpdate({ set: { idempotencyKey: event.idempotencyKey } });
   // Push best-effort après la transaction : on capture le recipient, on envoie hors-transaction.
   // Le push est opt-in (token Expo enregistré), les in-app events sont toujours créés.
   if (event.recipientPhone && event.push !== false) {
-    const data: Record<string, unknown> = { deliveryId: event.deliveryId, eventType: event.eventType };
+    const persisted = (await tx.select({ id: tikisDeliveryEvents.id }).from(tikisDeliveryEvents).where(eq(tikisDeliveryEvents.idempotencyKey, event.idempotencyKey)).limit(1))[0];
+    const data: Record<string, unknown> = { notificationId: persisted?.id ?? eventId, deliveryId: event.deliveryId, eventType: event.eventType, screen: event.status === "active" ? "tracking" : "delivery" };
     if (event.status) data.status = event.status;
-    void enqueuePushToPhone({ phone: event.recipientPhone, title: event.title, body: event.body, data, channelId: "tikis-delivery" });
+    void enqueuePushToPhone({ phone: event.recipientPhone, title: event.title, body: event.body, data, channelId: "tikis-transactional" });
   }
 }
 
@@ -1760,6 +1762,9 @@ export async function registerPushToken(input: { phone: string; token: string; p
   if (!isValidExpoPushTokenShape(input.token)) {
     throw new Error("Format de token push invalide.");
   }
+  // Un token représente une installation active, pas un compte permanent. Si le même
+  // appareil change de compte, on retire l’ancienne association avant de l’enregistrer.
+  await db.delete(tikisPushTokens).where(and(eq(tikisPushTokens.token, input.token), ne(tikisPushTokens.phone, input.phone)));
   const now = new Date();
   const existing = (await db.select().from(tikisPushTokens).where(and(eq(tikisPushTokens.phone, input.phone), eq(tikisPushTokens.token, input.token))).limit(1))[0];
   if (existing) {
@@ -1781,7 +1786,7 @@ export async function unregisterPushToken(input: { phone: string; token: string 
 export async function listActivePushTokens(phone: string) {
   const db = await getDb();
   if (!db) return [];
-  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
   return db.select().from(tikisPushTokens).where(and(eq(tikisPushTokens.phone, phone), gte(tikisPushTokens.lastSeenAt, cutoff)));
 }
 
@@ -1799,12 +1804,10 @@ export async function enqueuePushToPhone(input: { phone: string; title: string; 
   const result = await sendPushToTokens(messages);
   const db = await getDb();
   if (!db) return result;
-  // Si un token a renvoyé DeviceNotRegistered, on le supprime pour éviter de re-essayer.
-  for (let i = 0; i < messages.length; i += 1) {
-    const message = result.errors[i] ?? "";
-    if (message.includes("DeviceNotRegistered") || message.includes("InvalidCredentials")) {
-      await db.delete(tikisPushTokens).where(eq(tikisPushTokens.id, tokens[i]!.id));
-    }
+  // Expo renvoie un ticket par message valide. Les tokens désactivés sont purgés
+  // immédiatement pour ne pas dégrader le taux de livraison des prochaines alertes.
+  for (const invalidToken of result.invalidTokens) {
+    await db.delete(tikisPushTokens).where(and(eq(tikisPushTokens.phone, input.phone), eq(tikisPushTokens.token, invalidToken)));
   }
   return result;
 }
