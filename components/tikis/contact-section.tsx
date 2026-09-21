@@ -15,7 +15,15 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DEMO_OTP = "730512";
 const OTP_LENGTH = 6;
 
-export function ContactSection() {
+/**
+ * Les deux lignes de contact.
+ *
+ * `embedded` les rend nues, sans titre de section, sans carte ni note de bas
+ * de bloc : la page de profil les range dans sa propre carte « Mon compte »,
+ * avec le pays et la ville. Le bloc autonome garde son cadre pour les écrans
+ * qui l'affichent seul.
+ */
+export function ContactSection({ embedded = false }: { embedded?: boolean } = {}) {
   const { colors: theme } = useThemeColors();
   const { profile, updateProfile } = useTikisStore();
   const requestOtp = trpc.profiles.requestContactOtp.useMutation();
@@ -117,10 +125,8 @@ export function ContactSection() {
   const phoneVerified = Boolean(profile?.phoneVerified);
   const emailVerified = Boolean(profile?.emailVerified);
 
-  return (
-    <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { color: theme.muted }]}>Informations personnelles</Text>
-      <View style={[styles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+  const rows = (
+    <>
         <ContactRow
           icon="phone"
           iconBg="primary"
@@ -139,13 +145,23 @@ export function ContactSection() {
           verified={emailVerified}
           verifiedLabel="Vérifiée"
           onPress={() => open("email")}
-          last
+          last={!embedded}
           theme={theme}
         />
-      </View>
-      <Text style={[styles.helper, { color: theme.muted }]}>
-        Chaque modification est confirmée par un code OTP reçu par SMS (téléphone) ou par e-mail. L'e-mail sert à la récupération du compte.
-      </Text>
+    </>
+  );
+
+  return (
+    <View style={embedded ? undefined : styles.section}>
+      {embedded ? rows : (
+        <>
+          <Text style={[styles.sectionTitle, { color: theme.muted }]}>Informations personnelles</Text>
+          <View style={[styles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>{rows}</View>
+          <Text style={[styles.helper, { color: theme.muted }]}>
+            Chaque modification est confirmée par un code OTP reçu par SMS (téléphone) ou par e-mail. L’e-mail sert à la récupération du compte.
+          </Text>
+        </>
+      )}
 
       <Modal visible={active !== null} transparent animationType="slide" onRequestClose={close}>
         <View style={[styles.overlay, { backgroundColor: "rgba(0,0,0,0.42)" }]}>

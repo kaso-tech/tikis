@@ -22,7 +22,12 @@ function formatMoney(amount: number) {
   return `${new Intl.NumberFormat("fr-FR").format(amount)} FCFA`;
 }
 
-export function LoyaltyProgress({ phone }: { phone: string | null }) {
+/**
+ * `compact` retire l'en-tête « Programme de fidélité » et la description : sur
+ * une page où chaque bloc se disputait la même attention, le programme tient
+ * en une ligne de titre, une barre et un reste à parcourir.
+ */
+export function LoyaltyProgress({ phone, compact = false }: { phone: string | null; compact?: boolean }) {
   const { colors: theme } = useThemeColors();
   const styles = makeStyles(theme);
   const query = trpc.loyalty.myProgress.useQuery(undefined, { enabled: Boolean(phone) });
@@ -38,15 +43,15 @@ export function LoyaltyProgress({ phone }: { phone: string | null }) {
   const programs = (query.data ?? []) as Progress[];
   if (programs.length === 0) return null;
   return (
-    <View style={styles.card}>
-      <View style={styles.row}><MaterialIcons name="card-giftcard" size={18} color={theme.primary} /><Text style={styles.title}>Programme de fidélité</Text></View>
+    <View style={compact ? styles.cardCompact : styles.card}>
+      {compact ? null : <View style={styles.row}><MaterialIcons name="card-giftcard" size={18} color={theme.primary} /><Text style={styles.title}>Programme de fidélité</Text></View>}
       {programs.map((program) => (
-        <View key={program.programId} style={styles.item}>
+        <View key={program.programId} style={compact ? styles.itemCompact : styles.item}>
           <View style={styles.itemHeader}>
             <Text style={styles.itemName} numberOfLines={1}>{program.programName}</Text>
             <Text style={styles.bonus}>{formatMoney(program.bonusAmount)}</Text>
           </View>
-          {program.programDescription ? <Text style={styles.itemDesc} numberOfLines={2}>{program.programDescription}</Text> : null}
+          {program.programDescription && !compact ? <Text style={styles.itemDesc} numberOfLines={2}>{program.programDescription}</Text> : null}
           <View style={styles.bar}>
             <View style={[styles.barFill, { width: `${computeProgressPercent(program.completedCount, program.requiredDeliveries)}%`, backgroundColor: program.remaining === 0 ? theme.success : theme.primary }]} />
           </View>
@@ -63,6 +68,8 @@ export function LoyaltyProgress({ phone }: { phone: string | null }) {
 function makeStyles(theme: ThemedColors) {
   return StyleSheet.create({
     card: { backgroundColor: theme.surface, borderRadius: 10, borderWidth: 0, padding: 14, gap: 10, marginBottom: 12 },
+    cardCompact: { backgroundColor: theme.surface, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: theme.border, padding: 4, gap: 8 },
+    itemCompact: { backgroundColor: theme.surface, borderRadius: 11, padding: 9, gap: 7 },
     row: { flexDirection: "row", alignItems: "center", gap: 8 },
     title: { fontSize: 14, fontWeight: "600", color: theme.foreground },
     loading: { alignItems: "center", paddingVertical: 6 },

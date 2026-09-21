@@ -113,7 +113,8 @@ export function SessionsSection() {
         </View>
         <Text style={styles.count}>{sessions.length}</Text>
       </View>
-      <Text style={styles.subtitle}>Liste des sessions actives sur ton compte. Révoque celles que tu ne reconnais pas.</Text>
+      {/* Seul bloc de l'application à tutoyer, quand tout le reste vouvoie. */}
+      <Text style={styles.subtitle}>Ces appareils sont connectés à votre compte Tikis. Déconnectez ceux que vous ne reconnaissez pas.</Text>
 
       <View style={styles.actions}>
         <Text style={styles.btnGhost} onPress={registerNow} disabled={busy}>{busy ? "..." : "Enregistrer cette session"}</Text>
