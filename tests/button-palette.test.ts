@@ -16,7 +16,16 @@ describe("palette des boutons hors authentification", () => {
   });
 
   it("préserve explicitement les boutons du flux d’authentification", () => {
-    expect((authSource.match(/<TikisButton authStyle/g) ?? []).length).toBe(6);
+    // Cinq depuis la fusion de l'écran de bienvenue avec celui du numéro : le
+    // « Accepter et continuer » de l'accueil n'a plus d'écran à lui.
+    expect((authSource.match(/<TikisButton authStyle/g) ?? []).length).toBe(5);
+  });
+
+  it("donne au bouton bloqué un fond à lui, au lieu d’une transparence", () => {
+    // `opacity: 0.84` sur un fond saturé ne se voit pas : l'écran proposait une
+    // action qui ne répondait pas, sur l'authentification comme ailleurs.
+    expect(buttonSource).toContain('DISABLED_PALETTE: ButtonPalette = { background: "#EEF1F6"');
+    expect(buttonSource).toContain("disabled && !loading ? DISABLED_PALETTE : activePalette");
   });
 
   it("applique la même palette aux actions personnalisées hors authentification", () => {

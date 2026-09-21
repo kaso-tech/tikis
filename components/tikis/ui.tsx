@@ -6,6 +6,9 @@ type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 type ButtonPalette = { background: string; foreground: string; border?: string };
 
+/** Ce que porte un bouton qu'on ne peut pas actionner : un gris franc, pas une transparence. */
+const DISABLED_PALETTE: ButtonPalette = { background: "#EEF1F6", foreground: "#7A8699", border: "#DDE3EC" };
+
 const buttonColors: Record<ButtonVariant, ButtonPalette> = {
   primary: { background: "#FFFFFF", foreground: "#9A6201", border: "#E3E3E3" },
   secondary: { background: "#FFFFFF", foreground: "#111111", border: "#E3E3E3" },
@@ -38,14 +41,19 @@ export function TikisButton({
   compact?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
-  const palette: ButtonPalette = authStyle && variant === "primary"
+  const blocked = disabled || loading;
+  const activePalette: ButtonPalette = authStyle && variant === "primary"
     ? { background: "#9A6201", foreground: "#FFFFFF", border: "#9A6201" }
     : buttonColors[variant];
-  const blocked = disabled || loading;
+  // Un bouton bloqué ne recevait que `opacity: 0.84` : sur un fond saturé, seize
+  // pour cent d'atténuation ne se voient pas, et l'écran proposait une action
+  // qui ne répondait pas. En chargement, la palette reste celle de l'action :
+  // c'est elle qui est en cours, pas une action refusée.
+  const palette: ButtonPalette = disabled && !loading ? DISABLED_PALETTE : activePalette;
 
   const textStyle = [styles.buttonText, compact && styles.buttonTextCompact, { color: palette.foreground }];
 
-  return <Pressable accessibilityRole="button" accessibilityState={{ disabled: blocked, busy: loading }} disabled={blocked} onPress={() => { haptic.light(); onPress(); }} style={({ pressed }) => [styles.button, compact && styles.buttonCompact, { backgroundColor: palette.background, borderColor: palette.border ?? palette.background }, style, (pressed || blocked) && styles.buttonPressed]}>
+  return <Pressable accessibilityRole="button" accessibilityState={{ disabled: blocked, busy: loading }} disabled={blocked} onPress={() => { haptic.light(); onPress(); }} style={({ pressed }) => [styles.button, compact && styles.buttonCompact, { backgroundColor: palette.background, borderColor: palette.border ?? palette.background }, style, pressed && !blocked && styles.buttonPressed]}>
     {loading ? <><ActivityIndicator color={palette.foreground} /><Text style={textStyle} numberOfLines={1}>{loadingLabel ?? (compact ? "…" : "Traitement en cours…")}</Text></> : <>{icon ? <MaterialIcons name={icon} size={compact ? 16 : 18} color={palette.foreground} /> : null}<Text style={textStyle} numberOfLines={1}>{label}</Text></>}
   </Pressable>;
 }
