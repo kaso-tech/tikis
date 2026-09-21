@@ -3,6 +3,7 @@ import { COOKIE_NAME } from "../shared/const";
 import { randomInt, randomUUID } from "node:crypto";
 import * as db from "./db";
 import { publishDeliveryPositionBroadcast, publishDeliveryStatusBroadcast, syncDeliveryRealtimeMembers } from "./supabase-realtime";
+import { concealPlaceForDriver } from "./_test-helpers/delivery-visibility";
 import { isCoordinateInCountry } from "./_test-helpers/geo-fence";
 import { storagePut } from "./storage";
 import * as geography from "./geography";
@@ -262,23 +263,10 @@ function deliveryForProfile(delivery: ResolvedDelivery, profile: Awaited<ReturnT
   if (profile.accountType === "sender") return { ...delivery, routeVisibility: "exact" };
   const maySeeExactRoute = delivery.driverId === profile.phone && (delivery.status === "active" || delivery.status === "completed");
   if (maySeeExactRoute) return { ...delivery, routeVisibility: "exact" };
-  const concealPlace = (place: ResolvedDelivery["pickup"]) => ({
-    ...place,
-    name: place.city || "Zone indicative",
-    district: "",
-    formattedAddress: place.city || "Zone indicative",
-    street: undefined,
-    googlePlaceId: undefined,
-    mapboxId: undefined,
-    mapboxSessionToken: undefined,
-    latitude: Math.round(place.latitude * 10) / 10,
-    longitude: Math.round(place.longitude * 10) / 10,
-    precision: "area" as const,
-  });
   return {
     ...delivery,
-    pickup: concealPlace(delivery.pickup),
-    dropoff: concealPlace(delivery.dropoff),
+    pickup: concealPlaceForDriver(delivery.pickup),
+    dropoff: concealPlaceForDriver(delivery.dropoff),
     senderName: "Expéditeur Tikis",
     senderPhone: undefined,
     driverName: undefined,
