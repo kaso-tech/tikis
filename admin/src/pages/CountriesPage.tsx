@@ -1,8 +1,10 @@
+import { countryDraftIssue, isoCountry } from "../../../shared/iso-countries";
+import { countryFlagEmoji } from "../../../lib/registration-rules";
 import { useEffect, useState } from "react";
 import { trpc } from "../lib/trpc";
 import { useAdminAuth } from "../lib/auth";
 
-type Country = { id: string; name: string; dialCode: string; digits: number; groups: string; timeZones: string; enabled: boolean; sortOrder: number };
+type Country = { id: string; name: string; dialCode: string; digits: number; groups: string; timeZones: string; enabled: boolean; sortOrder: number; issue?: string | null };
 
 const emptyDraft = { id: "", name: "", dialCode: "+", digits: "8", groups: "2,2,2,2", timeZones: "", sortOrder: "0" };
 
@@ -50,6 +52,10 @@ export default function CountriesPage() {
     const sortOrder = Number(draft.sortOrder) || 0;
     if (!/^[A-Z]{2}$/.test(draft.id.toUpperCase())) { setError("Code pays ISO à 2 lettres requis (ex. BF)."); return; }
     if (!draft.name.trim()) { setError("Nom du pays requis."); return; }
+    // Le serveur refuse aussi : ce contrôle-ci évite d'attendre l'aller-retour
+    // pour apprendre que « Bénin » n'est pas BN.
+    const inconsistency = countryDraftIssue({ id: draft.id, name: draft.name, dialCode: draft.dialCode });
+    if (inconsistency) { setError(inconsistency); return; }
     if (groups.length === 0 || timeZones.length === 0) { setError("Groupes d’affichage et fuseau horaire requis."); return; }
     setSaving(true);
     try {
@@ -85,7 +91,10 @@ export default function CountriesPage() {
           <tbody>
             {rows.map((country) => (
               <tr key={country.id}>
-                <td style={{ fontWeight: 600 }}>{country.name} <span style={{ color: "var(--muted)", fontWeight: 400 }}>({country.id})</span></td>
+                <td style={{ fontWeight: 600 }}>
+                  {countryFlagEmoji(country.id)} {country.name} <span style={{ color: "var(--muted)", fontWeight: 400 }}>({country.id})</span>
+                  {country.issue ? <div style={{ marginTop: 4, fontWeight: 500, fontSize: 12, color: "var(--danger, #A43740)" }}>⚠ {country.issue}</div> : null}
+                </td>
                 <td>{country.dialCode}</td>
                 <td style={{ fontSize: 12, color: "var(--muted)" }}>{country.digits} chiffres · {country.groups}</td>
                 <td><span className={`pill ${country.enabled ? "pill-success" : "pill-neutral"}`}><span className="dot" />{country.enabled ? "Actif" : "Inactif"}</span></td>
@@ -105,7 +114,15 @@ export default function CountriesPage() {
         <div className="card" style={{ maxWidth: 480 }}>
           <div className="card-head"><div><div className="card-title">{rows.some((r) => r.id === draft.id.toUpperCase()) ? "Modifier le pays" : "Ajouter un pays"}</div></div></div>
           <div className="grid grid-2" style={{ marginBottom: 10 }}>
-            <div><label className="field-label">Code ISO (2 lettres)</label><input className="input" maxLength={2} value={draft.id} onChange={(e) => setDraft((s) => ({ ...s, id: e.target.value.toUpperCase() }))} /></div>
+            <div>
+              <label className="field-label">Code ISO (2 lettres)</label>
+              <input className="input" maxLength={2} value={draft.id} onChange={(e) => setDraft((s) => ({ ...s, id: e.target.value.toUpperCase() }))} />
+              {/* Le drapeau se déduit des deux lettres : le montrer ici rend la
+                  confusion de code visible avant l'enregistrement. */}
+              <div style={{ marginTop: 4, fontSize: 12, color: "var(--muted)" }}>
+                {countryFlagEmoji(draft.id)} {isoCountry(draft.id)?.name ?? "code inconnu"}
+              </div>
+            </div>
             <div><label className="field-label">Indicatif</label><input className="input" value={draft.dialCode} onChange={(e) => setDraft((s) => ({ ...s, dialCode: e.target.value }))} /></div>
           </div>
           <label className="field-label">Nom du pays</label>

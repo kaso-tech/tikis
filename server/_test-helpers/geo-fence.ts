@@ -13,6 +13,14 @@ const COUNTRY_BBOX: Record<string, { minLat: number; maxLat: number; minLng: num
   ML: { minLat: 10.0, maxLat: 25.0, minLng: -12.2, maxLng: 4.2 },
   TG: { minLat: 6.0, maxLat: 11.2, minLng: -0.2, maxLng: 1.8 },
   GH: { minLat: 4.5, maxLat: 11.2, minLng: -3.3, maxLng: 1.3 },
+  // Ajoutés depuis la console d'administration, donc absents de cette table :
+  // leur géofencing retombait lui aussi sur la bbox par défaut.
+  BJ: { minLat: 6.2, maxLat: 12.5, minLng: 0.7, maxLng: 3.9 },
+  NE: { minLat: 11.6, maxLat: 23.6, minLng: 0.1, maxLng: 16.0 },
+  NG: { minLat: 4.2, maxLat: 13.9, minLng: 2.6, maxLng: 14.7 },
+  // La France figure à l'inscription depuis le début, sans bbox : métropole
+  // seulement, ce qui correspond au périmètre réellement desservi.
+  FR: { minLat: 41.3, maxLat: 51.1, minLng: -5.2, maxLng: 9.6 },
 };
 
 /** Bbox d'erreur si le pays n'est pas dans la whitelist.

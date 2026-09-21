@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import { and, count, desc, eq, gte, like, lte, or, sql } from "drizzle-orm";
+import { countryDraftIssue } from "../shared/iso-countries";
 import { getDb } from "./db";
 import * as db from "./db";
 import {
@@ -539,12 +540,21 @@ export async function adminListCountries() {
   const dbc = await getDb();
   if (!dbc) return [];
   const rows = await dbc.select().from(tikisSupportedCountries);
-  return rows.sort((a, b) => a.sortOrder - b.sortOrder);
+  // `issue` rend visibles les lignes enregistrées avant que la cohérence soit
+  // vérifiée : la console les signale au lieu de les laisser passer pour bonnes.
+  return rows
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((row) => ({ ...row, issue: countryDraftIssue({ id: row.id, name: row.name, dialCode: row.dialCode }) }));
 }
 
 export async function adminUpsertCountry(input: { id: string; name: string; dialCode: string; digits: number; groups: number[]; timeZones: string[]; enabled: boolean; sortOrder: number }) {
   if (!/^[A-Z]{2}$/.test(input.id)) throw new Error("Le code pays doit être un code ISO à 2 lettres (ex. BF).");
   if (!/^\+\d{1,4}$/.test(input.dialCode)) throw new Error("Indicatif téléphonique invalide (ex. +226).");
+  // Le code, le nom et l'indicatif doivent désigner le même pays. Sans cette
+  // vérification, « Bénin / BN / +229 » s'enregistrait sans broncher — et BN est
+  // le Brunei, dont l'application affichait ensuite le drapeau et les villes.
+  const inconsistency = countryDraftIssue({ id: input.id, name: input.name, dialCode: input.dialCode });
+  if (inconsistency) throw new Error(inconsistency);
   if (!Number.isInteger(input.digits) || input.digits < 4 || input.digits > 15) throw new Error("Nombre de chiffres invalide.");
   if (input.groups.reduce((a, b) => a + b, 0) !== input.digits) throw new Error("La somme des groupes d’affichage doit être égale au nombre de chiffres.");
   if (input.timeZones.length === 0) throw new Error("Au moins un fuseau horaire est requis.");

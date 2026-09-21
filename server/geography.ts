@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { normalizeLocation, sanitizePlaceText } from "../lib/geo-rules";
 import { COUNTRIES } from "../lib/registration-rules";
+import { countryNameMatches, isoCountry } from "../shared/iso-countries";
 import type { LocationLabel, PlaceSuggestion } from "../shared/tikis-domain";
 import * as db from "./db";
 import { recordGeographicMetric } from "./geography-observability";
@@ -106,13 +107,17 @@ async function rememberResolvedPlace(place: LocationLabel) {
 
 /** Décision produit assumée : un lieu situé hors du pays associé au profil est rejeté (blocage dur), pas
  *  seulement signalé. Conséquence connue et acceptée : un utilisateur proche d'une frontière pointant un
- *  lieu légitimement situé de l'autre côté ne peut pas le sélectionner via ce chemin. La comparaison de
- *  noms de pays (`localeCompare` sensibilité "base") tolère la casse et les accents mais reste sensible à
- *  une variante de ponctuation (ex. apostrophe) si Mapbox et `COUNTRIES` divergeaient un jour sur ce point. */
+ *  lieu légitimement situé de l'autre côté ne peut pas le sélectionner via ce chemin.
+ *
+ *  La référence était `COUNTRIES` (lib/registration-rules.ts), une liste de sept pays figée dans le code :
+ *  pour un pays ajouté depuis la console — le Bénin, le Niger — elle ne trouvait rien, et la vérification
+ *  se sautait en silence. `shared/iso-countries.ts` connaît les pays desservis et compare sans se laisser
+ *  arrêter par un accent ou une apostrophe, là où `localeCompare` butait sur la ponctuation. */
 function ensureCountry(place: LocationLabel, countryCode?: string) {
   if (!countryCode || !place.country) return place;
-  const expectedCountry = COUNTRIES.find((country) => country.id === countryCode)?.name;
-  if (expectedCountry && place.country.localeCompare(expectedCountry, "fr", { sensitivity: "base" }) !== 0) {
+  const known = isoCountry(countryCode) ?? COUNTRIES.find((country) => country.id === countryCode);
+  if (!known) return place;
+  if (!countryNameMatches(known.id, place.country)) {
     throw new Error("Ce lieu se trouve hors du pays associé à votre profil.");
   }
   return place;
