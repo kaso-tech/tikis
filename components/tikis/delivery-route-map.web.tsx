@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { DriverMarker, DropoffMarker, PickupMarker } from "@/components/tikis/map-markers";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import type { LocationLabel } from "@/shared/tikis-domain";
 
@@ -13,10 +14,10 @@ export function DeliveryRouteMap({ pickup, dropoff, coordinates, routeSource, dr
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.grid, { backgroundColor: theme.background }]} />
       <View style={[styles.route, isFallback && { backgroundColor: theme.warning, opacity: 0.85 }, { backgroundColor: theme.primary }]} />
-      <View style={[styles.start, { backgroundColor: theme.primary }]}><MaterialIcons name="inventory-2" size={17} color={theme.surface} /></View>
-      <View style={[styles.destination, { backgroundColor: theme.surface }]}><MaterialIcons name="location-on" size={25} color={theme.error} /></View>
+      <View style={styles.start}><PickupMarker /></View>
+      <View style={styles.destination}><DropoffMarker /></View>
       {driverPosition ? (
-        <View style={[styles.driver, { backgroundColor: theme.primary, borderColor: theme.surface }]}><MaterialIcons name="navigation" size={15} color={theme.surface} /></View>
+        <View style={styles.driver}><DriverMarker heading={driverPosition.heading} /></View>
       ) : null}
       <View style={styles.webNote}>
         <MaterialIcons name="map" size={17} color={theme.primary} />
@@ -30,9 +31,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, overflow: "hidden", position: "relative" },
   grid: { ...StyleSheet.absoluteFill, opacity: 0.28 },
   route: { position: "absolute", height: 6, borderRadius: 4, width: "65%", top: "51%", left: "17%", transform: [{ rotate: "-17deg" }] },
-  start: { position: "absolute", left: "15%", top: "62%", width: 30, height: 30, borderRadius: 7, alignItems: "center", justifyContent: "center" },
-  destination: { position: "absolute", right: "15%", top: "31%", width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  driver: { position: "absolute", left: "48%", top: "45%", width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center", borderWidth: 2 },
+  // Les marqueurs sont ancrés par leur pointe : on positionne le coin haut-gauche du dessin.
+  start: { position: "absolute", left: "15%", top: "62%", marginLeft: -19, marginTop: -37 },
+  destination: { position: "absolute", right: "15%", top: "31%", marginRight: -19, marginTop: -37 },
+  driver: { position: "absolute", left: "48%", top: "45%", marginLeft: -22, marginTop: -22 },
   webNote: { position: "absolute", left: 14, right: 14, bottom: 14, padding: 11, borderRadius: 9, backgroundColor: "rgba(255,255,255,0.94)", flexDirection: "row", gap: 7, alignItems: "center" },
   webNoteText: { fontSize: 12, fontWeight: "500", flex: 1, lineHeight: 17 },
 });

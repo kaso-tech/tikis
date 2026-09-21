@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import MapView, { Marker, Polyline } from "react-native-maps";
+import { CHIP_ANCHOR, DriverMarker, DropoffMarker, PickupMarker, PIN_ANCHOR } from "@/components/tikis/map-markers";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import type { LocationLabel } from "@/shared/tikis-domain";
 
@@ -96,11 +97,15 @@ export function DeliveryRouteMap({
         {approachCoordinates && approachCoordinates.length >= 2 ? (
           <Polyline coordinates={approachCoordinates} strokeColor={theme.success} strokeWidth={5} lineCap="round" lineJoin="round" />
         ) : null}
-        <Marker coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }} anchor={{ x: 0.5, y: 0.5 }}><View style={styles.startMarker}><MaterialIcons name="inventory-2" size={15} color={theme.surface} /></View></Marker>
-        <Marker coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }} anchor={{ x: 0.5, y: 0.85 }}><View style={styles.destinationMarker}><MaterialIcons name="location-on" size={26} color={theme.error} /></View></Marker>
+        <Marker coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }} anchor={PIN_ANCHOR}>
+          <PickupMarker />
+        </Marker>
+        <Marker coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }} anchor={PIN_ANCHOR}>
+          <DropoffMarker />
+        </Marker>
         {driverPosition ? (
-          <Marker coordinate={{ latitude: driverPosition.latitude, longitude: driverPosition.longitude }} anchor={{ x: 0.5, y: 0.5 }} rotation={driverPosition.heading ?? 0} flat>
-            <View style={styles.driverMarker}><MaterialIcons name="navigation" size={18} color={theme.surface} /></View>
+          <Marker coordinate={{ latitude: driverPosition.latitude, longitude: driverPosition.longitude }} anchor={CHIP_ANCHOR}>
+            <DriverMarker heading={driverPosition.heading} />
           </Marker>
         ) : null}
       </MapView>
@@ -121,8 +126,5 @@ export function DeliveryRouteMap({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F0F3F8" },
   map: { ...StyleSheet.absoluteFill },
-  startMarker: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 0 },
-  destinationMarker: { width: 34, height: 34, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
-  driverMarker: { width: 34, height: 34, borderRadius: 17, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
   recenter: { position: "absolute", right: 14, width: 44, height: 44, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
 });

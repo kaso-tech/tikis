@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Dimensions, Linking, PanResponder, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import MapView, { Marker, Polyline, type Region } from "react-native-maps";
+import { CHIP_ANCHOR, DriverMarker, DropoffMarker, PickupMarker, PIN_ANCHOR } from "@/components/tikis/map-markers";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
 import { haptic } from "@/lib/haptics";
@@ -473,6 +474,7 @@ export function HomeScreen() {
         role={role}
         sheetSnap={sheetSnap}
         driverPosition={role === "driver" ? driverLocation.location : senderLivePosition}
+        driverHeading={role === "driver" ? deviceHeading ?? null : senderLivePosition?.heading ?? null}
         userLocation={driverLocation.location}
       />
 
@@ -727,7 +729,7 @@ function WalletCard({ walletBalance, totalBalance, blockedBalance }: { walletBal
   );
 }
 
-function MapBackground({ selected, role, sheetSnap, driverPosition, userLocation }: { selected: Delivery | null | undefined; role: "sender" | "driver"; sheetSnap: number; driverPosition: { latitude: number; longitude: number } | null; userLocation: { latitude: number; longitude: number } | null }) {
+function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeading, userLocation }: { selected: Delivery | null | undefined; role: "sender" | "driver"; sheetSnap: number; driverPosition: { latitude: number; longitude: number } | null; /** Cap du livreur, en degrés : un nombre simple plutôt qu'un champ de `driverPosition`, dont la nouvelle identité relancerait le calcul d'itinéraire d'approche à chaque rendu. */ driverHeading: number | null; userLocation: { latitude: number; longitude: number } | null }) {
   const mapRef = useRef<MapView>(null);
   const routeMutation = trpc.geography.route.useMutation();
   const routeRequestRef = useRef(routeMutation.mutateAsync);
@@ -859,30 +861,16 @@ function MapBackground({ selected, role, sheetSnap, driverPosition, userLocation
           <>
             {approachCoordinates.length > 1 ? <Polyline coordinates={approachCoordinates} strokeColor="#176C52" strokeWidth={4} lineCap="round" /> : null}
             {routeCoordinates.length > 1 ? <Polyline coordinates={routeCoordinates} strokeColor="#9A6201" strokeWidth={4} lineCap="round" /> : null}
-            <Marker coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={{ x: 0.5, y: 1 }}>
-              <View style={styles.pinWrap}>
-                <View style={styles.pinShadow} />
-                <View style={[styles.pinCircle, styles.pinCircleStart]}>
-                  <MaterialIcons name="trip-origin" size={14} color="#FFFFFF" />
-                </View>
-                <View style={[styles.pinTriangle, styles.pinTriangleStart]} />
-              </View>
+            <Marker coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={PIN_ANCHOR}>
+              <PickupMarker />
             </Marker>
             {hasDriver && driverPosition ? (
-              <Marker coordinate={driverPosition} anchor={{ x: 0.5, y: 0.5 }}>
-                <View style={styles.nativeMarkerDriver}>
-                  <MaterialIcons name="two-wheeler" size={16} color="#FFFFFF" />
-                </View>
+              <Marker coordinate={driverPosition} anchor={CHIP_ANCHOR}>
+                <DriverMarker heading={driverHeading} />
               </Marker>
             ) : null}
-            <Marker coordinate={{ latitude: selected.dropoff.latitude, longitude: selected.dropoff.longitude }} anchor={{ x: 0.5, y: 1 }}>
-              <View style={styles.pinWrap}>
-                <View style={styles.pinShadow} />
-                <View style={[styles.pinCircle, styles.pinCircleEnd]}>
-                  <MaterialIcons name="location-on" size={14} color="#A43740" />
-                </View>
-                <View style={[styles.pinTriangle, styles.pinTriangleEnd]} />
-              </View>
+            <Marker coordinate={{ latitude: selected.dropoff.latitude, longitude: selected.dropoff.longitude }} anchor={PIN_ANCHOR}>
+              <DropoffMarker />
             </Marker>
           </>
         ) : null}
@@ -1105,20 +1093,9 @@ const styles = StyleSheet.create({
 
   mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F0F3F8", zIndex: 0 },
   mapCanvas: { zIndex: 0 },
-  nativeMarkerStart: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
-  nativeMarkerDriver: { width: 30, height: 30, borderRadius: 15, backgroundColor: "#111111", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#FFFFFF" },
-  nativeMarkerEnd: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#A43740" },
 
   userMarkerHalo: { width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(154,98,1,0.18)", alignItems: "center", justifyContent: "center" },
   userMarkerDot: { width: 13, height: 13, borderRadius: 7, backgroundColor: "#9A6201", borderWidth: 2.5, borderColor: "#FFFFFF" },
-  pinWrap: { alignItems: "center", width: 36, paddingTop: 0 },
-  pinShadow: { position: "absolute", bottom: 0, width: 14, height: 4, borderRadius: 7, backgroundColor: "rgba(0,0,0,0.25)" },
-  pinCircle: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2.5, borderColor: "#FFFFFF", marginBottom: -2 },
-  pinCircleStart: { backgroundColor: "#9A6201" },
-  pinCircleEnd: { backgroundColor: "#FFFFFF" },
-  pinTriangle: { width: 0, height: 0, borderLeftWidth: 6, borderRightWidth: 6, borderTopWidth: 8, borderLeftColor: "transparent", borderRightColor: "transparent", marginTop: -2 },
-  pinTriangleStart: { borderTopColor: "#9A6201" },
-  pinTriangleEnd: { borderTopColor: "#FFFFFF" },
 
   fab: { position: "absolute", right: 14, width: 50, height: 50, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3", zIndex: 10 },
   sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },

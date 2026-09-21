@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, PanResponder, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { DriverMarker, DropoffMarker, PickupMarker } from "@/components/tikis/map-markers";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
@@ -451,7 +452,7 @@ export function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
-      <MapBackground selected={selected} role={role} driverPosition={role === "driver" ? driverLocation.location : senderLivePosition} />
+      <MapBackground selected={selected} role={role} driverPosition={role === "driver" ? driverLocation.location : senderLivePosition} driverHeading={senderLivePosition?.heading ?? null} />
 
       <Animated.View style={[styles.sheet, { height: sheetHeight }]}>
         <View {...panResponder.panHandlers} style={styles.sheetHeader}>
@@ -693,7 +694,7 @@ function WalletCard({ walletBalance, totalBalance, blockedBalance }: { walletBal
   );
 }
 
-function MapBackground({ selected, role, driverPosition }: { selected: Delivery | null | undefined; role: "sender" | "driver"; driverPosition: { latitude: number; longitude: number } | null }) {
+function MapBackground({ selected, role, driverPosition, driverHeading }: { selected: Delivery | null | undefined; role: "sender" | "driver"; driverPosition: { latitude: number; longitude: number } | null; driverHeading: number | null }) {
   const hasDriver = Boolean(selected?.status === "active" && driverPosition);
   const pickup = selected?.pickup;
   const dropoff = selected?.dropoff;
@@ -772,17 +773,29 @@ function MapBackground({ selected, role, driverPosition }: { selected: Delivery 
         />
       ) : null}
 
-      <View style={[styles.marker, styles.markerStart]}>
-        <MaterialIcons name="inventory-2" size={14} color="#FFFFFF" />
-      </View>
+      {routeLine ? (
+        <>
+          <View style={[styles.mapPin, { left: routeLine.left - 19, top: routeLine.top - 37 }]}>
+            <PickupMarker />
+          </View>
+          <View
+            style={[
+              styles.mapPin,
+              {
+                left: routeLine.left + Math.cos((routeLine.angle * Math.PI) / 180) * routeLine.length - 19,
+                top: routeLine.top + Math.sin((routeLine.angle * Math.PI) / 180) * routeLine.length - 37,
+              },
+            ]}
+          >
+            <DropoffMarker />
+          </View>
+        </>
+      ) : null}
       {hasDriver && approachLine ? (
-        <View style={[styles.marker, styles.markerDriver, { left: approachLine.left - 16, top: approachLine.top - 16 }]}>
-          <MaterialIcons name="two-wheeler" size={18} color="#FFFFFF" />
+        <View style={[styles.mapChip, { left: approachLine.left - 22, top: approachLine.top - 22 }]}>
+          <DriverMarker heading={driverHeading} />
         </View>
       ) : null}
-      <View style={[styles.marker, styles.markerEnd]}>
-        <MaterialIcons name="location-on" size={16} color="#A43740" />
-      </View>
     </View>
   );
 }
@@ -967,10 +980,11 @@ const styles = StyleSheet.create({
   mapRoad3: { top: "78%", left: "20%", right: "-10%", height: 12, transform: [{ rotate: "-4deg" }] },
   routeLine: { position: "absolute", height: 3, backgroundColor: "#9A6201", borderRadius: 2 } as any,
   approachLine: { position: "absolute", height: 3, backgroundColor: "#176C52", borderRadius: 2 } as any,
-  marker: { position: "absolute", width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF" },
-  markerStart: { top: "32%", left: "16%", backgroundColor: "#9A6201" },
-  markerDriver: { top: "50%", left: "42%", backgroundColor: "#111111" },
-  markerEnd: { top: "64%", right: "18%", backgroundColor: "#FFFFFF", borderColor: "#A43740" },
+  // Les extrémités se posaient à des pourcentages fixes, sans rapport avec le
+  // tracé calculé juste au-dessus : elles flottaient à côté de leur propre
+  // ligne. Elles sont désormais calées sur ses deux bouts.
+  mapPin: { position: "absolute" },
+  mapChip: { position: "absolute" },
 
   fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3", zIndex: 10 },
   sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
