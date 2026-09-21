@@ -96,7 +96,7 @@ export default function ProfileScreen() {
   }, [driver, receivedReviews]);
 
   async function pickPhoto() {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1, 1], quality: 0.45, base64: true });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsEditing: true, aspect: [1, 1], quality: 0.45, base64: true });
     if (result.canceled || !result.assets[0]?.base64) return;
     const mime = result.assets[0].mimeType;
     if (mime !== "image/jpeg" && mime !== "image/png" && mime !== "image/webp") {

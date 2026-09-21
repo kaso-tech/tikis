@@ -35,7 +35,7 @@ export default function ReportDeliveryScreen() {
   const reportMutation = trpc.reports.create.useMutation();
 
   async function pickAttachment() {
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.5, base64: true });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.5, base64: true });
     if (result.canceled || !result.assets[0]?.base64) return;
     const mime = result.assets[0].mimeType;
     if (mime !== "image/jpeg" && mime !== "image/png" && mime !== "image/webp") {

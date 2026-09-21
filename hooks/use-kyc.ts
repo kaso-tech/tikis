@@ -39,14 +39,14 @@ async function launchSource(source: PickSource, kind: KycDocumentKind): Promise<
   if (source === "camera") {
     const camera = await ImagePicker.requestCameraPermissionsAsync();
     if (!camera.granted) return null;
-    return ImagePicker.launchCameraAsync({ allowsEditing: true, aspect, quality: 0.55, base64: true });
+    return ImagePicker.launchCameraAsync({ mediaTypes: ["images"], allowsEditing: true, aspect, quality: 0.55, base64: true });
   }
   if (Platform.OS === "web") {
-    return ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect, quality: 0.55, base64: true });
+    return ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsEditing: true, aspect, quality: 0.55, base64: true });
   }
   const media = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!media.granted) return null;
-  return ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect, quality: 0.55, base64: true });
+  return ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsEditing: true, aspect, quality: 0.55, base64: true });
 }
 
 export function useKyc() {
