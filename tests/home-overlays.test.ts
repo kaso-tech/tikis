@@ -8,27 +8,34 @@ const homes = {
   natif: read("components/tikis/screens/home-screen.native.tsx"),
   web: read("components/tikis/screens/home-screen.web.tsx"),
 };
-const candidatesScreen = read("app/delivery/[id]/candidates.tsx");
+const sheet = read("components/tikis/candidates-sheet.tsx");
 
 /**
- * La liste des candidatures était une feuille glissante empilée par-dessus la feuille
- * d'accueil. Sur Android, `elevation` décide seul de l'ordre de peinture entre frères :
- * elle passait dessous, invisible sous un fond blanc opaque, et le bouton « Candidats »
- * paraissait sans effet. Le correctif d'alors ajustait les rangs de profondeur ; celui-ci
- * supprime la superposition, donc le problème.
+ * La feuille des candidatures passait *sous* la feuille d'accueil sur Android :
+ * entre frères, `elevation` décide seul de l'ordre de peinture, et le bouton
+ * « Candidats » paraissait donc sans effet. Le correctif d'alors ajustait les
+ * rangs de profondeur ; celui-ci rend la feuille dans sa propre fenêtre, où
+ * aucun frère ne peut passer devant.
  */
-describe("la liste des candidatures est un écran, pas une surcouche", () => {
-  it.each(Object.entries(homes))("sur %s, l'accueil y navigue au lieu d'empiler une feuille", (_name, home) => {
-    expect(home).toContain("/candidates` as any)");
-    expect(home).not.toContain("CandidatesSheet");
-    expect(home).not.toContain("candidateDelivery");
+describe("la feuille des candidatures ne peut plus passer sous l'accueil", () => {
+  it("est rendue dans un Modal, pas empilée dans l'arbre de l'accueil", () => {
+    expect(sheet).toContain('<Modal visible transparent animationType="none"');
+    // La forme d'une propriété de style, pas le mot : le commentaire du fichier
+    // explique justement pourquoi l'empilement ne dépend plus d'elle.
+    expect(sheet).not.toMatch(/elevation:/);
+    expect(sheet).not.toMatch(/zIndex:/);
+  });
+
+  it.each(Object.entries(homes))("sur %s, l'accueil l'ouvre par son état", (_name, home) => {
+    expect(home).toContain("setCandidatesDeliveryId(delivery.id)");
+    expect(home).toContain("<CandidatesSheet visible={Boolean(candidatesDeliveryId)}");
   });
 
   it("un échec de chargement ne s'y lit pas comme une absence de candidat", () => {
-    expect(candidatesScreen).toContain("candidatesQuery.isLoading");
-    expect(candidatesScreen).toContain("Liste des candidatures indisponible");
-    expect(candidatesScreen).toContain("En attente de candidatures");
-    expect(candidatesScreen).toContain("candidatesQuery.refetch()");
+    expect(sheet).toContain("candidatesQuery.isLoading");
+    expect(sheet).toContain("Liste des candidatures indisponible");
+    expect(sheet).toContain("En attente de candidatures");
+    expect(sheet).toContain("candidatesQuery.refetch()");
   });
 });
 

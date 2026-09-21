@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Dimensions, Linking, PanResponder, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import MapView, { Marker, Polyline, type Region } from "react-native-maps";
+import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { CHIP_ANCHOR, DriverMarker, DropoffMarker, PickupMarker, PIN_ANCHOR } from "@/components/tikis/map-markers";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
@@ -125,6 +126,7 @@ export function HomeScreen() {
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [applicationDelivery, setApplicationDelivery] = useState<Delivery | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingHomeAction | null>(null);
+  const [candidatesDeliveryId, setCandidatesDeliveryId] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [, setNow] = useState(Date.now());
   const hasInitialData = useRef(false);
@@ -370,9 +372,7 @@ export function HomeScreen() {
   function handleSenderAction(delivery: Delivery) {
     switch (resolveSenderHomeAction(delivery)) {
       case "candidates":
-        // Choisir un livreur bloque sa commission et engage l'expéditeur sur un
-        // montant : cela mérite un écran, pas un tiroir ouvert par-dessus l'accueil.
-        router.push(`/delivery/${delivery.id}/candidates` as any);
+        setCandidatesDeliveryId(delivery.id);
         return;
       case "cancel":
         setPendingAction({ kind: "cancel", delivery });
@@ -630,6 +630,7 @@ export function HomeScreen() {
           <MaterialIcons name="keyboard-arrow-up" size={20} color="#111111" />
         </Pressable>
       ) : null}
+      <CandidatesSheet visible={Boolean(candidatesDeliveryId)} deliveryId={candidatesDeliveryId} onClose={() => setCandidatesDeliveryId(null)} />
       {applicationDelivery ? (
         <FinancialConfirmationModal
           visible

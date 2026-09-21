@@ -1,14 +1,14 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { router, useLocalSearchParams } from "expo-router";
-import { useMemo, useState } from "react";
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, View } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { router } from "expo-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Dimensions, Modal, PanResponder, Pressable, ScrollView, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar, TikisButton } from "@/components/tikis/ui";
 import { createStyles } from "@/lib/create-styles";
 import { formatListRoute } from "@/lib/geo-rules";
 import { haptic } from "@/lib/haptics";
+import { nextSheetLevel, sheetDragOffset, type SheetLevel } from "@/lib/sheet-gesture";
 import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
-import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import {
   bestPlacedCandidate,
@@ -23,43 +23,111 @@ import {
 } from "@/shared/candidate-ranking";
 import { formatMoney, type DriverCandidate } from "@/shared/tikis-domain";
 
-const PLACEHOLDER_ID = "00000000-0000-4000-8000-000000000000";
+const SCREEN_HEIGHT = Dimensions.get("window").height;
+const SHEET_MID_HEIGHT = Math.round(SCREEN_HEIGHT * 0.72);
+const SHEET_FULL_HEIGHT = Math.round(SCREEN_HEIGHT * 0.92);
+
+function sheetHeightFor(level: SheetLevel): number {
+  return level === "full" ? SHEET_FULL_HEIGHT : SHEET_MID_HEIGHT;
+}
+
+type Props = {
+  visible: boolean;
+  deliveryId: string | null;
+  onClose: () => void;
+};
 
 /**
- * Choisir un livreur parmi les candidats.
+ * Choisir un livreur parmi les candidats, dans une feuille glissante.
  *
- * Cet écran remplace la feuille glissante qui rendait ce choix depuis l'accueil et la
- * fiche de livraison. Une feuille ouverte à 45 % de la hauteur montrait deux candidats
- * sur quatre et ne défilait pas ; surtout, elle traitait comme un geste de passage une
- * décision qui bloque la commission d'un livreur et engage l'expéditeur sur un montant.
+ * La feuille précédente avait deux défauts de conteneur, tous deux structurels :
  *
- * La page dit donc trois choses qu'aucun écran ne disait :
- *  1. ce que chaque candidat coûte **par rapport au prix publié** (« votre prix »,
- *     « +1 500 FCFA »), là où une contre-offre s'affichait comme un prix accepté ;
- *  2. à quelle distance il se trouve réellement, ou « position inconnue » — l'ancienne
- *     carte affichait « 1,2 km » écrit en dur pour tout le monde ;
- *  3. au moment de confirmer, ce que l'expéditeur va payer. L'ancien écran de
- *     confirmation n'affichait que la commission prélevée **au livreur**.
+ *  - elle ne défilait pas. `scrollEnabled` se lisait sur une `ref`, qui ne
+ *    redéclenche aucun rendu : agrandir la feuille ne débloquait rien. Ici le
+ *    palier vit dans un `state` — comme dans la feuille de suivi — et le
+ *    défilement n'est de toute façon jamais coupé, le geste de glissement étant
+ *    confiné à la poignée ;
+ *  - sur Android elle passait *sous* la feuille d'accueil, `elevation` décidant
+ *    seul de l'ordre de peinture entre frères. Elle est maintenant rendue dans
+ *    un `Modal`, c'est-à-dire dans sa propre fenêtre : aucun frère ne peut
+ *    passer devant.
+ *
+ * Elle s'ouvre à 72 % de la hauteur au lieu de 45 %, ce qui laisse voir quatre
+ * candidats au lieu de deux, et se déplie à 92 %. Un geste franc vers le bas
+ * depuis le palier bas la referme.
+ *
+ * Le contenu, lui, répond à la seule question posée : combien, par rapport au
+ * prix publié. Une contre-offre de 4 500 FCFA sur une course à 3 000 s'affichait
+ * exactement comme un prix accepté ; la distance « 1,2 km » était écrite en dur
+ * pour tout le monde ; et l'écran de confirmation montrait la commission
+ * prélevée *au livreur* comme s'il s'agissait du montant dû.
  */
-export default function DeliveryCandidatesScreen() {
+export function CandidatesSheet({ visible, deliveryId, onClose }: Props) {
   const { colors: theme } = useThemeColors();
   const styles = useMemo(() => stylesFor(theme), [theme]);
-  const params = useLocalSearchParams<{ id: string }>();
-  const { role, profile } = useTikisStore();
+  const insets = useSafeAreaInsets();
   const utilities = trpc.useUtils();
-  const deliveryId = params.id ?? PLACEHOLDER_ID;
-  const enabled = Boolean(params.id && profile?.phone);
 
-  const deliveryQuery = trpc.deliveries.get.useQuery({ id: deliveryId }, { enabled });
-  const candidatesQuery = trpc.deliveries.candidates.useQuery({ deliveryId }, { enabled });
+  const queryId = deliveryId ?? "00000000-0000-4000-8000-000000000000";
+  const enabled = visible && Boolean(deliveryId);
+  const deliveryQuery = trpc.deliveries.get.useQuery({ id: queryId }, { enabled });
+  const candidatesQuery = trpc.deliveries.candidates.useQuery({ deliveryId: queryId }, { enabled });
   const selectMutation = trpc.deliveries.selectCandidate.useMutation();
 
+  const [level, setLevel] = useState<SheetLevel>("mid");
   const [sort, setSort] = useState<CandidateSort>(DEFAULT_CANDIDATE_SORT);
   const [sortOpen, setSortOpen] = useState(false);
   const [certifiedOnly, setCertifiedOnly] = useState(false);
   const [pending, setPending] = useState<DriverCandidate | null>(null);
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState("");
+
+  const baseHeight = useRef(new Animated.Value(SHEET_MID_HEIGHT)).current;
+  const panY = useRef(new Animated.Value(0)).current;
+  const enter = useRef(new Animated.Value(0)).current;
+  const levelRef = useRef<SheetLevel>("mid");
+  levelRef.current = level;
+  // Fermer depuis le PanResponder, créé une seule fois : sans cette indirection il
+  // capturerait le `onClose` du premier rendu.
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
+  // Chaque ouverture repart du palier bas et de l'état neutre : une feuille
+  // rouverte sur le filtre « Certifiés » d'une autre course serait incompréhensible.
+  useEffect(() => {
+    if (!visible) return;
+    setLevel("mid");
+    setSort(DEFAULT_CANDIDATE_SORT);
+    setCertifiedOnly(false);
+    setPending(null);
+    setSortOpen(false);
+    setMessage("");
+    baseHeight.setValue(SHEET_MID_HEIGHT);
+    panY.setValue(0);
+    enter.setValue(0);
+    Animated.spring(enter, { toValue: 1, useNativeDriver: true, bounciness: 0, speed: 14 }).start();
+  }, [visible, baseHeight, panY, enter]);
+
+  useEffect(() => {
+    Animated.timing(baseHeight, { toValue: sheetHeightFor(level), duration: 220, useNativeDriver: false }).start();
+    panY.setValue(0);
+  }, [level, baseHeight, panY]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 4,
+      onPanResponderMove: (_, gesture) => { panY.setValue(sheetDragOffset(gesture.dy)); },
+      onPanResponderRelease: (_, gesture) => {
+        const next = nextSheetLevel(levelRef.current, gesture.dy, gesture.vy);
+        Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start();
+        // Une liste n'a pas de palier replié utile : le geste qui y mènerait ferme.
+        if (next === "mini") closeRef.current();
+        else setLevel(next);
+      },
+      onPanResponderTerminate: () => { Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start(); },
+    }),
+  ).current;
 
   const delivery = deliveryQuery.data;
   const deliveryPrice = delivery ? (delivery.offeredPrice ?? delivery.estimatedPrice) : 0;
@@ -68,7 +136,7 @@ export default function DeliveryCandidatesScreen() {
   const running = useMemo(() => candidates.filter(isCandidateInRunning), [candidates]);
 
   // Le bandeau ne s'affiche que tant que personne n'est retenu : une fois le choix fait,
-  // c'est le livreur retenu qui occupe le haut de l'écran, pas une suggestion périmée.
+  // c'est le livreur retenu qui occupe le haut de la feuille, pas une suggestion périmée.
   const best = useMemo(() => (chosen ? null : bestPlacedCandidate(candidates, deliveryPrice)), [candidates, chosen, deliveryPrice]);
 
   // Le vivier de la liste : les candidats encore en lice, moins celui déjà mis en avant.
@@ -83,7 +151,7 @@ export default function DeliveryCandidatesScreen() {
   );
 
   async function confirmChoice() {
-    if (!pending) return;
+    if (!pending || !deliveryId) return;
     setProcessing(true);
     try {
       await selectMutation.mutateAsync({ deliveryId, candidateId: pending.id });
@@ -103,174 +171,193 @@ export default function DeliveryCandidatesScreen() {
     }
   }
 
-  if (candidatesQuery.isLoading || deliveryQuery.isLoading) {
-    return <SafeAreaView style={styles.safe} edges={["top"]}>
-      <TopBar count={null} />
-      <View style={styles.centered}><ActivityIndicator color={theme.primary} /><Text style={styles.centeredTitle}>Chargement des candidatures…</Text></View>
-    </SafeAreaView>;
-  }
+  if (!visible) return null;
 
-  // Un expéditeur qui n'est pas propriétaire n'arrive jamais ici : le serveur refuse la
-  // requête. Un livreur, lui, ne reçoit que sa propre candidature — cet écran ne le
-  // concerne pas, et le lui montrer amputé serait plus déroutant que de le renvoyer.
-  if (!delivery || role !== "sender") {
-    return <SafeAreaView style={styles.safe} edges={["top"]}>
-      <TopBar count={null} />
-      <View style={styles.centered}>
-        <Text style={styles.centeredTitle}>{delivery ? "Réservé à l’expéditeur" : "Livraison introuvable"}</Text>
-        <Text style={styles.centeredText}>{delivery ? "Seul l’expéditeur de cette course voit la liste de ses candidats." : "Cette livraison n’existe plus ou ne vous appartient pas."}</Text>
-        <TikisButton label="Retour" icon="arrow-back" variant="secondary" onPress={() => router.back()} style={styles.centeredButton} />
-      </View>
-    </SafeAreaView>;
-  }
-
+  const loading = candidatesQuery.isLoading || deliveryQuery.isLoading;
   const error = candidatesQuery.error?.message ?? null;
+  const height = Animated.add(baseHeight, panY);
+  const slide = enter.interpolate({ inputRange: [0, 1], outputRange: [SHEET_FULL_HEIGHT, 0] });
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <TopBar count={running.length} chosenName={chosen?.name ?? null} />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+      <Animated.View style={[styles.backdrop, { opacity: enter }]} pointerEvents="auto">
+        <Pressable style={styles.backdropFill} onPress={onClose} accessibilityLabel="Fermer la liste des candidats" />
+      </Animated.View>
 
-        <View style={styles.recap}>
-          <Text style={styles.recapTitle} numberOfLines={1}>{delivery.title}</Text>
-          {/* `formatListRoute` et non les villes brutes : deux points de la même ville
-              donnaient « Ouagadougou → Ouagadougou », qui n'apprend rien. */}
-          <Text style={styles.recapRoute} numberOfLines={1}>{formatListRoute(delivery.pickup, delivery.dropoff)} · {delivery.distanceKm.toLocaleString("fr-FR")} km</Text>
-          <View style={styles.recapBottom}>
-            <Text style={styles.recapLabel}>Votre prix</Text>
-            <Text style={styles.recapPrice}>{formatMoney(deliveryPrice)}</Text>
-            <View style={styles.recapSpacer} />
-            {delivery.vehicleTypes.map((vehicle) => <View key={vehicle} style={styles.vehicleChip}><Text style={styles.vehicleChipText}>{vehicle}</Text></View>)}
-          </View>
-        </View>
-
-        {error ? (
-          <View style={styles.errorCard}>
-            <MaterialIcons name="cloud-off" size={20} color={theme.error} />
-            <View style={styles.errorBody}>
-              <Text style={styles.errorTitle}>Liste des candidatures indisponible</Text>
-              <Text style={styles.errorText}>{error}</Text>
+      <Animated.View style={[styles.sheet, { height, transform: [{ translateY: slide }] }]}>
+        <View {...panResponder.panHandlers} accessibilityRole="adjustable" accessibilityLabel="Glisser pour déplier la liste">
+          <View style={styles.grip} />
+          <View style={styles.headerRow}>
+            <View style={styles.headerText}>
+              <Text style={styles.headerEyebrow}>CANDIDATURES</Text>
+              <Text style={styles.headerTitle} numberOfLines={1}>
+                {chosen
+                  ? `${chosen.name} est retenu`
+                  : loading
+                    ? "Chargement des candidatures…"
+                    : running.length === 0
+                      ? "Aucun candidat pour l’instant"
+                      : running.length === 1
+                        ? "1 livreur, à confirmer"
+                        : `${running.length} livreurs, un seul à choisir`}
+              </Text>
             </View>
-            <Pressable onPress={() => void candidatesQuery.refetch()} accessibilityRole="button" style={({ pressed }) => [styles.retry, pressed && styles.pressed]}>
-              <MaterialIcons name="refresh" size={16} color={theme.foreground} />
-              <Text style={styles.retryText}>Réessayer</Text>
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Fermer" style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}>
+              <MaterialIcons name="close" size={18} color={theme.foreground} />
             </Pressable>
           </View>
-        ) : null}
 
-        {chosen ? (
-          <ChosenCard candidate={chosen} deliveryPrice={deliveryPrice} theme={theme} onUnselect={() => router.push(`/delivery/${deliveryId}` as any)} />
-        ) : null}
+          {delivery ? (
+            <View style={styles.recap}>
+              <View style={styles.recapLine}>
+                <Text style={styles.recapLabel}>Votre prix</Text>
+                <Text style={styles.recapPrice}>{formatMoney(deliveryPrice)}</Text>
+                <View style={styles.listSpacer} />
+                {/* Les engins demandés restent sous les yeux : sans eux, la ligne
+                    « Moto · à 1,2 km » d'un candidat ne se juge pas. */}
+                {delivery.vehicleTypes.map((vehicle) => <View key={vehicle} style={styles.vehicleChip}><Text style={styles.vehicleChipText}>{vehicle}</Text></View>)}
+              </View>
+              {/* `formatListRoute` et non les villes brutes : deux points de la même
+                  ville donnaient « Ouagadougou → Ouagadougou », qui n'apprend rien. */}
+              <Text style={styles.recapRoute} numberOfLines={1}>{formatListRoute(delivery.pickup, delivery.dropoff)} · {delivery.distanceKm.toLocaleString("fr-FR")} km</Text>
+            </View>
+          ) : null}
+        </View>
 
-        {best ? (
-          <View style={styles.bestCard}>
-            <Text style={styles.bestEyebrow}>LE MIEUX PLACÉ</Text>
-            <CandidateIdentity candidate={best.candidate} deliveryPrice={deliveryPrice} theme={theme} />
-            <Text style={styles.bestReason}>{capitalize(joinReasons(best.reasons))}</Text>
-            <TikisButton
-              label={`Choisir ${firstName(best.candidate.name)} · ${formatMoney(candidatePrice(best.candidate, deliveryPrice))}`}
-              onPress={() => setPending(best.candidate)}
-              style={styles.bestCta}
-            />
-          </View>
-        ) : null}
+        {/* Jamais conditionnel : c'est précisément sa désactivation au palier bas,
+            lue sur une `ref`, qui rendait l'ancienne liste impossible à parcourir. */}
+        <ScrollView style={styles.list} contentContainerStyle={[styles.content, { paddingBottom: 28 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+          {loading ? (
+            <View style={styles.centered}><ActivityIndicator color={theme.primary} /><Text style={styles.centeredTitle}>Chargement des candidatures…</Text></View>
+          ) : null}
 
-        {running.length === 0 && !error ? (
-          <View style={styles.empty}>
-            <View style={styles.emptyIcon}><MaterialIcons name="schedule" size={26} color={theme.muted} /></View>
-            <Text style={styles.emptyTitle}>En attente de candidatures</Text>
-            <Text style={styles.emptyText}>Votre livraison est publiée. Les livreurs compatibles apparaîtront ici dès qu’ils proposeront leur service.</Text>
-          </View>
-        ) : null}
-
-        {listed.length > 0 ? (
-          <>
-            <View style={styles.listHeader}>
-              <Text style={styles.listHeaderTitle}>{best || chosen ? `LES ${listed.length} AUTRE${listed.length > 1 ? "S" : ""}` : `${listed.length} CANDIDAT${listed.length > 1 ? "S" : ""}`}</Text>
-              <View style={styles.listSpacer} />
-              {certifiedCount > 0 ? (
-                <Pressable
-                  onPress={() => setCertifiedOnly((current) => !current)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: certifiedOnly }}
-                  style={({ pressed }) => [styles.control, certifiedOnly && styles.controlActive, pressed && styles.pressed]}
-                >
-                  <Text style={[styles.controlText, certifiedOnly && styles.controlTextActive]}>Certifiés</Text>
-                  <Text style={[styles.controlCount, certifiedOnly && styles.controlTextActive]}>{certifiedCount}</Text>
-                </Pressable>
-              ) : null}
-              <Pressable onPress={() => setSortOpen(true)} accessibilityRole="button" style={({ pressed }) => [styles.control, pressed && styles.pressed]}>
-                <Text style={styles.controlText}>{CANDIDATE_SORTS.find((entry) => entry.key === sort)?.label}</Text>
-                <MaterialIcons name="expand-more" size={15} color={theme.muted} />
+          {error ? (
+            <View style={styles.errorCard}>
+              <MaterialIcons name="cloud-off" size={20} color={theme.error} />
+              <View style={styles.errorBody}>
+                <Text style={styles.errorTitle}>Liste des candidatures indisponible</Text>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+              <Pressable onPress={() => void candidatesQuery.refetch()} accessibilityRole="button" style={({ pressed }) => [styles.retry, pressed && styles.pressed]}>
+                <MaterialIcons name="refresh" size={16} color={theme.foreground} />
+                <Text style={styles.retryText}>Réessayer</Text>
               </Pressable>
             </View>
+          ) : null}
 
-            {listed.map((candidate) => (
-              <CandidateRow
-                key={candidate.id}
-                candidate={candidate}
-                deliveryPrice={deliveryPrice}
-                replacing={Boolean(chosen)}
-                theme={theme}
-                onChoose={() => setPending(candidate)}
+          {chosen ? (
+            <ChosenCard
+              candidate={chosen}
+              deliveryPrice={deliveryPrice}
+              theme={theme}
+              onUnselect={() => { onClose(); if (deliveryId) router.push(`/delivery/${deliveryId}` as any); }}
+            />
+          ) : null}
+
+          {best ? (
+            <View style={styles.bestCard}>
+              <Text style={styles.bestEyebrow}>LE MIEUX PLACÉ</Text>
+              <CandidateIdentity candidate={best.candidate} deliveryPrice={deliveryPrice} theme={theme} />
+              <Text style={styles.bestReason}>{capitalize(joinReasons(best.reasons))}</Text>
+              <TikisButton
+                label={`Choisir ${firstName(best.candidate.name)} · ${formatMoney(candidatePrice(best.candidate, deliveryPrice))}`}
+                onPress={() => setPending(best.candidate)}
+                style={styles.bestCta}
               />
+            </View>
+          ) : null}
+
+          {!loading && !error && running.length === 0 ? (
+            <View style={styles.empty}>
+              <View style={styles.emptyIcon}><MaterialIcons name="schedule" size={26} color={theme.muted} /></View>
+              <Text style={styles.emptyTitle}>En attente de candidatures</Text>
+              <Text style={styles.emptyText}>Votre livraison est publiée. Les livreurs compatibles apparaîtront ici dès qu’ils proposeront leur service.</Text>
+            </View>
+          ) : null}
+
+          {listed.length > 0 ? (
+            <>
+              <View style={styles.listHeader}>
+                <Text style={styles.listHeaderTitle}>{best || chosen ? `LES ${listed.length} AUTRE${listed.length > 1 ? "S" : ""}` : `${listed.length} CANDIDAT${listed.length > 1 ? "S" : ""}`}</Text>
+                <View style={styles.listSpacer} />
+                {certifiedCount > 0 ? (
+                  <Pressable
+                    onPress={() => setCertifiedOnly((current) => !current)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: certifiedOnly }}
+                    style={({ pressed }) => [styles.control, certifiedOnly && styles.controlActive, pressed && styles.pressed]}
+                  >
+                    <Text style={[styles.controlText, certifiedOnly && styles.controlTextActive]}>Certifiés</Text>
+                    <Text style={[styles.controlCount, certifiedOnly && styles.controlTextActive]}>{certifiedCount}</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable onPress={() => setSortOpen(true)} accessibilityRole="button" style={({ pressed }) => [styles.control, pressed && styles.pressed]}>
+                  <Text style={styles.controlText}>{CANDIDATE_SORTS.find((entry) => entry.key === sort)?.label}</Text>
+                  <MaterialIcons name="expand-more" size={15} color={theme.muted} />
+                </Pressable>
+              </View>
+
+              {listed.map((candidate) => (
+                <CandidateRow
+                  key={candidate.id}
+                  candidate={candidate}
+                  deliveryPrice={deliveryPrice}
+                  replacing={Boolean(chosen)}
+                  theme={theme}
+                  onChoose={() => setPending(candidate)}
+                />
+              ))}
+            </>
+          ) : null}
+
+          {certifiedOnly && listed.length === 0 && pool.length > 0 ? (
+            <Text style={styles.filterEmpty}>Aucun candidat certifié pour l’instant.</Text>
+          ) : null}
+
+          {message ? <Text style={styles.message}>{message}</Text> : null}
+        </ScrollView>
+      </Animated.View>
+
+      {/* Le tri et la confirmation sont posés dans la même fenêtre que la feuille,
+          et non dans des `Modal` imbriqués : sur Android, un modal dans un modal
+          se ferme par paires imprévisibles. */}
+      {sortOpen ? (
+        <View style={styles.layer}>
+          <Pressable style={styles.backdropFill} onPress={() => setSortOpen(false)} accessibilityLabel="Fermer le tri" />
+          <View style={[styles.sortSheet, { bottom: Math.max(26, insets.bottom + 14) }]}>
+            <Text style={styles.sortTitle}>Trier les candidats</Text>
+            {CANDIDATE_SORTS.map((entry) => (
+              <Pressable
+                key={entry.key}
+                onPress={() => { setSort(entry.key); setSortOpen(false); }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: entry.key === sort }}
+                style={({ pressed }) => [styles.sortOption, entry.key === sort && styles.sortOptionActive, pressed && styles.pressed]}
+              >
+                <Text style={[styles.sortOptionText, entry.key === sort && styles.sortOptionTextActive]}>{entry.label}</Text>
+                {entry.key === sort ? <MaterialIcons name="check" size={18} color={theme.primary} /> : null}
+              </Pressable>
             ))}
-          </>
-        ) : null}
-
-        {certifiedOnly && listed.length === 0 && pool.length > 0 ? (
-          <Text style={styles.filterEmpty}>Aucun candidat certifié pour l’instant.</Text>
-        ) : null}
-
-        {message ? <Text style={styles.message}>{message}</Text> : null}
-      </ScrollView>
-
-      <SortSheet
-        visible={sortOpen}
-        selected={sort}
-        theme={theme}
-        onSelect={(next) => { setSort(next); setSortOpen(false); }}
-        onClose={() => setSortOpen(false)}
-      />
+          </View>
+        </View>
+      ) : null}
 
       {pending ? (
-        <ChoiceModal
-          candidate={pending}
-          deliveryPrice={deliveryPrice}
-          replacing={Boolean(chosen)}
-          loading={processing}
-          theme={theme}
-          onCancel={() => !processing && setPending(null)}
-          onConfirm={() => void confirmChoice()}
-        />
+        <View style={styles.layer}>
+          <Pressable style={styles.backdropFill} onPress={() => !processing && setPending(null)} accessibilityLabel="Fermer" />
+          <ChoicePanel
+            candidate={pending}
+            deliveryPrice={deliveryPrice}
+            replacing={Boolean(chosen)}
+            loading={processing}
+            theme={theme}
+            bottomInset={insets.bottom}
+            onCancel={() => !processing && setPending(null)}
+            onConfirm={() => void confirmChoice()}
+          />
+        </View>
       ) : null}
-    </SafeAreaView>
-  );
-}
-
-function TopBar({ count, chosenName }: { count: number | null; chosenName?: string | null }) {
-  const { colors: theme } = useThemeColors();
-  const styles = useMemo(() => stylesFor(theme), [theme]);
-  return (
-    <View style={styles.topBar}>
-      <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Retour" style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}>
-        <MaterialIcons name="arrow-back" size={20} color={theme.foreground} />
-      </Pressable>
-      <View style={styles.topBarText}>
-        <Text style={styles.topBarEyebrow}>CANDIDATURES</Text>
-        <Text style={styles.topBarTitle} numberOfLines={1}>
-          {chosenName
-            ? `${chosenName} est retenu`
-            : count === null
-              ? "Choisir un livreur"
-              : count === 0
-                ? "Aucun candidat pour l’instant"
-                : count === 1
-                  ? "1 livreur, à confirmer"
-                  : `${count} livreurs, un seul à choisir`}
-        </Text>
-      </View>
-    </View>
+    </Modal>
   );
 }
 
@@ -352,33 +439,6 @@ function ChosenCard({ candidate, deliveryPrice, theme, onUnselect }: { candidate
   );
 }
 
-function SortSheet({ visible, selected, theme, onSelect, onClose }: { visible: boolean; selected: CandidateSort; theme: ThemedColors; onSelect: (sort: CandidateSort) => void; onClose: () => void }) {
-  const styles = useMemo(() => stylesFor(theme), [theme]);
-  // Rendue dans un `Modal`, donc hors du `SafeAreaView` : elle dégage
-  // l'indicateur d'accueil elle-même, sinon la dernière option passe dessous.
-  const insets = useSafeAreaInsets();
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.modalBackdrop} onPress={onClose} accessibilityLabel="Fermer le tri" />
-      <View style={[styles.sortSheet, { bottom: Math.max(26, insets.bottom + 14) }]}>
-        <Text style={styles.sortTitle}>Trier les candidats</Text>
-        {CANDIDATE_SORTS.map((entry) => (
-          <Pressable
-            key={entry.key}
-            onPress={() => onSelect(entry.key)}
-            accessibilityRole="button"
-            accessibilityState={{ selected: entry.key === selected }}
-            style={({ pressed }) => [styles.sortOption, entry.key === selected && styles.sortOptionActive, pressed && styles.pressed]}
-          >
-            <Text style={[styles.sortOptionText, entry.key === selected && styles.sortOptionTextActive]}>{entry.label}</Text>
-            {entry.key === selected ? <MaterialIcons name="check" size={18} color={theme.primary} /> : null}
-          </Pressable>
-        ))}
-      </View>
-    </Modal>
-  );
-}
-
 /**
  * Ce que choisir engage, en chiffres.
  *
@@ -387,23 +447,21 @@ function SortSheet({ visible, selected, theme, onSelect, onClose }: { visible: b
  * 4 500 FCFA lisait donc « 300 FCFA », le seul montant de l'écran qui ne le concernait
  * pas. Ici, les trois lignes sont les siennes.
  */
-function ChoiceModal({ candidate, deliveryPrice, replacing, loading, theme, onCancel, onConfirm }: {
+function ChoicePanel({ candidate, deliveryPrice, replacing, loading, theme, bottomInset, onCancel, onConfirm }: {
   candidate: DriverCandidate;
   deliveryPrice: number;
   replacing: boolean;
   loading: boolean;
   theme: ThemedColors;
+  bottomInset: number;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
   const styles = useMemo(() => stylesFor(theme), [theme]);
-  const insets = useSafeAreaInsets();
   const total = candidatePrice(candidate, deliveryPrice);
   const delta = candidatePriceDelta(candidate, deliveryPrice);
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onCancel}>
-      <Pressable style={styles.modalBackdrop} onPress={onCancel} accessibilityLabel="Fermer" />
-      <View style={[styles.choiceSheet, { paddingBottom: Math.max(26, insets.bottom + 14) }]}>
+      <View style={[styles.choiceSheet, { paddingBottom: Math.max(26, bottomInset + 14) }]}>
         <View style={styles.choiceHead}>
           <Avatar initials={candidate.initials} color={candidate.isCertified ? theme.foreground : theme.muted} size={46} />
           <View style={styles.choiceHeadBody}>
@@ -451,7 +509,6 @@ function ChoiceModal({ candidate, deliveryPrice, replacing, loading, theme, onCa
         />
         <TikisButton label="Revenir à la liste" variant="ghost" onPress={onCancel} disabled={loading} style={styles.choiceCancel} />
       </View>
-    </Modal>
   );
 }
 
@@ -491,25 +548,32 @@ function shortRelative(iso: string, now = Date.now()): string {
 }
 
 const stylesFor = createStyles((theme: ThemedColors) => ({
-  safe: { flex: 1, backgroundColor: theme.background },
-  content: { paddingHorizontal: 16, paddingBottom: 40, gap: 8 },
   pressed: { opacity: 0.6 },
 
-  topBar: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12 },
+  backdrop: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: theme.overlay },
+  backdropFill: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },
+  // Le voile appartient à la couche, pas seulement au fond de la feuille : sans
+  // lui, le panneau de confirmation se posait sur une liste restée lisible et
+  // tranchait le milieu d'une ligne.
+  layer: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, justifyContent: "flex-end", backgroundColor: theme.overlay },
+  sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: theme.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, overflow: "hidden" },
+  grip: { width: 40, height: 4, borderRadius: 2, backgroundColor: theme.border, alignSelf: "center", marginTop: 9, marginBottom: 11 },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16 },
+  headerText: { flex: 1, minWidth: 0 },
+  headerEyebrow: { fontSize: 10, fontWeight: "700", letterSpacing: 0.7, color: theme.primary },
+  headerTitle: { fontSize: 18, fontWeight: "700", letterSpacing: -0.4, color: theme.foreground, marginTop: 2 },
   iconBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, alignItems: "center", justifyContent: "center" },
-  topBarText: { flex: 1, minWidth: 0 },
-  topBarEyebrow: { fontSize: 10, fontWeight: "700", letterSpacing: 0.7, color: theme.primary },
-  topBarTitle: { fontSize: 18, fontWeight: "700", letterSpacing: -0.4, color: theme.foreground, marginTop: 2 },
 
-  recap: { backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 },
-  recapTitle: { fontSize: 13, fontWeight: "700", color: theme.foreground },
-  recapRoute: { fontSize: 11.5, fontWeight: "500", color: theme.muted, marginTop: 3 },
-  recapBottom: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 9, paddingTop: 9, borderTopWidth: 1, borderTopColor: theme.border },
+  recap: { marginTop: 12, paddingHorizontal: 16, paddingVertical: 9, gap: 3, backgroundColor: theme.surface, borderTopWidth: 1, borderBottomWidth: 1, borderColor: theme.border },
+  recapLine: { flexDirection: "row", alignItems: "center", gap: 7 },
   recapLabel: { fontSize: 11.5, fontWeight: "600", color: theme.muted },
-  recapPrice: { fontSize: 14, fontWeight: "700", color: theme.foreground, fontVariant: ["tabular-nums"] },
-  recapSpacer: { flex: 1 },
-  vehicleChip: { height: 22, paddingHorizontal: 8, borderRadius: 6, backgroundColor: theme.background, alignItems: "center", justifyContent: "center" },
+  recapPrice: { fontSize: 13.5, fontWeight: "700", color: theme.foreground, fontVariant: ["tabular-nums"] },
+  recapRoute: { fontSize: 11.5, fontWeight: "500", color: theme.muted },
+  vehicleChip: { height: 21, paddingHorizontal: 7, borderRadius: 6, backgroundColor: theme.background, alignItems: "center", justifyContent: "center" },
   vehicleChipText: { fontSize: 10.5, fontWeight: "600", color: theme.foreground },
+
+  list: { flex: 1 },
+  content: { paddingHorizontal: 16, paddingTop: 12, gap: 8 },
 
   errorCard: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border, borderRadius: 14, padding: 13 },
   errorBody: { flex: 1, minWidth: 0 },
@@ -559,10 +623,8 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
   priceNeutral: { fontSize: 11, fontWeight: "600", color: theme.muted, marginTop: 1 },
   priceDelta: { fontSize: 11, fontWeight: "700", marginTop: 1, fontVariant: ["tabular-nums"] },
 
-  centered: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 34, gap: 6 },
-  centeredTitle: { fontSize: 15, fontWeight: "700", color: theme.foreground, marginTop: 10 },
-  centeredText: { fontSize: 12, lineHeight: 18, textAlign: "center", color: theme.muted },
-  centeredButton: { marginTop: 14, alignSelf: "stretch" },
+  centered: { alignItems: "center", justifyContent: "center", paddingVertical: 54, gap: 6 },
+  centeredTitle: { fontSize: 14, fontWeight: "600", color: theme.muted, marginTop: 10 },
 
   empty: { alignItems: "center", paddingVertical: 44, paddingHorizontal: 26 },
   emptyIcon: { width: 64, height: 64, borderRadius: 16, backgroundColor: theme.surface, alignItems: "center", justifyContent: "center", marginBottom: 12 },
@@ -571,7 +633,6 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
   filterEmpty: { fontSize: 12, textAlign: "center", color: theme.muted, paddingVertical: 24 },
   message: { fontSize: 12, textAlign: "center", color: theme.error, marginTop: 12 },
 
-  modalBackdrop: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: theme.overlay },
   sortSheet: { position: "absolute", left: 16, right: 16, bottom: 26, backgroundColor: theme.surface, borderRadius: 18, padding: 8 },
   sortTitle: { fontSize: 11, fontWeight: "700", letterSpacing: 0.6, color: theme.muted, paddingHorizontal: 10, paddingTop: 8, paddingBottom: 6 },
   sortOption: { flexDirection: "row", alignItems: "center", height: 46, paddingHorizontal: 10, borderRadius: 12 },
@@ -579,7 +640,7 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
   sortOptionText: { flex: 1, fontSize: 13.5, fontWeight: "600", color: theme.foreground },
   sortOptionTextActive: { fontWeight: "700" },
 
-  choiceSheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: theme.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 26 },
+  choiceSheet: { backgroundColor: theme.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 26 },
   choiceHead: { flexDirection: "row", alignItems: "center", gap: 11 },
   choiceHeadBody: { flex: 1, minWidth: 0 },
   choiceName: { fontSize: 17, fontWeight: "700", letterSpacing: -0.3, color: theme.foreground },

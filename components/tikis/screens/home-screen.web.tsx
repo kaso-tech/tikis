@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, PanResponder, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { DriverMarker, DropoffMarker, PickupMarker } from "@/components/tikis/map-markers";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
@@ -117,6 +118,7 @@ export function HomeScreen() {
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [applicationDelivery, setApplicationDelivery] = useState<Delivery | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingHomeAction | null>(null);
+  const [candidatesDeliveryId, setCandidatesDeliveryId] = useState<string | null>(null);
   const [nowTick, setNow] = useState(0);
   const now = Date.now() + nowTick;
   const hasInitialData = useRef(false);
@@ -347,9 +349,7 @@ export function HomeScreen() {
   function handleSenderAction(delivery: Delivery) {
     switch (resolveSenderHomeAction(delivery)) {
       case "candidates":
-        // Choisir un livreur bloque sa commission et engage l'expéditeur sur un
-        // montant : cela mérite un écran, pas un tiroir ouvert par-dessus l'accueil.
-        router.push(`/delivery/${delivery.id}/candidates` as any);
+        setCandidatesDeliveryId(delivery.id);
         return;
       case "cancel":
         setPendingAction({ kind: "cancel", delivery });
@@ -599,6 +599,7 @@ export function HomeScreen() {
           </Animated.View>
         </ScrollView>
       </Animated.View>
+      <CandidatesSheet visible={Boolean(candidatesDeliveryId)} deliveryId={candidatesDeliveryId} onClose={() => setCandidatesDeliveryId(null)} />
       {applicationDelivery ? (
         <FinancialConfirmationModal
           visible

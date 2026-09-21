@@ -4,6 +4,7 @@ import { type ComponentProps, useEffect, useMemo, useRef, useState } from "react
 import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { SectionHeading, TikisButton } from "@/components/tikis/ui";
@@ -92,6 +93,7 @@ export default function DeliveryDetailScreen() {
   const [message, setMessage] = useState("");
   const [senderAction, setSenderAction] = useState<SenderAction>(null);
   const [senderProcessing, setSenderProcessing] = useState(false);
+  const [candidatesOpen, setCandidatesOpen] = useState(false);
   const [clock, setClock] = useState(() => Date.now());
   const countdownDeliveryId = delivery?.id;
   const countdownStatus = delivery?.status;
@@ -345,7 +347,7 @@ export default function DeliveryDetailScreen() {
         ) : null}
 
         {showCandidates ? (
-          <Pressable onPress={() => router.push(`/delivery/${deliveryId}/candidates` as any)} style={({ pressed }) => [styles.candidatesTrigger, isActive && styles.candidatesTriggerActive, pressed && styles.pressed]}>
+          <Pressable onPress={() => setCandidatesOpen(true)} style={({ pressed }) => [styles.candidatesTrigger, isActive && styles.candidatesTriggerActive, pressed && styles.pressed]}>
             <View style={[styles.candidatesIcon, isActive && styles.candidatesIconActive]}>
               <MaterialIcons name="group" size={18} color="#9A6201" />
             </View>
@@ -409,6 +411,7 @@ export default function DeliveryDetailScreen() {
 
       {actionConfig ? <FinancialConfirmationModal visible title={actionConfig.title} description={actionConfig.description} amount={actionConfig.amount} confirmLabel={actionConfig.label} irreversible={actionConfig.irreversible} allowCounterOffer={action === "apply"} loading={processing} onCancel={() => setAction(null)} onConfirm={(counterOffer) => void confirmAction(counterOffer)} /> : null}
       {senderActionConfig ? <DeliveryActionConfirmationModal visible title={senderActionConfig.title} description={senderActionConfig.description} confirmLabel={senderActionConfig.confirmLabel} tone={senderActionConfig.tone} loading={senderProcessing} onCancel={() => !senderProcessing && setSenderAction(null)} onConfirm={() => void confirmSenderAction()} /> : null}
+      <CandidatesSheet visible={candidatesOpen} deliveryId={deliveryId} onClose={() => setCandidatesOpen(false)} />
     </SafeAreaView>
   );
 }

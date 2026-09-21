@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
-const screen = read("app/delivery/[id]/candidates.tsx");
+const screen = read("components/tikis/candidates-sheet.tsx");
 const detail = read("app/delivery/[id].tsx");
 const db = read("server/db.ts");
 const domain = read("shared/tikis-domain.ts");
@@ -47,7 +47,7 @@ describe("le prix porte toujours son écart au prix publié", () => {
 
 describe("la confirmation montre ce que l'expéditeur va payer", () => {
   it("elle annonce le total à sa charge", () => {
-    const modal = screen.slice(screen.indexOf("function ChoiceModal"));
+    const modal = screen.slice(screen.indexOf("function ChoicePanel"));
     expect(modal).toContain("Vous paierez");
     expect(modal).toContain("Votre prix publié");
   });
@@ -56,7 +56,7 @@ describe("la confirmation montre ce que l'expéditeur va payer", () => {
     // L'ancienne confirmation réutilisait le modal financier générique, dont le
     // montant est la commission prélevée au livreur : un expéditeur acceptant
     // 4 500 FCFA y lisait « 300 FCFA ».
-    const modal = screen.slice(screen.indexOf("function ChoiceModal"));
+    const modal = screen.slice(screen.indexOf("function ChoicePanel"));
     expect(modal).toContain("retenue sur le compte du livreur");
     expect(modal).not.toContain("commissionBlocked");
   });
@@ -64,7 +64,7 @@ describe("la confirmation montre ce que l'expéditeur va payer", () => {
   it("la fiche de livraison ne porte plus l'ancienne confirmation de sélection", () => {
     expect(detail).not.toContain('action === "select"');
     expect(detail).not.toContain("selectedCandidate");
-    expect(detail).toContain("/candidates` as any)");
+    expect(detail).toContain("<CandidatesSheet visible={candidatesOpen}");
   });
 });
 
@@ -82,6 +82,34 @@ describe("le compteur du filtre ne promet que ce que la liste montre", () => {
     // Le candidat du bandeau n'est plus dans la liste : le compter ferait
     // annoncer « Certifiés 1 » à un filtre qui ne rendrait aucune ligne.
     expect(screen).toContain("pool.filter((candidate) => candidate.isCertified).length");
+  });
+});
+
+describe("la feuille défile, quel que soit son palier", () => {
+  it("le palier vit dans un état, pas dans une ref", () => {
+    // `scrollEnabled={sheetValue.current > SHEET_PEEK}` lisait une `ref`, qui ne
+    // redéclenche aucun rendu : agrandir la feuille ne débloquait jamais la liste.
+    expect(screen).toContain('useState<SheetLevel>("mid")');
+    expect(screen).not.toMatch(/scrollEnabled=/);
+  });
+
+  it("le geste de glissement est confiné à la poignée", () => {
+    // Tant que le PanResponder ne couvre pas la liste, les deux gestes ne se
+    // disputent rien et le défilement n'a jamais besoin d'être coupé.
+    const header = screen.slice(screen.indexOf("panResponder.panHandlers"), screen.indexOf("<ScrollView"));
+    expect(header).toContain("styles.grip");
+    expect(header).not.toContain("<ScrollView");
+  });
+
+  it("réutilise la géométrie de glissement déjà testée du suivi", () => {
+    expect(screen).toContain('from "@/lib/sheet-gesture"');
+    expect(screen).toContain("nextSheetLevel(levelRef.current, gesture.dy, gesture.vy)");
+  });
+
+  it("s’ouvre plus haut qu’avant, et se referme d’un geste franc vers le bas", () => {
+    // 45 % laissaient voir deux candidats sur quatre.
+    expect(screen).toContain("SCREEN_HEIGHT * 0.72");
+    expect(screen).toContain('if (next === "mini") closeRef.current();');
   });
 });
 
