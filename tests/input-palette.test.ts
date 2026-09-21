@@ -39,8 +39,8 @@ describe("palette des champs et menus", () => {
   });
 
   it("ne modifie pas la palette de fond des boutons d’authentification", () => {
-    // Cinq depuis la fusion de l'écran de bienvenue avec celui du numéro.
-    expect((authSource.match(/<TikisButton authStyle/g) ?? []).length).toBe(5);
+    // Un par écran du parcours : accueil, numéro, code, rôle, engins, nom.
+    expect((authSource.match(/<TikisButton authStyle/g) ?? []).length).toBe(6);
     expect(buttonSource).toContain('authStyle && variant === "primary"');
     expect(buttonSource).toContain('background: "#9A6201", foreground: "#FFFFFF"');
   });

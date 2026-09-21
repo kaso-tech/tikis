@@ -5,13 +5,29 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(join(process.cwd(), "components/tikis/auth-flow.tsx"), "utf8");
 
 describe("parcours de connexion et d’inscription", () => {
-  it("commence au numéro : l’écran de bienvenue est fondu dedans", () => {
-    expect(source).toContain('type Stage = "phone" | "otp" | "role" | "vehicles" | "name";');
-    expect(source).toContain('useState<Stage>("phone")');
-    expect(source).not.toContain("WelcomeScreen");
-    // La promesse, la marque et le texte légal vivent désormais sur l'écran du numéro.
-    expect(source).toContain("Votre numéro suffit.");
+  it("accueille d’abord, demande le numéro ensuite", () => {
+    expect(source).toContain('type Stage = "welcome" | "phone" | "otp" | "role" | "vehicles" | "name";');
+    expect(source).toContain('useState<Stage>("welcome")');
+    expect(source).toContain("function WelcomeScreen");
+    // L'accueil porte la marque, la promesse et le consentement ; l'écran du
+    // numéro ne porte que sa question.
     expect(source).toContain('router.push("/legal/terms"');
+    expect(source).toContain("Votre numéro suffit.");
+  });
+
+  it("n’étage pas de bandeau au-dessus de l’accueil, et y revient depuis le numéro", () => {
+    // Le premier écran n'a pas d'étape précédente : un bandeau « Étape » y
+    // annoncerait un parcours avant que l'on en ait choisi un.
+    expect(source).toContain('{stage === "welcome" ? null : <FlowHeader');
+    expect(source).toContain('if (stage === "phone") setStage("welcome");');
+  });
+
+  it("ne creuse plus l’écran d’accueil entre la marque et le corps", () => {
+    // `justifyContent: "space-between"` sur un conteneur pleine hauteur laissait
+    // environ 250 px de vide au milieu.
+    const welcome = source.slice(source.indexOf("function WelcomeScreen"), source.indexOf("function PhoneScreen"));
+    expect(welcome).not.toContain("space-between");
+    expect(welcome).toContain("styles.form");
   });
 
   it("ne dit « inscription » qu’une fois le numéro vérifié", () => {

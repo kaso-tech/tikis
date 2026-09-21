@@ -16,9 +16,8 @@ describe("palette des boutons hors authentification", () => {
   });
 
   it("préserve explicitement les boutons du flux d’authentification", () => {
-    // Cinq depuis la fusion de l'écran de bienvenue avec celui du numéro : le
-    // « Accepter et continuer » de l'accueil n'a plus d'écran à lui.
-    expect((authSource.match(/<TikisButton authStyle/g) ?? []).length).toBe(5);
+    // Un par écran du parcours : accueil, numéro, code, rôle, engins, nom.
+    expect((authSource.match(/<TikisButton authStyle/g) ?? []).length).toBe(6);
   });
 
   it("donne au bouton bloqué un fond à lui, au lieu d’une transparence", () => {
