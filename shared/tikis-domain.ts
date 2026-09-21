@@ -171,6 +171,16 @@ export interface DriverCandidate {
   commissionBlocked: number;
   isVerified: boolean;
   isCertified: boolean;
+  /**
+   * Distance à vol d'oiseau entre la dernière position connue du livreur et le point de
+   * récupération, en kilomètres.
+   *
+   * `null` quand cette position est absente ou trop ancienne pour être affirmée
+   * (`BASE_POSITION_MAX_AGE_MS`) : l'écran affiche alors « position inconnue ». La liste
+   * des candidats affichait jusqu'ici « 1,2 km » écrit en dur pour tout le monde — un
+   * chiffre inventé au milieu d'une décision qui engage de l'argent.
+   */
+  distanceFromPickupKm: number | null;
   createdAt: string;
 }
 

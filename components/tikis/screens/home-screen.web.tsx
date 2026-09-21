@@ -11,10 +11,9 @@ import { useDriverLocation } from "@/hooks/use-driver-location";
 import { useDriverBasePositionSync } from "@/hooks/use-driver-base-position-sync";
 import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format";
-import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
-import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus, type DriverCandidate } from "@/shared/tikis-domain";
+import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus } from "@/shared/tikis-domain";
 import { resolveDriverHomeAction, resolveSenderHomeAction, senderHomeActionLabel } from "@/shared/delivery-home-action";
 import { sortDriverOpportunities } from "@/shared/driver-opportunities";
 import { deliveryCardContext, deliveryCardSignal, deliveryCardStateLabel, deliveryCardTone } from "@/lib/delivery-card";
@@ -41,8 +40,7 @@ type FilterKey = "active" | "open" | "pending" | "completed";
 type PendingHomeAction =
   | { kind: "withdraw"; delivery: Delivery }
   | { kind: "confirm"; delivery: Delivery }
-  | { kind: "cancel"; delivery: Delivery }
-  | { kind: "select"; delivery: Delivery; candidate: DriverCandidate };
+  | { kind: "cancel"; delivery: Delivery };
 
 const SENDER_FILTERS: { key: FilterKey; label: string }[] = [
   { key: "open", label: "Publiées" },
@@ -117,7 +115,6 @@ export function HomeScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [driverOnline, setDriverOnline] = useState(true);
   const [applyingId, setApplyingId] = useState<string | null>(null);
-  const [candidateDelivery, setCandidateDelivery] = useState<Delivery | null>(null);
   const [applicationDelivery, setApplicationDelivery] = useState<Delivery | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingHomeAction | null>(null);
   const [nowTick, setNow] = useState(0);
@@ -239,11 +236,6 @@ export function HomeScreen() {
   const withdrawMutation = trpc.deliveries.withdraw.useMutation();
   const confirmMutation = trpc.deliveries.confirm.useMutation();
   const cancelMutation = trpc.deliveries.cancel.useMutation();
-  const selectCandidateMutation = trpc.deliveries.selectCandidate.useMutation();
-  const candidatesQuery = trpc.deliveries.candidates.useQuery(
-    { deliveryId: candidateDelivery?.id ?? "00000000-0000-0000-0000-000000000000" },
-    { enabled: Boolean(candidateDelivery?.id) },
-  );
 
   const applicationCommission = (delivery: Delivery, priceOverride?: number) => {
     const rate = walletQuery.data?.commissionRate;
@@ -355,7 +347,9 @@ export function HomeScreen() {
   function handleSenderAction(delivery: Delivery) {
     switch (resolveSenderHomeAction(delivery)) {
       case "candidates":
-        setCandidateDelivery(delivery);
+        // Choisir un livreur bloque sa commission et engage l'expéditeur sur un
+        // montant : cela mérite un écran, pas un tiroir ouvert par-dessus l'accueil.
+        router.push(`/delivery/${delivery.id}/candidates` as any);
         return;
       case "cancel":
         setPendingAction({ kind: "cancel", delivery });
@@ -374,26 +368,6 @@ export function HomeScreen() {
         // Un bouton visible ne doit jamais ne rien faire.
         router.push(`/delivery/${delivery.id}` as any);
     }
-  }
-
-  async function chooseCandidate(candidate: DriverCandidate) {
-    if (!candidateDelivery) return;
-    setApplyingId(candidate.id);
-    try {
-      await selectCandidateMutation.mutateAsync({ deliveryId: candidateDelivery.id, candidateId: candidate.id });
-      setCandidateDelivery(null);
-      await Promise.all([utilities.deliveries.list.invalidate(), utilities.wallet.snapshot.invalidate(), utilities.notifications.list.invalidate()]);
-      setPendingAction(null);
-    } catch (cause) {
-      Alert.alert("Sélection indisponible", cause instanceof Error ? cause.message : "Réessayez dans un instant.");
-    } finally {
-      setApplyingId(null);
-    }
-  }
-
-  function requestCandidateSelection(candidate: DriverCandidate) {
-    if (!candidateDelivery) return;
-    setPendingAction({ kind: "select", delivery: candidateDelivery, candidate });
   }
 
   const isDriver = role === "driver";
@@ -625,18 +599,6 @@ export function HomeScreen() {
           </Animated.View>
         </ScrollView>
       </Animated.View>
-      <CandidatesSheet
-        visible={Boolean(candidateDelivery)}
-        candidates={candidatesQuery.data ?? []}
-        deliveryStatus={candidateDelivery?.status ?? "open"}
-        deliveryPrice={candidateDelivery ? (candidateDelivery.offeredPrice ?? candidateDelivery.estimatedPrice) : 0}
-        loadingId={applyingId}
-        isLoading={candidatesQuery.isLoading}
-        errorMessage={candidatesQuery.error ? "La liste n'a pas pu être chargée. Vérifiez votre connexion." : null}
-        onRetry={() => void candidatesQuery.refetch()}
-        onClose={() => setCandidateDelivery(null)}
-        onChoose={requestCandidateSelection}
-      />
       {applicationDelivery ? (
         <FinancialConfirmationModal
           visible
@@ -658,9 +620,6 @@ export function HomeScreen() {
       ) : null}
       {pendingAction?.kind === "confirm" ? (
         <ActionConfirmationModal visible title="Confirmer cette mission ?" description="La commission réservée sera prélevée et la livraison passera en cours." confirmLabel="Confirmer" icon="check-circle" tone="success" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
-      ) : null}
-      {pendingAction?.kind === "select" ? (
-        <ActionConfirmationModal visible title="Choisir ce livreur ?" description={`${pendingAction.candidate.name} recevra votre demande de confirmation. Aucun montant ne sera débité du Wallet expéditeur.`} confirmLabel="Choisir" icon="person" tone="primary" loading={applyingId === pendingAction.candidate.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void chooseCandidate(pendingAction.candidate)} />
       ) : null}
     </SafeAreaView>
   );

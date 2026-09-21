@@ -4,36 +4,31 @@ import { describe, expect, it } from "vitest";
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
-const sheet = read("components/tikis/candidates-sheet.tsx");
 const homes = {
   natif: read("components/tikis/screens/home-screen.native.tsx"),
   web: read("components/tikis/screens/home-screen.web.tsx"),
 };
+const candidatesScreen = read("app/delivery/[id]/candidates.tsx");
 
-/** Le rang de profondeur déclaré sur un style nommé, ou 0 s'il n'en porte pas. */
-function depthOf(source: string, style: string, token: "zIndex" | "elevation") {
-  const block = new RegExp(`\\b${style}: \\{[^}]*\\}`).exec(source)?.[0] ?? "";
-  return Number(new RegExp(`${token}: (\\d+)`).exec(block)?.[1] ?? 0);
-}
-
-describe("la liste des candidatures passe au-dessus de la feuille d'accueil", () => {
-  it.each(Object.entries(homes))("sur %s, elle a un rang de profondeur supérieur", (_name, home) => {
-    for (const token of ["zIndex", "elevation"] as const) {
-      expect(depthOf(sheet, "overlay", token)).toBeGreaterThan(depthOf(home, "sheet", token));
-    }
+/**
+ * La liste des candidatures était une feuille glissante empilée par-dessus la feuille
+ * d'accueil. Sur Android, `elevation` décide seul de l'ordre de peinture entre frères :
+ * elle passait dessous, invisible sous un fond blanc opaque, et le bouton « Candidats »
+ * paraissait sans effet. Le correctif d'alors ajustait les rangs de profondeur ; celui-ci
+ * supprime la superposition, donc le problème.
+ */
+describe("la liste des candidatures est un écran, pas une surcouche", () => {
+  it.each(Object.entries(homes))("sur %s, l'accueil y navigue au lieu d'empiler une feuille", (_name, home) => {
+    expect(home).toContain("/candidates` as any)");
+    expect(home).not.toContain("CandidatesSheet");
+    expect(home).not.toContain("candidateDelivery");
   });
 
-  it("s'ancre sur ce rang plutôt que sur l'ordre du JSX", () => {
-    // Elle est rendue après la feuille d'accueil dans l'arbre, ce qui suffirait
-    // sur le web ; sur Android, `elevation` décide seul et la faisait passer
-    // dessous, sous un fond blanc opaque.
-    expect(sheet).toContain("StyleSheet.absoluteFill, styles.overlay");
-  });
-
-  it.each(Object.entries(homes))("sur %s, un échec de chargement ne se lit pas comme une absence de candidat", (_name, home) => {
-    expect(home).toContain("isLoading={candidatesQuery.isLoading}");
-    expect(home).toContain("errorMessage={candidatesQuery.error");
-    expect(home).toContain("onRetry={");
+  it("un échec de chargement ne s'y lit pas comme une absence de candidat", () => {
+    expect(candidatesScreen).toContain("candidatesQuery.isLoading");
+    expect(candidatesScreen).toContain("Liste des candidatures indisponible");
+    expect(candidatesScreen).toContain("En attente de candidatures");
+    expect(candidatesScreen).toContain("candidatesQuery.refetch()");
   });
 });
 

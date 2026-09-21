@@ -4,7 +4,6 @@ import { type ComponentProps, useEffect, useMemo, useRef, useState } from "react
 import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { SectionHeading, TikisButton } from "@/components/tikis/ui";
@@ -13,9 +12,9 @@ import { deliveryRemainingMs, formatDeliveryCountdown } from "@/lib/delivery-cou
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
-import { deliveryStatusMeta, formatMoney, formatRelativeDate, type DriverCandidate } from "@/shared/tikis-domain";
+import { deliveryStatusMeta, formatMoney, formatRelativeDate } from "@/shared/tikis-domain";
 
-type FinancialAction = "apply" | "withdraw" | "select" | "confirm" | "complete" | null;
+type FinancialAction = "apply" | "withdraw" | "confirm" | "complete" | null;
 type SenderAction = "disable" | "reactivate" | "cancel" | "unselect" | null;
 
 function DetailRow({ icon, label, value }: { icon: ComponentProps<typeof MaterialIcons>["name"]; label: string; value: string }) {
@@ -76,7 +75,6 @@ export default function DeliveryDetailScreen() {
   }, [delivery]);
   const applyMutation = trpc.deliveries.submitApplication.useMutation();
   const withdrawMutation = trpc.deliveries.withdraw.useMutation();
-  const selectMutation = trpc.deliveries.selectCandidate.useMutation();
   const confirmMutation = trpc.deliveries.confirm.useMutation();
   const completeMutation = trpc.deliveries.complete.useMutation();
   const disableMutation = trpc.deliveries.disable.useMutation();
@@ -90,12 +88,10 @@ export default function DeliveryDetailScreen() {
   const candidates = candidatesQuery.data ?? [];
   const ownCandidate = candidates.find((candidate) => candidate.driverId === profile?.phone);
   const [action, setAction] = useState<FinancialAction>(null);
-  const [selectedCandidate, setSelectedCandidate] = useState<DriverCandidate | null>(null);
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState("");
   const [senderAction, setSenderAction] = useState<SenderAction>(null);
   const [senderProcessing, setSenderProcessing] = useState(false);
-  const [candidatesSheetOpen, setCandidatesSheetOpen] = useState(false);
   const [clock, setClock] = useState(() => Date.now());
   const countdownDeliveryId = delivery?.id;
   const countdownStatus = delivery?.status;
@@ -120,14 +116,13 @@ export default function DeliveryDetailScreen() {
   const actionConfig = useMemo(() => {
     if (!delivery) return null;
     const commissionBase = delivery.offeredPrice ?? delivery.estimatedPrice;
-    const commission = selectedCandidate?.commissionBlocked ?? Math.round(commissionBase * (walletQuery.data?.commissionRate ?? 0));
+    const commission = Math.round(commissionBase * (walletQuery.data?.commissionRate ?? 0));
     if (action === "apply") return { title: "Envoyer votre candidature", description: "Cette commission sera temporairement bloquée sur votre Wallet. Elle sera définitivement prélevée uniquement si l’expéditeur vous sélectionne.", amount: commission, label: "Confirmer ma candidature", irreversible: false };
     if (action === "withdraw") return { title: "Retirer votre candidature", description: "Votre candidature sera retirée et la commission temporairement bloquée redeviendra immédiatement disponible.", amount: ownCandidate?.commissionBlocked ?? commission, label: "Retirer ma candidature", irreversible: false };
-    if (action === "select") return { title: delivery.status === "active" ? "Remplacer le livreur" : "Choisir ce livreur", description: delivery.status === "active" ? "Le nouveau livreur devra confirmer sa disponibilité. Sa commission compensera automatiquement celle de l’ancien livreur : Tikis conservera une seule commission." : "La commission de ce livreur reste réservée jusqu’à ce qu’il confirme sa disponibilité : c’est à ce moment-là qu’elle sera définitivement prélevée et que vos coordonnées deviendront visibles l’un pour l’autre. Les autres commissions bloquées sont libérées immédiatement. Vous pourrez annuler ce choix sans frais tant qu’il n’a pas confirmé.", amount: commission, label: delivery.status === "active" ? "Demander le remplacement" : "Choisir ce livreur", irreversible: delivery.status === "active" };
     if (action === "confirm") return { title: "Confirmer la mission", description: "Votre confirmation autorise le partage des coordonnées avec l’expéditeur et finalise la mise en relation Tikis.", amount: ownCandidate?.commissionBlocked ?? commission, label: "Confirmer la mission", irreversible: true };
     if (action === "complete") return { title: "Terminer la livraison", description: "Confirmez uniquement lorsque la remise et le paiement direct avec l’expéditeur sont finalisés.", amount: 0, label: "Marquer comme terminée", irreversible: false };
     return null;
-  }, [action, delivery, ownCandidate, selectedCandidate, walletQuery.data?.commissionRate]);
+  }, [action, delivery, ownCandidate, walletQuery.data?.commissionRate]);
 
   const senderActionConfig = useMemo(() => {
     if (senderAction === "disable") return { title: "Désactiver la livraison", description: "Elle ne sera plus visible pour de nouveaux livreurs. Les candidatures en cours seront annulées et les commissions temporairement bloquées seront libérées.", confirmLabel: "Désactiver", tone: "warning" as const };
@@ -186,7 +181,6 @@ export default function DeliveryDetailScreen() {
         const result = await withdrawMutation.mutateAsync({ deliveryId });
         utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
       }
-      if (action === "select" && selectedCandidate) await selectMutation.mutateAsync({ deliveryId, candidateId: selectedCandidate.id });
       if (action === "confirm") {
         const result = await confirmMutation.mutateAsync({ deliveryId });
         utilities.wallet.snapshot.setData(undefined, (current) => current ? { ...current, wallet: result.wallet } : current);
@@ -197,7 +191,6 @@ export default function DeliveryDetailScreen() {
       }
       await refreshDelivery();
       setAction(null);
-      setSelectedCandidate(null);
       haptic.success();
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Cette action n’a pas pu être enregistrée.");
@@ -217,12 +210,6 @@ export default function DeliveryDetailScreen() {
     } catch (cause) {
       setMessage(cause instanceof Error ? cause.message : "Cette action n’a pas pu être enregistrée.");
     } finally { setSenderProcessing(false); }
-  }
-
-  function openCandidateAction(candidate: DriverCandidate) {
-    setSelectedCandidate(candidate);
-    setCandidatesSheetOpen(false);
-    setAction("select");
   }
 
   return (
@@ -358,7 +345,7 @@ export default function DeliveryDetailScreen() {
         ) : null}
 
         {showCandidates ? (
-          <Pressable onPress={() => setCandidatesSheetOpen(true)} style={({ pressed }) => [styles.candidatesTrigger, isActive && styles.candidatesTriggerActive, pressed && styles.pressed]}>
+          <Pressable onPress={() => router.push(`/delivery/${deliveryId}/candidates` as any)} style={({ pressed }) => [styles.candidatesTrigger, isActive && styles.candidatesTriggerActive, pressed && styles.pressed]}>
             <View style={[styles.candidatesIcon, isActive && styles.candidatesIconActive]}>
               <MaterialIcons name="group" size={18} color="#9A6201" />
             </View>
@@ -420,17 +407,8 @@ export default function DeliveryDetailScreen() {
         ) : null}
       </ScrollView>
 
-      {actionConfig ? <FinancialConfirmationModal visible title={actionConfig.title} description={actionConfig.description} amount={actionConfig.amount} confirmLabel={actionConfig.label} irreversible={actionConfig.irreversible} allowCounterOffer={action === "apply"} loading={processing} onCancel={() => { setAction(null); setSelectedCandidate(null); }} onConfirm={(counterOffer) => void confirmAction(counterOffer)} /> : null}
+      {actionConfig ? <FinancialConfirmationModal visible title={actionConfig.title} description={actionConfig.description} amount={actionConfig.amount} confirmLabel={actionConfig.label} irreversible={actionConfig.irreversible} allowCounterOffer={action === "apply"} loading={processing} onCancel={() => setAction(null)} onConfirm={(counterOffer) => void confirmAction(counterOffer)} /> : null}
       {senderActionConfig ? <DeliveryActionConfirmationModal visible title={senderActionConfig.title} description={senderActionConfig.description} confirmLabel={senderActionConfig.confirmLabel} tone={senderActionConfig.tone} loading={senderProcessing} onCancel={() => !senderProcessing && setSenderAction(null)} onConfirm={() => void confirmSenderAction()} /> : null}
-      <CandidatesSheet
-        visible={candidatesSheetOpen}
-        candidates={candidates}
-        deliveryStatus={delivery.status}
-        deliveryPrice={delivery.offeredPrice ?? delivery.estimatedPrice}
-        loadingId={processing ? selectedCandidate?.id ?? null : null}
-        onClose={() => setCandidatesSheetOpen(false)}
-        onChoose={openCandidateAction}
-      />
     </SafeAreaView>
   );
 }

@@ -9,7 +9,7 @@ import { sendPushToTokens, type PushMessage } from "./push";
 import { isValidExpoPushTokenShape } from "./_test-helpers/push-token-shape";
 import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppNotification, LocationLabel, SelectableVehicleType, WalletOperation, WalletSnapshot } from "../shared/tikis-domain";
 import { candidateMovementVersion, computeReplacementSettlement } from "../shared/wallet-commission";
-import { DEFAULT_DRIVER_PERIMETER, evaluatePerimeter, isValidPerimeterRadius, MAX_PERIMETER_RADIUS_KM, MIN_PERIMETER_RADIUS_KM, type DriverPerimeterPreferences } from "../shared/driver-perimeter";
+import { BASE_POSITION_MAX_AGE_MS, DEFAULT_DRIVER_PERIMETER, distanceKmBetween, evaluatePerimeter, isValidPerimeterRadius, MAX_PERIMETER_RADIUS_KM, MIN_PERIMETER_RADIUS_KM, type DriverPerimeterPreferences } from "../shared/driver-perimeter";
 import { DELIVERY_EXPIRATION_MS, deliveryActivityTimestamp, deliveryExpirationOutcome } from "../shared/delivery-expiration";
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -1573,6 +1573,7 @@ export async function listTikisDeliveryCandidates(deliveryId: string): Promise<D
     if (!c.driverPhone) continue;
     completedByDriver.set(c.driverPhone, (completedByDriver.get(c.driverPhone) ?? 0) + 1);
   }
+  const distanceByDriver = await distancesFromPickup(db, deliveryId, driverPhones);
   return rows.map(({ candidate, profile }) => {
     const stats = ratingByDriver.get(candidate.driverPhone);
     const rating = stats && stats.count > 0 ? Math.round((stats.sum / stats.count) * 10) / 10 : 0;
@@ -1592,9 +1593,53 @@ export async function listTikisDeliveryCandidates(deliveryId: string): Promise<D
       commissionBlocked: candidate.commissionBlocked,
       isVerified: true,
       isCertified,
+      distanceFromPickupKm: distanceByDriver.get(candidate.driverPhone) ?? null,
       createdAt: candidate.createdAt.toISOString(),
     };
   });
+}
+
+/**
+ * À quelle distance du point de récupération se trouve chaque livreur candidat.
+ *
+ * La valeur est absente — jamais remplacée par une approximation — dès que l'une des
+ * conditions manque : point de récupération introuvable, livreur sans position de
+ * référence, ou position plus ancienne que `BASE_POSITION_MAX_AGE_MS`. Un livreur qui
+ * n'a pas ouvert l'application depuis une semaine n'est plus forcément là où sa
+ * dernière position le dit, et l'expéditeur mérite de le savoir plutôt que de lire un
+ * chiffre faux.
+ *
+ * Lecture de confort : un incident sur ces requêtes ne doit pas priver l'expéditeur de
+ * la liste de ses candidats, qui est l'information réellement attendue à cet instant.
+ */
+async function distancesFromPickup(db: any, deliveryId: string, driverPhones: string[]): Promise<Map<string, number>> {
+  const distances = new Map<string, number>();
+  if (driverPhones.length === 0) return distances;
+  try {
+    const [pickup] = await db
+      .select({ latitude: tikisPlaces.latitude, longitude: tikisPlaces.longitude })
+      .from(tikisDeliveries)
+      .innerJoin(tikisPlaces, eq(tikisDeliveries.pickupPlaceId, tikisPlaces.id))
+      .where(eq(tikisDeliveries.id, deliveryId))
+      .limit(1);
+    if (!pickup) return distances;
+    const pickupPoint = { latitude: Number(pickup.latitude), longitude: Number(pickup.longitude) };
+    if (!Number.isFinite(pickupPoint.latitude) || !Number.isFinite(pickupPoint.longitude)) return distances;
+
+    const perimeters = await getDriverPerimetersByPhone(db, driverPhones);
+    const now = Date.now();
+    for (const phone of driverPhones) {
+      const perimeter = perimeters.get(phone);
+      // Comparaison à `null`, jamais falsy : la latitude 0 est une coordonnée valide.
+      if (perimeter?.baseLatitude == null || perimeter.baseLongitude == null) continue;
+      if (perimeter.baseUpdatedAt && now - new Date(perimeter.baseUpdatedAt).getTime() > BASE_POSITION_MAX_AGE_MS) continue;
+      const distance = distanceKmBetween({ latitude: perimeter.baseLatitude, longitude: perimeter.baseLongitude }, pickupPoint);
+      if (Number.isFinite(distance)) distances.set(phone, Math.round(distance * 10) / 10);
+    }
+  } catch (cause) {
+    console.error("[candidates] Distances indisponibles, candidats affichés sans position", cause);
+  }
+  return distances;
 }
 
 export async function getTikisDeliveryCandidateForDriver(deliveryId: string, driverPhone: string) {
