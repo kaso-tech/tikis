@@ -78,7 +78,6 @@ export default function ContactScreen() {
         </Pressable>
         <View>
           <Text style={[styles.title, { color: theme.foreground }]}>Contactez-nous</Text>
-          <Text style={[styles.subtitle, { color: theme.muted }]}>Notre équipe vous répond sous 24 heures ouvrées.</Text>
         </View>
       </View>
       <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -133,7 +132,7 @@ export default function ContactScreen() {
                 <Text style={[styles.counter, { color: theme.muted }]}>{message.length}/1000</Text>
               </View>
 
-              {error ? <Text style={styles.error}>{error}</Text> : <Text style={[styles.helper, { color: theme.muted }]}>Tous les champs sont assainis avant envoi. Les pièces jointes ne sont pas encore prises en charge.</Text>}
+              {error ? <Text style={styles.error}>{error}</Text> : null}
 
               <TikisButton label="Envoyer" icon="send" onPress={() => void send()} loading={sending} loadingLabel="Préparation…" disabled={!canSend} />
             </>

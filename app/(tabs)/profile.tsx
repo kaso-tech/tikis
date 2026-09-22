@@ -315,13 +315,11 @@ export default function ProfileScreen() {
               <MenuRow
                 icon="star-outline"
                 label="Mes avis"
-                sub="Évaluations envoyées"
                 onPress={() => router.push("/reviews" as any)}
               />
               <MenuRow
                 icon="bookmark"
                 label="Adresses enregistrées"
-                sub="Vos lieux favoris"
                 onPress={() => router.push("/(tabs)/addresses" as any)}
                 last
               />
@@ -332,13 +330,11 @@ export default function ProfileScreen() {
             <MenuRow
               icon="notifications"
               label="Notifications"
-              sub="Gérer les notifications de cet appareil"
               onPress={() => router.push("/notification-settings" as any)}
             />
             <MenuRow
               icon="devices"
               label="Appareils connectés"
-              sub="Voir et déconnecter vos sessions"
               onPress={() => router.push("/sessions" as any)}
             />
             <MenuRow

@@ -129,7 +129,7 @@ export function DeliveryCard({ delivery, onPress, onMap }: { delivery: Delivery;
         </View>
       ) : null}
     </View>
-    <FinancialConfirmationModal visible={confirmationVisible} title="Envoyer votre candidature" description="La commission Tikis sera temporairement réservée sur votre Wallet. Elle ne sera prélevée qu'après votre sélection et votre confirmation." amount={commission} confirmLabel="Confirmer ma candidature" loading={isApplying} onCancel={() => !isApplying && setConfirmationVisible(false)} onConfirm={() => void apply()} />
+    <FinancialConfirmationModal visible={confirmationVisible} title="Envoyer votre candidature" description="Bloquée sur votre Wallet, la commission n’est prélevée que si vous êtes sélectionné." amount={commission} confirmLabel="Confirmer ma candidature" loading={isApplying} onCancel={() => !isApplying && setConfirmationVisible(false)} onConfirm={() => void apply()} />
   </View>;
 }
 

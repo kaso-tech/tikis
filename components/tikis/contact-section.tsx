@@ -157,9 +157,6 @@ export function ContactSection({ embedded = false }: { embedded?: boolean } = {}
         <>
           <Text style={[styles.sectionTitle, { color: theme.muted }]}>Informations personnelles</Text>
           <View style={[styles.sectionCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>{rows}</View>
-          <Text style={[styles.helper, { color: theme.muted }]}>
-            Chaque modification est confirmée par un code OTP reçu par SMS (téléphone) ou par e-mail. L’e-mail sert à la récupération du compte.
-          </Text>
         </>
       )}
 
@@ -174,9 +171,6 @@ export function ContactSection({ embedded = false }: { embedded?: boolean } = {}
               </View>
               <Text style={[styles.title, { color: theme.foreground }]}>
                 {active === "email" ? "Modifier l'adresse e-mail" : "Modifier le numéro de téléphone"}
-              </Text>
-              <Text style={[styles.subtitle, { color: theme.muted }]}>
-                {stage === "draft" ? "Saisissez la nouvelle valeur. Un code de confirmation vous sera envoyé." : "Saisissez le code à 6 chiffres reçu pour confirmer la modification."}
               </Text>
 
               {stage === "draft" ? (

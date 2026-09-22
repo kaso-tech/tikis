@@ -57,7 +57,7 @@ describe("la confirmation montre ce que l'expéditeur va payer", () => {
     // montant est la commission prélevée au livreur : un expéditeur acceptant
     // 4 500 FCFA y lisait « 300 FCFA ».
     const modal = screen.slice(screen.indexOf("function ChoicePanel"));
-    expect(modal).toContain("retenue sur le compte du livreur");
+    expect(modal).toContain("reste à sa charge");
     expect(modal).not.toContain("commissionBlocked");
   });
 

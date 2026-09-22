@@ -604,7 +604,7 @@ export function HomeScreen() {
         <FinancialConfirmationModal
           visible
           title="Envoyer votre candidature"
-          description="La commission Tikis sera temporairement réservée sur votre Wallet. Elle ne sera prélevée qu’après votre sélection et votre confirmation."
+          description="Bloquée sur votre Wallet, la commission n’est prélevée que si vous êtes sélectionné."
           amount={applicationCommission(applicationDelivery) ?? 0}
           confirmLabel="Confirmer ma candidature"
           allowCounterOffer
@@ -614,13 +614,13 @@ export function HomeScreen() {
         />
       ) : null}
       {pendingAction?.kind === "cancel" ? (
-        <ActionConfirmationModal visible title="Annuler cette livraison ?" description="La livraison sera retirée et ne recevra plus de candidatures." confirmLabel="Annuler la livraison" icon="cancel" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void cancelSenderDelivery(pendingAction.delivery)} />
+        <ActionConfirmationModal visible title="Annuler cette livraison ?" description="Elle sera retirée et ne recevra plus de candidatures." confirmLabel="Annuler la livraison" icon="cancel" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void cancelSenderDelivery(pendingAction.delivery)} />
       ) : null}
       {pendingAction?.kind === "withdraw" ? (
-        <ActionConfirmationModal visible title="Se retirer de cette candidature ?" description="Votre candidature sera retirée et la commission réservée redeviendra immédiatement disponible." confirmLabel="Se retirer" icon="undo" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
+        <ActionConfirmationModal visible title="Se retirer de cette candidature ?" description="La commission réservée redevient immédiatement disponible." confirmLabel="Se retirer" icon="undo" tone="danger" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
       ) : null}
       {pendingAction?.kind === "confirm" ? (
-        <ActionConfirmationModal visible title="Confirmer cette mission ?" description="La commission réservée sera prélevée et la livraison passera en cours." confirmLabel="Confirmer" icon="check-circle" tone="success" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
+        <ActionConfirmationModal visible title="Confirmer cette mission ?" description="La commission sera prélevée et la livraison passe en cours." confirmLabel="Confirmer" icon="check-circle" tone="success" loading={applyingId === pendingAction.delivery.id} onCancel={() => !applyingId && setPendingAction(null)} onConfirm={() => void executeDriverAction(pendingAction)} />
       ) : null}
     </SafeAreaView>
   );

@@ -489,14 +489,14 @@ function ChoicePanel({ candidate, deliveryPrice, replacing, loading, theme, bott
 
         <View style={styles.noteRow}>
           <MaterialIcons name="info-outline" size={15} color={theme.muted} />
-          <Text style={styles.noteText}>Vous réglez ce montant directement au livreur à la remise. La commission Tikis est retenue sur le compte du livreur, pas sur le vôtre.</Text>
+          <Text style={styles.noteText}>Réglé directement au livreur à la remise ; la commission Tikis reste à sa charge.</Text>
         </View>
         <View style={styles.noteRow}>
           <MaterialIcons name="check-circle-outline" size={15} color={theme.success} />
           <Text style={styles.noteText}>
             {replacing
-              ? "Le livreur actuellement retenu sera libéré et sa commission compensée : Tikis n’en conserve qu’une seule pour cette course."
-              : "Tant qu’il n’a pas confirmé sa disponibilité, vous pouvez annuler ce choix sans aucun frais."}
+              ? "Le livreur actuel est libéré et sa commission compensée : une seule commission Tikis pour cette course."
+              : "Annulable sans frais tant qu’il n’a pas confirmé sa disponibilité."}
           </Text>
         </View>
 

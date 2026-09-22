@@ -113,9 +113,6 @@ export function SessionsSection() {
         </View>
         <Text style={styles.count}>{sessions.length}</Text>
       </View>
-      {/* Seul bloc de l'application à tutoyer, quand tout le reste vouvoie. */}
-      <Text style={styles.subtitle}>Ces appareils sont connectés à votre compte Tikis. Déconnectez ceux que vous ne reconnaissez pas.</Text>
-
       <View style={styles.actions}>
         <Text style={styles.btnGhost} onPress={registerNow} disabled={busy}>{busy ? "..." : "Enregistrer cette session"}</Text>
         {sessions.length > 1 ? <Text style={styles.btnDanger} onPress={confirmRevokeAll}>Tout déconnecter (sauf ici)</Text> : null}

@@ -68,7 +68,6 @@ export default function NotificationSettingsScreen() {
         <View style={styles.hero}>
           <View style={styles.heroIcon}><MaterialIcons name="notifications-active" size={28} color={theme.primary} /></View>
           <Text style={styles.title}>Restez informé</Text>
-          <Text style={styles.subtitle}>Recevez les informations importantes de Tikis, même lorsque l’application est fermée.</Text>
         </View>
 
         <View style={styles.card}>
@@ -76,7 +75,7 @@ export default function NotificationSettingsScreen() {
             <View style={[styles.statusDot, { backgroundColor: status === "granted" ? theme.success : status === "denied" ? theme.error : theme.muted }]} />
             <View style={styles.statusCopy}>
               <Text style={styles.cardTitle}>{loading ? "Vérification en cours" : status === "granted" ? "Notifications activées" : status === "denied" ? "Notifications bloquées" : status === "unsupported" ? "Version non compatible" : "Notifications non activées"}</Text>
-              <Text style={styles.cardText}>{loading ? "Nous vérifions l’autorisation de cet appareil." : status === "granted" ? "Les événements de vos livraisons peuvent vous être signalés instantanément." : "Activez-les pour ne pas manquer une candidature, une confirmation ou une mise à jour importante."}</Text>
+              {loading || status === "granted" ? null : <Text style={styles.cardText}>Activez-les pour ne pas manquer une candidature, une confirmation ou une mise à jour importante.</Text>}
             </View>
             {loading ? <ActivityIndicator color={theme.primary} /> : null}
           </View>
@@ -94,7 +93,6 @@ export default function NotificationSettingsScreen() {
         {role === "driver" ? (
           <Pressable onPress={() => router.push("/driver-alerts" as never)} style={({ pressed }) => [styles.linkCard, pressed && styles.pressed]} accessibilityRole="button">
             <View style={styles.cardHeader}><MaterialIcons name="tune" size={19} color={theme.primary} /><Text style={styles.cardTitle}>Alertes de nouvelles courses</Text></View>
-            <Text style={styles.cardText}>Configurez séparément les alertes de courses et votre périmètre de recherche.</Text>
             <MaterialIcons name="chevron-right" size={20} color={theme.muted} style={styles.chevron} />
           </Pressable>
         ) : null}

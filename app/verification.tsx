@@ -84,7 +84,6 @@ export default function VerificationScreen() {
         </Pressable>
         <View>
           <Text style={[styles.title, { color: theme.foreground }]}>Vérification d’identité</Text>
-          <Text style={[styles.subtitle, { color: theme.muted }]}>Confirmez votre profil pour accéder aux livraisons.</Text>
         </View>
       </View>
       <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -93,13 +92,13 @@ export default function VerificationScreen() {
             <SurfaceCard style={[styles.approvedCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <View style={[styles.approvedIcon, { backgroundColor: theme.pressed }]}><MaterialIcons name="verified" size={28} color={theme.success} /></View>
               <Text style={[styles.approvedTitle, { color: theme.foreground }]}>Profil validé</Text>
-              <Text style={[styles.approvedText, { color: theme.muted }]}>Vous pouvez désormais postuler aux livraisons. La communauté Tikis vous fait confiance.</Text>
+              <Text style={[styles.approvedText, { color: theme.muted }]}>Vous pouvez désormais postuler aux livraisons.</Text>
             </SurfaceCard>
           ) : submitted ? (
             <SurfaceCard style={[styles.submittedCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
               <View style={[styles.submittedIcon, { backgroundColor: theme.pressed }]}><MaterialIcons name="hourglass-top" size={26} color={theme.warning} /></View>
               <Text style={[styles.submittedTitle, { color: theme.foreground }]}>Vérification en cours</Text>
-              <Text style={[styles.submittedText, { color: theme.muted }]}>Votre compte est en cours de vérification par les administrateurs. Délai habituel : 24 heures ouvrées. Vous serez notifié dès la validation.</Text>
+              <Text style={[styles.submittedText, { color: theme.muted }]}>Délai habituel : 24 heures ouvrées. Vous serez notifié dès la validation.</Text>
             </SurfaceCard>
           ) : (
             <>
@@ -116,7 +115,7 @@ export default function VerificationScreen() {
                   <MaterialIcons name="privacy-tip" size={20} color={theme.primary} />
                   <View style={styles.summaryCopy}>
                     <Text style={[styles.summaryTitle, { color: theme.foreground }]}>Pourquoi cette vérification ?</Text>
-                    <Text style={[styles.summaryText, { color: theme.muted }]}>Elle sécurise la communauté et vous permet de candidater aux livraisons. Vos documents sont stockés de manière chiffrée et ne sont jamais partagés.</Text>
+                    <Text style={[styles.summaryText, { color: theme.muted }]}>Vos documents sont stockés de manière chiffrée et ne sont jamais partagés.</Text>
                   </View>
                 </View>
               </SurfaceCard>

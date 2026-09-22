@@ -55,7 +55,7 @@ export function TikisLogoutProvider({ children }: { children: React.ReactNode })
           <View style={styles.dialog}>
             <View style={styles.icon}><MaterialIcons name="logout" size={25} color="#B4232D" /></View>
             <Text style={styles.title}>Se déconnecter ?</Text>
-            <Text style={styles.description}>Vous devrez saisir à nouveau votre numéro de téléphone et votre code de vérification pour accéder à Tikis.</Text>
+            <Text style={styles.description}>Vous devrez ressaisir votre numéro et le code de vérification.</Text>
             {loading ? (
               <View style={styles.loading}>
                 <ActivityIndicator color="#B4232D" />

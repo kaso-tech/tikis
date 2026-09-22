@@ -14,7 +14,6 @@ export function FinancialConfirmationModal({
   description,
   amount,
   confirmLabel,
-  irreversible = false,
   loading = false,
   allowCounterOffer = false,
   onCancel,
@@ -25,7 +24,6 @@ export function FinancialConfirmationModal({
   description: string;
   amount: number;
   confirmLabel: string;
-  irreversible?: boolean;
   loading?: boolean;
   allowCounterOffer?: boolean;
   onCancel: () => void;
@@ -57,10 +55,12 @@ export function FinancialConfirmationModal({
           <View style={[styles.iconWrap, { backgroundColor: theme.background }]}><MaterialIcons name="account-balance-wallet" size={24} color={theme.primary} /></View>
           <Text style={[styles.title, { color: theme.foreground }]}>{title}</Text>
           <Text style={[styles.description, { color: theme.muted }]}>{description}</Text>
-          <View style={[styles.amountRow, { backgroundColor: theme.background }]}>
-            <Text style={[styles.amountLabel, { color: theme.muted }]}>Montant concerné</Text>
-            <Text style={[styles.amount, { color: theme.foreground }]}>{formatMoney(amount)}</Text>
-          </View>
+          {amount > 0 ? (
+            <View style={[styles.amountRow, { backgroundColor: theme.background }]}>
+              <Text style={[styles.amountLabel, { color: theme.muted }]}>Montant concerné</Text>
+              <Text style={[styles.amount, { color: theme.foreground }]}>{formatMoney(amount)}</Text>
+            </View>
+          ) : null}
 
           {allowCounterOffer ? (
             counterFieldOpen ? (
@@ -98,12 +98,6 @@ export function FinancialConfirmationModal({
             )
           ) : null}
 
-          <View style={styles.note}>
-            <MaterialIcons name={irreversible ? "lock" : "info-outline"} size={17} color={irreversible ? theme.warning : theme.primary} />
-            <Text style={[styles.noteText, { color: theme.muted }, irreversible ? { color: theme.warning } : null]}>
-              {irreversible ? "Cette étape rend la commission Tikis définitivement acquise après confirmation du livreur." : "Aucun débit définitif ne sera appliqué tant que la prochaine étape n'est pas confirmée."}
-            </Text>
-          </View>
           <TikisButton label={confirmLabel} onPress={() => onConfirm(hasCounter ? { amount: counterAmount } : undefined)} loading={loading} disabled={!counterValid} style={styles.confirm} />
           <Pressable accessibilityRole="button" onPress={onCancel} style={({ pressed }) => [styles.cancel, pressed && styles.pressed]}>
             <Text style={[styles.cancelText, { color: theme.muted }]}>Annuler</Text>

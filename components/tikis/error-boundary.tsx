@@ -56,7 +56,7 @@ function ErrorFallback({ error, onReset, fallbackTitle }: { error: Error; onRese
           <Text style={styles.iconText}>!</Text>
         </View>
         <Text style={styles.title}>{fallbackTitle ?? "L’application a rencontré un problème"}</Text>
-        <Text style={styles.subtitle}>L’équipe technique a été notifiée. Vous pouvez revenir à l’accueil ou nous contacter avec le détail ci-dessous.</Text>
+        <Text style={styles.subtitle}>L’équipe technique a été notifiée.</Text>
         <View style={styles.errorCard}>
           <Text style={styles.errorLabel}>Message</Text>
           <Text style={styles.errorMessage} numberOfLines={6}>{error.message}</Text>

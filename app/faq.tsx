@@ -84,7 +84,6 @@ export default function FaqScreen() {
         </Pressable>
         <View>
           <Text style={[styles.title, { color: theme.foreground }]}>Foire aux questions</Text>
-          <Text style={[styles.subtitle, { color: theme.muted }]}>Réponses aux questions les plus fréquentes sur Tikis.</Text>
         </View>
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">

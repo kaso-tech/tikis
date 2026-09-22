@@ -119,18 +119,18 @@ export default function DeliveryDetailScreen() {
     if (!delivery) return null;
     const commissionBase = delivery.offeredPrice ?? delivery.estimatedPrice;
     const commission = Math.round(commissionBase * (walletQuery.data?.commissionRate ?? 0));
-    if (action === "apply") return { title: "Envoyer votre candidature", description: "Cette commission sera temporairement bloquée sur votre Wallet. Elle sera définitivement prélevée uniquement si l’expéditeur vous sélectionne.", amount: commission, label: "Confirmer ma candidature", irreversible: false };
-    if (action === "withdraw") return { title: "Retirer votre candidature", description: "Votre candidature sera retirée et la commission temporairement bloquée redeviendra immédiatement disponible.", amount: ownCandidate?.commissionBlocked ?? commission, label: "Retirer ma candidature", irreversible: false };
-    if (action === "confirm") return { title: "Confirmer la mission", description: "Votre confirmation autorise le partage des coordonnées avec l’expéditeur et finalise la mise en relation Tikis.", amount: ownCandidate?.commissionBlocked ?? commission, label: "Confirmer la mission", irreversible: true };
-    if (action === "complete") return { title: "Terminer la livraison", description: "Confirmez uniquement lorsque la remise et le paiement direct avec l’expéditeur sont finalisés.", amount: 0, label: "Marquer comme terminée", irreversible: false };
+    if (action === "apply") return { title: "Envoyer votre candidature", description: "Bloquée sur votre Wallet, la commission n’est prélevée que si vous êtes sélectionné.", amount: commission, label: "Confirmer ma candidature" };
+    if (action === "withdraw") return { title: "Retirer votre candidature", description: "La commission bloquée redevient immédiatement disponible.", amount: ownCandidate?.commissionBlocked ?? commission, label: "Retirer ma candidature" };
+    if (action === "confirm") return { title: "Confirmer la mission", description: "Vos coordonnées seront partagées avec l’expéditeur, et la commission définitivement prélevée.", amount: ownCandidate?.commissionBlocked ?? commission, label: "Confirmer la mission" };
+    if (action === "complete") return { title: "Terminer la livraison", description: "À confirmer une fois la remise et le paiement effectués.", amount: 0, label: "Marquer comme terminée" };
     return null;
   }, [action, delivery, ownCandidate, walletQuery.data?.commissionRate]);
 
   const senderActionConfig = useMemo(() => {
-    if (senderAction === "disable") return { title: "Désactiver la livraison", description: "Elle ne sera plus visible pour de nouveaux livreurs. Les candidatures en cours seront annulées et les commissions temporairement bloquées seront libérées.", confirmLabel: "Désactiver", tone: "warning" as const };
-    if (senderAction === "reactivate") return { title: "Activer la livraison", description: "La livraison redeviendra visible pour les livreurs compatibles. Les anciennes candidatures restent annulées afin de leur permettre de se proposer avec les informations actuelles.", confirmLabel: "Activer", tone: "success" as const };
-    if (senderAction === "cancel") return { title: "Annuler la livraison", description: "Cette action est réservée aux courses qui n’ont pas encore démarré. La livraison sera conservée dans votre historique avec son statut d’annulation.", confirmLabel: "Annuler la livraison", tone: "danger" as const };
-    if (senderAction === "unselect") return { title: "Annuler le choix du livreur", description: "Ce livreur n’a pas encore confirmé sa disponibilité : votre choix sera annulé sans aucun frais, sa commission bloquée sera intégralement libérée, et la livraison redeviendra ouverte aux candidatures. Le livreur reste candidat et pourra être choisi à nouveau.", confirmLabel: "Annuler le choix", tone: "warning" as const };
+    if (senderAction === "disable") return { title: "Désactiver la livraison", description: "Les candidatures en cours sont annulées et leurs commissions libérées.", confirmLabel: "Désactiver", tone: "warning" as const };
+    if (senderAction === "reactivate") return { title: "Activer la livraison", description: "Les livreurs compatibles peuvent de nouveau candidater ; les anciennes candidatures restent annulées.", confirmLabel: "Activer", tone: "success" as const };
+    if (senderAction === "cancel") return { title: "Annuler la livraison", description: "Elle restera visible dans votre historique, marquée comme annulée.", confirmLabel: "Annuler la livraison", tone: "danger" as const };
+    if (senderAction === "unselect") return { title: "Annuler le choix du livreur", description: "Sans frais : sa commission est libérée, la livraison rouvre aux candidatures, et il reste candidat.", confirmLabel: "Annuler le choix", tone: "warning" as const };
     return null;
   }, [senderAction]);
 
@@ -409,7 +409,7 @@ export default function DeliveryDetailScreen() {
         ) : null}
       </ScrollView>
 
-      {actionConfig ? <FinancialConfirmationModal visible title={actionConfig.title} description={actionConfig.description} amount={actionConfig.amount} confirmLabel={actionConfig.label} irreversible={actionConfig.irreversible} allowCounterOffer={action === "apply"} loading={processing} onCancel={() => setAction(null)} onConfirm={(counterOffer) => void confirmAction(counterOffer)} /> : null}
+      {actionConfig ? <FinancialConfirmationModal visible title={actionConfig.title} description={actionConfig.description} amount={actionConfig.amount} confirmLabel={actionConfig.label} allowCounterOffer={action === "apply"} loading={processing} onCancel={() => setAction(null)} onConfirm={(counterOffer) => void confirmAction(counterOffer)} /> : null}
       {senderActionConfig ? <DeliveryActionConfirmationModal visible title={senderActionConfig.title} description={senderActionConfig.description} confirmLabel={senderActionConfig.confirmLabel} tone={senderActionConfig.tone} loading={senderProcessing} onCancel={() => !senderProcessing && setSenderAction(null)} onConfirm={() => void confirmSenderAction()} /> : null}
       <CandidatesSheet visible={candidatesOpen} deliveryId={deliveryId} onClose={() => setCandidatesOpen(false)} />
     </SafeAreaView>
