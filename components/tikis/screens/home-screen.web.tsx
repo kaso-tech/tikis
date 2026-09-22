@@ -97,14 +97,14 @@ export function HomeScreen() {
   const { isDark, colors: theme } = useThemeColors();
   const firstName = profile?.fullName.split(" ")[0] ?? "à vous";
 
-  const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 5_000 });
+  const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 60_000 });
   const deliveries = useMemo(() => deliveriesQuery.data ?? [], [deliveriesQuery.data]);
 
-  const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 5_000, refetchOnMount: "always", refetchOnWindowFocus: true });
+  const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 60_000, refetchOnMount: "always", refetchOnWindowFocus: true });
   const driverWallet = walletQuery.data?.wallet;
   // Gains de courses = informatifs, calculés depuis les livraisons terminées (jamais depuis le Wallet, qui n'est
   // jamais crédité par une livraison : le paiement se fait directement entre l'expéditeur et le livreur).
-  const driverEarningsHistoryQuery = trpc.wallet.driverEarningsHistory.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 5_000 });
+  const driverEarningsHistoryQuery = trpc.wallet.driverEarningsHistory.useQuery(undefined, { enabled: role === "driver" && Boolean(profile?.phone), refetchInterval: 60_000 });
   const driverEarningsHistory = driverEarningsHistoryQuery.data ?? [];
 
   const [filter, setFilter] = useState<FilterKey>("open");

@@ -42,7 +42,7 @@ export default function NotificationsScreen() {
   const { colors: theme } = useThemeColors();
   const router = useRouter();
   const { profile, role } = useTikisStore();
-  const notificationsQuery = trpc.notifications.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 8_000 });
+  const notificationsQuery = trpc.notifications.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 60_000 });
   const markAllReadMutation = trpc.notifications.markRead.useMutation({ onSuccess: () => void notificationsQuery.refetch() });
   const markOneReadMutation = trpc.notifications.markOneRead.useMutation({ onSuccess: () => void notificationsQuery.refetch() });
   const notifications = useMemo(() => notificationsQuery.data ?? [], [notificationsQuery.data]);

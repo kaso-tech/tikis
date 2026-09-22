@@ -28,7 +28,7 @@ export function TikisHeader() {
   const insets = useSafeAreaInsets();
   const { profile } = useTikisStore();
   const { colors: theme } = useThemeColors();
-  const notificationsQuery = trpc.notifications.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 8_000 });
+  const notificationsQuery = trpc.notifications.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 60_000 });
   const unread = (notificationsQuery.data ?? []).filter((item) => !item.read).length;
 
   return (

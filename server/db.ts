@@ -5,6 +5,7 @@ import { drizzle } from "drizzle-orm/mysql2";
 import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, TikisDriverPreferences, tikisDriverPreferences, tikisFavoritePlaces, tikisKycSubmissions, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisPushTokens, tikisRateLimits, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, tikisYengapayWebhookEvents, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { createYengapayPaymentIntent, readYengapayConfig, verifyYengapayPayment } from "./yengapay";
+import { publishWalletBroadcast } from "./supabase-realtime";
 import { sendPushToTokens, type PushMessage } from "./push";
 import { isValidExpoPushTokenShape } from "./_test-helpers/push-token-shape";
 import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppNotification, LocationLabel, SelectableVehicleType, WalletOperation, WalletSnapshot } from "../shared/tikis-domain";
@@ -855,7 +856,22 @@ export async function applyWalletMovement(tx: any, movement: WalletMovement) {
     id: randomUUID(), profilePhone: movement.profilePhone, deliveryId: movement.deliveryId ?? null, operation: movement.operation,
     amount: movement.amount, availableBefore, availableAfter, heldBefore, heldAfter, reason: movement.reason, idempotencyKey: movement.idempotencyKey,
   });
+  // Best-effort, comme le push transactionnel d'appendDeliveryEvent plus bas : ne dépend jamais de
+  // cette transaction, ne la retarde jamais. Seul point d'appel de tout le Wallet — un dépôt, un
+  // retrait, une commission bloquée ou débloquée, un ajustement admin passent tous par ici, donc
+  // le signal Realtime couvre tout, y compris les mouvements qui n'ont jamais fait de la livraison
+  // à l'origine (rien, sinon le polling, n'annonçait jusqu'ici un dépôt YengaPay qui vient de se régler).
+  void notifyWalletChanged(movement.profilePhone);
   return { availableAfter, heldAfter, idempotencyKey: movement.idempotencyKey };
+}
+
+async function notifyWalletChanged(profilePhone: string) {
+  try {
+    const profile = await getTikisProfileByPhone(profilePhone);
+    if (profile?.supabaseUserId) void publishWalletBroadcast(profile.supabaseUserId);
+  } catch (cause) {
+    console.error("[wallet] signal Realtime non envoyé", cause);
+  }
 }
 
 async function appendDeliveryEvent(tx: any, event: DeliveryEventInput) {

@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { PropsWithChildren } from "react";
-import { subscribeToDeliveryChannel } from "@/lib/supabase-tracking";
+import { subscribeToDeliveryChannel, subscribeToWalletChannel, supabaseClient } from "@/lib/supabase-tracking";
 import { presentDeliveryStatusPush } from "@/lib/simulated-push-notifications";
 import { startBackgroundDriverTracking, stopBackgroundDriverTracking } from "@/lib/background-location-task";
 import { useTikisStore } from "@/lib/tikis-store";
@@ -12,7 +12,41 @@ import { trpc } from "@/lib/trpc";
 export function DeliveryRealtimeProvider({ children }: PropsWithChildren) {
   const { profile, role } = useTikisStore();
   const utilities = trpc.useUtils();
-  const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 12_000 });
+  const ensureRealtimeSessionMutation = trpc.profiles.ensureRealtimeSession.useMutation();
+  // Id Supabase de la session active une fois établie — condition du canal Wallet plus bas, qui a
+  // besoin de connaître sa propre identité Supabase pour construire le nom du canal qu'il rejoint.
+  const [supabaseUserId, setSupabaseUserId] = useState<string | null>(null);
+  // Un seul essai par numéro, par lancement de l'application : établir la session ne dépend pas
+  // de ce qui change ensuite (livraisons, rôle), et la retenter à chaque rendu n'apporterait rien —
+  // une fois posée, Supabase la garde fraîche lui-même (persistSession + autoRefreshToken).
+  const attemptedRealtimeSessionFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!profile?.phone || attemptedRealtimeSessionFor.current === profile.phone) return;
+    attemptedRealtimeSessionFor.current = profile.phone;
+    const supabase = supabaseClient();
+    if (!supabase) return; // Supabase non configuré côté client : rien à établir.
+    void (async () => {
+      try {
+        // Un profil passé par Supabase Phone Auth (profiles.lookupSupabase/registerSupabase) a
+        // déjà posé sa session au moment de la connexion — inutile de la remplacer.
+        const existing = await supabase.auth.getSession();
+        if (existing.data.session) {
+          setSupabaseUserId(existing.data.session.user.id);
+          return;
+        }
+        const session = await ensureRealtimeSessionMutation.mutateAsync();
+        if (!session) return;
+        const { data } = await supabase.auth.setSession({ access_token: session.accessToken, refresh_token: session.refreshToken });
+        if (data.session) setSupabaseUserId(data.session.user.id);
+      } catch {
+        // Best-effort : les canaux Realtime ci-dessous continuent d'échouer à s'authentifier pour
+        // ce profil, comme avant cette fonctionnalité — le polling existant reste la source de
+        // fraîcheur. Un prochain lancement de l'application retentera.
+      }
+    })();
+  }, [profile?.phone, ensureRealtimeSessionMutation]);
+
+  const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 60_000 });
   const deliveryIds = useMemo(() => {
     const deliveries = deliveriesQuery.data ?? [];
     // Pour un livreur, `deliveries.list` renvoie aussi toutes les livraisons "open" simplement
@@ -63,6 +97,19 @@ export function DeliveryRealtimeProvider({ children }: PropsWithChildren) {
     }));
     return () => { unsubscribes.forEach((unsubscribe) => unsubscribe()); };
   }, [deliveryIds, deliveryKey, utilities]);
+
+  // Couvre ce que le canal de livraison ci-dessus ne voit pas : un dépôt YengaPay qui se règle, un
+  // ajustement admin — rien qui touche au statut d'une livraison. server/db.ts (applyWalletMovement)
+  // publie sur ce canal à chaque mouvement du Wallet, quelle qu'en soit l'origine.
+  useEffect(() => {
+    if (!supabaseUserId) return;
+    return subscribeToWalletChannel(supabaseUserId, () => {
+      void Promise.all([
+        utilities.wallet.snapshot.invalidate(),
+        utilities.wallet.driverEarningsHistory.invalidate(),
+      ]);
+    });
+  }, [supabaseUserId, utilities]);
 
   return <>{children}</>;
 }

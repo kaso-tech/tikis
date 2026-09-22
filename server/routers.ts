@@ -474,6 +474,16 @@ export const appRouter = router({
       const updated = await db.updateTikisProfile(profile.phone, { vehicles: JSON.stringify(input.vehicles) });
       return toPublicProfile(updated);
     }),
+    /** Établit (ou réutilise) une session Supabase Auth pour ce profil, quel que soit son parcours
+     *  d'authentification Tikis — voir server/supabase-admin-auth.ts. Le client l'appelle une fois
+     *  au démarrage puis applique la session obtenue (supabase.auth.setSession) : sans elle, les
+     *  canaux Realtime privés (server/supabase-realtime.ts) échouent à s'authentifier en silence.
+     *  `null` quand Supabase n'est pas configuré ou que l'établissement échoue — jamais une erreur :
+     *  rien côté Tikis ne dépend de cette session, le client retombe sur le polling existant. */
+    ensureRealtimeSession: tikisProtectedProcedure.mutation(async ({ ctx }) => {
+      const { ensureSupabaseRealtimeSession } = await import("./supabase-admin-auth");
+      return ensureSupabaseRealtimeSession(ctx.tikisProfilePhone);
+    }),
     /** Accessible même si le compte est banni/suspendu : c'est ce qui permet à l'app de savoir
      *  quel écran dédié afficher (banni, suppression en cours) sans passer par les routes bloquées. */
     status: tikisSessionProcedure.query(async ({ ctx }) => {

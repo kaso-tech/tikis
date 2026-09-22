@@ -144,3 +144,43 @@ export function subscribeToDeliveryChannel(deliveryId: string, handlers: { onSta
     }
   };
 }
+
+function walletChannelName(supabaseUserId: string) {
+  const safeId = supabaseUserId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 96);
+  return safeId ? `wallet:${safeId}` : null;
+}
+
+type WalletChannelEntry = { channel: RealtimeChannel; listeners: Set<() => void> };
+const walletChannels = new Map<string, WalletChannelEntry>();
+
+function getOrCreateWalletChannelEntry(supabaseUserId: string): WalletChannelEntry | null {
+  const existing = walletChannels.get(supabaseUserId);
+  if (existing) return existing;
+  const supabase = supabaseClient();
+  const name = walletChannelName(supabaseUserId);
+  if (!supabase || !name) return null;
+  const listeners = new Set<() => void>();
+  const channel = supabase.channel(name, { config: { private: true } })
+    .on("broadcast", { event: "changed" }, () => listeners.forEach((listener) => listener()))
+    .subscribe();
+  const entry: WalletChannelEntry = { channel, listeners };
+  walletChannels.set(supabaseUserId, entry);
+  return entry;
+}
+
+/** S'abonne aux mouvements du Wallet d'un profil (pas son contenu, juste le signal — le solde reste
+ *  à relire via wallet.snapshot). `supabaseUserId` : celui de la session Supabase active, jamais le
+ *  numéro Tikis — c'est ce qu'authentifie realtime_wallet_rls.sql. Retourne une fonction de
+ *  désabonnement à appeler au démontage. */
+export function subscribeToWalletChannel(supabaseUserId: string, onChange: () => void): () => void {
+  const entry = getOrCreateWalletChannelEntry(supabaseUserId);
+  if (!entry) return () => {};
+  entry.listeners.add(onChange);
+  return () => {
+    entry.listeners.delete(onChange);
+    if (entry.listeners.size === 0) {
+      walletChannels.delete(supabaseUserId);
+      void entry.channel.unsubscribe();
+    }
+  };
+}
