@@ -46,6 +46,26 @@ export type YengapayProviderConfig = {
   webhookSecret: string | null;
 };
 
+/**
+ * Refuse de démarrer plutôt que d'ouvrir le webhook.
+ *
+ * En mode live sans `YENGAPAY_WEBHOOK_SECRET`, `verifyYengapayWebhookSignature`
+ * rejette déjà chaque appel — mais un serveur qui répond en boucle « signature
+ * invalide » à un vrai PSP est un incident silencieux (aucun dépôt ne se
+ * règle jamais), pas une protection. Un oubli de configuration doit empêcher
+ * le démarrage, pas se découvrir en production au premier paiement bloqué.
+ * Sans effet en mode test, où aucun PSP réel n'appelle ce webhook.
+ */
+export function assertYengapayWebhookSecretConfigured(): void {
+  if (process.env.NODE_ENV !== "production") return;
+  const config = readYengapayConfig();
+  if (config.mode !== "live") return;
+  if (config.webhookSecret) return;
+  throw new Error(
+    "YENGAPAY_MODE=live en production sans YENGAPAY_WEBHOOK_SECRET : le webhook de paiement rejetterait tout événement du PSP. Configurez le secret avant de redémarrer.",
+  );
+}
+
 export function readYengapayConfig(): YengapayProviderConfig {
   const explicitMode = (process.env.YENGAPAY_MODE ?? "").toLowerCase();
   const apiKey = process.env.YENGAPAY_API_KEY ?? null;
@@ -154,7 +174,13 @@ export async function verifyYengapayPayment(input: VerifyCheckoutInput): Promise
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 export function verifyYengapayWebhookSignature(rawBody: string, signatureHeader: string | null, secret: string | null): boolean {
-  if (!secret) return true;
+  // Un secret absent ne doit jamais se lire comme « signature non requise » :
+  // ç'a longtemps ouvert le webhook à quiconque connaît une `providerReference`
+  // (visible du client qui a initié le paiement), qui pouvait alors s'auto-créditer
+  // en postant lui-même l'événement de succès. `assertYengapayWebhookSecretConfigured`
+  // referme l'autre moitié du problème : un déploiement live sans secret ne démarre
+  // plus du tout, plutôt que de dégrader silencieusement la sécurité jusqu'ici.
+  if (!secret) return false;
   if (!signatureHeader) return false;
   const expected = createHmac("sha256", secret).update(rawBody, "utf8").digest("hex");
   const provided = signatureHeader.replace(/^sha256=/, "").trim();

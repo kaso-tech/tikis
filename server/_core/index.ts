@@ -17,7 +17,7 @@ import { expireLoyaltyGrants } from "../loyalty";
 import { publishDeliveryStatusBroadcast } from "../supabase-realtime";
 import { corsMiddleware, securityHeadersMiddleware, publicApiRateLimit } from "./security";
 import { initSentry, reportException } from "./sentry";
-import { parseYengapayWebhookEvent, readYengapayConfig, verifyYengapayWebhookSignature } from "../yengapay";
+import { assertYengapayWebhookSecretConfigured, parseYengapayWebhookEvent, readYengapayConfig, verifyYengapayWebhookSignature } from "../yengapay";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -39,6 +39,10 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // Avant toute autre chose : un déploiement live sans secret de webhook ne
+  // doit jamais atteindre l'écoute réseau, où l'incident ne se découvrirait
+  // qu'au premier paiement qui ne se règle jamais.
+  assertYengapayWebhookSecretConfigured();
   await initSentry();
   const app = express();
   const server = createServer(app);
@@ -198,4 +202,11 @@ async function startServer() {
   });
 }
 
-startServer().catch(console.error);
+startServer().catch((error) => {
+  // Un simple `.catch(console.error)` laisse le processus sortir avec le code
+  // 0 par défaut : un orchestrateur (systemd, Docker, pm2) lirait ça comme un
+  // déploiement réussi. Le secret de webhook manquant, entre autres échecs de
+  // démarrage, doit se voir comme un vrai échec.
+  console.error(error);
+  process.exit(1);
+});
