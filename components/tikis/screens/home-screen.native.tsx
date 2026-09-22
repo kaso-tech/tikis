@@ -668,32 +668,6 @@ export function HomeScreen() {
   );
 }
 
-function WalletCard({ walletBalance, totalBalance, blockedBalance }: { walletBalance: number; totalBalance: number; blockedBalance: number }) {
-  return (
-    <View style={styles.walletCard}>
-      <Text style={styles.walletEyebrow}>SOLDE DISPONIBLE</Text>
-      <View style={styles.walletRow}>
-        <Text style={styles.walletAmount}>{formatMoney(walletBalance)}</Text>
-        <View style={styles.walletTrend}>
-          <MaterialIcons name="trending-up" size={11} color="#48B889" />
-          <Text style={styles.walletTrendText}>+12%</Text>
-        </View>
-      </View>
-      <View style={styles.walletDivider} />
-      <View style={styles.walletStats}>
-        <View style={styles.walletStat}>
-          <Text style={styles.walletStatLabel}>Solde total</Text>
-          <Text style={styles.walletStatValue}>{formatMoney(totalBalance)}</Text>
-        </View>
-        <View style={styles.walletStat}>
-          <Text style={styles.walletStatLabel}>Bloquée</Text>
-          <Text style={styles.walletStatValue}>{formatMoney(blockedBalance)}</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
 function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeading, userLocation }: { selected: Delivery | null | undefined; role: "sender" | "driver"; sheetSnap: number; driverPosition: { latitude: number; longitude: number } | null; /** Cap du livreur, en degrés : un nombre simple plutôt qu'un champ de `driverPosition`, dont la nouvelle identité relancerait le calcul d'itinéraire d'approche à chaque rendu. */ driverHeading: number | null; userLocation: { latitude: number; longitude: number } | null }) {
   const mapRef = useRef<MapView>(null);
   const pickup = selected?.pickup;
@@ -1083,17 +1057,6 @@ const styles = StyleSheet.create({
   searchPill: { height: 40, backgroundColor: "#F0F3F8", borderRadius: 11, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
   searchInput: { flex: 1, color: "#9A6201", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
 
-  walletCard: { marginHorizontal: 14, marginTop: 6, marginBottom: 8, backgroundColor: "#111111", borderRadius: 12, padding: 14 },
-  walletEyebrow: { color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
-  walletRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginTop: 4, marginBottom: 10 },
-  walletAmount: { color: "#FFFFFF", fontSize: 26, fontWeight: "700", letterSpacing: -0.4 },
-  walletTrend: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(72,184,137,0.16)", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 6 },
-  walletTrendText: { color: "#48B889", fontSize: 11, fontWeight: "700" },
-  walletDivider: { height: 1, backgroundColor: "rgba(255,255,255,0.10)", marginBottom: 10 },
-  walletStats: { flexDirection: "row", gap: 12 },
-  walletStat: { flex: 1 },
-  walletStatLabel: { color: "rgba(255,255,255,0.55)", fontSize: 10 },
-  walletStatValue: { color: "#FFFFFF", fontSize: 13, fontWeight: "700", marginTop: 2 },
 
   filterRow: { flexDirection: "row", gap: 6, paddingBottom: 10, alignItems: "center" },
   filterScroll: { flexGrow: 0 },

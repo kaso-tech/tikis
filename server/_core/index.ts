@@ -66,8 +66,17 @@ async function startServer() {
 
   // Capture le raw body pour la validation de signature des webhooks PSP.
   app.use("/api/webhooks", express.json({ limit: "1mb", verify: (req, _res, buf) => { (req as { rawBody?: string }).rawBody = buf.toString("utf8"); } }));
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  // `kyc.submit` (3 images en base64, jusqu'à ~6,7 Mo chacune d'après kycBase64ImageSchema —
+  // server/routers.ts) est la seule mutation dont la charge légitime dépasse de loin celle de
+  // toute autre. Comme kyc.submit passe par sa propre route non groupée (voir lib/trpc.ts et le
+  // second montage de createExpressMiddleware plus bas), cette limite plus large ne s'applique
+  // qu'à elle : les 22 Mo (3 × 6,7 Mo + marge) ne s'appliquent jamais au reste de l'API.
+  app.use("/api/trpc-kyc", express.json({ limit: "22mb" }));
+  // 2 Mo pour tout le reste : la limite couvrait jusqu'ici l'ensemble de l'API sans distinction,
+  // à 50 fois cette taille — un levier de saturation mémoire bien plus généreux que ce qu'aucune
+  // mutation ordinaire n'envoie jamais.
+  app.use(express.json({ limit: "2mb" }));
+  app.use(express.urlencoded({ limit: "2mb", extended: true }));
 
   registerStorageProxy(app);
   registerOAuthRoutes(app);
@@ -178,18 +187,21 @@ async function startServer() {
     app.get("/admin", (_req, res) => res.status(503).send("Console d’administration non compilée. Voir admin/README.md pour la builder (npm run build dans le dossier admin/)."));
   }
 
-  app.use(
-    "/api/trpc",
-    createExpressMiddleware({
-      router: appRouter,
-      createContext,
-      onError: ({ error, path, type, ctx, req }) => {
-        if (error.code === "UNAUTHORIZED") return;
-        console.error(`[tRPC] ${type} ${path} failed:`, error);
-        reportException(error, { source: "trpc", path, type, requestId: req?.headers?.["x-request-id"] });
-      },
-    }),
-  );
+  const trpcHandlerOptions = {
+    router: appRouter,
+    createContext,
+    onError: ({ error, path, type, ctx, req }: { error: unknown; path: string | undefined; type: string; ctx: unknown; req: { headers?: Record<string, string | string[] | undefined> } }) => {
+      const trpcError = error as { code?: string };
+      if (trpcError.code === "UNAUTHORIZED") return;
+      console.error(`[tRPC] ${type} ${path} failed:`, error);
+      reportException(error, { source: "trpc", path, type, requestId: req?.headers?.["x-request-id"] });
+    },
+  };
+  app.use("/api/trpc", createExpressMiddleware(trpcHandlerOptions));
+  // Route dédiée pour kyc.submit (voir lib/trpc.ts : splitLink l'exclut du groupage tRPC), afin
+  // que la limite de charge élargie ci-dessus ne s'applique qu'à elle. Même routeur, même
+  // contexte : ce n'est qu'un second point d'entrée vers la même API.
+  app.use("/api/trpc-kyc", createExpressMiddleware(trpcHandlerOptions));
 
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
     if (res.headersSent) return;

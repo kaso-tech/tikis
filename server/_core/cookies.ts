@@ -8,21 +8,16 @@ function isIpAddress(host: string) {
   return host.includes(":");
 }
 
-function isSecureRequest(req: Request) {
-  if (req.protocol === "https") return true;
-
-  const forwardedProto = req.headers["x-forwarded-proto"];
-  if (!forwardedProto) return false;
-
-  const protoList = Array.isArray(forwardedProto) ? forwardedProto : forwardedProto.split(",");
-
-  return protoList.some((proto) => proto.trim().toLowerCase() === "https");
-}
-
 /**
  * Extract parent domain for cookie sharing across subdomains.
  * e.g., "3000-xxx.manuspre.computer" -> ".manuspre.computer"
  * This allows cookies set by 3000-xxx to be read by 8081-xxx
+ *
+ * Réservé aux environnements de prévisualisation, dont les sous-domaines
+ * changent à chaque session. En production, `TIKIS_COOKIE_DOMAIN` (plus bas)
+ * fixe la valeur au lieu de la dériver de l'en-tête `Host` de la requête : le
+ * dériver dynamiquement revenait à laisser quiconque contrôle cet en-tête
+ * choisir le domaine sur lequel le cookie de session s'applique.
  */
 function getParentDomain(hostname: string): string | undefined {
   // Don't set domain for localhost or IP addresses
@@ -47,15 +42,26 @@ function getParentDomain(hostname: string): string | undefined {
 export function getSessionCookieOptions(
   req: Request,
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
-  const hostname = req.hostname;
-  const domain = getParentDomain(hostname);
+  // En production, TIKIS_COOKIE_DOMAIN fixe le domaine explicitement (ex. ".tikis.app") plutôt
+  // que de le recalculer depuis l'en-tête Host de chaque requête — un en-tête que le client
+  // choisit. Sans cette variable (environnements de prévisualisation, développement local), le
+  // calcul dynamique historique reste le seul moyen de partager le cookie entre sous-domaines
+  // éphémères.
+  const fixedDomain = process.env.TIKIS_COOKIE_DOMAIN?.trim();
+  const domain = fixedDomain || getParentDomain(req.hostname);
 
   return {
     domain,
     httpOnly: true,
     path: "/",
-    sameSite: "none",
-    secure: isSecureRequest(req),
+    // Same-site pour tout trafic réel (mêmes domaines parents des deux côtés, fixe ou dynamique
+    // ci-dessus) : `None` admettait le cookie sur une requête cross-site, une protection CSRF
+    // bien plus faible que ce que ce cookie a jamais eu besoin ici.
+    sameSite: "lax",
+    // `req.secure` respecte `app.set("trust proxy", 1)` (server/_core/index.ts) : sur tout trafic
+    // réel — production, toujours HTTPS — il vaut donc toujours `true`. Rester dérivé de la
+    // requête, plutôt que forcé en dur, laisse le développement local (HTTP) fonctionner.
+    secure: req.secure,
   };
 }
 
