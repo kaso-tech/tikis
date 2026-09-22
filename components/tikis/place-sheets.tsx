@@ -69,7 +69,6 @@ export function FloatingPlacePicker({
           <View style={styles.closeSpacer} />
         </View>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={[styles.subtitle, { color: theme.muted }]}>Recherchez une adresse ou sélectionnez un point directement sur la carte, puis confirmez le lieu.</Text>
           {target ? (
             <PlacePicker
               label={target === "pickup" ? "Adresse de récupération" : "Adresse de destination"}
@@ -168,7 +167,6 @@ export function FavoritePlacesSheet({
           <View style={styles.closeSpacer} />
         </View>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={[styles.subtitle, { color: theme.muted }]}>Retrouvez, renommez ou choisissez un lieu pour votre course.</Text>
           <View style={[styles.searchBox, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <MaterialIcons name="search" size={19} color={theme.muted} />
             <TextInput value={query} onChangeText={(value) => setQuery(value.replace(/[^\p{L}\p{N} .,'’()\-]/gu, "").replace(/\s{2,}/g, " "))} placeholder="Rechercher un favori" placeholderTextColor={theme.muted} style={[styles.searchInput, { color: theme.foreground }]} maxLength={80} />

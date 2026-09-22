@@ -369,7 +369,6 @@ export default function ProfileScreen() {
           <View style={[styles.sheet, isDark && { backgroundColor: theme.surface }]}>
             <View style={styles.sheetGrip} />
             <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Mes engins</Text>
-            <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>Sélectionnez les engins que vous utilisez pour les livraisons (au moins un).</Text>
             <View style={styles.vehiclesList}>
               {(["Vélo", "Moto", "Tricycle", "Voiture"] as const).map((option) => {
                 const checked = profile?.vehicles?.includes(option) ?? false;
@@ -412,7 +411,6 @@ export default function ProfileScreen() {
           <View style={[styles.sheet, isDark && { backgroundColor: theme.surface }]}>
             <View style={styles.sheetGrip} />
             <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Choisir un pays</Text>
-            <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>Votre pays reste inchangé jusqu’à ce que vous en choisissiez un autre ici.</Text>
             {locationError ? <Text style={styles.error}>{locationError}</Text> : null}
             <ScrollView style={{ maxHeight: 380, marginTop: 8 }}>
               {(countriesQuery.data ?? []).map((c) => (
@@ -483,7 +481,6 @@ export default function ProfileScreen() {
           <View style={[styles.sheet, isDark && { backgroundColor: theme.surface }]}>
             <View style={styles.sheetGrip} />
             <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Modifier mon profil</Text>
-            <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>Vos informations sont contrôlées avant enregistrement.</Text>
             <Pressable onPress={() => void pickPhoto()} style={({ pressed }) => [styles.photoPicker, pressed && styles.pressed]}>
               <View style={styles.photoPickerIcon}>
                 <MaterialIcons name="add-a-photo" size={22} color="#9A6201" />
@@ -504,7 +501,7 @@ export default function ProfileScreen() {
               placeholderTextColor={theme.placeholder}
               style={[styles.input, error ? styles.inputError : null, isDark && { backgroundColor: theme.background, color: theme.foreground, borderColor: theme.border }]}
             />
-            {error ? <Text style={styles.error}>{error}</Text> : <Text style={[styles.helper, isDark && { color: theme.muted }]}>Un nom unique est accepté. Les séparateurs successifs sont retirés automatiquement.</Text>}
+            {error ? <Text style={styles.error}>{error}</Text> : null}
             <TikisButton label="Enregistrer les modifications" icon="save" onPress={() => void saveProfile()} loading={updateMutation.isPending} style={styles.saveButton} />
           </View>
         </KeyboardAvoidingView>

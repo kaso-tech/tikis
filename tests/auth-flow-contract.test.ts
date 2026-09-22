@@ -73,4 +73,20 @@ describe("parcours de connexion et d’inscription", () => {
     expect(source).not.toContain("welcomeCopy");
     expect(source).not.toContain("onLanguageChange");
   });
+
+  it("ne reformule plus en phrase ce qu’un intitulé dit déjà", () => {
+    // Chaque ligne de confiance de l'accueil portait un titre court *et* une
+    // phrase qui ne faisait que le paraphraser ("Compte sécurisé" / "Votre
+    // numéro est confirmé par un code reçu par SMS."). Le composant ne prend
+    // plus qu'un intitulé.
+    expect(source).toMatch(/function TrustRow\([^)]*\btitle: string;\s*isDark: boolean/);
+    expect(source).not.toContain("Vos coordonnées ne sont partagées");
+    expect(source).not.toContain("Les livreurs l’acceptent ou proposent le leur");
+    // Le nombre de chiffres attendu était déjà visible dans le champ (le
+    // format des espaces le montre) : il ne se répète plus à côté de l'indicatif.
+    expect(source).not.toContain("chiffres</Text>");
+    // Une explication de mécanique interne ("les espaces sont ajoutés
+    // automatiquement…") plutôt qu'une information utile à l'utilisateur.
+    expect(source).not.toContain("Les espaces sont ajoutés automatiquement");
+  });
 });
