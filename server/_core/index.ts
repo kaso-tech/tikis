@@ -47,6 +47,14 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
+  // Un seul saut de confiance : le déploiement place le serveur derrière son
+  // propre reverse proxy / équilibreur, qui pose `X-Forwarded-For` lui-même.
+  // Sans ce réglage, `req.ip` ignore l'en-tête et retombe sur l'adresse du
+  // proxy pour toutes les requêtes ; avec une valeur trop large (`true`),
+  // n'importe quel client pourrait préfixer sa propre IP à l'en-tête, telle
+  // quelle relue en confiance. `1` retient l'unique IP juste avant ce saut.
+  app.set("trust proxy", 1);
+
   app.use(securityHeadersMiddleware);
   app.use(corsMiddleware);
   app.use((req, res, next) => {

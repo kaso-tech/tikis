@@ -9,6 +9,7 @@ import { isCoordinateInCountry } from "./_test-helpers/geo-fence";
 import { storagePut } from "./storage";
 import * as geography from "./geography";
 import { getSessionCookieOptions, setTikisProfileCookie, clearTikisProfileCookie } from "./_core/cookies";
+import { clientIp } from "./_core/security";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, tikisProtectedProcedure, tikisSessionProcedure } from "./_core/trpc";
 import { findCountryForPhone } from "../lib/registration-rules";
@@ -126,6 +127,31 @@ function enforcePerPhoneRateLimit(scope: string, phone: string) {
     const minutes = Math.ceil(PER_PHONE_BLOCK_MS / 60_000);
     throw new Error(`Trop de tentatives pour ce numéro. Réessayez dans ${minutes} minute(s).`);
   }
+}
+
+/**
+ * Complète la limite par numéro d'une limite par IP, distribuée entre les
+ * instances (`checkDistributedRateLimit`, table partagée).
+ *
+ * `enforcePerPhoneRateLimit` remet un compteur à zéro pour chaque nouveau
+ * numéro : sans ce garde-fou, un même client pouvait tenter des dizaines de
+ * numéros différents à la cadence qu'il voulait, chacun avec son propre
+ * budget de 5 tentatives. Un seul espace partagé, `profiles-auth`, couvre
+ * toutes les mutations publiques de `profiles` : mélanger `lookup`,
+ * `register` et `requestContactOtp` depuis la même IP ne redonne pas de
+ * budget neuf à chaque bascule.
+ */
+const IP_AUTH_SCOPE = "profiles-auth";
+const IP_AUTH_WINDOW_MS = 10 * 60_000;
+const IP_AUTH_MAX = 30;
+
+async function enforcePerIpRateLimit(req: { ip?: string; socket?: { remoteAddress?: string } } | undefined) {
+  const ip = clientIp(req ?? {});
+  // Sans IP identifiable (contexte hors HTTP, par ex. en test) : rien à limiter par ce biais,
+  // la limite par numéro reste seule à s'appliquer.
+  if (ip === "unknown") return;
+  const allowed = await db.checkDistributedRateLimit(IP_AUTH_SCOPE, ip, IP_AUTH_WINDOW_MS, IP_AUTH_MAX);
+  if (!allowed) throw new Error("Trop de tentatives depuis cette connexion. Réessayez plus tard.");
 }
 
 const bucketCleanupTimer = setInterval(() => {
@@ -354,6 +380,7 @@ export const appRouter = router({
   profiles: router({
     /** Called after local OTP verification in the simulation flow. A production build must verify OTP server-side before this query. */
     lookup: publicProcedure.input(z.object({ phone: phoneSchema, otp: simulationOtpSchema })).mutation(async ({ input, ctx }) => {
+      await enforcePerIpRateLimit(ctx.req);
       enforcePerPhoneRateLimit("lookup", input.phone);
       const profile = await db.getTikisProfileByPhone(input.phone);
       if (profile) assertProfileNotBlocked(profile);
@@ -363,6 +390,7 @@ export const appRouter = router({
       return { profile: toPublicProfile(profile), sessionToken };
     }),
     lookupSupabase: publicProcedure.input(z.object({ phone: phoneSchema, accessToken: supabaseAccessTokenSchema })).mutation(async ({ input, ctx }) => {
+      await enforcePerIpRateLimit(ctx.req);
       enforcePerPhoneRateLimit("lookupSupabase", input.phone);
       const supabaseUserId = await verifySupabasePhoneSession(input.phone, input.accessToken);
       const profile = await db.getTikisProfileByPhone(input.phone);
@@ -374,6 +402,7 @@ export const appRouter = router({
       return { profile: toPublicProfile(linked), sessionToken };
     }),
     register: publicProcedure.input(registrationInputSchema).mutation(async ({ input, ctx }) => {
+      await enforcePerIpRateLimit(ctx.req);
       enforcePerPhoneRateLimit("register", input.phone);
       await assertCountryEnabled(input.countryCode);
       const referralCode = input.role === "driver" ? await generateUniqueReferralCode(input.fullName) : undefined;
@@ -390,6 +419,7 @@ export const appRouter = router({
       return { profile: toPublicProfile(profile), sessionToken };
     }),
     registerSupabase: publicProcedure.input(profileFieldsSchema.extend({ accessToken: supabaseAccessTokenSchema }).superRefine(validateProfileRole)).mutation(async ({ input, ctx }) => {
+      await enforcePerIpRateLimit(ctx.req);
       enforcePerPhoneRateLimit("registerSupabase", input.phone);
       await assertCountryEnabled(input.countryCode);
       const supabaseUserId = await verifySupabasePhoneSession(input.phone, input.accessToken);
@@ -404,7 +434,8 @@ export const appRouter = router({
     update: publicProcedure.input(z.object({ phone: phoneSchema, otp: simulationOtpSchema, fullName: fullNameSchema.optional(), photoBase64: base64ImageSchema.optional(), photoMime: photoMimeSchema.optional(), country: z.string().length(2).optional(), city: z.string().trim().min(2).max(80).optional() }).superRefine((value, ctx) => {
       if (!value.fullName && !value.photoBase64 && !value.country && !value.city) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Aucune modification à enregistrer." });
       if (value.photoBase64 && !value.photoMime) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["photoMime"], message: "Type d’image requis." });
-    })).mutation(async ({ input }) => {
+    })).mutation(async ({ input, ctx }) => {
+      await enforcePerIpRateLimit(ctx.req);
       enforcePerPhoneRateLimit("update", input.phone);
       let photoKey: string | null | undefined;
       if (input.photoBase64 && input.photoMime) {
@@ -446,7 +477,8 @@ export const appRouter = router({
       kind: z.enum(["phone", "email"]),
       value: z.string().min(3).max(180),
       phone: phoneSchema,
-    })).mutation(async ({ input }) => {
+    })).mutation(async ({ input, ctx }) => {
+      await enforcePerIpRateLimit(ctx.req);
       enforcePerPhoneRateLimit("requestContactOtp", input.phone);
       if (input.kind === "phone") {
         if (!/^\+?[0-9 ]{8,20}$/.test(input.value.trim())) throw new Error("Numéro de téléphone invalide.");
@@ -461,7 +493,8 @@ export const appRouter = router({
       otp: z.string().min(6).max(6),
       phone: phoneSchema,
       sessionOtp: simulationOtpSchema,
-    })).mutation(async ({ input }) => {
+    })).mutation(async ({ input, ctx }) => {
+      await enforcePerIpRateLimit(ctx.req);
       enforcePerPhoneRateLimit("updateContact", input.phone);
       if (input.otp !== input.sessionOtp) throw new Error("Code de confirmation invalide.");
       const current = await db.getTikisProfileByPhone(input.phone);

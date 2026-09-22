@@ -1,17 +1,12 @@
 import { z } from "zod";
 import { router, publicProcedure, tikisAdminProcedure, requireTikisAdminRole, invalidateTikisProfileCache } from "./_core/trpc";
+import { clientIp } from "./_core/security";
 import { assertLoginAllowed, createAdminSession, recordLoginFailure, recordLoginSuccess, verifyAdminPassword } from "./admin-auth";
 import * as adminDb from "./admin-db";
 import * as db from "./db";
 import { publishDeliveryStatusBroadcast } from "./supabase-realtime";
 
-function clientIp(req: { headers: Record<string, unknown>; socket?: { remoteAddress?: string } }) {
-  const forwarded = req.headers["x-forwarded-for"];
-  const value = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  return (typeof value === "string" ? value.split(",")[0].trim() : undefined) ?? req.socket?.remoteAddress ?? "unknown";
-}
-
-async function audit(ctx: { tikisAdmin: { adminId: number; email: string } | null; req: { headers: Record<string, unknown>; socket?: { remoteAddress?: string } } }, action: string, targetType: string, targetId: string, details?: unknown) {
+async function audit(ctx: { tikisAdmin: { adminId: number; email: string } | null; req: { ip?: string; socket?: { remoteAddress?: string } } }, action: string, targetType: string, targetId: string, details?: unknown) {
   if (!ctx.tikisAdmin) return;
   await adminDb.writeAdminAuditLog({ adminId: ctx.tikisAdmin.adminId, adminEmail: ctx.tikisAdmin.email, action, targetType, targetId, details, ipAddress: clientIp(ctx.req) });
 }
