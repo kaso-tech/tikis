@@ -49,9 +49,17 @@ const config: ExpoConfig = {
   icon: "./assets/images/icon.png",
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
+  // Suit `version` automatiquement à chaque publication plutôt qu'une chaîne figée à mettre à
+  // jour à la main : sans lui, EAS Update (le jour où il sera activé) ne saurait à quel binaire
+  // natif associer quelle mise à jour OTA.
+  runtimeVersion: { policy: "appVersion" },
   ios: {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
+    // Numéro de build App Store : distinct de `version` (le numéro visible par l'utilisateur),
+    // incrémenté à chaque soumission vers TestFlight/l'App Store, y compris entre deux versions
+    // identiques. Un premier envoi côté EAS Build l'auto-incrémente ensuite lui-même.
+    buildNumber: "1",
     config: {
       googleMapsApiKey: env.googleMapsIosKey,
     },
@@ -69,6 +77,9 @@ const config: ExpoConfig = {
     softwareKeyboardLayoutMode: "pan",
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
+    // Entier strictement croissant exigé par le Play Store à chaque envoi, y compris entre deux
+    // versions identiques (contrairement à `version`, jamais montré à l'utilisateur).
+    versionCode: 1,
     config: {
       googleMaps: {
         apiKey: env.googleMapsAndroidKey,
@@ -114,25 +125,17 @@ const config: ExpoConfig = {
       "expo-image-picker",
       {
         photosPermission: "Autoriser $(PRODUCT_NAME) à accéder à vos photos pour modifier votre photo de profil.",
+        // L'app n'appelle jamais launchCameraAsync ni ne sélectionne de vidéo (mediaTypes
+        // vaut ["images"] aux deux seuls appels, app/(tabs)/profile.tsx et
+        // app/report/[id].tsx) : caméra et micro n'ont rien à demander.
+        cameraPermission: false,
+        microphonePermission: false,
       },
     ],
     [
       "expo-location",
       {
         locationWhenInUsePermission: "Autoriser $(PRODUCT_NAME) à utiliser votre position pour prioriser les adresses proches de vous.",
-      },
-    ],
-    [
-      "expo-audio",
-      {
-        microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",
-      },
-    ],
-    [
-      "expo-video",
-      {
-        supportsBackgroundPlayback: true,
-        supportsPictureInPicture: true,
       },
     ],
     [
