@@ -136,8 +136,15 @@ const config: ExpoConfig = {
       "expo-location",
       {
         locationWhenInUsePermission: "Autoriser $(PRODUCT_NAME) à utiliser votre position pour prioriser les adresses proches de vous.",
+        // « Toujours » n'est demandé qu'au livreur, et seulement au moment où une course devient
+        // active (lib/background-location-task.ts) : jamais au lancement, jamais à l'expéditeur.
+        locationAlwaysAndWhenInUsePermission: "Autoriser $(PRODUCT_NAME) à partager votre position avec l'expéditeur pendant une course active, même écran verrouillé.",
+        isIosBackgroundLocationEnabled: true,
+        isAndroidBackgroundLocationEnabled: true,
+        isAndroidForegroundServiceEnabled: true,
       },
     ],
+    "expo-task-manager",
     [
       "expo-splash-screen",
       {

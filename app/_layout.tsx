@@ -7,6 +7,9 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { Platform } from "react-native";
 import "@/lib/_core/nativewind-pressable";
+// `defineTask` doit être appelé une seule fois, tôt, en dehors de tout composant — voir
+// lib/background-location-task.ts pour pourquoi ce module existe.
+import "@/lib/background-location-task";
 import { ThemeProvider } from "@/lib/theme-provider";
 import { TikisDrawer } from "@/components/tikis/app-chrome";
 import { AppStatusGate } from "@/components/tikis/app-status-gate";
