@@ -30,16 +30,8 @@ jobs:
       - name: Types (tsc --noEmit)
         run: pnpm check
 
-      # Non bloquant pour l'instant : `eslint-plugin-react-hooks@7` (dépendance d'`eslint-config-expo`)
-      # ajoute des règles de pureté React Compiler (react-hooks/refs, /purity, /set-state-in-effect,
-      # /preserve-manual-memoization) qui remontent 105 signalements sur les patterns `useRef` +
-      # `Animated.Value` employés dans tout le code natif — un cas d'usage légitime de l'API
-      # `Animated` classique, mais que ces règles ne distinguent pas d'un vrai risque pour
-      # `experiments.reactCompiler` (app.config.ts). Chacun mérite d'être trié avant de rendre ce
-      # gate bloquant ; ce lot ne les a pas encore examinés un par un.
       - name: Lint
         run: pnpm lint
-        continue-on-error: true
 
       # Les tests qui exigent de vrais secrets Supabase/Mapbox (tests/*-supabase-*.test.ts,
       # mapbox-supabase-config.test.ts) se sautent eux-mêmes quand ces secrets manquent — ils
