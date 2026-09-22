@@ -218,7 +218,7 @@ export default function DeliveryDetailScreen() {
           {isRouteLoading ? (
             <View style={styles.heroMapRouteLoading} pointerEvents="none">
               <ActivityIndicator size="small" color="#9A6201" />
-              <Text style={styles.heroMapRouteLoadingText}>Calcul de l'itinéraire…</Text>
+              <Text style={styles.heroMapRouteLoadingText}>Calcul de l’itinéraire…</Text>
             </View>
           ) : null}
         </View>

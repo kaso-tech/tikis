@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# Un push qui suit de près annule la vérification du précédent sur la même branche :
+# inutile de finir de vérifier un état déjà dépassé.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Types, lint, tests (app mobile + serveur)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Types (tsc --noEmit)
+        run: pnpm check
+
+      # Non bloquant pour l'instant : `eslint-plugin-react-hooks@7` (dépendance d'`eslint-config-expo`)
+      # ajoute des règles de pureté React Compiler (react-hooks/refs, /purity, /set-state-in-effect,
+      # /preserve-manual-memoization) qui remontent 105 signalements sur les patterns `useRef` +
+      # `Animated.Value` employés dans tout le code natif — un cas d'usage légitime de l'API
+      # `Animated` classique, mais que ces règles ne distinguent pas d'un vrai risque pour
+      # `experiments.reactCompiler` (app.config.ts). Chacun mérite d'être trié avant de rendre ce
+      # gate bloquant ; ce lot ne les a pas encore examinés un par un.
+      - name: Lint
+        run: pnpm lint
+        continue-on-error: true
+
+      # Les tests qui exigent de vrais secrets Supabase/Mapbox (tests/*-supabase-*.test.ts,
+      # mapbox-supabase-config.test.ts) se sautent eux-mêmes quand ces secrets manquent — ils
+      # vérifient un déploiement, pas le code de cette PR. Rien à configurer ici pour ça.
+      - name: Tests
+        run: pnpm test
+
+  admin-check:
+    name: Types (console d'administration)
+    runs-on: ubuntu-latest
+    # La console d'administration est un projet autonome — son propre package.json, son
+    # propre lockfile npm, sa propre chaîne de build (voir admin/README.md) — délibérément
+    # tenu à l'écart du workspace pnpm racine, jamais installé par `pnpm install`.
+    defaults:
+      run:
+        working-directory: admin
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: admin/package-lock.json
+
+      - run: npm ci
+
+      - name: Types (tsc -b)
+        run: npx tsc -b

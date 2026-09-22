@@ -159,7 +159,7 @@ export default function EarningsScreen() {
               <Text style={styles.balanceSub}>{formatMoney(averagePerCourse)}</Text>
             </View>
             <View style={styles.balanceCol}>
-              <Text style={styles.balanceLabel}>Aujourd'hui</Text>
+              <Text style={styles.balanceLabel}>Aujourd’hui</Text>
               <Text style={styles.balanceSub}>{formatMoney(todayEarnings)}</Text>
             </View>
             <View style={styles.balanceCol}>
@@ -261,7 +261,7 @@ export default function EarningsScreen() {
         {isLoading ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.emptyText, { color: theme.muted }]}>Chargement sécurisé de vos gains…</Text></View>
         ) : hasError ? (
-          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.emptyText, { color: theme.muted }]}>L'historique des gains est momentanément indisponible.</Text></View>
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.emptyText, { color: theme.muted }]}>L’historique des gains est momentanément indisponible.</Text></View>
         ) : (
           <>
             <DriverEarningsProjection phone={profile?.phone ?? null} />

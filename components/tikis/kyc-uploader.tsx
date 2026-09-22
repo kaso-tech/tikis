@@ -62,7 +62,7 @@ export function KycUploader({ kind, title, description, capture, loading, onPick
           {loading ? (
             <View style={styles.dropzoneLoading}>
               <MaterialIcons name="hourglass-top" size={22} color={theme.primary} />
-              <Text style={[styles.dropzoneText, { color: theme.foreground }]}>Chargement de l'image…</Text>
+              <Text style={[styles.dropzoneText, { color: theme.foreground }]}>Chargement de l’image…</Text>
             </View>
           ) : (
             <>
