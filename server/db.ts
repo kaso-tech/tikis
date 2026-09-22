@@ -1575,6 +1575,12 @@ export async function listTikisDeliveryCandidates(deliveryId: string): Promise<D
     if (!c.driverPhone) continue;
     completedByDriver.set(c.driverPhone, (completedByDriver.get(c.driverPhone) ?? 0) + 1);
   }
+  // `kyc.submit` refuse une nouvelle soumission une fois `approved` obtenu (« Votre identité
+  // est déjà vérifiée ») : un livreur ne peut jamais avoir à la fois un dossier approuvé et un
+  // autre plus récent d'un statut différent. Un simple test d'existence suffit donc — pas besoin
+  // de ne retenir que la soumission la plus récente par livreur.
+  const approvedKycRows = await db.select({ driverPhone: tikisKycSubmissions.driverPhone }).from(tikisKycSubmissions).where(and(inArray(tikisKycSubmissions.driverPhone, driverPhones), eq(tikisKycSubmissions.status, "approved")));
+  const approvedDrivers = new Set(approvedKycRows.map((r) => r.driverPhone));
   const distanceByDriver = await distancesFromPickup(db, deliveryId, driverPhones);
   return rows.map(({ candidate, profile }) => {
     const stats = ratingByDriver.get(candidate.driverPhone);
@@ -1593,7 +1599,11 @@ export async function listTikisDeliveryCandidates(deliveryId: string): Promise<D
       ...(candidate.offerPrice ? { offerPrice: candidate.offerPrice } : {}),
       status: candidate.status,
       commissionBlocked: candidate.commissionBlocked,
-      isVerified: true,
+      // `submitApplication` (server/routers.ts) exige déjà un KYC approuvé avant de candidater :
+      // ce drapeau devrait donc toujours valoir `true` ici pour une candidature nouvellement créée.
+      // Il reste calculé, et non supposé, pour rester vrai aussi pour les candidatures posées avant
+      // ce contrôle, ou si une révision administrative révoque une approbation après coup.
+      isVerified: approvedDrivers.has(candidate.driverPhone),
       isCertified,
       distanceFromPickupKm: distanceByDriver.get(candidate.driverPhone) ?? null,
       createdAt: candidate.createdAt.toISOString(),

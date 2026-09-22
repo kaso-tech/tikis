@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { COOKIE_NAME } from "../shared/const";
+import type { DriverCandidate } from "../shared/tikis-domain";
 import { randomInt, randomUUID } from "node:crypto";
 import * as db from "./db";
 import { publishDeliveryPositionBroadcast, publishDeliveryStatusBroadcast, syncDeliveryRealtimeMembers } from "./supabase-realtime";
@@ -300,6 +301,21 @@ function deliveryForProfile(delivery: ResolvedDelivery, profile: Awaited<ReturnT
     driverPhone: undefined,
     routeVisibility: "approximate",
   };
+}
+
+/**
+ * Le numéro d'un candidat n'est révélé à l'expéditeur qu'une fois attribué —
+ * symétrique à `deliveryForProfile`, qui masque les coordonnées du côté
+ * livreur jusqu'à l'attribution. Avant sa sélection, le candidat n'est encore
+ * qu'une proposition parmi d'autres : rien dans le client n'a besoin de son
+ * numéro pour l'afficher (l'écran de choix travaille sur `candidate.id`, la
+ * sélection envoie `candidateId`, jamais le numéro) ni pour le sélectionner.
+ * `candidate.id` tient lieu d'identifiant stable tant que le numéro reste caché.
+ */
+function candidateForSender(candidate: DriverCandidate): DriverCandidate {
+  const attributed = candidate.status === "selected" || candidate.status === "confirmed";
+  if (attributed) return candidate;
+  return { ...candidate, driverId: candidate.id };
 }
 
 export const appRouter = router({
@@ -654,14 +670,20 @@ export const appRouter = router({
       const candidates = await db.listTikisDeliveryCandidates(input.deliveryId);
       if (profile.accountType === "sender") {
         if (record.senderPhone !== profile.phone) throw new Error("Cette livraison ne vous appartient pas.");
-        return candidates;
+        return candidates.map(candidateForSender);
       }
       return candidates.filter((candidate) => candidate.driverId === profile.phone);
     }),
     submitApplication: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid(), confirmedCommission: z.number().int().positive().max(10_000_000), offerPrice: z.number().int().positive().max(10_000_000).optional() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") throw new Error("Seul un livreur peut candidater.");
-      if (!profile.photoKey) throw new Error("Votre profil doit être vérifié (photo + pièce d'identité) avant de candidater à une livraison.");
+      if (!profile.photoKey) throw new Error("Votre profil doit avoir une photo avant de candidater à une livraison.");
+      // Avant ce contrôle, seule la photo de profil était exigée : le message promettait une
+      // « pièce d'identité » vérifiée que rien ne vérifiait jamais. `kyc.submit` capture les
+      // documents, mais un dossier `submitted` n'a encore été regardé par personne — seul
+      // `approved` (décision d'un admin, `adminReviewKyc`) atteste réellement de l'identité.
+      const kyc = await db.getLatestKycSubmission(profile.phone);
+      if (kyc?.status !== "approved") throw new Error("Votre identité doit être vérifiée avant de candidater à une livraison. Soumettez vos documents depuis votre profil.");
       const result = await db.applyForTikisDelivery({ id: randomUUID(), deliveryId: input.deliveryId, driverPhone: profile.phone, confirmedCommission: input.confirmedCommission, ...(input.offerPrice ? { offerPrice: input.offerPrice } : {}) });
       // Sans ce signal, la feuille de candidatures d'un Sender déjà ouverte sur l'écran détail ne
       // voyait jamais apparaître une nouvelle candidature sans rafraîchissement manuel.

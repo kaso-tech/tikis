@@ -12,6 +12,7 @@ const dbMock = vi.hoisted(() => ({
   listTikisDeliveryCandidateStatesForDriver: vi.fn(),
   countTikisDeliveryCandidates: vi.fn(),
   listTikisDeliveryCandidates: vi.fn(),
+  getLatestKycSubmission: vi.fn(),
   applyForTikisDelivery: vi.fn(),
   saveTikisDeliveryLiveLocation: vi.fn(),
   getTikisDeliveryLiveLocation: vi.fn(),
@@ -68,6 +69,9 @@ describe("livraisons persistées Tikis", () => {
     dbMock.listTikisWalletLedger.mockResolvedValue([]);
     dbMock.getTikisCommissionRate.mockResolvedValue(0.1);
     dbMock.listTikisDeliveryEvents.mockResolvedValue([]);
+    // Par défaut, le livreur des tests a une identité déjà vérifiée : ce fichier teste
+    // l'accès aux livraisons, pas le contrôle KYC (couvert par kyc-application-gate.test.ts).
+    dbMock.getLatestKycSubmission.mockResolvedValue({ status: "approved" });
   });
 
   it("refuse la création sans session Tikis", async () => {

@@ -8,6 +8,7 @@ const screen = read("components/tikis/candidates-sheet.tsx");
 const detail = read("app/delivery/[id].tsx");
 const db = read("server/db.ts");
 const domain = read("shared/tikis-domain.ts");
+const routers = read("server/routers.ts");
 
 describe("la distance affichée est réelle, ou avouée inconnue", () => {
   it("aucune distance n'est écrite en dur dans l'écran", () => {
@@ -121,5 +122,33 @@ describe("le bandeau de mise en avant reste vérifiable", () => {
 
   it("il s'efface dès qu'un livreur est retenu", () => {
     expect(screen).toContain("chosen ? null : bestPlacedCandidate");
+  });
+});
+
+describe("le badge « vérifié » reflète un vrai contrôle d'identité", () => {
+  it("isVerified n'est plus une constante, il vient du statut KYC approuvé", () => {
+    // C'était `isVerified: true` en dur : l'expéditeur lisait « vérifié » sur un livreur
+    // dont l'identité n'avait été contrôlée par personne.
+    expect(db).not.toContain("isVerified: true,");
+    expect(db).toContain("isVerified: approvedDrivers.has(candidate.driverPhone)");
+    expect(db).toContain('eq(tikisKycSubmissions.status, "approved")');
+  });
+
+  it("candidater exige ce même statut approuvé, pas seulement une photo de profil", () => {
+    const mutation = routers.slice(routers.indexOf("submitApplication:"), routers.indexOf("update: tikisProtectedProcedure.input(deliveryInputSchema"));
+    expect(mutation).toContain("getLatestKycSubmission(profile.phone)");
+    expect(mutation).toContain('kyc?.status !== "approved"');
+  });
+});
+
+describe("le numéro d'un candidat n'est révélé qu'une fois attribué", () => {
+  it("candidateForSender masque le numéro tant que le statut n'est pas sélectionné ou confirmé", () => {
+    expect(routers).toContain('candidate.status === "selected" || candidate.status === "confirmed"');
+    expect(routers).toContain("driverId: candidate.id");
+  });
+
+  it("la procédure candidates applique ce masquage côté expéditeur", () => {
+    const procedure = routers.slice(routers.indexOf("candidates: tikisProtectedProcedure"), routers.indexOf("submitApplication:"));
+    expect(procedure).toContain("candidates.map(candidateForSender)");
   });
 });
