@@ -13,6 +13,7 @@ import { ActivityIndicator, Animated, Dimensions, Linking, PanResponder, Pressab
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
+import { useApproachRoute, useRouteCoordinates } from "@/hooks/use-route-coordinates";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
 import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { formatDistanceKm } from "@/lib/date-format";
@@ -144,53 +145,19 @@ export default function DeliveryTrackingScreen() {
     { enabled: Boolean(delivery?.driverPhone), refetchInterval: 60_000 },
   );
 
-  const { mutateAsync: requestRoute, isPending: isRouteLoading } = trpc.geography.route.useMutation();
-  const [coordinates, setCoordinates] = useState<Coordinate[]>([]);
-  const [approach, setApproach] = useState<Coordinate[]>([]);
-  const [routeError, setRouteError] = useState(false);
+  // Itinéraire et approche passent par les hooks partagés avec la fiche de
+  // livraison. Cet écran refaisait sa propre requête, dont la dépendance était
+  // l'objet `delivery` : la requête de livraison se revalidant toutes les huit
+  // secondes, un itinéraire était redemandé à la même cadence. Le quota de
+  // `geography.route` s'épuisait, et c'est la fiche — un appel, un échec — qui
+  // en payait le prix en retombant sur sa ligne droite au retour ici.
+  const { coordinates, isLoading: isRouteLoading, hasFailed: routeError } = useRouteCoordinates(delivery?.pickup, delivery?.dropoff);
+  const approach = useApproachRoute({
+    from: livePosition,
+    to: delivery?.pickup,
+    enabled: delivery?.status === "active",
+  });
   const [sheetLevel, setSheetLevel] = useState<SheetLevel>("mid");
-
-  const pickupLatitude = delivery?.pickup.latitude;
-  const pickupLongitude = delivery?.pickup.longitude;
-  const dropoffLatitude = delivery?.dropoff.latitude;
-  const dropoffLongitude = delivery?.dropoff.longitude;
-  const routeInput = useMemo(
-    () => delivery && pickupLatitude !== undefined && pickupLongitude !== undefined && dropoffLatitude !== undefined && dropoffLongitude !== undefined
-      ? { origin: delivery.pickup, destination: delivery.dropoff }
-      : null,
-    [delivery, dropoffLatitude, dropoffLongitude, pickupLatitude, pickupLongitude],
-  );
-
-  useEffect(() => {
-    let current = true;
-    if (!routeInput) return;
-    setRouteError(false);
-    void requestRoute(routeInput)
-      .then((route) => { if (current) setCoordinates(route.coordinates ?? []); })
-      .catch(() => { if (current) { setCoordinates([]); setRouteError(true); } });
-    return () => { current = false; };
-  }, [requestRoute, routeInput]);
-
-  // Le segment d'approche se recalcule seulement quand le livreur a bougé : une
-  // requête d'itinéraire à chaque point GPS reçu ne changerait presque rien au
-  // tracé et multiplierait les appels.
-  const lastApproach = useRef<{ latitude: number; longitude: number; at: number } | null>(null);
-  useEffect(() => {
-    let current = true;
-    if (!livePosition || !delivery || delivery.status !== "active" || pickupLatitude === undefined || pickupLongitude === undefined) {
-      setApproach([]);
-      return;
-    }
-    const previous = lastApproach.current;
-    const movedMeters = previous ? haversineKm(previous, livePosition) * 1_000 : Infinity;
-    if (previous && movedMeters < 80 && Date.now() - previous.at < 15_000) return;
-    lastApproach.current = { latitude: livePosition.latitude, longitude: livePosition.longitude, at: Date.now() };
-    const origin = { name: "Position du livreur", district: "", city: "", latitude: livePosition.latitude, longitude: livePosition.longitude, source: "manual" as const };
-    void requestRoute({ origin, destination: delivery.pickup })
-      .then((route) => { if (current) setApproach(route.coordinates ?? []); })
-      .catch(() => { if (current) setApproach([{ latitude: livePosition.latitude, longitude: livePosition.longitude }, { latitude: pickupLatitude, longitude: pickupLongitude }]); });
-    return () => { current = false; };
-  }, [delivery, livePosition, pickupLatitude, pickupLongitude, requestRoute]);
 
   // === Glissement de la feuille ===
   const panY = useRef(new Animated.Value(0)).current;

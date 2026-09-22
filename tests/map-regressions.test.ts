@@ -10,15 +10,20 @@ const detail = read("app/delivery/[id].tsx");
 const hooks = read("hooks/use-route-coordinates.ts");
 const sheet = read("components/tikis/candidates-sheet.tsx");
 
+const tracking = read("app/delivery/[id]/map.tsx");
+
 const surfaces = { accueil: home, "fiche de livraison": routeMap };
 
 describe("les calques de la carte ont une identité stable", () => {
+  // `TrackedMarker` habille `Marker` pour piloter `tracksViewChanges` (voir
+  // « le marqueur de collecte survit à un aller-retour d'écran » plus bas) :
+  // un calque de la carte, au même titre que `Marker` et `Polyline`.
   it.each(Object.entries(surfaces))("sur %s, chaque marqueur et chaque tracé porte une clé", (_name, source) => {
     // Sans clé, React réconcilie par position : quand le marqueur de position
     // s'efface à l'arrivée d'une course, `react-native-maps` retire côté natif
     // celui qui occupe l'index libéré — le point de collecte.
-    const layers = source.match(/<(Marker|Polyline)\b/g) ?? [];
-    const keyed = source.match(/<(Marker|Polyline) key=/g) ?? [];
+    const layers = source.match(/<(Marker|TrackedMarker|Polyline)\b/g) ?? [];
+    const keyed = source.match(/<(Marker|TrackedMarker|Polyline) key=/g) ?? [];
     expect(layers.length).toBeGreaterThan(0);
     expect(keyed.length).toBe(layers.length);
   });
@@ -26,9 +31,34 @@ describe("les calques de la carte ont une identité stable", () => {
   it.each(Object.entries(surfaces))("sur %s, le rang de dessin est explicite", (_name, source) => {
     // « The order of overlays with the same z-index is arbitrary », dit la
     // documentation de react-native-maps.
-    const layers = source.match(/<(Marker|Polyline)\b/g) ?? [];
+    const layers = source.match(/<(Marker|TrackedMarker|Polyline)\b/g) ?? [];
     const ranked = source.match(/zIndex=\{MAP_Z\./g) ?? [];
     expect(ranked.length).toBe(layers.length);
+  });
+});
+
+describe("le marqueur de collecte survit à un aller-retour d'écran", () => {
+  const tracked = read("components/tikis/tracked-marker.tsx");
+
+  it("chaque épingle et le livreur passent par TrackedMarker, pas Marker nu", () => {
+    // `tracksViewChanges` vrai en continu coûte cher ; faux en continu laisse
+    // parfois une image vide après un retour d'écran — c'était le marqueur de
+    // collecte qui disparaissait de l'accueil. TrackedMarker pilote les deux.
+    expect(home).not.toMatch(/<Marker\b/);
+    expect(routeMap).not.toMatch(/<Marker\b/);
+    expect(home).toContain("TrackedMarker");
+    expect(routeMap).toContain("TrackedMarker");
+  });
+
+  it("l'image est reprise au retour sur l'écran, pas seulement au montage", () => {
+    expect(tracked).toContain("useFocusEffect");
+  });
+
+  it("le livreur redessine son cap sans dépendre de sa coordonnée", () => {
+    // `redrawKey` doit changer avec le cap affiché, jamais avec la position :
+    // sinon chaque point GPS reprendrait un instantané, en continu.
+    expect(home).toContain('redrawKey={driverHeading ?? "no-heading"}');
+    expect(routeMap).toContain('redrawKey={driverPosition.heading ?? "no-heading"}');
   });
 });
 
@@ -60,6 +90,26 @@ describe("l’itinéraire survit à un retour sur l’écran", () => {
     expect(home).toContain("useRouteCoordinates(pickup, dropoff)");
     expect(home).not.toContain("setRouteCoordinates");
     expect(home).not.toContain("setApproachCoordinates");
+  });
+
+  it("l'écran de suivi ne redemande plus son propre itinéraire à chaque revalidation de la livraison", () => {
+    // Son `useEffect` dépendait de `delivery` — que `livePosition` (toutes les
+    // 2 s) et la revalidation de la fiche (toutes les 8 s) rendent neuf sans
+    // cesse. Chaque rendu relançait donc une requête `geography.route`,
+    // épuisant le quota que la fiche partage avec cet écran.
+    expect(tracking).toContain("useRouteCoordinates(delivery?.pickup, delivery?.dropoff)");
+    expect(tracking).toContain("useApproachRoute({");
+    expect(tracking).not.toContain("requestRoute(routeInput)");
+  });
+
+  it("un échec réseau se retente, il n'abandonne pas la fiche sur sa ligne droite", () => {
+    expect(hooks).toContain("ROUTE_RETRY_DELAYS_MS");
+    expect(hooks).toContain("setAttempt((value) => value + 1)");
+  });
+
+  it("un itinéraire déjà obtenu se redessine sans requête au retour sur l'écran", () => {
+    expect(hooks).toContain("readCachedRoute(key)");
+    expect(hooks).toContain("writeCachedRoute(key, coordinates)");
   });
 });
 

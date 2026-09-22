@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Polyline } from "react-native-maps";
 import { CHIP_ANCHOR, DriverMarker, DropoffMarker, MAP_Z, PickupMarker, PIN_ANCHOR } from "@/components/tikis/map-markers";
+import { TrackedMarker } from "@/components/tikis/tracked-marker";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import type { LocationLabel } from "@/shared/tikis-domain";
 
@@ -100,16 +101,16 @@ export function DeliveryRouteMap({
         {approachCoordinates && approachCoordinates.length >= 2 ? (
           <Polyline key="approach-line" coordinates={approachCoordinates} strokeColor={theme.success} strokeWidth={5} lineCap="round" lineJoin="round" zIndex={MAP_Z.approach} />
         ) : null}
-        <Marker key="pickup" coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }} anchor={PIN_ANCHOR} zIndex={MAP_Z.pin}>
+        <TrackedMarker key="pickup" coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }} anchor={PIN_ANCHOR} zIndex={MAP_Z.pin}>
           <PickupMarker />
-        </Marker>
-        <Marker key="dropoff" coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }} anchor={PIN_ANCHOR} zIndex={MAP_Z.pin}>
+        </TrackedMarker>
+        <TrackedMarker key="dropoff" coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }} anchor={PIN_ANCHOR} zIndex={MAP_Z.pin}>
           <DropoffMarker />
-        </Marker>
+        </TrackedMarker>
         {driverPosition ? (
-          <Marker key="driver" coordinate={{ latitude: driverPosition.latitude, longitude: driverPosition.longitude }} anchor={CHIP_ANCHOR} zIndex={MAP_Z.driver}>
+          <TrackedMarker key="driver" coordinate={{ latitude: driverPosition.latitude, longitude: driverPosition.longitude }} anchor={CHIP_ANCHOR} zIndex={MAP_Z.driver} redrawKey={driverPosition.heading ?? "no-heading"}>
             <DriverMarker heading={driverPosition.heading} />
-          </Marker>
+          </TrackedMarker>
         ) : null}
       </MapView>
       {userMovedMap ? (

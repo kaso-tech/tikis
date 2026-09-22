@@ -2,9 +2,10 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Animated, Dimensions, Linking, PanResponder, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import MapView, { Marker, Polyline, type Region } from "react-native-maps";
+import MapView, { Polyline, type Region } from "react-native-maps";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { CHIP_ANCHOR, DriverMarker, DropoffMarker, MAP_Z, PickupMarker, PIN_ANCHOR } from "@/components/tikis/map-markers";
+import { TrackedMarker } from "@/components/tikis/tracked-marker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
 import { haptic } from "@/lib/haptics";
@@ -797,26 +798,26 @@ function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeadin
             avec lui. Le rang de dessin est explicite pour la même raison — à
             rang égal, la bibliothèque ne promet aucun ordre. */}
         {!selected && userLocation ? (
-          <Marker key="user-position" coordinate={userLocation} anchor={{ x: 0.5, y: 0.5 }} zIndex={MAP_Z.driver} title="Votre position">
+          <TrackedMarker key="user-position" coordinate={userLocation} anchor={{ x: 0.5, y: 0.5 }} zIndex={MAP_Z.driver} title="Votre position">
             <View style={styles.userMarkerHalo}>
               <View style={styles.userMarkerDot} />
             </View>
-          </Marker>
+          </TrackedMarker>
         ) : null}
         {selected ? (
           <>
             {approachCoordinates.length > 1 ? <Polyline key="approach-line" coordinates={approachCoordinates} strokeColor="#176C52" strokeWidth={4} lineCap="round" zIndex={MAP_Z.approach} /> : null}
             {routeCoordinates.length > 1 ? <Polyline key="route-line" coordinates={routeCoordinates} strokeColor="#9A6201" strokeWidth={4} lineCap="round" zIndex={MAP_Z.route} /> : null}
-            <Marker key={`pickup-${selected.id}`} coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={PIN_ANCHOR} zIndex={MAP_Z.pin}>
+            <TrackedMarker key={`pickup-${selected.id}`} coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={PIN_ANCHOR} zIndex={MAP_Z.pin}>
               <PickupMarker />
-            </Marker>
-            <Marker key={`dropoff-${selected.id}`} coordinate={{ latitude: selected.dropoff.latitude, longitude: selected.dropoff.longitude }} anchor={PIN_ANCHOR} zIndex={MAP_Z.pin}>
+            </TrackedMarker>
+            <TrackedMarker key={`dropoff-${selected.id}`} coordinate={{ latitude: selected.dropoff.latitude, longitude: selected.dropoff.longitude }} anchor={PIN_ANCHOR} zIndex={MAP_Z.pin}>
               <DropoffMarker />
-            </Marker>
+            </TrackedMarker>
             {hasDriver && driverPosition ? (
-              <Marker key="driver-position" coordinate={driverPosition} anchor={CHIP_ANCHOR} zIndex={MAP_Z.driver}>
+              <TrackedMarker key="driver-position" coordinate={driverPosition} anchor={CHIP_ANCHOR} zIndex={MAP_Z.driver} redrawKey={driverHeading ?? "no-heading"}>
                 <DriverMarker heading={driverHeading} />
-              </Marker>
+              </TrackedMarker>
             ) : null}
           </>
         ) : null}

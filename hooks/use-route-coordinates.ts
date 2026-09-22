@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from "react";
+import { readCachedRoute, writeCachedRoute } from "@/lib/route-cache";
 import { isUsablePoint, pointKey, routeGeometryKey, shouldRefreshApproach, type ApproachAnchor, type Point } from "@/lib/route-refresh";
 import { trpc } from "@/lib/trpc";
 import type { LocationLabel } from "@/shared/tikis-domain";
+
+/** Reprises après échec, et attente avant chacune. Trois essais espacés
+ *  couvrent une coupure réseau passagère ou un pic de latence sans transformer
+ *  un incident en martèlement du serveur. */
+export const ROUTE_RETRY_DELAYS_MS = [1_500, 4_000, 10_000] as const;
+export const ROUTE_MAX_ATTEMPTS = ROUTE_RETRY_DELAYS_MS.length;
 
 /** Un point GPS habillé en lieu, seul format accepté par `geography.route`. */
 function asPlace(point: Point, name: string): LocationLabel {
@@ -17,13 +24,21 @@ function asPlace(point: Point, name: string): LocationLabel {
  * livraison, dont l'itinéraire redevenait une ligne droite au retour du suivi
  * en direct.
  */
-export function useRouteCoordinates(origin: LocationLabel | null | undefined, destination: LocationLabel | null | undefined): { coordinates: Point[]; isLoading: boolean } {
+export function useRouteCoordinates(origin: LocationLabel | null | undefined, destination: LocationLabel | null | undefined): { coordinates: Point[]; isLoading: boolean; hasFailed: boolean } {
   const routeMutation = trpc.geography.route.useMutation();
   const requestRef = useRef(routeMutation.mutateAsync);
   requestRef.current = routeMutation.mutateAsync;
   const [coordinates, setCoordinates] = useState<Point[]>([]);
   const endpointsRef = useRef<{ origin: LocationLabel; destination: LocationLabel } | null>(null);
   const requestedKey = useRef<string | null>(null);
+  /** Compteur de reprises : le faire changer relance l'effet à géométrie
+   *  constante, seule façon de retenter après un échec. */
+  const [attempt, setAttempt] = useState(0);
+  /** Vrai une fois les reprises épuisées : l'écran peut alors dire que le
+   *  tracé affiché n'est qu'indicatif, au lieu de le laisser passer pour vrai. */
+  const [hasFailed, setHasFailed] = useState(false);
+  const attemptsForKey = useRef<{ key: string; count: number }>({ key: "", count: 0 });
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const usable = isUsablePoint(origin) && isUsablePoint(destination);
   if (usable) endpointsRef.current = { origin: origin as LocationLabel, destination: destination as LocationLabel };
@@ -37,20 +52,55 @@ export function useRouteCoordinates(origin: LocationLabel | null | undefined, de
     }
     // Même géométrie qu'au dernier appel : le tracé en place reste le bon.
     if (requestedKey.current === key) return;
+    // Déjà obtenu plus tôt dans la session — au premier passage sur la fiche,
+    // ou sur l'écran de suivi, qui est un écran distinct : on le redessine sans
+    // requête, donc sans ligne droite intermédiaire.
+    const cached = readCachedRoute(key);
+    if (cached) {
+      requestedKey.current = key;
+      setHasFailed(false);
+      setCoordinates(cached);
+      return;
+    }
     const endpoints = endpointsRef.current;
     if (!endpoints) return;
     requestedKey.current = key;
     let active = true;
     setCoordinates((current) => (current.length ? [] : current));
     void requestRef.current({ origin: endpoints.origin, destination: endpoints.destination })
-      .then((route) => { if (active) setCoordinates(route.coordinates ?? []); })
-      // L'échec n'est pas réessayé en boucle : la carte retombe sur son tracé
-      // provisoire, que `DeliveryRouteMap` signale déjà par un trait pointillé.
-      .catch(() => { if (active) setCoordinates([]); });
-    return () => { active = false; };
-  }, [key]);
+      .then((route) => {
+        const coordinates = route.coordinates ?? [];
+        writeCachedRoute(key, coordinates);
+        if (!active) return;
+        setHasFailed(false);
+        setCoordinates(coordinates);
+      })
+      .catch(() => {
+        // La demande n'a pas abouti : on efface la marque, sans quoi la clé
+        // resterait notée comme « déjà demandée » et plus aucun rendu ne
+        // retenterait. C'est ce qui figeait la carte sur sa ligne droite
+        // jusqu'à la fermeture de l'écran, pour un seul échec réseau.
+        if (requestedKey.current === key) requestedKey.current = null;
+        if (!active) return;
+        setCoordinates([]);
+        const tally = attemptsForKey.current.key === key ? attemptsForKey.current : { key, count: 0 };
+        if (tally.count >= ROUTE_MAX_ATTEMPTS) {
+          setHasFailed(true);
+          // Épuisé : la carte garde son tracé provisoire, que `DeliveryRouteMap`
+          // signale par un trait pointillé. Inutile de marteler le réseau.
+          attemptsForKey.current = tally;
+          return;
+        }
+        attemptsForKey.current = { key, count: tally.count + 1 };
+        retryTimer.current = setTimeout(() => setAttempt((value) => value + 1), ROUTE_RETRY_DELAYS_MS[tally.count]);
+      });
+    return () => {
+      active = false;
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+    };
+  }, [attempt, key]);
 
-  return { coordinates, isLoading: routeMutation.isPending };
+  return { coordinates, isLoading: routeMutation.isPending, hasFailed };
 }
 
 /**
