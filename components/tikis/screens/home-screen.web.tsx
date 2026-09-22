@@ -110,37 +110,51 @@ export function HomeScreen() {
   const [filter, setFilter] = useState<FilterKey>("open");
   const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
+  // Repartir du filtre « Publiées » à chaque changement de rôle : ajustement pendant le
+  // rendu (state React), pas dans un effet — un setState synchrone dans le corps d'un
+  // effet est refusé par le compilateur (react-hooks/set-state-in-effect), et comparer
+  // au rôle du rendu précédent est le remplacement documenté.
+  const [prevRole, setPrevRole] = useState(role);
+  if (role !== prevRole) {
+    setPrevRole(role);
     setFilter("open");
-  }, [role]);
+  }
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [driverOnline, setDriverOnline] = useState(true);
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [applicationDelivery, setApplicationDelivery] = useState<Delivery | null>(null);
   const [pendingAction, setPendingAction] = useState<PendingHomeAction | null>(null);
   const [candidatesDeliveryId, setCandidatesDeliveryId] = useState<string | null>(null);
-  const [nowTick, setNow] = useState(0);
-  const now = Date.now() + nowTick;
-  const hasInitialData = useRef(false);
+  // Tenue à jour par l'intervalle plus bas — plus l'ancien `Date.now() + nowTick`, qui appelait
+  // `Date.now()` pendant le rendu : impur pour le React Compiler (react-hooks/purity).
+  const [now, setNow] = useState(() => Date.now());
+  // state, pas ref : lu pendant le rendu juste plus bas (évite de réafficher l'état de
+  // chargement à chaque refetch une fois les premières données arrivées).
+  const [hasInitialData, setHasInitialData] = useState(false);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   useEffect(() => {
-    const interval = setInterval(() => setNow((t) => t + 1), 30_000);
+    const interval = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(interval);
   }, []);
-  useEffect(() => {
-    if (deliveriesQuery.data) hasInitialData.current = true;
-  }, [deliveriesQuery.data]);
-  const sheetHeight = useRef(new Animated.Value(SHEET_PEEK)).current;
+  // Ajustement pendant le rendu, pas dans un effet : la donnée est déjà disponible ici, un
+  // aller-retour par un effet n'apporterait rien — et une fois vrai, la condition s'arrête d'elle-même.
+  if (deliveriesQuery.data && !hasInitialData) {
+    setHasInitialData(true);
+  }
+  // useState plutôt que useRef(...).current : des valeurs Animated stables, créées une seule fois,
+  // lues pendant le rendu (styles/interpolations ci-dessous) — ce que le React Compiler interdit à
+  // un ref (react-hooks/refs), pas à un state dont on n'appelle jamais le setter.
+  const [sheetHeight] = useState(() => new Animated.Value(SHEET_PEEK));
   const sheetValue = useRef(SHEET_PEEK);
   const dragStartHeight = useRef(SHEET_PEEK);
-  const filterTransition = useRef(new Animated.Value(1)).current;
+  const [filterTransition] = useState(() => new Animated.Value(1));
   const previousDeliveryStatuses = useRef<Record<string, DeliveryStatus> | null>(null);
-  const badgeScales = useRef<Record<FilterKey, Animated.Value>>({
+  const [badgeScales] = useState<Record<FilterKey, Animated.Value>>(() => ({
     open: new Animated.Value(1),
     pending: new Animated.Value(1),
     active: new Animated.Value(1),
     completed: new Animated.Value(1),
-  }).current;
+  }));
   const driverLocation = useDriverLocation({ enabled: role === "driver" });
   // Tient à jour le centre des rayons « alertes » et « affichage » du livreur (cf. app/driver-alerts.tsx).
   useDriverBasePositionSync(driverLocation.location, role === "driver");
@@ -178,20 +192,15 @@ export function HomeScreen() {
   const publishLivePositionMutation = trpc.deliveries.updateLivePosition.useMutation();
   const lastPublishedPosition = useRef<{ deliveryId: string; latitude: number; longitude: number } | null>(null);
 
-  useEffect(() => {
-    if (!selectedId && selected) setSelectedId(selected.id);
-  }, [selected, selectedId]);
-
-  useEffect(() => {
-    if (selectedId && filteredList.every((d) => d.id !== selectedId)) {
-      if (role === "driver") {
-        const own = filteredList.find((d) => d.ownCandidateStatus === "selected" || d.ownCandidateStatus === "confirmed" || d.status === "active");
-        setSelectedId(own?.id ?? filteredList[0]?.id ?? null);
-      } else {
-        setSelectedId(filteredList[0]?.id ?? null);
-      }
-    }
-  }, [filteredList, selectedId, role]);
+  // Fait persister le choix de secours de `selected` (ci-dessus) dans `selectedId`, pour qu'il ne
+  // soit recalculé que si la sélection redevient invalide — pas à chaque rendu. Ajustement pendant
+  // le rendu, pas dans un effet : `selected.id` reste toujours celui vers lequel `selectedId` doit
+  // converger (`selected` retombe déjà sur le même repli — livreur propre puis premier de la liste —
+  // que ces deux anciens effets recalculaient séparément), donc `selectedId !== selected.id`
+  // rétablit l'invariant sans jamais boucler : une fois synchronisés, la condition devient fausse.
+  if (selected && selectedId !== selected.id) {
+    setSelectedId(selected.id);
+  }
 
   useEffect(() => {
     if (role !== "driver" || selected?.status !== "active" || !driverLocation.location) return;
@@ -214,7 +223,14 @@ export function HomeScreen() {
     Animated.timing(sheetHeight, { toValue, duration: 220, useNativeDriver: false }).start();
   };
 
-  const panResponder = useRef(PanResponder.create({
+  // useState (initialiseur paresseux) plutôt que useRef(...).current : PanResponder.create est appelé
+  // une seule fois, sa référence reste stable sur toute la vie de l'écran — un recalcul à chaque
+  // rendu casserait un glissement en cours au prochain rafraîchissement de données (livraisons,
+  // position live…). Les callbacks lisent/écrivent sheetValue/dragStartHeight.current : sûr, puisqu'ils
+  // ne sont jamais appelés pendant le rendu, seulement à l'événement — mais le compilateur ne peut
+  // pas le prouver statiquement, d'où la désactivation ciblée ci-dessous.
+  // eslint-disable-next-line react-hooks/refs -- lecture différée à l'événement, jamais pendant le rendu (cf. commentaire au-dessus)
+  const [panResponder] = useState(() => PanResponder.create({
     onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 5 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
     onPanResponderGrant: () => { dragStartHeight.current = sheetValue.current; },
     onPanResponderMove: (_, gesture) => {
@@ -231,7 +247,7 @@ export function HomeScreen() {
           : targets.reduce((closest, snap) => Math.abs(snap - current) < Math.abs(closest - current) ? snap : closest, SHEET_PEEK);
       animateSheetTo(target);
     },
-  })).current;
+  }));
 
   const utilities = trpc.useUtils();
   const applyMutation = trpc.deliveries.submitApplication.useMutation();
@@ -529,7 +545,7 @@ export function HomeScreen() {
           </ScrollView>
 
           <Animated.View style={[styles.tabContent, { opacity: filterTransition, transform: [{ translateY: filterTranslateY }] }]}>
-          {!hasInitialData.current && deliveriesQuery.isLoading ? (
+          {!hasInitialData && deliveriesQuery.isLoading ? (
             <View style={styles.loadingState}>
               <ActivityIndicator color="#9A6201" />
               <Text style={styles.loadingText}>Chargement de vos livraisons…</Text>

@@ -23,14 +23,19 @@ export function PlacePicker({ label, tone, value, countryCode, onChange }: Props
   const latestSearch = useRef(0);
   const searchMutationRef = useRef(search.mutateAsync);
   const valueRef = useRef(value);
-  searchMutationRef.current = search.mutateAsync;
-  valueRef.current = value;
+  // Écrit hors du rendu : affecter `.current` directement dans le corps du composant est aussi
+  // interdit par le compilateur qu'une lecture — seul un effet ou un gestionnaire le peut.
+  useEffect(() => {
+    searchMutationRef.current = search.mutateAsync;
+    valueRef.current = value;
+  });
   const { colors: theme } = useThemeColors();
   const { bias: deviceBias, status: gpsStatus, requestBias } = useSearchLocationBias();
   const accent = tone === "pickup" ? theme.primary : theme.error;
   const biasLatitude = deviceBias?.latitude ?? null;
   const biasLongitude = deviceBias?.longitude ?? null;
   const runSearch = useCallback(async (rawQuery: string, includeCommunityFallback = false) => { const clean = autocompleteQuery(rawQuery); if (!clean) { setResults((current) => current.length ? [] : current); return; } const requestId = ++latestSearch.current; try { setMessage(""); const selectedPlace = valueRef.current; const preferredBias = biasLatitude !== null && biasLongitude !== null ? { latitude: biasLatitude, longitude: biasLongitude } : (selectedPlace ? { latitude: selectedPlace.latitude, longitude: selectedPlace.longitude } : null); const places = await searchMutationRef.current({ query: clean, ...(countryCode ? { countryCode } : {}), ...(preferredBias ? { biasLatitude: preferredBias.latitude, biasLongitude: preferredBias.longitude } : {}), ...(includeCommunityFallback ? { includeCommunityFallback: true } : {}) }); if (requestId !== latestSearch.current) return; setResults((current) => haveSameSuggestionIds(current, places) ? current : places); if (!places.length) setMessage(includeCommunityFallback ? "Aucun lieu trouvé." : "Aucun résultat Mapbox. Appuyez sur Rechercher pour élargir aux commerces connus."); } catch (cause) { if (requestId === latestSearch.current) setMessage(cause instanceof Error ? cause.message : "La recherche est indisponible."); } }, [biasLatitude, biasLongitude, countryCode]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- `setResults` retourne la même référence si déjà vide (updater ci-dessous) : React ignore alors ce rendu, aucune cascade réelle. Nécessaire ici pour invalider en même temps toute recherche en vol via `latestSearch`, une écriture de ref qui doit elle aussi rester hors du rendu.
   useEffect(() => { if (!autocompleteQuery(query)) { latestSearch.current += 1; setResults((current) => current.length ? [] : current); return; } const timer = setTimeout(() => { void runSearch(query); }, PLACE_AUTOCOMPLETE_DEBOUNCE_MS); return () => clearTimeout(timer); }, [query, runSearch]);
   async function selectSuggestion(suggestion: PlaceSuggestion) { try { if (suggestion.directLocation) { latestSearch.current += 1; onChange(suggestion.directLocation); setResults([]); setMessage(""); return; } if (!suggestion.mapboxId) throw new Error("Ce résultat ne possède pas de coordonnées exploitables."); setMessage("Chargement des coordonnées…"); const place = await resolvePlace({ mapboxId: suggestion.mapboxId, ...(suggestion.mapboxSessionToken ? { mapboxSessionToken: suggestion.mapboxSessionToken } : {}) }); latestSearch.current += 1; onChange(place); setResults([]); setMessage(""); } catch (cause) { setMessage(cause instanceof Error ? cause.message : "La sélection du lieu est indisponible."); } }
   async function prioritizeNearbyResults() { const nearby = await requestBias(); setMessage(nearby ? (autocompleteQuery(query) ? "Résultats priorisés autour de votre position actuelle." : "Position activée. Saisissez une adresse pour rechercher à proximité.") : "Position indisponible ou non autorisée. La recherche reste disponible."); }

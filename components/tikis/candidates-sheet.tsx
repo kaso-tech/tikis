@@ -82,26 +82,43 @@ export function CandidatesSheet({ visible, deliveryId, onClose }: Props) {
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState("");
 
-  const baseHeight = useRef(new Animated.Value(SHEET_MID_HEIGHT)).current;
-  const panY = useRef(new Animated.Value(0)).current;
-  const enter = useRef(new Animated.Value(0)).current;
+  // useState plutôt que useRef(...).current : une valeur Animated stable, créée une seule fois, lue
+  // pendant le rendu (styles ci-dessous) — ce que le React Compiler interdit à un ref
+  // (react-hooks/refs), pas à un state dont on n'appelle jamais le setter.
+  const [baseHeight] = useState(() => new Animated.Value(SHEET_MID_HEIGHT));
+  const [panY] = useState(() => new Animated.Value(0));
+  const [enter] = useState(() => new Animated.Value(0));
   const levelRef = useRef<SheetLevel>("mid");
-  levelRef.current = level;
+  // Écrit hors du rendu : affecter `.current` directement dans le corps du composant est aussi
+  // interdit par le compilateur qu'une lecture — seul un effet ou un gestionnaire le peut.
+  useEffect(() => { levelRef.current = level; });
   // Fermer depuis le PanResponder, créé une seule fois : sans cette indirection il
   // capturerait le `onClose` du premier rendu.
   const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  useEffect(() => { closeRef.current = onClose; });
 
-  // Chaque ouverture repart du palier bas et de l'état neutre : une feuille
-  // rouverte sur le filtre « Certifiés » d'une autre course serait incompréhensible.
+  // Chaque ouverture repart du palier bas et de l'état neutre : une feuille rouverte sur le filtre
+  // « Certifiés » d'une autre course serait incompréhensible. Ajustement pendant le rendu (state
+  // React) plutôt que dans un effet : le compilateur interdit un setState synchrone dans le corps
+  // d'un effet (react-hooks/set-state-in-effect), et ce motif — comparer au rendu précédent — est le
+  // remplacement documenté (https://react.dev/reference/react/useState#storing-information-from-previous-renders).
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (visible) {
+      setLevel("mid");
+      setSort(DEFAULT_CANDIDATE_SORT);
+      setCertifiedOnly(false);
+      setPending(null);
+      setSortOpen(false);
+      setMessage("");
+    }
+  }
+
+  // Ce qui reste dans un effet : uniquement l'animation elle-même, un appel impératif à un système
+  // externe (Animated) — pas du state React, donc rien que le compilateur n'interdise ici.
   useEffect(() => {
     if (!visible) return;
-    setLevel("mid");
-    setSort(DEFAULT_CANDIDATE_SORT);
-    setCertifiedOnly(false);
-    setPending(null);
-    setSortOpen(false);
-    setMessage("");
     baseHeight.setValue(SHEET_MID_HEIGHT);
     panY.setValue(0);
     enter.setValue(0);
@@ -117,21 +134,26 @@ export function CandidatesSheet({ visible, deliveryId, onClose }: Props) {
     panY.setValue(0);
   }, [level, baseHeight, panY]);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 4,
-      onPanResponderMove: (_, gesture) => { panY.setValue(sheetDragOffset(gesture.dy)); },
-      onPanResponderRelease: (_, gesture) => {
-        const next = nextSheetLevel(levelRef.current, gesture.dy, gesture.vy);
-        Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start();
-        // Une liste n'a pas de palier replié utile : le geste qui y mènerait ferme.
-        if (next === "mini") closeRef.current();
-        else setLevel(next);
-      },
-      onPanResponderTerminate: () => { Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start(); },
-    }),
-  ).current;
+  // useState (initialiseur paresseux) plutôt que useRef(...).current : PanResponder.create est appelé
+  // une seule fois, sa référence reste stable sur toute la vie de la feuille — un recalcul à chaque
+  // rendu casserait un glissement en cours au prochain rafraîchissement de données. Les callbacks lisent
+  // levelRef.current / closeRef.current : sûr, puisqu'ils ne sont jamais appelés pendant le rendu,
+  // seulement à l'événement — mais le compilateur ne peut pas le prouver statiquement, d'où la
+  // désactivation ciblée ci-dessous.
+  // eslint-disable-next-line react-hooks/refs -- lecture différée à l'événement, jamais pendant le rendu (cf. commentaire au-dessus)
+  const [panResponder] = useState(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 4,
+    onPanResponderMove: (_, gesture) => { panY.setValue(sheetDragOffset(gesture.dy)); },
+    onPanResponderRelease: (_, gesture) => {
+      const next = nextSheetLevel(levelRef.current, gesture.dy, gesture.vy);
+      Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start();
+      // Une liste n'a pas de palier replié utile : le geste qui y mènerait ferme.
+      if (next === "mini") closeRef.current();
+      else setLevel(next);
+    },
+    onPanResponderTerminate: () => { Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start(); },
+  }));
 
   const delivery = deliveryQuery.data;
   const deliveryPrice = delivery ? (delivery.offeredPrice ?? delivery.estimatedPrice) : 0;

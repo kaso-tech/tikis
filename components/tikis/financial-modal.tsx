@@ -1,5 +1,5 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { TikisButton } from "@/components/tikis/ui";
 import { useThemeColors } from "@/lib/use-theme-colors";
@@ -34,13 +34,17 @@ export function FinancialConfirmationModal({
   const [counterError, setCounterError] = useState<string | null>(null);
   const [counterFieldOpen, setCounterFieldOpen] = useState(false);
 
-  useEffect(() => {
+  // Ajustement pendant le rendu, comparé au rendu précédent, plutôt qu'un setState synchrone dans
+  // le corps d'un effet (react-hooks/set-state-in-effect) : réinitialise la contre-offre à la fermeture.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
     if (!visible) {
       setCounterInput("");
       setCounterError(null);
       setCounterFieldOpen(false);
     }
-  }, [visible]);
+  }
 
   const counterAmount = counterInput.trim().length > 0 ? parseOfferedPrice(counterInput) : null;
   const counterValid = counterAmount === null || (counterAmount !== undefined && offeredPriceError(String(counterAmount)) === undefined);

@@ -16,7 +16,7 @@ describe("pulsation des badges de statut", () => {
   });
 
   it.each(sources)("effectue une pulsation discrète et réversible sur le badge concerné", (source) => {
-    expect(source).toContain("const badgeScales = useRef<Record<FilterKey, Animated.Value>>");
+    expect(source).toContain("const [badgeScales] = useState<Record<FilterKey, Animated.Value>>");
     expect(source).toContain("Animated.sequence([");
     expect(source).toContain("toValue: 1.14, duration: 110");
     expect(source).toContain("toValue: 1, duration: 170");

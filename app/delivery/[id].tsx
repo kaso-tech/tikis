@@ -76,6 +76,7 @@ export default function DeliveryDetailScreen() {
 
   useEffect(() => {
     if (!countdownDeliveryId || countdownStatus === "completed" || countdownStatus === "expired" || countdownStatus === "cancelled") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resynchronise l'horloge dès que le compte à rebours devient éligible (nouvelle livraison, ou statut qui vient de le permettre) ; `Date.now()` est nécessairement lu ici (impur), donc ne peut pas migrer vers un ajustement pendant le rendu comme les autres cas de ce lot — sans lui, le premier rendu afficherait une horloge périmée jusqu'au prochain battement de l'intervalle.
     setClock(Date.now());
     const interval = setInterval(() => setClock(Date.now()), 1_000);
     return () => clearInterval(interval);

@@ -38,7 +38,10 @@ export default function DeliveryDraftsScreen() {
       return () => {
         active = false;
       };
-    }, [profile?.phone]),
+      // `[profile]`, pas `[profile?.phone]` : le React Compiler infère la dépendance depuis l'accès
+      // `profile.phone` ci-dessus (une fois `profile?.phone` vérifié non nul) et refuse de préserver
+      // une mémoïsation manuelle plus étroite que ce qu'il a lui-même inféré.
+    }, [profile]),
   );
 
   async function handleDelete(draft: DeliveryDraft) {

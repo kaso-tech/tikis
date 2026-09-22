@@ -24,22 +24,38 @@ export function YangoAddressPicker({ visible, target, value, countryCode, profil
   const [mapVisible, setMapVisible] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [recentPlaces, setRecentPlaces] = useState<LocationLabel[]>([]);
-  const translateY = useRef(new Animated.Value(0)).current;
+  // useState plutôt que useRef(...).current : une valeur Animated stable, créée une seule fois, lue
+  // pendant le rendu (styles/PanResponder ci-dessous) — ce que le React Compiler interdit à un ref
+  // (react-hooks/refs), pas à un state dont on n'appelle jamais le setter.
+  const [translateY] = useState(() => new Animated.Value(0));
   const search = trpc.geography.search.useMutation();
   const resolve = trpc.geography.resolve.useMutation();
   const reverse = trpc.geography.reverse.useMutation();
   const latestSearch = useRef(0);
   const searchMutationRef = useRef(search.mutateAsync);
   const valueRef = useRef(value);
-  valueRef.current = value;
-  searchMutationRef.current = search.mutateAsync;
+  // Écrit hors du rendu : affecter `.current` directement dans le corps du composant est aussi
+  // interdit par le compilateur qu'une lecture — seul un effet ou un gestionnaire le peut.
+  useEffect(() => {
+    valueRef.current = value;
+    searchMutationRef.current = search.mutateAsync;
+  });
   const { bias, status: gpsStatus, requestBias } = useSearchLocationBias();
   const hasQuery = Boolean(query.trim());
   const title = target === "pickup" ? "Adresse de récupération" : target === "dropoff" ? "Adresse de destination" : "Nouvelle adresse";
 
+  // Ajustement pendant le rendu, comparé au rendu précédent, plutôt qu'un setState synchrone dans
+  // le corps d'un effet (react-hooks/set-state-in-effect) : réinitialise l'écran à la fermeture.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (!visible) { setQuery(""); setResults([]); setMessage(""); setShowAddresses(false); setSelecting(false); setMapVisible(false); }
+  }
+
+  // Ce qui reste dans un effet : uniquement l'appel impératif à Animated, un système externe.
   useEffect(() => {
     if (visible) return;
-    setQuery(""); setResults([]); setMessage(""); setShowAddresses(false); setSelecting(false); setMapVisible(false); translateY.setValue(0);
+    translateY.setValue(0);
   }, [translateY, visible]);
 
   useEffect(() => {
@@ -67,6 +83,7 @@ export function YangoAddressPicker({ visible, target, value, countryCode, profil
   }, [bias, countryCode]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- `setResults` retourne la même référence si déjà vide (updater ci-dessus) : React ignore alors ce rendu, aucune cascade réelle. Nécessaire ici pour invalider en même temps toute recherche en vol via `latestSearch`, une écriture de ref qui doit elle aussi rester hors du rendu.
     if (!hasQuery) { latestSearch.current += 1; setResults((current) => current.length ? [] : current); return; }
     const suggestionTimer = setTimeout(() => { void runSearch(query); }, PLACE_AUTOCOMPLETE_DEBOUNCE_MS);
     const expandedSearchTimer = setTimeout(() => { void runSearch(query, true); }, Math.max(850, PLACE_AUTOCOMPLETE_DEBOUNCE_MS + 450));

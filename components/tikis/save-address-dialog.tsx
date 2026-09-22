@@ -1,5 +1,5 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, View } from "react-native";
 import { TikisButton } from "@/components/tikis/ui";
 import { sanitizePlaceText } from "@/lib/geo-rules";
@@ -11,7 +11,13 @@ export function SaveAddressDialog({ visible, place, onClose, onSave }: { visible
   const [label, setLabel] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  useEffect(() => { if (visible) { setLabel(""); setError(""); } }, [visible]);
+  // Ajustement pendant le rendu, comparé au rendu précédent, plutôt qu'un setState synchrone dans
+  // le corps d'un effet (react-hooks/set-state-in-effect) : réinitialise le champ à l'ouverture.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (visible) { setLabel(""); setError(""); }
+  }
   async function save() { if (!place || !label.trim() || saving) return; setSaving(true); setError(""); try { await onSave(label.trim()); onClose(); } catch (cause) { setError(cause instanceof Error ? cause.message : "Impossible d’enregistrer cette adresse."); } finally { setSaving(false); } }
   return <Modal visible={visible} transparent animationType="fade" onRequestClose={() => !saving && onClose()}><View style={[styles.overlay, { backgroundColor: theme.overlay }]}><KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.keyboard}><View style={[styles.dialog, { backgroundColor: theme.surface }]}><View style={[styles.icon, { backgroundColor: theme.primary + "14" }]}><MaterialIcons name="bookmark-add" size={25} color={theme.primary} /></View><Text style={[styles.title, { color: theme.foreground }]}>Enregistrer cette adresse</Text>{place ? <View style={[styles.address, { backgroundColor: theme.input }]}><Text style={[styles.addressTitle, { color: theme.foreground }]} numberOfLines={1}>{locationTitle(place)}</Text><Text style={[styles.addressMeta, { color: theme.muted }]} numberOfLines={2}>{locationSubtitle(place)}</Text></View> : null}<Text style={[styles.label, { color: theme.muted }]}>LIBELLÉ</Text><TextInput value={label} onChangeText={(value) => { setLabel(sanitizePlaceText(value, 80, { preserveTrailingSpace: true })); setError(""); }} placeholder="Ex. Maison ou Bureau" placeholderTextColor={theme.muted} style={[styles.input, { backgroundColor: theme.input, color: theme.foreground, borderColor: error ? theme.error : theme.border }]} maxLength={80} autoFocus returnKeyType="done" onSubmitEditing={() => void save()} />{error ? <Text style={[styles.error, { color: theme.error }]}>{error}</Text> : null}<View style={styles.actions}><TikisButton label="Annuler" variant="secondary" onPress={onClose} disabled={saving} style={styles.action} /><TikisButton label="Enregistrer" icon="bookmark-add" onPress={() => void save()} loading={saving} loadingLabel="Enregistrement…" disabled={!label.trim()} style={styles.action} /></View></View></KeyboardAvoidingView></View></Modal>;
 }

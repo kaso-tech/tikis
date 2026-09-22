@@ -160,8 +160,11 @@ export default function DeliveryTrackingScreen() {
   const [sheetLevel, setSheetLevel] = useState<SheetLevel>("mid");
 
   // === Glissement de la feuille ===
-  const panY = useRef(new Animated.Value(0)).current;
-  const sheetBaseHeight = useRef(new Animated.Value(SHEET_MID_HEIGHT)).current;
+  // useState plutôt que useRef(...).current : une valeur Animated stable, créée une seule fois, lue
+  // pendant le rendu (styles/PanResponder ci-dessous) — ce que le React Compiler interdit à un ref
+  // (react-hooks/refs), pas à un state dont on n'appelle jamais le setter.
+  const [panY] = useState(() => new Animated.Value(0));
+  const [sheetBaseHeight] = useState(() => new Animated.Value(SHEET_MID_HEIGHT));
   const sheetLevelRef = useRef(sheetLevel);
   useEffect(() => { sheetLevelRef.current = sheetLevel; }, [sheetLevel]);
 
@@ -177,18 +180,24 @@ export default function DeliveryTrackingScreen() {
     panY.setValue(0);
   }, [panY, sheetBaseHeight, sheetLevel]);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 4,
-      onPanResponderMove: (_, gesture) => { panY.setValue(sheetDragOffset(gesture.dy)); },
-      onPanResponderRelease: (_, gesture) => {
-        setSheetLevel(nextSheetLevel(sheetLevelRef.current, gesture.dy, gesture.vy));
-        Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start();
-      },
-      onPanResponderTerminate: () => { Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start(); },
-    }),
-  ).current;
+  // useState (initialiseur paresseux) plutôt que useRef(...).current : PanResponder.create est appelé
+  // une seule fois, sa référence reste stable sur toute la vie du composant — un simple recalcul à
+  // chaque rendu casserait un glissement en cours au prochain rafraîchissement de la position live
+  // (toutes les ~2 s pendant une course active). `onPanResponderRelease` lit sheetLevelRef.current :
+  // sûr, puisqu'il n'est jamais appelé pendant le rendu, seulement au relâchement du doigt — mais le
+  // compilateur ne peut pas prouver statiquement que PanResponder.create n'invoque pas ses callbacks
+  // immédiatement, d'où la désactivation ciblée ci-dessous.
+  // eslint-disable-next-line react-hooks/refs -- lecture différée à l'événement, jamais pendant le rendu (cf. commentaire au-dessus)
+  const [panResponder] = useState(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 4,
+    onPanResponderMove: (_, gesture) => { panY.setValue(sheetDragOffset(gesture.dy)); },
+    onPanResponderRelease: (_, gesture) => {
+      setSheetLevel(nextSheetLevel(sheetLevelRef.current, gesture.dy, gesture.vy));
+      Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start();
+    },
+    onPanResponderTerminate: () => { Animated.timing(panY, { toValue: 0, duration: 200, useNativeDriver: false }).start(); },
+  }));
 
   const sheetHeight = Animated.add(sheetBaseHeight, panY);
 
@@ -215,7 +224,11 @@ export default function DeliveryTrackingScreen() {
     haptic.light();
     const url = `tel:${delivery.driverPhone}`;
     if (await Linking.canOpenURL(url)) await Linking.openURL(url);
-  }, [delivery?.driverPhone]);
+    // `[delivery]`, pas `[delivery?.driverPhone]` : le React Compiler infère la dépendance depuis
+    // l'accès `delivery.driverPhone` ci-dessus (une fois vérifié non nul), pas depuis l'expression
+    // optionnelle du tableau de dépendances — une mémoïsation manuelle plus étroite que ce qu'il
+    // infère lui-même n'est jamais préservée.
+  }, [delivery]);
 
   // Le suivi en direct est réservé aux expéditeurs : un livreur n'a jamais accès à cette page.
   if (role === "driver") {

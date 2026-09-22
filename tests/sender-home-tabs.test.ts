@@ -32,7 +32,7 @@ describe("onglets de l’accueil expéditeur", () => {
   });
 
   it.each([nativeSource, webSource])("anime le contenu du filtre avec une transition brève et accessible", (source) => {
-    expect(source).toContain("const filterTransition = useRef(new Animated.Value(1)).current;");
+    expect(source).toContain("const [filterTransition] = useState(() => new Animated.Value(1));");
     expect(source).toContain("function selectFilter(nextFilter: FilterKey)");
     expect(source).toContain("duration: 180");
     expect(source).toContain("styles.tabContent");

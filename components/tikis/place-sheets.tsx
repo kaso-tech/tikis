@@ -1,5 +1,5 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -41,12 +41,16 @@ export function FloatingPlacePicker({
     setPendingPlace((current) => current?.mapboxId === place.mapboxId && current?.latitude === place.latitude && current?.longitude === place.longitude ? current : place);
   }, []);
 
-  useEffect(() => {
+  // Ajustement pendant le rendu, comparé au rendu précédent, plutôt qu'un setState synchrone dans
+  // le corps d'un effet (react-hooks/set-state-in-effect) : réinitialise la sélection à la fermeture.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
     if (!visible) {
       setPendingPlace(null);
       setConfirming(false);
     }
-  }, [visible]);
+  }
 
   function confirmPlace() {
     if (!pendingPlace || confirming) return;

@@ -51,12 +51,11 @@ export function AuthFlow() {
 
   // Sécurité : si le pays pré-sélectionné localement a été désactivé depuis la console admin,
   // on ne le laisse jamais soumis par défaut — on bascule sur le premier pays réellement actif.
-  useEffect(() => {
-    if (!countriesQuery.data || countriesQuery.data.length === 0) return;
-    const stillEnabled = countriesQuery.data.some((c) => c.id === country.id);
-    if (!stillEnabled) setCountry(countriesQuery.data[0]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countriesQuery.data]);
+  // Ajustement pendant le rendu, pas dans un effet : la donnée est déjà disponible ici, et la
+  // condition s'arrête d'elle-même une fois `country` de nouveau valide, sans jamais boucler.
+  if (countriesQuery.data && countriesQuery.data.length > 0 && !countriesQuery.data.some((c) => c.id === country.id)) {
+    setCountry(countriesQuery.data[0]);
+  }
   const [isCountryPickerOpen, setCountryPickerOpen] = useState(false);
   const [phoneInput, setPhoneInput] = useState("");
   const [phoneError, setPhoneError] = useState("");

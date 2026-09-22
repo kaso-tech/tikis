@@ -45,6 +45,7 @@ export function TrackedMarker({
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- `retake` pose `tracks` à vrai puis programme, via le timer déjà tenu en ref, son retour à faux après SETTLE_MS : les deux doivent rester choreographiés ensemble dans un effet, pas scindés en un ajustement de rendu qui ne peut ni lire ni écrire `timer.current`.
     retake();
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, [redrawKey, retake]);

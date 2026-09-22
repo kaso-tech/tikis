@@ -25,8 +25,12 @@ export function PlacePicker({ label, tone, value, countryCode, onChange }: Props
   const latestSearch = useRef(0);
   const searchMutationRef = useRef(search.mutateAsync);
   const valueRef = useRef(value);
-  searchMutationRef.current = search.mutateAsync;
-  valueRef.current = value;
+  // Écrit hors du rendu : affecter `.current` directement dans le corps du composant est aussi
+  // interdit par le compilateur qu'une lecture — seul un effet ou un gestionnaire le peut.
+  useEffect(() => {
+    searchMutationRef.current = search.mutateAsync;
+    valueRef.current = value;
+  });
   const { colors: theme } = useThemeColors();
   const { bias: deviceBias, status: gpsStatus, requestBias } = useSearchLocationBias();
   const accent = tone === "pickup" ? theme.primary : theme.error;
@@ -36,9 +40,18 @@ export function PlacePicker({ label, tone, value, countryCode, onChange }: Props
   const biasLatitude = deviceBias?.latitude ?? null;
   const biasLongitude = deviceBias?.longitude ?? null;
 
+  // Ajustement pendant le rendu, pas dans un effet : l'updater ci-dessous renvoie la même référence
+  // si `query` correspond déjà — un setState synchrone dans le corps d'un effet est refusé par le
+  // compilateur (react-hooks/set-state-in-effect), et cette forme auto-gardée s'exécute sans risque
+  // à chaque rendu qualifiant, sans jamais boucler.
+  if (valueName && valueLatitude !== null && valueLongitude !== null) {
+    setQuery((current) => current === valueName ? current : valueName);
+  }
+
+  // Ce qui reste dans un effet : uniquement l'appel impératif à la carte, qui doit rester gardé par
+  // les dépendances pour ne pas rejouer l'animation à chaque rendu.
   useEffect(() => {
     if (!valueName || valueLatitude === null || valueLongitude === null) return;
-    setQuery((current) => current === valueName ? current : valueName);
     mapRef.current?.animateToRegion({ latitude: valueLatitude, longitude: valueLongitude, latitudeDelta: 0.025, longitudeDelta: 0.025 }, 350);
   }, [valueLatitude, valueLongitude, valueName]);
 
@@ -61,6 +74,7 @@ export function PlacePicker({ label, tone, value, countryCode, onChange }: Props
   }, [biasLatitude, biasLongitude, countryCode]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- `setResults` retourne la même référence si déjà vide (updater ci-dessus) : React ignore alors ce rendu, aucune cascade réelle. Nécessaire ici pour invalider en même temps toute recherche en vol via `latestSearch`, une écriture de ref qui doit elle aussi rester hors du rendu.
     if (!autocompleteQuery(query)) { latestSearch.current += 1; setResults((current) => current.length ? [] : current); return; }
     const timer = setTimeout(() => { void runSearch(query); }, PLACE_AUTOCOMPLETE_DEBOUNCE_MS);
     return () => clearTimeout(timer);

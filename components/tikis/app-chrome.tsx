@@ -1,6 +1,6 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, usePathname } from "expo-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { Animated, Easing, Modal, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar } from "@/components/tikis/ui";
@@ -57,8 +57,11 @@ export function TikisDrawer() {
   const { role, profile } = useTikisStore();
   const { openLogoutConfirmation } = useTikisLogout();
   const { colorScheme, setColorScheme } = useThemeContext();
-  const slide = useRef(new Animated.Value(-DRAWER_WIDTH)).current;
-  const scrimOpacity = useRef(new Animated.Value(0)).current;
+  // useState plutôt que useRef(...).current : une valeur Animated stable, créée une seule fois, lue
+  // pendant le rendu (style ci-dessous) — ce que le React Compiler interdit à un ref (react-hooks/refs),
+  // pas à un state dont on n'appelle jamais le setter.
+  const [slide] = useState(() => new Animated.Value(-DRAWER_WIDTH));
+  const [scrimOpacity] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.parallel([

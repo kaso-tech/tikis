@@ -20,12 +20,14 @@ export default function NotificationSettingsScreen() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  // `loading` démarre déjà à `true` (état initial ci-dessus) — `refresh` n'est appelée qu'une fois,
+  // au montage : un `setLoading(true)` ici serait redondant, sans rien changer à ce que l'écran affiche.
   const refresh = useCallback(async () => {
-    setLoading(true);
     setStatus(await getPushPermissionStatus());
     setLoading(false);
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- chargement asynchrone au montage, l'état ne se pose qu'après l'attente de `getPushPermissionStatus()` — le motif documenté par React pour récupérer une donnée dans un effet (https://react.dev/learn/synchronizing-with-effects#fetching-data).
   useEffect(() => { void refresh(); }, [refresh]);
 
   const enable = useCallback(async () => {

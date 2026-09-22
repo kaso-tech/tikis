@@ -55,6 +55,10 @@ export default function EarningsScreen() {
   const { profile } = useTikisStore();
   const [period, setPeriod] = useState<Period>("day");
   const [flow, setFlow] = useState<FlowFilter>("earnings");
+  // Capturé une fois à l'ouverture de l'écran plutôt qu'appelé pendant le rendu (deux fois, dans le
+  // calcul ci-dessous) : `Date.now()` est impur pour le React Compiler (react-hooks/purity). Des
+  // fenêtres de 7/14 jours n'ont pas besoin d'une fraîcheur à la seconde près.
+  const [now] = useState(() => Date.now());
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, {
     enabled: Boolean(profile?.phone),
     refetchInterval: 5_000,
@@ -94,7 +98,7 @@ export default function EarningsScreen() {
     const totalLast7 = earningsHistory
       .filter((entry) => {
         const date = new Date(entry.createdAt);
-        const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
         return date.getTime() >= sevenDaysAgo && isDeliveryEarning(entry);
       })
       .reduce((sum, entry) => sum + entry.amount, 0);
@@ -102,7 +106,6 @@ export default function EarningsScreen() {
     const totalPrev7 = earningsHistory
       .filter((entry) => {
         const date = new Date(entry.createdAt);
-        const now = Date.now();
         return date.getTime() >= now - 14 * 24 * 60 * 60 * 1000 && date.getTime() < now - 7 * 24 * 60 * 60 * 1000 && isDeliveryEarning(entry);
       })
       .reduce((sum, entry) => sum + entry.amount, 0);
@@ -121,7 +124,7 @@ export default function EarningsScreen() {
       comparison: { last7: totalLast7, prev7: totalPrev7, trend },
       history: visible.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
     };
-  }, [journal, earningsHistory, period, flow]);
+  }, [journal, earningsHistory, period, flow, now]);
 
   const todayEarnings = useMemo(() => deliveryMetricsForDay(earningsHistory).earnings, [earningsHistory]);
   const lastEarningDate = history[0] ? new Date(history[0].createdAt) : null;

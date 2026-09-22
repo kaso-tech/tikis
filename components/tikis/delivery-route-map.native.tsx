@@ -75,8 +75,17 @@ export function DeliveryRouteMap({
     });
   }, [route]);
 
-  useEffect(() => {
+  // Redonne la main au cadrage automatique dès qu'un nouvel itinéraire arrive : ajustement pendant
+  // le rendu, comparé au rendu précédent, plutôt qu'un setState synchrone dans le corps de l'effet
+  // ci-dessous (react-hooks/set-state-in-effect) — `route` est l'unique dépendance de `fitToRoute`,
+  // donc comparer son identité suffit à détecter le même changement.
+  const [prevRoute, setPrevRoute] = useState(route);
+  if (route !== prevRoute) {
+    setPrevRoute(route);
     setUserMovedMap(false);
+  }
+
+  useEffect(() => {
     const timer = setTimeout(() => fitToRoute(true), 180);
     return () => clearTimeout(timer);
   }, [fitToRoute]);
