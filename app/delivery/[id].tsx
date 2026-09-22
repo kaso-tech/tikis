@@ -1,11 +1,13 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, useLocalSearchParams } from "expo-router";
-import { type ComponentProps, useEffect, useMemo, useRef, useState } from "react";
+import { type ComponentProps, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
 import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
+import { useApproachRoute, useRouteCoordinates } from "@/hooks/use-route-coordinates";
+import { useDriverLocation } from "@/hooks/use-driver-location";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { SectionHeading, TikisButton } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
@@ -13,7 +15,7 @@ import { deliveryRemainingMs, formatDeliveryCountdown } from "@/lib/delivery-cou
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
-import { deliveryStatusMeta, formatMoney, formatRelativeDate } from "@/shared/tikis-domain";
+import { deliveryStatusMeta, formatMoney, formatRelativeDate, isPickupPending } from "@/shared/tikis-domain";
 
 type FinancialAction = "apply" | "withdraw" | "confirm" | "complete" | null;
 type SenderAction = "disable" | "reactivate" | "cancel" | "unselect" | null;
@@ -36,44 +38,18 @@ export default function DeliveryDetailScreen() {
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: Boolean(profile?.phone) });
   const deliveryQuery = trpc.deliveries.get.useQuery({ id: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
   const candidatesQuery = trpc.deliveries.candidates.useQuery({ deliveryId: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
-  const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
-  const requestRouteMutation = trpc.geography.route.useMutation();
-  const requestRouteRef = useRef(requestRouteMutation.mutateAsync);
-  requestRouteRef.current = requestRouteMutation.mutateAsync;
   const delivery = deliveryQuery.data;
-  const fallbackRouteCoordinates = useMemo(
-    () => {
-      if (!delivery) return [] as { latitude: number; longitude: number }[];
-      return [
-        { latitude: delivery.pickup.latitude, longitude: delivery.pickup.longitude },
-        { latitude: delivery.dropoff.latitude, longitude: delivery.dropoff.longitude },
-      ];
-    },
-    [delivery?.pickup.latitude, delivery?.pickup.longitude, delivery?.dropoff.latitude, delivery?.dropoff.longitude],
-  );
-  const mapCoordinates = useMemo(
-    () => (routeCoordinates.length >= 2 ? routeCoordinates : fallbackRouteCoordinates),
-    [routeCoordinates, fallbackRouteCoordinates],
-  );
-  useEffect(() => {
-    if (!delivery) return;
-    const pickup = delivery.pickup;
-    const dropoff = delivery.dropoff;
-    if (typeof pickup.latitude !== "number" || typeof dropoff.latitude !== "number") return;
-    let cancelled = false;
-    setRouteCoordinates([]);
-    void requestRouteRef.current({ origin: pickup, destination: dropoff }).then((route) => {
-      if (cancelled) return;
-      setRouteCoordinates(route.coordinates ?? []);
-    }).catch((cause) => {
-      if (cancelled) return;
-      console.warn("[delivery-detail] Itinéraire indisponible, fallback polyline locale", cause instanceof Error ? cause.message : cause);
-      setRouteCoordinates([]);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [delivery]);
+  // Clé sur la géométrie, pas sur l'objet livraison : une revalidation de la
+  // requête — au retour du suivi en direct, par exemple — rendait un objet neuf,
+  // vidait le tracé, et la carte retombait sur la ligne droite.
+  const { coordinates: routeCoordinates, isLoading: isRouteLoading } = useRouteCoordinates(delivery?.pickup, delivery?.dropoff);
+  const isDriver = role === "driver";
+  const driverLocation = useDriverLocation({ enabled: isDriver });
+  const approachCoordinates = useApproachRoute({
+    from: driverLocation.location,
+    to: delivery?.pickup,
+    enabled: isDriver && isPickupPending(delivery?.status),
+  });
   const applyMutation = trpc.deliveries.submitApplication.useMutation();
   const withdrawMutation = trpc.deliveries.withdraw.useMutation();
   const confirmMutation = trpc.deliveries.confirm.useMutation();
@@ -231,13 +207,15 @@ export default function DeliveryDetailScreen() {
             pickup={delivery.pickup}
             dropoff={delivery.dropoff}
             routeSource={delivery.routeSource}
-            coordinates={mapCoordinates}
+            coordinates={routeCoordinates}
+            driverPosition={isDriver ? driverLocation.location : null}
+            approachCoordinates={approachCoordinates}
           />
           <View style={styles.heroMapStatus}>
             <View style={[styles.heroMapDot, { backgroundColor: statusBadgeColor }]} />
             <Text style={styles.heroMapStatusText}>{statusBadgeText}</Text>
           </View>
-          {requestRouteMutation.isPending ? (
+          {isRouteLoading ? (
             <View style={styles.heroMapRouteLoading} pointerEvents="none">
               <ActivityIndicator size="small" color="#9A6201" />
               <Text style={styles.heroMapRouteLoadingText}>Calcul de l'itinéraire…</Text>

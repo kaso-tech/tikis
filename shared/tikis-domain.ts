@@ -141,6 +141,17 @@ export interface Delivery {
   routeVisibility?: DeliveryRouteVisibility;
 }
 
+/**
+ * La course attend-elle encore d'être récupérée ?
+ *
+ * C'est la seule question à laquelle répond le tracé livreur → point de
+ * collecte : tant qu'elle est ouverte, attribuée ou en cours, ce trajet est
+ * devant lui. Une fois livrée, annulée ou expirée, il ne le concerne plus.
+ */
+export function isPickupPending(status: DeliveryStatus | undefined | null): boolean {
+  return status === "open" || status === "pending_confirmation" || status === "active";
+}
+
 export function isDeliveryCompletedToday(delivery: Pick<Delivery, "status" | "completedAt">, now = new Date()): boolean {
   if (delivery.status !== "completed" || !delivery.completedAt) return false;
   const completedAt = new Date(delivery.completedAt);

@@ -35,6 +35,26 @@ export const PIN_ANCHOR = { x: 0.5, y: 1 } as const;
 /** Ancrage d'une pastille : son centre tombe sur la coordonnée. */
 export const CHIP_ANCHOR = { x: 0.5, y: 0.5 } as const;
 
+/**
+ * L'ordre de superposition sur la carte.
+ *
+ * « The order of overlays with the same z-index is arbitrary », dit la
+ * documentation de `react-native-maps` — et tous les marqueurs de Tikis
+ * partageaient le même rang par défaut. Leur ordre de dessin dépendait donc de
+ * l'implémentation, ce qui n'est pas une base pour une carte qui doit se lire
+ * pareil à chaque ouverture.
+ */
+export const MAP_Z = {
+  /** Le trajet de la course, dessous. */
+  route: 1,
+  /** L'approche du livreur, par-dessus le trajet. */
+  approach: 2,
+  /** Les deux extrémités. */
+  pin: 3,
+  /** Le livreur, toujours visible au-dessus du reste. */
+  driver: 4,
+} as const;
+
 function Pin({ color, icon }: { color: string; icon: "inventory-2" | "sports-score" }) {
   return (
     <View style={styles.pin}>

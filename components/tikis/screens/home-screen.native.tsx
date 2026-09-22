@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, Animated, Dimensions, Linking, PanResponder, 
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import MapView, { Marker, Polyline, type Region } from "react-native-maps";
 import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
-import { CHIP_ANCHOR, DriverMarker, DropoffMarker, PickupMarker, PIN_ANCHOR } from "@/components/tikis/map-markers";
+import { CHIP_ANCHOR, DriverMarker, DropoffMarker, MAP_Z, PickupMarker, PIN_ANCHOR } from "@/components/tikis/map-markers";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisStore } from "@/lib/tikis-store";
 import { haptic } from "@/lib/haptics";
@@ -14,12 +14,13 @@ import { useDriverLocation } from "@/hooks/use-driver-location";
 import { useDriverBasePositionSync } from "@/hooks/use-driver-base-position-sync";
 import { useDeviceHeading } from "@/hooks/use-device-heading";
 import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
+import { useApproachRoute, useRouteCoordinates } from "@/hooks/use-route-coordinates";
 import { compassRotationToTarget } from "@/lib/compass";
 import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
 import { RateDeliveryDialog } from "@/components/tikis/rate-delivery-dialog";
-import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus } from "@/shared/tikis-domain";
+import { isPickupPending, availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus } from "@/shared/tikis-domain";
 import { resolveDriverHomeAction, resolveSenderHomeAction, senderHomeActionLabel } from "@/shared/delivery-home-action";
 import { deliveryCardContext, deliveryCardSignal, deliveryCardStateLabel, deliveryCardTone } from "@/lib/delivery-card";
 import { isOpenDeliveryStale } from "@/shared/delivery-freshness";
@@ -694,16 +695,21 @@ function WalletCard({ walletBalance, totalBalance, blockedBalance }: { walletBal
 
 function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeading, userLocation }: { selected: Delivery | null | undefined; role: "sender" | "driver"; sheetSnap: number; driverPosition: { latitude: number; longitude: number } | null; /** Cap du livreur, en degrés : un nombre simple plutôt qu'un champ de `driverPosition`, dont la nouvelle identité relancerait le calcul d'itinéraire d'approche à chaque rendu. */ driverHeading: number | null; userLocation: { latitude: number; longitude: number } | null }) {
   const mapRef = useRef<MapView>(null);
-  const routeMutation = trpc.geography.route.useMutation();
-  const routeRequestRef = useRef(routeMutation.mutateAsync);
-  const [routeCoordinates, setRouteCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
-  const [approachCoordinates, setApproachCoordinates] = useState<{ latitude: number; longitude: number }[]>([]);
-  const lastApproachRequest = useRef<{ deliveryId: string; latitude: number; longitude: number; at: number } | null>(null);
   const pickup = selected?.pickup;
   const dropoff = selected?.dropoff;
-  const selectedDeliveryId = selected?.id;
   const selectedDeliveryStatus = selected?.status;
   const hasDriver = Boolean(selected?.status === "active" && driverPosition);
+  const { coordinates: routeCoordinates } = useRouteCoordinates(pickup, dropoff);
+  /**
+   * L'approche livreur → récupération.
+   *
+   * Elle n'était tracée que sur une course déjà active, donc jamais au moment
+   * où elle sert vraiment : quand le livreur regarde une course ouverte et
+   * décide s'il s'en rapproche. Côté expéditeur elle reste liée à la course en
+   * cours, seul moment où la position d'un livreur le concerne.
+   */
+  const showsApproach = role === "driver" ? isPickupPending(selectedDeliveryStatus) : selectedDeliveryStatus === "active";
+  const approachCoordinates = useApproachRoute({ from: driverPosition, to: pickup, enabled: showsApproach });
   const region = useMemo(() => {
     if (!selected) return { latitude: 5.3599, longitude: -4.0083, latitudeDelta: 0.12, longitudeDelta: 0.12 };
     return fitRegionFor(selected.pickup, selected.dropoff);
@@ -711,10 +717,12 @@ function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeadin
 
   const driverPositionRef = useRef(driverPosition);
   const userLocationRef = useRef(userLocation);
+  const showsApproachRef = useRef(showsApproach);
   useEffect(() => {
     driverPositionRef.current = driverPosition;
     userLocationRef.current = userLocation;
-  }, [driverPosition, userLocation]);
+    showsApproachRef.current = showsApproach;
+  }, [driverPosition, showsApproach, userLocation]);
 
   /** `true` dès que l'utilisateur a déplacé ou zoomé la carte : à partir de là
    *  elle lui appartient, et seul le bouton de recentrage la reprend. */
@@ -739,7 +747,9 @@ function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeadin
       mapRef.current?.animateToRegion({ ...user, latitudeDelta: 0.012, longitudeDelta: 0.012 }, animated ? 400 : 0);
       return;
     }
-    const points = driver && selected.status === "active"
+    // La position du livreur entre dans le cadrage dès que son approche est
+    // tracée — sinon la ligne verte partirait hors de l'écran.
+    const points = driver && showsApproachRef.current
       ? [driver, selected.pickup, selected.dropoff]
       : [selected.pickup, selected.dropoff];
     mapRef.current?.fitToCoordinates(points, { edgePadding: edgePaddingFor(snap), animated });
@@ -762,39 +772,6 @@ function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeadin
     return () => clearTimeout(timer);
   }, [fitToSelection, hasUserLocation, selected?.id, sheetSnap]);
 
-  useEffect(() => {
-    routeRequestRef.current = routeMutation.mutateAsync;
-  }, [routeMutation.mutateAsync]);
-
-  useEffect(() => {
-    let active = true;
-    if (!pickup || !dropoff) { setRouteCoordinates([]); return; }
-    void routeRequestRef.current({ origin: pickup, destination: dropoff })
-      .then((route) => { if (active) setRouteCoordinates(route.coordinates); })
-      .catch(() => { if (active) setRouteCoordinates([]); });
-    return () => { active = false; };
-  }, [selected?.id, pickup, dropoff]);
-
-  useEffect(() => {
-    let active = true;
-    if (!selectedDeliveryId || selectedDeliveryStatus !== "active" || !pickup || !driverPosition) {
-      setApproachCoordinates([]);
-      return;
-    }
-    const previous = lastApproachRequest.current;
-    const elapsed = Date.now() - (previous?.at ?? 0);
-    const movedMeters = previous?.deliveryId === selectedDeliveryId
-      ? geodesicDistanceKm(previous, driverPosition) * 1_000
-      : Infinity;
-    if (previous?.deliveryId === selectedDeliveryId && movedMeters < 80 && elapsed < 15_000) return;
-    lastApproachRequest.current = { deliveryId: selectedDeliveryId, ...driverPosition, at: Date.now() };
-    const origin = { name: "Position du livreur", district: "", city: "", latitude: driverPosition.latitude, longitude: driverPosition.longitude, source: "manual" as const };
-    void routeRequestRef.current({ origin, destination: pickup })
-      .then((route) => { if (active) setApproachCoordinates(route.coordinates); })
-      .catch(() => { if (active) setApproachCoordinates([driverPosition, pickup]); });
-    return () => { active = false; };
-  }, [driverPosition, pickup, selectedDeliveryId, selectedDeliveryStatus]);
-
   return (
     <View style={styles.mapBg}>
       <MapView
@@ -813,8 +790,14 @@ function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeadin
         onPanDrag={() => setUserMovedMap(true)}
         onRegionChangeComplete={(_region, details) => { if (details?.isGesture) setUserMovedMap(true); }}
       >
+        {/* Chaque calque porte une clé stable. Sans elle, React les réconcilie
+            par position, et `react-native-maps` retire côté natif le marqueur
+            qui occupe l'index libéré : quand le marqueur de position s'efface
+            à l'arrivée d'une course, c'est le point de collecte qui partait
+            avec lui. Le rang de dessin est explicite pour la même raison — à
+            rang égal, la bibliothèque ne promet aucun ordre. */}
         {!selected && userLocation ? (
-          <Marker coordinate={userLocation} anchor={{ x: 0.5, y: 0.5 }} title="Votre position">
+          <Marker key="user-position" coordinate={userLocation} anchor={{ x: 0.5, y: 0.5 }} zIndex={MAP_Z.driver} title="Votre position">
             <View style={styles.userMarkerHalo}>
               <View style={styles.userMarkerDot} />
             </View>
@@ -822,19 +805,19 @@ function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeadin
         ) : null}
         {selected ? (
           <>
-            {approachCoordinates.length > 1 ? <Polyline coordinates={approachCoordinates} strokeColor="#176C52" strokeWidth={4} lineCap="round" /> : null}
-            {routeCoordinates.length > 1 ? <Polyline coordinates={routeCoordinates} strokeColor="#9A6201" strokeWidth={4} lineCap="round" /> : null}
-            <Marker coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={PIN_ANCHOR}>
+            {approachCoordinates.length > 1 ? <Polyline key="approach-line" coordinates={approachCoordinates} strokeColor="#176C52" strokeWidth={4} lineCap="round" zIndex={MAP_Z.approach} /> : null}
+            {routeCoordinates.length > 1 ? <Polyline key="route-line" coordinates={routeCoordinates} strokeColor="#9A6201" strokeWidth={4} lineCap="round" zIndex={MAP_Z.route} /> : null}
+            <Marker key={`pickup-${selected.id}`} coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={PIN_ANCHOR} zIndex={MAP_Z.pin}>
               <PickupMarker />
             </Marker>
+            <Marker key={`dropoff-${selected.id}`} coordinate={{ latitude: selected.dropoff.latitude, longitude: selected.dropoff.longitude }} anchor={PIN_ANCHOR} zIndex={MAP_Z.pin}>
+              <DropoffMarker />
+            </Marker>
             {hasDriver && driverPosition ? (
-              <Marker coordinate={driverPosition} anchor={CHIP_ANCHOR}>
+              <Marker key="driver-position" coordinate={driverPosition} anchor={CHIP_ANCHOR} zIndex={MAP_Z.driver}>
                 <DriverMarker heading={driverHeading} />
               </Marker>
             ) : null}
-            <Marker coordinate={{ latitude: selected.dropoff.latitude, longitude: selected.dropoff.longitude }} anchor={PIN_ANCHOR}>
-              <DropoffMarker />
-            </Marker>
           </>
         ) : null}
       </MapView>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import MapView, { Marker, Polyline } from "react-native-maps";
-import { CHIP_ANCHOR, DriverMarker, DropoffMarker, PickupMarker, PIN_ANCHOR } from "@/components/tikis/map-markers";
+import { CHIP_ANCHOR, DriverMarker, DropoffMarker, MAP_Z, PickupMarker, PIN_ANCHOR } from "@/components/tikis/map-markers";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import type { LocationLabel } from "@/shared/tikis-domain";
 
@@ -93,18 +93,21 @@ export function DeliveryRouteMap({
         onPanDrag={() => setUserMovedMap(true)}
         onRegionChangeComplete={(_region, details) => { if (details?.isGesture) setUserMovedMap(true); }}
       >
-        <Polyline coordinates={route} strokeColor={isFallback ? theme.warning : theme.primary} strokeWidth={5} lineCap="round" lineJoin="round" lineDashPattern={isFallback ? [10, 6] : undefined} />
+        {/* Clés stables et rang de dessin explicite : à rang égal la
+            bibliothèque ne promet aucun ordre, et sans clé elle retire côté
+            natif le calque qui occupe l'index libéré plutôt que le bon. */}
+        <Polyline key="route-line" coordinates={route} strokeColor={isFallback ? theme.warning : theme.primary} strokeWidth={5} lineCap="round" lineJoin="round" lineDashPattern={isFallback ? [10, 6] : undefined} zIndex={MAP_Z.route} />
         {approachCoordinates && approachCoordinates.length >= 2 ? (
-          <Polyline coordinates={approachCoordinates} strokeColor={theme.success} strokeWidth={5} lineCap="round" lineJoin="round" />
+          <Polyline key="approach-line" coordinates={approachCoordinates} strokeColor={theme.success} strokeWidth={5} lineCap="round" lineJoin="round" zIndex={MAP_Z.approach} />
         ) : null}
-        <Marker coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }} anchor={PIN_ANCHOR}>
+        <Marker key="pickup" coordinate={{ latitude: pickup.latitude, longitude: pickup.longitude }} anchor={PIN_ANCHOR} zIndex={MAP_Z.pin}>
           <PickupMarker />
         </Marker>
-        <Marker coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }} anchor={PIN_ANCHOR}>
+        <Marker key="dropoff" coordinate={{ latitude: dropoff.latitude, longitude: dropoff.longitude }} anchor={PIN_ANCHOR} zIndex={MAP_Z.pin}>
           <DropoffMarker />
         </Marker>
         {driverPosition ? (
-          <Marker coordinate={{ latitude: driverPosition.latitude, longitude: driverPosition.longitude }} anchor={CHIP_ANCHOR}>
+          <Marker key="driver" coordinate={{ latitude: driverPosition.latitude, longitude: driverPosition.longitude }} anchor={CHIP_ANCHOR} zIndex={MAP_Z.driver}>
             <DriverMarker heading={driverPosition.heading} />
           </Marker>
         ) : null}

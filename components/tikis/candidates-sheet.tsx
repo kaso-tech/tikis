@@ -105,7 +105,11 @@ export function CandidatesSheet({ visible, deliveryId, onClose }: Props) {
     baseHeight.setValue(SHEET_MID_HEIGHT);
     panY.setValue(0);
     enter.setValue(0);
-    Animated.spring(enter, { toValue: 1, useNativeDriver: true, bounciness: 0, speed: 14 }).start();
+    // Pilote JS, pas natif : `enter` anime le `translateY` de la feuille, dont le
+    // même nœud de style porte aussi la `height`. Un seul nœud ne peut pas être
+    // à cheval sur les deux pilotes — rendre `enter` natif force tout le style à
+    // passer en natif, et le module natif ne sait pas animer `height`.
+    Animated.spring(enter, { toValue: 1, useNativeDriver: false, bounciness: 0, speed: 14 }).start();
   }, [visible, baseHeight, panY, enter]);
 
   useEffect(() => {
