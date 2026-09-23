@@ -7,7 +7,7 @@ import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
 import { deliveryMetricsForDay, isDeliveryEarning } from "@/lib/wallet-metrics";
 import { formatMoney, formatRelativeDate, type FinancialRecord } from "@/shared/tikis-domain";
-import { DriverEarningsProjection } from "@/components/tikis/driver-earnings-projection";
+import { DriverEarningsTrend } from "@/components/tikis/driver-earnings-trend";
 
 type Period = "day" | "week" | "month";
 type FlowFilter = "earnings" | "bonus" | "all";
@@ -278,7 +278,7 @@ export default function EarningsScreen() {
         ) : hasError ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.emptyText, { color: theme.muted }]}>L’historique des gains est momentanément indisponible.</Text></View>
         ) : (
-          <DriverEarningsProjection phone={profile?.phone ?? null} />
+          <DriverEarningsTrend phone={profile?.phone ?? null} />
         )}
 
         <View style={styles.sectionHeader}>

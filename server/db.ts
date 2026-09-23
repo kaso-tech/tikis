@@ -12,7 +12,7 @@ import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppN
 import { netDriverEarning } from "../shared/tikis-domain";
 import { candidateMovementVersion, computeReplacementSettlement } from "../shared/wallet-commission";
 import { BASE_POSITION_MAX_AGE_MS, DEFAULT_DRIVER_PERIMETER, distanceKmBetween, evaluatePerimeter, isValidPerimeterRadius, MAX_PERIMETER_RADIUS_KM, MIN_PERIMETER_RADIUS_KM, type DriverPerimeterPreferences } from "../shared/driver-perimeter";
-import { DELIVERY_EXPIRATION_MS, deliveryActivityTimestamp, deliveryExpirationOutcome } from "../shared/delivery-expiration";
+import { autoCompletionTimestamp, DELIVERY_EXPIRATION_MS, deliveryActivityTimestamp, deliveryExpirationOutcome } from "../shared/delivery-expiration";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
@@ -747,7 +747,9 @@ export async function expireOpenTikisDeliveries(now = new Date()) {
       const outcome = deliveryExpirationOutcome(delivery.status as "open" | "pending_confirmation" | "active" | "disabled", activityAt ?? delivery.createdAt, now.getTime());
       if (outcome === "complete" && delivery.driverPhone) {
         // Paiement direct Sender ↔ livreur, hors application : aucun crédit de Wallet ici (cf. completeTikisDeliveryWithEvents).
-        await tx.update(tikisDeliveries).set({ status: "completed", completedAt: now, updatedAt: now }).where(eq(tikisDeliveries.id, delivery.id));
+        // Datée à l'échéance des 24 h, pas à l'heure où cette tâche passe : voir `autoCompletionTimestamp`.
+        const completedAt = new Date(autoCompletionTimestamp(activityAt ?? delivery.createdAt, now.getTime()));
+        await tx.update(tikisDeliveries).set({ status: "completed", completedAt, updatedAt: now }).where(eq(tikisDeliveries.id, delivery.id));
         await appendDeliveryEvent(tx, { deliveryId: delivery.id, eventType: "delivery_completed", status: "completed", recipientPhone: delivery.senderPhone, title: "Livraison terminée automatiquement", body: "La course en cours a été clôturée automatiquement après 24 heures.", tone: "success", idempotencyKey: `${delivery.id}:auto-completed-sender` });
         await appendDeliveryEvent(tx, { deliveryId: delivery.id, eventType: "delivery_completed", status: "completed", recipientPhone: delivery.driverPhone, title: "Livraison terminée automatiquement", body: "La course a été clôturée après 24 heures.", tone: "success", idempotencyKey: `${delivery.id}:auto-completed-driver` });
         completedCount += 1;

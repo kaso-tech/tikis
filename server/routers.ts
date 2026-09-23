@@ -887,15 +887,15 @@ export const appRouter = router({
     }),
   }),
   analytics: router({
-    myDriverEarningsProjection: tikisProtectedProcedure.query(async ({ ctx }) => {
+    myDriverEarningsTrend: tikisProtectedProcedure.query(async ({ ctx }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       if (profile.accountType !== "driver") {
         return null;
       }
       // Les mêmes enregistrements que l'historique de l'écran Gains : nets de commission, avec le même
       // repli sur le prix estimé. Une seule source, donc un seul chiffre pour « 7 derniers jours ».
-      const { computeDriverEarningsProjection } = await import("./analytics");
-      return computeDriverEarningsProjection(await db.getDriverCompletedDeliveryEarnings(profile.phone));
+      const { computeDriverEarningsTrend } = await import("./analytics");
+      return computeDriverEarningsTrend(await db.getDriverCompletedDeliveryEarnings(profile.phone));
     }),
     getForDelivery: tikisProtectedProcedure.input(z.object({ deliveryId: z.string().uuid() })).query(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);

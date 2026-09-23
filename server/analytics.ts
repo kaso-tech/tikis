@@ -1,21 +1,23 @@
 /**
- * Analytics personnelles du livreur : la projection de gains affichée sur l'écran Gains.
+ * Analytics personnelles du livreur : la tendance de gains affichée sur l'écran Gains.
+ *
+ * Elle ne contient plus d'estimation des 30 prochains jours (moyenne × 30) : retirée à la demande du
+ * produit, elle présentait comme un chiffre un simple prolongement de la semaine écoulée.
  *
  * Elle part des MÊMES enregistrements que l'historique de cet écran (`getDriverCompletedDeliveryEarnings`)
  * au lieu de refaire sa propre somme en SQL. C'était le cas jusqu'ici, et les deux calculs divergeaient :
- * la projection additionnait `offeredPrice` brut, commission comprise, et comptait zéro pour toute course
+ * la carte additionnait `offeredPrice` brut, commission comprise, et comptait zéro pour toute course
  * publiée sans offre (SUM ignore les NULL, sans repli sur `estimatedPrice`). Le même écran affichait donc,
  * sous l'intitulé « 7 derniers jours », un montant différent de celui de son propre historique.
  *
  * Fonction pure : le routeur lui passe les enregistrements, elle ne touche pas à la base.
  */
 import type { FinancialRecord } from "../shared/tikis-domain";
-import { computeProjection30Days as project30, computeTrendPct as trendPct } from "./_test-helpers/driver-earnings-projection";
+import { computeTrendPct as trendPct } from "./_test-helpers/driver-earnings-projection";
 
-export type DriverEarningsProjection = {
+export type DriverEarningsTrend = {
   totalLast7Days: number;
   averagePerDay: number;
-  projection30Days: number;
   /** Comparaison avec les 7 jours précédents (%), null si pas d'historique. */
   trendPct: number | null;
   /** Top 5 jours par gains sur les 30 derniers jours. */
@@ -24,10 +26,10 @@ export type DriverEarningsProjection = {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export function computeDriverEarningsProjection(
+export function computeDriverEarningsTrend(
   earnings: ReadonlyArray<Pick<FinancialRecord, "amount" | "createdAt">>,
   now: Date = new Date(),
-): DriverEarningsProjection {
+): DriverEarningsTrend {
   const at = now.getTime();
   const inWindow = (from: number, to: number) =>
     earnings.filter((entry) => {
@@ -54,7 +56,6 @@ export function computeDriverEarningsProjection(
   return {
     totalLast7Days: totalLast7,
     averagePerDay,
-    projection30Days: project30(averagePerDay),
     trendPct: trendPct(totalLast7, totalPrev7),
     topDays,
   };

@@ -1,10 +1,5 @@
 const FRENCH_MONTHS_SHORT = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 
-/** Projection 30 jours : averagePerDay × 30. */
-export function computeProjection30Days(averagePerDay: number): number {
-  return averagePerDay * 30;
-}
-
 /** Évolution en % entre deux périodes. null si la période précédente est 0. */
 export function computeTrendPct(currentPeriod: number, previousPeriod: number): number | null {
   if (previousPeriod === 0) return null;

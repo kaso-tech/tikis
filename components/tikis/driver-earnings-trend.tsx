@@ -3,22 +3,23 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { type ThemedColors, useThemeColors } from "@/lib/use-theme-colors";
 import { trpc } from "@/lib/trpc";
 import { formatMoney } from "@/shared/tikis-domain";
-import { computeProjection30Days, computeTrendPct, formatTopDayDate } from "@/server/_test-helpers/driver-earnings-projection";
+import { formatTopDayDate } from "@/server/_test-helpers/driver-earnings-projection";
 
-type Projection = {
+type Trend = {
   totalLast7Days: number;
   averagePerDay: number;
-  projection30Days: number;
   trendPct: number | null;
   topDays: Array<{ date: string; amount: number }>;
 };
 
 const FRENCH_MONTHS_SHORT = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 
-export function DriverEarningsProjection({ phone }: { phone: string | null }) {
+/** Ce que la semaine écoulée a rapporté, comparé à la précédente. Aucune estimation de l'avenir : la carte
+ *  montrait « 30 prochains jours = moyenne × 30 », un prolongement présenté comme un chiffre. */
+export function DriverEarningsTrend({ phone }: { phone: string | null }) {
   const { colors: theme } = useThemeColors();
   const styles = makeStyles(theme);
-  const query = trpc.analytics.myDriverEarningsProjection.useQuery(undefined, {
+  const query = trpc.analytics.myDriverEarningsTrend.useQuery(undefined, {
     enabled: Boolean(phone),
     refetchInterval: 60_000,
   });
@@ -27,18 +28,18 @@ export function DriverEarningsProjection({ phone }: { phone: string | null }) {
   if (query.isLoading) {
     return (
       <View style={styles.card}>
-        <View style={styles.header}><MaterialIcons name="auto-graph" size={18} color={theme.primary} /><Text style={styles.title}>Projection gains</Text></View>
+        <View style={styles.header}><MaterialIcons name="auto-graph" size={18} color={theme.primary} /><Text style={styles.title}>Tendance des gains</Text></View>
         <View style={styles.loading}><ActivityIndicator size="small" color={theme.primary} /></View>
       </View>
     );
   }
-  const projection = query.data as Projection | null;
-  if (!projection) return null;
-  if (projection.totalLast7Days === 0) {
+  const trend = query.data as Trend | null;
+  if (!trend) return null;
+  if (trend.totalLast7Days === 0) {
     return (
       <View style={styles.card}>
-        <View style={styles.header}><MaterialIcons name="auto-graph" size={18} color={theme.primary} /><Text style={styles.title}>Projection gains</Text></View>
-        <Text style={styles.empty}>Terminez des courses pour activer la projection : elle se calcule sur vos 7 derniers jours.</Text>
+        <View style={styles.header}><MaterialIcons name="auto-graph" size={18} color={theme.primary} /><Text style={styles.title}>Tendance des gains</Text></View>
+        <Text style={styles.empty}>Terminez des courses pour voir votre tendance : elle se calcule sur vos 7 derniers jours.</Text>
       </View>
     );
   }
@@ -47,11 +48,11 @@ export function DriverEarningsProjection({ phone }: { phone: string | null }) {
     <View style={styles.card}>
       <View style={styles.header}>
         <MaterialIcons name="auto-graph" size={18} color={theme.primary} />
-        <Text style={styles.title}>Projection gains</Text>
-        {projection.trendPct !== null ? (
-          <View style={[styles.trendPill, { backgroundColor: projection.trendPct >= 0 ? theme.success : theme.error }]}>
-            <MaterialIcons name={projection.trendPct >= 0 ? "trending-up" : "trending-down"} size={12} color="#FFFFFF" />
-            <Text style={styles.trendPillText}>{projection.trendPct >= 0 ? "+" : ""}{projection.trendPct}%</Text>
+        <Text style={styles.title}>Tendance des gains</Text>
+        {trend.trendPct !== null ? (
+          <View style={[styles.trendPill, { backgroundColor: trend.trendPct >= 0 ? theme.success : theme.error }]}>
+            <MaterialIcons name={trend.trendPct >= 0 ? "trending-up" : "trending-down"} size={12} color="#FFFFFF" />
+            <Text style={styles.trendPillText}>{trend.trendPct >= 0 ? "+" : ""}{trend.trendPct}%</Text>
           </View>
         ) : null}
       </View>
@@ -59,29 +60,23 @@ export function DriverEarningsProjection({ phone }: { phone: string | null }) {
       <View style={styles.row}>
         <View style={styles.kpi}>
           <Text style={styles.kpiLabel}>7 derniers jours</Text>
-          <Text style={styles.kpiValue}>{formatMoney(projection.totalLast7Days)}</Text>
+          <Text style={styles.kpiValue}>{formatMoney(trend.totalLast7Days)}</Text>
         </View>
         <View style={styles.kpiDivider} />
         <View style={styles.kpi}>
           <Text style={styles.kpiLabel}>Moyenne / jour</Text>
-          <Text style={styles.kpiValue}>{formatMoney(projection.averagePerDay)}</Text>
+          <Text style={styles.kpiValue}>{formatMoney(trend.averagePerDay)}</Text>
         </View>
       </View>
 
-      <View style={styles.projectionBox}>
-        <Text style={styles.projectionLabel}>ESTIMATION 30 PROCHAINS JOURS</Text>
-        <Text style={styles.projectionValue}>{formatMoney(projection.projection30Days)}</Text>
-        <Text style={styles.projectionFoot}>Basée sur la moyenne de vos 7 derniers jours, commission déduite. Les variations saisonnières ne sont pas prises en compte.</Text>
-      </View>
-
-      {projection.topDays.length > 0 ? (
+      {trend.topDays.length > 0 ? (
         <View style={styles.topDays}>
           <Text style={styles.topDaysTitle}>Top jours (30 derniers)</Text>
-          {projection.topDays.map((row) => (
+          {trend.topDays.map((row) => (
             <View key={row.date} style={styles.topDayRow}>
               <Text style={styles.topDayDate}>{formatTopDayDate(row.date)}</Text>
               <View style={styles.topDayBarWrap}>
-                <View style={[styles.topDayBar, { width: `${Math.min(100, Math.round((row.amount / Math.max(...projection.topDays.map((d) => d.amount), 1)) * 100))}%`, backgroundColor: theme.primary }]} />
+                <View style={[styles.topDayBar, { width: `${Math.min(100, Math.round((row.amount / Math.max(...trend.topDays.map((d) => d.amount), 1)) * 100))}%`, backgroundColor: theme.primary }]} />
               </View>
               <Text style={styles.topDayAmount}>{formatMoney(row.amount)}</Text>
             </View>
@@ -106,10 +101,6 @@ function makeStyles(theme: ThemedColors) {
     kpiLabel: { fontSize: 10.5, color: theme.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
     kpiValue: { fontSize: 16, fontWeight: "600", color: theme.foreground },
     kpiDivider: { width: 1, height: 28, backgroundColor: theme.border, marginHorizontal: 10 },
-    projectionBox: { backgroundColor: theme.background, borderRadius: 8, padding: 12, gap: 4 },
-    projectionLabel: { fontSize: 10.5, color: theme.muted, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.5 },
-    projectionValue: { fontSize: 24, fontWeight: "600", color: theme.primary },
-    projectionFoot: { fontSize: 11, color: theme.muted, lineHeight: 16 },
     topDays: { gap: 6 },
     topDaysTitle: { fontSize: 11.5, fontWeight: "600", color: theme.muted, textTransform: "uppercase", letterSpacing: 0.5 },
     topDayRow: { flexDirection: "row", alignItems: "center", gap: 8 },

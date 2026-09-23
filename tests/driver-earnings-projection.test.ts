@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { computeProjection30Days, computeTrendPct, formatTopDayDate } from "../server/_test-helpers/driver-earnings-projection";
+import { computeTrendPct, formatTopDayDate } from "../server/_test-helpers/driver-earnings-projection";
 
 describe("projection gains driver (helpers purs)", () => {
-  it("computeProjection30Days multiplie la moyenne par 30", () => {
-    expect(computeProjection30Days(3000)).toBe(90000);
-    expect(computeProjection30Days(0)).toBe(0);
-    expect(computeProjection30Days(1000)).toBe(30000);
-  });
-
   it("computeTrendPct retourne le pourcentage d'évolution", () => {
     expect(computeTrendPct(14000, 7000)).toBe(100); // +100%
     expect(computeTrendPct(7000, 14000)).toBe(-50); // -50%

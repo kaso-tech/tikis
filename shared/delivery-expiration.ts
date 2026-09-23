@@ -34,6 +34,21 @@ export function deliveryExpirationOutcome(
   return null;
 }
 
+/**
+ * L'heure de fin d'une course clôturée automatiquement : l'échéance des 24 h, pas l'heure à laquelle la tâche
+ * planifiée passe la constater.
+ *
+ * La clôture enregistrait `now`. Or la tâche ne tourne que lorsque le planificateur l'appelle : si le serveur
+ * est resté arrêté, ou si l'appel a pris du retard, une course terminée le 31 août était datée du jour où la
+ * tâche a enfin tourné — et comptait dans les « Gains du jour » de ce jour-là. Jamais dans le futur, en
+ * revanche : l'échéance ne peut pas dépasser l'instant où l'on constate qu'elle est passée.
+ */
+export function autoCompletionTimestamp(activityAt: DeliveryActivitySource, now = Date.now()): number {
+  const timestamp = toTimestamp(activityAt);
+  if (timestamp === null) return now;
+  return Math.min(timestamp + DELIVERY_EXPIRATION_MS, now);
+}
+
 export function isOpenDeliveryExpired(status: DeliveryStatus, activityAt: Date | string | number | null, now = Date.now()): boolean {
   return deliveryExpirationOutcome(status, activityAt, now) === "expire";
 }

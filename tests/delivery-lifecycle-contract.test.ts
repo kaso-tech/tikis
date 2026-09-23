@@ -17,7 +17,8 @@ describe("contrat du cycle de livraison à vingt-quatre heures", () => {
   });
 
   it("finalise les courses actives et expire les courses jamais démarrées", () => {
-    expect(databaseSource).toContain('status: "completed", completedAt: now');
+    // Datée à l'échéance des 24 h, pas à l'heure où la tâche passe (tests/auto-completion-date.test.ts).
+    expect(databaseSource).toContain('status: "completed", completedAt, updatedAt: now');
     expect(databaseSource).toContain('status: "expired", cancelledAt: now');
     expect(databaseSource).toContain("livraison expirée avant départ");
   });
