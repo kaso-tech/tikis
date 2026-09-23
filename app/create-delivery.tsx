@@ -35,6 +35,7 @@ type DeliveryFieldName = "title" | "details" | "passengers" | "pickup" | "dropof
 
 export default function CreateDeliveryScreen() {
   const { deliveryId, draftId } = useLocalSearchParams<{ deliveryId?: string; draftId?: string }>();
+  const { colors: theme } = useThemeColors();
   const { profile } = useTikisStore();
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
@@ -310,7 +311,7 @@ export default function CreateDeliveryScreen() {
   const ctaLabel = isEditing ? "Enregistrer" : "Publier la course";
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
       <View style={styles.topBar}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Retour">
           <MaterialIcons name="arrow-back" size={20} color="#111111" />
@@ -581,7 +582,7 @@ function MiniNumber({ value, onChangeText, placeholder }: { value: string; onCha
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FAFAFA" },
+  safe: { flex: 1 },
   keyboard: { flex: 1 },
   content: { padding: 16, paddingBottom: 24, gap: 18 },
 
