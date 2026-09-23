@@ -179,7 +179,7 @@ async function startServer() {
 
   // Console d'administration Tikis : SPA statique compilée séparément (voir admin/README.md),
   // servie par ce même serveur ("même infra") mais sous son propre chemin, isolée du bundle mobile.
-  const adminDistPath = path.join(__dirname, "../../admin/dist");
+  const adminDistPath = path.resolve(process.cwd(), "admin/dist");
   if (fs.existsSync(adminDistPath)) {
     app.use("/admin", express.static(adminDistPath));
     app.get("/admin/*", (_req, res) => res.sendFile(path.join(adminDistPath, "index.html")));
