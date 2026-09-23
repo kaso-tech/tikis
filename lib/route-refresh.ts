@@ -18,10 +18,19 @@ import { geodesicDistanceKm } from "./geo-rules";
 
 export type Point = { latitude: number; longitude: number };
 
-/** Distance parcourue par le livreur avant de recalculer son approche. */
+/** Distance parcourue par le livreur avant de recalculer son approche. C'est le vrai déclencheur :
+ *  un tracé ne change que lorsque son origine bouge. */
 export const APPROACH_MIN_MOVE_METERS = 80;
-/** Âge au-delà duquel l'approche est recalculée même à l'arrêt. */
-export const APPROACH_MAX_AGE_MS = 15_000;
+/**
+ * Âge au-delà duquel l'approche est recalculée même à l'arrêt.
+ *
+ * Une minute, et non quinze secondes : à l'arrêt le tracé ne change pas, seule sa durée estimée
+ * bouge avec le trafic. Or chaque recalcul est un appel Mapbox Directions facturé, et il échappe
+ * au cache serveur — la gigue GPS suffit à déplacer l'origine au-delà du mètre qui distingue deux
+ * clés de cache. À quinze secondes, une approche de vingt minutes en coûtait quatre-vingts, pour
+ * chaque écran qui l'affiche (celui du livreur et celui de l'expéditeur qui le suit).
+ */
+export const APPROACH_MAX_AGE_MS = 60_000;
 
 /** Vrai si les deux coordonnées sont exploitables pour tracer quoi que ce soit. */
 export function isUsablePoint(point: Point | null | undefined): point is Point {

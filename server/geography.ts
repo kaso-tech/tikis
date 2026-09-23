@@ -37,7 +37,11 @@ type CacheEntry<T> = { value: T; expiresAt: number };
 const searchCache = new Map<string, CacheEntry<PlaceSuggestion[]>>();
 const routeCache = new Map<string, CacheEntry<{ distanceKm: number; durationMinutes: number; coordinates: { latitude: number; longitude: number }[] }>>();
 const SEARCH_CACHE_TTL_MS = 20_000;
-const ROUTE_CACHE_TTL_MS = 5 * 60_000;
+// Quinze minutes, et non cinq : entre deux points fixes, seule la durée bouge avec le trafic — la
+// distance, elle, sert au prix et ne change pas. Ce cache est partagé par tous les utilisateurs,
+// donc il travaille surtout sur les corridors répétés d'une même ville ; à cinq minutes, une même
+// course était refacturée douze fois par heure.
+const ROUTE_CACHE_TTL_MS = 15 * 60_000;
 const CACHE_LIMIT = 200;
 const MAPBOX_TIMEOUT_MS = 8_000;
 const OSM_TIMEOUT_MS = 6_000;

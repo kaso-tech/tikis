@@ -14,6 +14,16 @@ import { createStyles } from "@/lib/create-styles";
 
 type LocationTarget = "pickup" | "dropoff" | "address";
 
+/**
+ * En dessous de ce nombre de suggestions, la recherche ordinaire est jugée trop maigre et le repli
+ * élargi (Search Box forward, puis OpenStreetMap) prend le relais.
+ *
+ * Le seuil n'est pas à zéro : la couverture Mapbox des commerces à Ouagadougou est mince, et une
+ * unique rue vaguement approchante ne répond pas à « Pharmacie du Progrès ». Il reste bas parce que
+ * l'élargissement coûte deux appels Mapbox de plus et ramène des résultats plus lâches.
+ */
+const EXPANDED_SEARCH_FROM_BELOW = 3;
+
 export function YangoAddressPicker({ visible, target, value, countryCode, profilePhone, favorites, onClose, onSelect, onFavorite }: { visible: boolean; target: LocationTarget | null; value: LocationLabel | null; countryCode?: string; profilePhone?: string; favorites: SavedFavorite[]; onClose: () => void; onSelect: (place: LocationLabel) => void; onFavorite: (place: LocationLabel, label: string) => Promise<void> }) {
   const { colors: theme } = useThemeColors();
   const styles = useMemo(() => stylesFor(theme), [theme]);
@@ -65,29 +75,45 @@ export function YangoAddressPicker({ visible, target, value, countryCode, profil
     return () => { active = false; };
   }, [profilePhone, visible]);
 
-  const runSearch = useCallback(async (raw: string, includeCommunityFallback = false) => {
+  /** Nombre de suggestions obtenues, ou `null` si la recherche n'a pas abouti (requête vide,
+   *  réponse périmée, erreur réseau) — c'est ce qui décide d'élargir ou non, plus bas. */
+  const runSearch = useCallback(async (raw: string, includeCommunityFallback = false): Promise<number | null> => {
     const clean = autocompleteQuery(raw);
-    if (!clean) { setResults([]); return; }
+    if (!clean) { setResults([]); return null; }
     const requestId = ++latestSearch.current;
     try {
       setMessage("");
       const preferredBias = bias ?? (valueRef.current ? { latitude: valueRef.current.latitude, longitude: valueRef.current.longitude } : null);
       const places = await searchMutationRef.current({ query: clean, ...(countryCode ? { countryCode } : {}), ...(preferredBias ? { biasLatitude: preferredBias.latitude, biasLongitude: preferredBias.longitude } : {}), ...(includeCommunityFallback ? { includeCommunityFallback: true } : {}) });
-      if (requestId === latestSearch.current) {
-        setResults((current) => haveSameSuggestionIds(current, places) ? current : places);
-        if (!places.length) setMessage("Aucune adresse trouvée. Essayez une formulation plus précise ou ouvrez la carte.");
-      }
+      if (requestId !== latestSearch.current) return null;
+      setResults((current) => haveSameSuggestionIds(current, places) ? current : places);
+      // Annoncé seulement une fois l'élargissement tenté : le dire dès la recherche ordinaire
+      // faisait clignoter « aucune adresse » juste avant que le repli en trouve.
+      if (!places.length && includeCommunityFallback) setMessage("Aucune adresse trouvée. Essayez une formulation plus précise ou ouvrez la carte.");
+      return places.length;
     } catch (cause) {
       if (requestId === latestSearch.current) setMessage(cause instanceof Error ? cause.message : "La recherche est momentanément indisponible.");
+      return null;
     }
   }, [bias, countryCode]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- `setResults` retourne la même référence si déjà vide (updater ci-dessus) : React ignore alors ce rendu, aucune cascade réelle. Nécessaire ici pour invalider en même temps toute recherche en vol via `latestSearch`, une écriture de ref qui doit elle aussi rester hors du rendu.
     if (!hasQuery) { latestSearch.current += 1; setResults((current) => current.length ? [] : current); return; }
-    const suggestionTimer = setTimeout(() => { void runSearch(query); }, PLACE_AUTOCOMPLETE_DEBOUNCE_MS);
-    const expandedSearchTimer = setTimeout(() => { void runSearch(query, true); }, Math.max(850, PLACE_AUTOCOMPLETE_DEBOUNCE_MS + 450));
-    return () => { clearTimeout(suggestionTimer); clearTimeout(expandedSearchTimer); };
+    let active = true;
+    const suggestionTimer = setTimeout(() => {
+      void (async () => {
+        const found = await runSearch(query);
+        // L'élargissement partait avant sur son propre minuteur, systématiquement et en parallèle :
+        // chaque requête saisie coûtait trois appels Mapbox facturés (le suggest ordinaire, puis le
+        // suggest + le forward de l'élargissement) là où un seul suffit quand la recherche ordinaire
+        // répond. Il ne part plus que lorsqu'elle ne répond pas, et l'utilisateur garde la touche
+        // « Rechercher » du clavier pour le déclencher lui-même.
+        if (!active || found === null || found >= EXPANDED_SEARCH_FROM_BELOW) return;
+        await runSearch(query, true);
+      })();
+    }, PLACE_AUTOCOMPLETE_DEBOUNCE_MS);
+    return () => { active = false; clearTimeout(suggestionTimer); };
   }, [hasQuery, query, runSearch]);
 
   const panResponder = useMemo(() => PanResponder.create({
