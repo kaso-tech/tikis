@@ -1,3 +1,6 @@
+// Avant tout le reste : le filtre doit être posé avant que NativeWind n'évalue son runtime, sinon
+// l'avertissement qu'il vise est déjà parti. Voir lib/logbox-filters.ts.
+import "@/lib/logbox-filters";
 import "@/global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";

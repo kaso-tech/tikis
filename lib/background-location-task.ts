@@ -19,6 +19,7 @@
  * et relue à chaque réveil.
  */
 import { Platform } from "react-native";
+import { isRunningInExpoGo } from "expo";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
@@ -32,6 +33,22 @@ import { LIVE_POSITION_GPS_JUMP_ERR_MSG, LIVE_POSITION_OUT_OF_ZONE_ERR_MSG } fro
 
 export const BACKGROUND_DRIVER_LOCATION_TASK = "tikis-driver-background-location";
 const ACTIVE_DELIVERY_STORAGE_KEY = "tikis:background-tracking:active-delivery-id";
+
+/**
+ * Les deux environnements où ce suivi n'existe pas, et où l'appeler ne produit que du bruit.
+ *
+ * Le web n'a aucune API TaskManager. Expo Go embarque un binaire natif qui n'est pas le nôtre :
+ * le suivi en arrière-plan y est indisponible sur Android, et limité au simulateur sur iOS. Les
+ * fonctions de expo-location y répondent par un avertissement en console — un par session, mais
+ * affiché en rouge dans LogBox au premier écran venu, puisque le fournisseur Realtime appelle
+ * `stopBackgroundDriverTracking` dès qu'aucune course n'est active, c'est-à-dire presque toujours.
+ *
+ * `isRunningInExpoGo` vient de `expo` : c'est ce que expo-location interroge lui-même avant
+ * d'avertir. On ne passe ni par `Constants.appOwnership`, déprécié, ni par
+ * `Constants.executionEnvironment`, qui range Expo Go et les development builds sous la même
+ * valeur `storeClient` — ce qui aurait désactivé le suivi précisément là où il fonctionne.
+ */
+const BACKGROUND_TRACKING_SUPPORTED = Platform.OS !== "web" && !isRunningInExpoGo();
 
 /** Client tRPC autonome, sans lien avec le Provider React (indisponible dans une tâche de
  *  fond) : un seul appel isolé, jamais groupé avec quoi que ce soit d'autre. */
@@ -47,7 +64,7 @@ function createBackgroundClient(sessionToken: string) {
   });
 }
 
-if (Platform.OS !== "web") {
+if (BACKGROUND_TRACKING_SUPPORTED) {
   TaskManager.defineTask<{ locations: Location.LocationObject[] }>(BACKGROUND_DRIVER_LOCATION_TASK, async ({ data, error }) => {
     if (error) {
       console.error("[background-location] tâche en erreur", error);
@@ -91,7 +108,7 @@ if (Platform.OS !== "web") {
  * comme avant.
  */
 export async function startBackgroundDriverTracking(deliveryId: string): Promise<boolean> {
-  if (Platform.OS === "web") return false;
+  if (!BACKGROUND_TRACKING_SUPPORTED) return false;
   try {
     const servicesEnabled = await Location.hasServicesEnabledAsync();
     if (!servicesEnabled) return false;
@@ -127,7 +144,7 @@ export async function startBackgroundDriverTracking(deliveryId: string): Promise
 
 /** Arrête le suivi en arrière-plan. Idempotent : sans effet si la tâche n'est pas active. */
 export async function stopBackgroundDriverTracking(): Promise<void> {
-  if (Platform.OS === "web") return;
+  if (!BACKGROUND_TRACKING_SUPPORTED) return;
   try {
     await AsyncStorage.removeItem(ACTIVE_DELIVERY_STORAGE_KEY);
     const started = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_DRIVER_LOCATION_TASK);

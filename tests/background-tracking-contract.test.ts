@@ -30,9 +30,19 @@ describe("le suivi de position du livreur survit à l'arrière-plan", () => {
     expect(layout).toContain('import "@/lib/background-location-task"');
   });
 
-  it("la tâche ne s'exécute jamais sur web (aucune API TaskManager n'y existe)", () => {
-    expect(task).toContain('Platform.OS !== "web"');
-    expect(task).toContain('if (Platform.OS === "web") return');
+  it("ne touche jamais aux API de suivi là où elles n'existent pas : web et Expo Go", () => {
+    // Le web n'a aucune API TaskManager. Expo Go tourne sur un binaire natif qui n'est pas le
+    // nôtre : expo-location y répond par un avertissement, affiché en rouge dans LogBox dès le
+    // premier écran, puisque `stopBackgroundDriverTracking` part dès qu'aucune course n'est active.
+    // `isRunningInExpoGo` (celui de `expo`, qu'interroge expo-location lui-même) et non
+    // `Constants.executionEnvironment`, qui range Expo Go et les development builds sous la même
+    // valeur : s'y fier couperait le suivi précisément là où il fonctionne.
+    expect(task).toContain('Platform.OS !== "web" && !isRunningInExpoGo()');
+    expect(task).toContain('from "expo"');
+    expect(task).toContain("if (!BACKGROUND_TRACKING_SUPPORTED) return false;");
+    expect(task).toContain("if (!BACKGROUND_TRACKING_SUPPORTED) return;");
+    // La tâche elle-même n'est déclarée que là où l'OS saura la réveiller.
+    expect(task).toMatch(/if \(BACKGROUND_TRACKING_SUPPORTED\) \{\n\s*TaskManager\.defineTask/);
   });
 
   it("un cap invalide ne fait jamais échouer la publication de la position", () => {
