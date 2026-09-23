@@ -508,7 +508,7 @@ export default function ProfileScreen() {
 
 const VERIFY_TONE = {
   verified: { color: "#145C45", background: "#E7F2EC", icon: "verified-user" },
-  pending: { color: "#6B4600", background: "#FFF3E0", icon: "hourglass-empty" },
+  pending: { color: "#6B4600", background: "#FBEEDD", icon: "hourglass-empty" },
   blocked: { color: "#8C2F37", background: "#F7EAEB", icon: "error-outline" },
 } as const satisfies Record<string, { color: string; background: string; icon: React.ComponentProps<typeof MaterialIcons>["name"] }>;
 
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "center", gap: 13 },
   headerIdentity: { flex: 1, minWidth: 0 },
   avatarWrap: { position: "relative" },
-  avatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: "#FF9800", alignItems: "center", justifyContent: "center" },
+  avatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: "#01A7BD", alignItems: "center", justifyContent: "center" },
   avatarImage: { width: 58, height: 58, borderRadius: 29 },
   avatarText: { color: "#111111", fontSize: 19, fontWeight: "700" },
   avatarEdit: { position: "absolute", right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: "#FFFFFF", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", alignItems: "center", justifyContent: "center" },

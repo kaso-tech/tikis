@@ -26,10 +26,11 @@ describe("palette des champs et menus", () => {
 
   it("rend en noir le texte que l'utilisateur tape, jamais dans la couleur de marque", () => {
     // Numéro de téléphone, code reçu, nom, montant, recherche, commentaire d'avis, description d'un
-    // signalement : tous s'affichaient en #FF9800, soit 2,16:1 sur leur fond blanc.
+    // signalement : tous s'affichaient dans la couleur de marque (#FF9800 à l'époque, 2,16:1 sur
+    // fond blanc). La règle vaut pour n'importe quelle couleur de marque, pas seulement celle-là.
     for (const formSource of [createDeliverySource, contactSource, reviewSource, reportSource, profileSource, walletSource]) {
       expect(formSource).toMatch(/#FFFFFF|backgroundColor: theme\.input/);
-      expect(formSource).not.toMatch(/(input|textarea|comment)[a-zA-Z]*: \{[^}]*color: "#FF9800"/);
+      expect(formSource).not.toMatch(/(input|textarea|comment)[a-zA-Z]*: \{[^}]*color: "#01A7BD"/);
     }
   });
 
@@ -46,6 +47,6 @@ describe("palette des champs et menus", () => {
     // Un bouton par écran : accueil, numéro, code, rôle, engins, nom. Ils avaient leur propre palette
     // (fond orange, texte blanc, 2,16:1) ; ils prennent maintenant celle de tout le monde.
     expect((authSource.match(/<TikisButton /g) ?? []).length).toBe(6);
-    expect(buttonSource).toContain('primary: { background: "#FF9800", foreground: "#111111"');
+    expect(buttonSource).toContain('primary: { background: "#01A7BD", foreground: "#111111"');
   });
 });

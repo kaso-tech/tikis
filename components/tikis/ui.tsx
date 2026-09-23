@@ -2,6 +2,15 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, t
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { haptic } from "@/lib/haptics";
 
+/**
+ * L'ambre des étoiles de notation : une convention universelle (Google, l'App Store la gardent
+ * identique quel que soit leur thème), indépendante de la couleur de marque — elle ne doit jamais
+ * suivre `theme.primary`. Le passage du brun à l'orange (46217d2), puis de l'orange au turquoise,
+ * l'a montré : sans ce découplage explicite, un remplacement mécanique aurait rendu les étoiles
+ * turquoise, où plus personne ne les aurait lues comme une note.
+ */
+export const RATING_STAR_COLOR = "#FF9800";
+
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
 type ButtonPalette = { background: string; foreground: string; border?: string };
@@ -12,8 +21,8 @@ const DISABLED_PALETTE: ButtonPalette = { background: "#EEF1F6", foreground: "#7
 const buttonColors: Record<ButtonVariant, ButtonPalette> = {
   // L'action principale est le seul endroit de l'interface où la couleur de marque remplit une surface :
   // ailleurs elle se contente de border ou de marquer. Le texte posé dessus est sombre, jamais blanc —
-  // #FFFFFF sur #FF9800 ne donne que 2,16:1, là où #111111 en donne 8,76:1.
-  primary: { background: "#FF9800", foreground: "#111111", border: "#FF9800" },
+  // #FFFFFF sur #01A7BD ne donne que 2,89:1, là où #111111 en donne 6,53:1.
+  primary: { background: "#01A7BD", foreground: "#111111", border: "#01A7BD" },
   secondary: { background: "#FFFFFF", foreground: "#111111", border: "#E3E3E3" },
   ghost: { background: "#F0F3F8", foreground: "#111111", border: "#E3E3E3" },
   danger: { background: "#FFFFFF", foreground: "#A43740", border: "#E3E3E3" },

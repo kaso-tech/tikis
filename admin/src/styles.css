@@ -1,17 +1,17 @@
 /* ============================================================
    Tikis Admin — design system (aligné sur theme.config.js)
-   Tokens : primary orange #FF9800, fond #EEEDF3, surface #FFFFFF
+   Tokens : primary turquoise #01A7BD, fond #EEEDF3, surface #FFFFFF
    Densité moyenne, sobre, sans ombre, hairline borders.
    ============================================================ */
 
 :root {
-  /* --primary remplit et borde ; il ne porte jamais de texte : #FF9800 sur blanc ne donne que 2,16:1.
-     --primary-ink est la même teinte assombrie jusqu'à devenir lisible (4,9:1 sur blanc, 4,6:1 sur la
+  /* --primary remplit et borde ; il ne porte jamais de texte : #01A7BD sur blanc ne donne que 2,89:1.
+     --primary-ink est la même teinte assombrie jusqu'à devenir lisible (5,4:1 sur blanc, 4,9:1 sur la
      teinte claire) — c'est elle que prennent les liens, les valeurs et les pastilles. */
-  --primary: #FF9800;
-  --primary-ink: #8A5000;
-  --primary-soft: #FFF3E0;
-  --primary-hover: #F57C00;
+  --primary: #01A7BD;
+  --primary-ink: #017584;
+  --primary-soft: #E7F7F9;
+  --primary-hover: #018698;
   --background: #EEEDF3;
   --surface: #FFFFFF;
   --surface-2: #FAF8F5;
@@ -314,7 +314,7 @@ a:hover { text-decoration: underline; }
   outline: none;
   transition: border-color 120ms;
 }
-/* L'anneau de focus prend l'encre, pas l'aplat : à 2,16:1 il ne se voyait pas, WCAG en demande 3:1. */
+/* L'anneau de focus prend l'encre, pas l'aplat : à 2,89:1 il ne se voyait pas assez, WCAG en demande 3:1. */
 .input:focus, .select:focus, .textarea:focus { border-color: var(--primary-ink); }
 .input::placeholder { color: var(--muted); }
 .field-label { font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 4px; display: block; text-transform: uppercase; letter-spacing: 0.4px; }

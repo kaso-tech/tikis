@@ -12,9 +12,9 @@ describe("palette des boutons", () => {
   it("l'action principale est le seul aplat de la couleur de marque, et son texte y est sombre", () => {
     // Le bouton existait en deux variantes, toutes deux sous le seuil lisible : fond blanc à texte
     // orange (2,16:1) hors authentification, fond orange à texte blanc (2,16:1) dans le parcours de
-    // création de compte. Une seule palette désormais, et #111111 sur #FF9800 donne 8,76:1.
-    expect(buttonSource).toContain('primary: { background: "#FF9800", foreground: "#111111", border: "#FF9800" }');
-    expect(buttonSource).not.toContain('foreground: "#FF9800"');
+    // création de compte. Une seule palette désormais, et #111111 sur #01A7BD donne 6,53:1.
+    expect(buttonSource).toContain('primary: { background: "#01A7BD", foreground: "#111111", border: "#01A7BD" }');
+    expect(buttonSource).not.toContain('foreground: "#01A7BD"');
     expect(buttonSource).not.toContain('foreground: "#FFFFFF"');
   });
 
@@ -29,9 +29,9 @@ describe("palette des boutons", () => {
 
   it("les actions écrites en toutes lettres se lisent en neutre, pas en orange pâle", () => {
     // Les cartes de l'accueil — « Trajet » côté expéditeur, « Registre » côté livreur — portaient
-    // leur libellé en #FF9800 sur fond blanc. La bordure suffit à marquer l'action.
+    // leur libellé en #01A7BD sur fond blanc. La bordure suffit à marquer l'action.
     for (const source of [nativeHomeSource, webHomeSource]) {
-      expect(source).toContain('backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#FF9800"');
+      expect(source).toContain('backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#01A7BD"');
       expect(source).toContain('tripCtaText: { fontSize: 12.5, fontWeight: "700", color: "#111111" }');
       expect(source).toContain('compactAction: { fontSize: 11.5, fontWeight: "700", color: "#111111" }');
     }

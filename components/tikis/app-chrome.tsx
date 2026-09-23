@@ -131,7 +131,7 @@ export function TikisDrawer() {
               accessibilityLabel="Activer le mode sombre"
               value={isDark}
               onValueChange={toggleDarkMode}
-              trackColor={{ false: "#E3E3E3", true: "#FF9800" }}
+              trackColor={{ false: "#E3E3E3", true: "#01A7BD" }}
               thumbColor={isDark ? "#FBF7F0" : "#FFFFFF"}
             />
           </View>
@@ -206,8 +206,8 @@ const styles = StyleSheet.create({
   profileName: { color: "#111111", fontSize: 15, fontWeight: "600" },
   profileNameDark: { color: "#FBF7F0" },
   rolePill: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
-  roleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#FF9800" },
-  roleDotDark: { backgroundColor: "#FF9800" },
+  roleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#01A7BD" },
+  roleDotDark: { backgroundColor: "#01A7BD" },
   roleLabel: { color: "#667085", fontSize: 11, fontWeight: "500" },
   roleLabelDark: { color: "#C8BCAA" },
   themeRow: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", gap: 10 },
@@ -223,9 +223,9 @@ const styles = StyleSheet.create({
   menuRow: { minHeight: 48, borderRadius: 8, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", gap: 9 },
   menuRowActive: { backgroundColor: "#111111" },
   menuRowDark: { backgroundColor: "transparent" },
-  menuRowActiveDark: { backgroundColor: "#FF9800" },
+  menuRowActiveDark: { backgroundColor: "#01A7BD" },
   menuIcon: { width: 32, height: 32, borderRadius: 7, alignItems: "center", justifyContent: "center", backgroundColor: "#F0F3F8" },
-  menuIconActive: { backgroundColor: "#FF9800" },
+  menuIconActive: { backgroundColor: "#01A7BD" },
   menuIconDark: { backgroundColor: "#231A10" },
   menuText: { flex: 1 },
   menuTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },

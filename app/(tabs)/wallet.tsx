@@ -27,9 +27,9 @@ const operationMeta: Record<WalletOperation, { label: string; icon: React.Compon
 };
 
 const TONE_COLOR: Record<Tone, string> = {
-  primary: "#FF9800",
+  primary: "#01A7BD",
   success: "#176C52",
-  warning: "#FF9800",
+  warning: "#01A7BD",
   error: "#A43740",
   neutral: "#667085",
 };
@@ -271,11 +271,11 @@ const styles = StyleSheet.create({
 
   // Le solde est une information, pas une action : il se lit sur une carte sombre, comme dans les applications
   // bancaires, et non sur un aplat de la couleur de marque — où le blanc ne donnait que 2,16:1 (et 1,51:1 pour les
-  // libellés à 55 % d'opacité). Le voile orange conserve la chaleur de la marque sans toucher à la lisibilité.
+  // libellés à 55 % d'opacité). Le voile de la couleur de marque conserve sa chaleur sans toucher à la lisibilité.
   balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#111111", position: "relative", overflow: "hidden" },
   balanceCardDriver: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#111111", borderWidth: 0, overflow: "hidden" },
   balanceCardSender: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#111111", borderWidth: 0, overflow: "hidden" },
-  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#FF9800", opacity: 0.18, borderRadius: 14 },
+  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#01A7BD", opacity: 0.18, borderRadius: 14 },
   balanceEyebrow: { color: "rgba(255,255,255,0.6)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   balanceEyebrowLight: { color: "rgba(255,255,255,0.7)" },
   balanceValueRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   quickStatLabel: { color: "#667085", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
 
   senderInfo: { marginHorizontal: 8, padding: 12, backgroundColor: "#FFFFFF", borderRadius: 10, flexDirection: "row", gap: 10, alignItems: "center" },
-  senderInfoIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#FF9800", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  senderInfoIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#01A7BD", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   senderInfoText: { flex: 1, color: "#667085", fontSize: 11, lineHeight: 16 },
   senderInfoTextBold: { fontWeight: "700" },
 

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const PRIMARY = "#FF9800";
+const PRIMARY = "#01A7BD";
 
 function sources(dir: string): string[] {
   return readdirSync(join(process.cwd(), dir)).flatMap((entry) => {
@@ -17,12 +17,16 @@ const ecrans = [...sources("app"), ...sources("components")];
 /**
  * La règle de la palette, en un mot : la couleur de marque remplit, borde et marque — elle ne se lit pas.
  *
- * #FF9800 sur blanc donne 2,16:1, et blanc sur #FF9800 le même 2,16:1, là où le seuil lisible est 4,5:1.
- * L'ancien brun #9A6201 tenait le rôle parce qu'il était la même teinte assombrie (30 % de luminosité
- * contre 50 %) : il donnait 5,10:1 dans les deux sens. En passant à l'orange sans changer la répartition,
- * on avait gardé 93 textes, tous les champs de saisie et les deux variantes du bouton principal sous le
- * seuil — d'où l'impression d'une application saturée de couleur, doublée d'un vrai problème de lecture
- * en plein soleil, là où ces livreurs travaillent.
+ * Elle a été écrite pour l'orange #FF9800 (69fec0b), qui ne donnait que 2,16:1 en texte sur blanc — sous
+ * le seuil lisible de 4,5:1 — là où l'ancien brun #9A6201 en donnait 5,10:1, à la même teinte mais assombrie
+ * (30 % de luminosité contre 50 %). Avant cette règle, l'app gardait 93 textes, tous les champs de saisie
+ * et les deux variantes du bouton principal sous le seuil : impression de saturation, doublée d'un vrai
+ * problème de lecture en plein soleil, là où ces livreurs travaillent.
+ *
+ * Le turquoise #01A7BD qui a suivi confirme que la règle protège au-delà d'une seule couleur : 2,89:1 en
+ * texte sur blanc, de nouveau sous le seuil — un remplacement brut aurait reproduit le même défaut avec
+ * une teinte différente. La discipline (fills/bordures/icônes justifiées, jamais de texte) a suffi à
+ * absorber le second changement sans repasser par cette analyse.
  */
 describe("sobriété de la palette", () => {
   it("aucun écran ne pose la couleur de marque comme couleur de texte", () => {
@@ -34,8 +38,8 @@ describe("sobriété de la palette", () => {
     // Trois cas seulement : l'étoile de notation (convention universelle), l'icône d'ouverture des
     // écrans d'authentification (size 30, seul accent de sa page), et une icône qui marque un état
     // sélectionné ou distingue collecte et destination — la couleur y porte du sens, pas du décor.
-    // Le piège à éviter : la forme ternaire `color={actif ? "#FF9800" : …}`, qu'une recherche sur
-    // `color="#FF9800"` laisse passer entièrement.
+    // Le piège à éviter : la forme ternaire `color={actif ? "#01A7BD" : …}`, qu'une recherche sur
+    // `color="#01A7BD"` laisse passer entièrement.
     const justifiee = (balise: string) =>
       balise.includes('name="star"') || balise.includes("star <= rating")
       || balise.includes("size={30}")

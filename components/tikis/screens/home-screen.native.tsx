@@ -37,7 +37,7 @@ const PICKUP_TOOLTIP_DURATION_MS = 3_000;
 /** Le ton renvoyé par `deliveryCardTone`, traduit en couleur. La couleur reste
  *  ici : la logique de carte dit l'état, elle ne peint pas. */
 const TONE_COLOR: Record<ReturnType<typeof deliveryCardTone>, string> = {
-  open: "#FF9800",
+  open: "#01A7BD",
   assigned: "#A65300",
   active: "#176C52",
   done: "#667085",
@@ -531,8 +531,8 @@ export function HomeScreen() {
                   setIsManualRefreshing(false);
                 }
               }}
-              tintColor="#FF9800"
-              colors={["#FF9800"]}
+              tintColor="#01A7BD"
+              colors={["#01A7BD"]}
               progressBackgroundColor="#FFFFFF"
             />
           }
@@ -796,7 +796,7 @@ function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeadin
         {selected ? (
           <>
             {approachCoordinates.length > 1 ? <Polyline key="approach-line" coordinates={approachCoordinates} strokeColor="#176C52" strokeWidth={4} lineCap="round" zIndex={MAP_Z.approach} /> : null}
-            {routeCoordinates.length > 1 ? <Polyline key="route-line" coordinates={routeCoordinates} strokeColor="#FF9800" strokeWidth={4} lineCap="round" zIndex={MAP_Z.route} /> : null}
+            {routeCoordinates.length > 1 ? <Polyline key="route-line" coordinates={routeCoordinates} strokeColor="#01A7BD" strokeWidth={4} lineCap="round" zIndex={MAP_Z.route} /> : null}
             <TrackedMarker key={`pickup-${selected.id}`} coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={PIN_ANCHOR} zIndex={MAP_Z.pin}>
               <PickupMarker />
             </TrackedMarker>
@@ -1040,10 +1040,10 @@ const styles = StyleSheet.create({
   mapCanvas: { zIndex: 0 },
 
   userMarkerHalo: { width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(154,98,1,0.18)", alignItems: "center", justifyContent: "center" },
-  userMarkerDot: { width: 13, height: 13, borderRadius: 7, backgroundColor: "#FF9800", borderWidth: 2.5, borderColor: "#FFFFFF" },
+  userMarkerDot: { width: 13, height: 13, borderRadius: 7, backgroundColor: "#01A7BD", borderWidth: 2.5, borderColor: "#FFFFFF" },
 
   fab: { position: "absolute", right: 14, width: 50, height: 50, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3", zIndex: 10 },
-  sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FF9800", alignItems: "center", justifyContent: "center" },
+  sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#01A7BD", alignItems: "center", justifyContent: "center" },
 
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden", zIndex: 2, elevation: 2 },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
@@ -1061,7 +1061,7 @@ const styles = StyleSheet.create({
   servicePillNeutral: { backgroundColor: "#F0F3F8" },
   serviceText: { color: "#667085", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   serviceTextOffline: { color: "#111111" },
-  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FF9800" },
+  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#01A7BD" },
   onlineDotOffline: { backgroundColor: "#667085" },
 
   searchRow: { paddingTop: 10, paddingBottom: 6 },
@@ -1076,11 +1076,11 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: "row", gap: 6, paddingBottom: 10, alignItems: "center" },
   filterScroll: { flexGrow: 0 },
   chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#F0F3F8", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", gap: 6 },
-  chipActive: { backgroundColor: "#FF980014", borderColor: "#FF9800", borderWidth: 1 },
+  chipActive: { backgroundColor: "#01A7BD14", borderColor: "#01A7BD", borderWidth: 1 },
   chipText: { color: "#667085", fontSize: 11, fontWeight: "600" },
   chipTextActive: { color: "#111111" },
-  chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#FF9800", alignItems: "center", justifyContent: "center" },
-  chipCountActive: { backgroundColor: "#FF9800" },
+  chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#01A7BD", alignItems: "center", justifyContent: "center" },
+  chipCountActive: { backgroundColor: "#01A7BD" },
   chipCountText: { color: "#111111", fontSize: 10, fontWeight: "700", lineHeight: 12 },
   tabContent: { minHeight: 1 },
 
@@ -1096,13 +1096,13 @@ const styles = StyleSheet.create({
   cardPressed: { backgroundColor: "#E7ECF4" },
   // La sélection cerne la carte au lieu de la repeindre : la liste ne change plus
   // de couleur autour de l'élément choisi.
-  cardSelected: { borderColor: "#FF9800", borderWidth: 1.5 },
+  cardSelected: { borderColor: "#01A7BD", borderWidth: 1.5 },
   cardRail: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3 },
 
   cardTrip: { paddingVertical: 13, paddingLeft: 17, paddingRight: 14, gap: 11 },
   tripHead: { flexDirection: "row", alignItems: "flex-start", gap: 11 },
   tripRail: { width: 12, alignItems: "center", paddingTop: 5, alignSelf: "stretch" },
-  tripDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 2.5, borderColor: "#FF9800" },
+  tripDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 2.5, borderColor: "#01A7BD" },
   tripLine: { flex: 1, width: 1.5, minHeight: 16, backgroundColor: "#E3E3E3", marginVertical: 2 },
   tripPin: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#A43740" },
   tripStops: { flex: 1, minWidth: 0, gap: 10 },
@@ -1116,7 +1116,7 @@ const styles = StyleSheet.create({
   tripState: { fontWeight: "700" },
   tripFoot: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#E3E3E3" },
   tripGhost: { fontSize: 12.5, fontWeight: "600", color: "#667085" },
-  tripCta: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#FF9800", minWidth: 96, alignItems: "center" },
+  tripCta: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#01A7BD", minWidth: 96, alignItems: "center" },
   tripCtaText: { fontSize: 12.5, fontWeight: "700", color: "#111111" },
   tripCtaQuiet: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#A43740", minWidth: 96, alignItems: "center" },
   tripCtaQuietText: { fontSize: 12.5, fontWeight: "700", color: "#A43740" },

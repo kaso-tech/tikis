@@ -334,9 +334,9 @@ const styles = StyleSheet.create({
 
   // Le solde est une information, pas une action : il se lit sur une carte sombre, comme dans les applications
   // bancaires, et non sur un aplat de la couleur de marque — où le blanc ne donnait que 2,16:1 (et 1,51:1 pour les
-  // libellés à 55 % d'opacité). Le voile orange conserve la chaleur de la marque sans toucher à la lisibilité.
+  // libellés à 55 % d'opacité). Le voile de la couleur de marque conserve sa chaleur sans toucher à la lisibilité.
   balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#111111", position: "relative", overflow: "hidden" },
-  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#FF9800", opacity: 0.18, borderRadius: 14 },
+  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#01A7BD", opacity: 0.18, borderRadius: 14 },
   balanceEyebrow: { color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   balanceValueRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
   balanceValue: { color: "#FFFFFF", fontSize: 28, fontWeight: "700", lineHeight: 34, includeFontPadding: false },
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
 
   periodTabs: { flexDirection: "row", gap: 6, paddingHorizontal: 2 },
   periodTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 9, borderRadius: 9, borderWidth: 1 },
-  periodTabActive: { backgroundColor: "#FF9800", borderColor: "#FF9800" },
+  periodTabActive: { backgroundColor: "#01A7BD", borderColor: "#01A7BD" },
   periodTabText: { fontSize: 11, fontWeight: "600" },
   periodTabTextActive: { color: "#111111" },
 
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
 
   flowTabs: { flexDirection: "row", gap: 6, paddingHorizontal: 2 },
   flowTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 8, borderRadius: 9, borderWidth: 1, borderColor: "#E3E3E3", backgroundColor: "#FFFFFF" },
-  flowTabActive: { backgroundColor: "#FF9800", borderColor: "#FF9800" },
+  flowTabActive: { backgroundColor: "#01A7BD", borderColor: "#01A7BD" },
   flowTabText: { fontSize: 11, fontWeight: "600", color: "#667085" },
   flowTabTextActive: { color: "#111111" },
 

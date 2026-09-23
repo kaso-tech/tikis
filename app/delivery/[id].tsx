@@ -9,7 +9,7 @@ import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
 import { useApproachRoute, useRouteCoordinates } from "@/hooks/use-route-coordinates";
 import { useDriverLocation } from "@/hooks/use-driver-location";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
-import { SectionHeading, TikisButton } from "@/components/tikis/ui";
+import { RATING_STAR_COLOR, SectionHeading, TikisButton } from "@/components/tikis/ui";
 import { haptic } from "@/lib/haptics";
 import { deliveryRemainingMs, formatDeliveryCountdown } from "@/lib/delivery-countdown";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
@@ -382,7 +382,7 @@ export default function DeliveryDetailScreen() {
 
         {message ? <Text style={styles.message}>{message}</Text> : null}
         {isCompleted && role === "sender" ? review ? (
-          <View style={styles.reviewDone}><MaterialIcons name="star" size={20} color="#FF9800" /><View style={styles.reviewDoneInfo}><Text style={styles.reviewDoneTitle}>Avis envoyé · {review.rating}/5</Text><Text style={styles.reviewDoneText}>{review.comment || "Votre évaluation est enregistrée dans votre historique."}</Text></View></View>
+          <View style={styles.reviewDone}><MaterialIcons name="star" size={20} color={RATING_STAR_COLOR} /><View style={styles.reviewDoneInfo}><Text style={styles.reviewDoneTitle}>Avis envoyé · {review.rating}/5</Text><Text style={styles.reviewDoneText}>{review.comment || "Votre évaluation est enregistrée dans votre historique."}</Text></View></View>
         ) : (
           <TikisButton label="Noter le livreur" variant="ghost" icon="star-outline" onPress={() => router.push(`/review/${deliveryId}` as any)} style={styles.rateButton} />
         ) : null}
@@ -435,7 +435,7 @@ const styles = StyleSheet.create({
   heroMapBlock: { position: "absolute", backgroundColor: "#DCDEE3", borderRadius: 5 },
   heroMapRoad: { position: "absolute", backgroundColor: "#FFFFFF", borderRadius: 99 },
   heroMapMarker: { position: "absolute", width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF", shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  heroMapMarkerStart: { top: "30%", left: "18%", backgroundColor: "#FF9800" },
+  heroMapMarkerStart: { top: "30%", left: "18%", backgroundColor: "#01A7BD" },
   heroMapMarkerEnd: { top: "60%", right: "22%", backgroundColor: "#FFFFFF", borderColor: "#A43740" },
   heroMapStatus: { position: "absolute", top: 12, left: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 7 },
   heroMapRouteLoading: { position: "absolute", top: 12, right: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 7 },
@@ -457,16 +457,16 @@ const styles = StyleSheet.create({
   timeline: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginTop: 10 },
   timelineStep: { alignItems: "center", width: 70 },
   timelineDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#F0F3F8", alignItems: "center", justifyContent: "center" },
-  timelineDotDone: { backgroundColor: "#FF9800" },
+  timelineDotDone: { backgroundColor: "#01A7BD" },
   timelineLine: { flex: 1, height: 1.5, backgroundColor: "#E3E3E3", marginTop: 11 },
-  timelineLineDone: { backgroundColor: "#FF9800" },
+  timelineLineDone: { backgroundColor: "#01A7BD" },
   timelineLabel: { color: "#667085", fontSize: 9, fontWeight: "600", textAlign: "center", marginTop: 6 },
   timelineLabelDone: { color: "#111111" },
 
   routeCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "stretch", gap: 10 },
   routeCol: { alignItems: "center", width: 14 },
   routePin: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
-  routePinFrom: { backgroundColor: "#FF9800" },
+  routePinFrom: { backgroundColor: "#01A7BD" },
   routePinTo: { backgroundColor: "#A43740" },
   routeLine: { width: 1.5, flex: 1, backgroundColor: "#E3E3E3", marginVertical: 4 },
   routeInfoWrap: { flex: 1, minWidth: 0 },
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
   driverActionBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#F0F3F8", alignItems: "center", justifyContent: "center" },
 
   candidatesTrigger: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
-  candidatesTriggerActive: { borderWidth: 1, borderColor: "#FF9800", borderStyle: "dashed" },
+  candidatesTriggerActive: { borderWidth: 1, borderColor: "#01A7BD", borderStyle: "dashed" },
   candidatesIcon: { width: 36, height: 36, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
   candidatesIconActive: { backgroundColor: "#FFFFFF" },
   candidatesBody: { flex: 1, minWidth: 0 },

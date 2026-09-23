@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   routeLine: {
     position: "absolute",
     height: 2,
-    backgroundColor: "#FF9800",
+    backgroundColor: "#01A7BD",
     borderRadius: 1,
   },
   // Les marqueurs sont ancrés par leur pointe : on place leur coin haut-gauche.
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#FF9800",
+    backgroundColor: "#01A7BD",
   },
   legendDotDropoff: {
     width: 8,

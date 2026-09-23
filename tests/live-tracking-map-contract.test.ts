@@ -15,7 +15,7 @@ describe("contrat de suivi cartographique", () => {
   it("publie la position GPS du livreur et trace un segment distinct vers la collecte", () => {
     expect(nativeHome).toContain("deliveries.updateLivePosition.useMutation");
     expect(nativeHome).toContain('strokeColor="#176C52"');
-    expect(nativeHome).toContain('strokeColor="#FF9800"');
+    expect(nativeHome).toContain('strokeColor="#01A7BD"');
   });
 
   it("affiche le suivi expéditeur dans la variante web avec un segment d’approche", () => {

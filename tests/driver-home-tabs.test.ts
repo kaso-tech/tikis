@@ -25,7 +25,8 @@ describe("onglets de l’accueil livreur", () => {
     expect(source).toContain("accessibilityRole=\"tab\"");
     expect(source).toContain("styles.chipCount");
     expect(source).toContain('backgroundColor: "#FFFFFF"');
-    // Le compteur se pose sur une pastille orange : son chiffre y est sombre, pas blanc (2,16:1).
+    // Le compteur se pose sur une pastille de la couleur de marque : son chiffre y est sombre, pas
+    // blanc — blanc sur #01A7BD ne donne que 2,89:1, sous le seuil lisible de 4,5:1.
     expect(source).toContain('chipCountText: { color: "#111111"');
   });
 });
