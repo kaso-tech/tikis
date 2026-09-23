@@ -19,11 +19,16 @@ describe("session Tikis signée", () => {
     await expect(verifyTikisProfileSession(token)).resolves.toBe("+22670000000");
   });
 
-  it("conserve une session de profil valide pendant trente jours", async () => {
+  it("conserve une session de profil valide pendant un an", async () => {
     const payload = decodeJwt(await createTikisProfileSession("+22670000001"));
     expect(payload.exp).toBeTypeOf("number");
     expect(payload.iat).toBeTypeOf("number");
+    // L'échéance inscrite dans le jeton suit la constante, au lieu d'une durée écrite à part qui
+    // pouvait diverger d'elle sans que rien ne le signale.
     expect((payload.exp ?? 0) - (payload.iat ?? 0)).toBe(TIKIS_SESSION_TTL_SECONDS);
+    // Et la constante elle-même vaut bien un an : personne ne doit ressaisir son numéro parce
+    // qu'il n'a pas ouvert l'application depuis un mois.
+    expect(TIKIS_SESSION_TTL_SECONDS).toBe(365 * 24 * 60 * 60);
   });
 
   it("rejette un jeton non signé ou une identité invalide", async () => {

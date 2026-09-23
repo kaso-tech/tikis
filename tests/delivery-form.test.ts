@@ -78,12 +78,31 @@ describe("l'engin suggéré par le colis", () => {
 describe("l'écran de publication", () => {
   const source = readFileSync(join(process.cwd(), "app/create-delivery.tsx"), "utf8");
 
-  it("mène de l'itinéraire à l'offre, puis au colis, puis à l'engin", () => {
-    const order = ["Votre offre", "Ce que vous envoyez", "L’engin"].map((title) => source.indexOf(title));
+  it("mène de l'itinéraire au colis, puis à l'engin, et demande le prix en dernier", () => {
+    const order = ["Ce que vous envoyez", "L’engin", "Votre offre"].map((title) => source.indexOf(title));
     expect(order.every((index) => index > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    // L'offre passe avant le colis : c'est la question à laquelle l'expéditeur veut une réponse.
-    expect(source.indexOf("Votre offre")).toBeLessThan(source.indexOf("Ce que vous envoyez"));
+    // L'offre passe en dernier : l'estimation dépend du type, des personnes, du poids/volume et de
+    // l'engin (`estimateDeliveryPrice`) autant que de la distance. Demandée avant eux, elle
+    // réclamait un prix sur des données incomplètes, puis bougeait sous le montant déjà saisi.
+    expect(source.indexOf("Votre offre")).toBeGreaterThan(source.indexOf("L’engin"));
+  });
+
+  it("prévient quand le prix proposé passe sous l'estimation", () => {
+    // L'expéditeur peut toujours remonter modifier le colis après avoir saisi son prix : sans ce
+    // signal, une course sous-payée partait avec une note neutre pour seul commentaire.
+    expect(source).toContain("isBelowEstimate");
+    expect(source).toContain("sous l’estimation");
+  });
+
+  it("traite les consignes comme réellement facultatives", () => {
+    // Le champ s'annonce « facultatif » mais passait par la variante requise de
+    // `deliveryTextInputIssue` : vide, il rendait `detailsReady` faux, ce qui désactivait le
+    // bouton Publier alors que `publicationBlocker` ne mentionne jamais les consignes — bouton
+    // mort, aucune explication. Chaque appel sur `details` passe désormais par `detailsInputIssue`.
+    expect(source).toContain("deliveryTextInputIssue(value, false)");
+    expect(source).not.toMatch(/deliveryTextInputIssue\(details\)/);
+    expect(source).toContain("detailsInputIssue(details)");
   });
 
   it("a renoncé à la barre de progression et à son pourcentage", () => {

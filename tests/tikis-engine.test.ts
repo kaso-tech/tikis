@@ -30,4 +30,12 @@ describe("règles métier Tikis de démonstration", () => {
     expect(deliveryTextInputIssue("Documents <script>")).toBe("Caractères non autorisés.");
     expect(deliveryTextInputIssue("   ")).toBe("Ce champ est requis.");
   });
+
+  it("laisse un champ facultatif vide sans rien reprocher, mais en filtre toujours les caractères", () => {
+    // Les consignes sont annoncées « facultatif » à l'écran : les déclarer requises désactivait le
+    // bouton Publier sans message, le pied de page ne les mentionnant jamais.
+    expect(deliveryTextInputIssue("", false)).toBe("");
+    expect(deliveryTextInputIssue("   ", false)).toBe("");
+    expect(deliveryTextInputIssue("Awa <script>", false)).toBe("Caractères non autorisés.");
+  });
 });

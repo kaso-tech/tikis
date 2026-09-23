@@ -1,4 +1,5 @@
 import type { CookieOptions, Request, Response } from "express";
+import { TIKIS_SESSION_TTL_SECONDS } from "../tikis-session";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -66,7 +67,9 @@ export function getSessionCookieOptions(
 }
 
 export const TIKIS_PROFILE_COOKIE = "tikis-profile-session";
-export const TIKIS_PROFILE_COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+// Dérivé de la durée de vie du jeton lui-même : un cookie qui expire avant le JWT qu'il transporte
+// déconnecterait le web plus tôt que le natif, sans raison.
+export const TIKIS_PROFILE_COOKIE_MAX_AGE_MS = TIKIS_SESSION_TTL_SECONDS * 1000;
 
 export function setTikisProfileCookie(res: Pick<Response, "cookie" | "clearCookie">, req: Request, token: string) {
   if (!res || typeof (res as { cookie?: unknown }).cookie !== "function") return;

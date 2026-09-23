@@ -33,6 +33,12 @@ const DELIVERY_TYPES: { value: DeliveryType; icon: React.ComponentProps<typeof M
 ];
 type DeliveryFieldName = "title" | "details" | "passengers" | "pickup" | "dropoff" | "price";
 
+/** Les consignes sont facultatives : seul le jeu de caractères est vérifié, jamais la présence.
+ *  `deliveryTextInputIssue` exige un contenu par défaut — l'appeler sans ce second argument
+ *  rendait « Ce champ est requis. » sur un champ vide, ce qui désactivait le bouton Publier
+ *  sans que rien ne l'explique (le pied de page ne mentionne jamais les consignes). */
+const detailsInputIssue = (value: string) => deliveryTextInputIssue(value, false);
+
 export default function CreateDeliveryScreen() {
   const { deliveryId, draftId } = useLocalSearchParams<{ deliveryId?: string; draftId?: string }>();
   const { colors: theme } = useThemeColors();
@@ -145,16 +151,19 @@ export default function CreateDeliveryScreen() {
   const parsedOfferedPrice = useMemo(() => parseOfferedPrice(offeredPriceInput), [offeredPriceInput]);
   const priceInputError = useMemo(() => offeredPriceError(offeredPriceInput), [offeredPriceInput]);
   const titleIssue = inputIssues.title || (touched.title ? deliveryTextInputIssue(title) : "");
-  const detailsIssue = inputIssues.details || (touched.details ? deliveryTextInputIssue(details) : "");
+  const detailsIssue = inputIssues.details || (touched.details ? detailsInputIssue(details) : "");
   const passengerIssue = inputIssues.passengers || (deliveryType === "Personne" && touched.passengers && (!Number(passengers) || Number(passengers) > 4) ? "Indiquez entre 1 et 4 personnes." : "");
   const pickupIssue = touched.pickup && !pickup ? "Choisissez le lieu de récupération." : "";
   const dropoffIssue = touched.dropoff && !dropoff ? "Choisissez la destination." : "";
   const measurementIssue = useMemo(() => validateDeliveryMeasurement(deliveryType, measurement), [deliveryType, measurement]);
   const titleReady = !deliveryTextInputIssue(title) && !inputIssues.title;
-  const detailsReady = !deliveryTextInputIssue(details) && !inputIssues.details;
+  const detailsReady = !detailsInputIssue(details) && !inputIssues.details;
   const passengerReady = deliveryType !== "Personne" || (Number(passengers) >= 1 && Number(passengers) <= 4 && !inputIssues.passengers);
   const canPublish = Boolean(titleReady && detailsReady && pickup && dropoff && route && estimate && passengerReady && !measurementIssue && !priceInputError && parsedOfferedPrice);
   const priceDifference = parsedOfferedPrice && estimate ? priceDifferencePercent(parsedOfferedPrice, estimate) : 0;
+  // `priceDifference` est arrondi : sous le pour cent d'écart il vaut 0, et on retombe sur la note
+  // neutre plutôt que d'annoncer « 0 % sous l'estimation ».
+  const isBelowEstimate = Boolean(parsedOfferedPrice) && priceDifference < 0;
   const favoriteLocations: SavedFavorite[] = useMemo(() => (favoritesQuery.data ?? []).map((item) => ({ id: item.id, label: item.label, location: favoriteToLocation(item) })), [favoritesQuery.data]);
   const isAddressInFavorites = useCallback((place: LocationLabel | null) => {
     if (!place || favoriteLocations.length === 0) return false;
@@ -242,7 +251,7 @@ export default function CreateDeliveryScreen() {
     if (loading) return;
     if (!canPublish) {
       setTouched({ title: true, details: true, passengers: deliveryType === "Personne", pickup: true, dropoff: true, price: Boolean(offeredPriceInput) });
-      setInputIssues((current) => ({ ...current, title: deliveryTextInputIssue(title), details: deliveryTextInputIssue(details), passengers: deliveryType === "Personne" && (!Number(passengers) || Number(passengers) > 4) ? "Indiquez entre 1 et 4 personnes." : "", price: priceInputError || "" }));
+      setInputIssues((current) => ({ ...current, title: deliveryTextInputIssue(title), details: detailsInputIssue(details), passengers: deliveryType === "Personne" && (!Number(passengers) || Number(passengers) > 4) ? "Indiquez entre 1 et 4 personnes." : "", price: priceInputError || "" }));
       if (!pickup || !dropoff) setRouteMessage("Sélectionnez les deux lieux requis pour calculer l’itinéraire.");
       return;
     }
@@ -356,6 +365,77 @@ export default function CreateDeliveryScreen() {
           ) : null}
 
           <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Ce que vous envoyez</Text>
+            <View style={styles.pillRow}>
+              {DELIVERY_TYPES.map((item) => {
+                const active = deliveryType === item.value;
+                return (
+                  <Pressable
+                    key={item.value}
+                    onPress={() => setDeliveryType(item.value)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={`${item.label} — ${item.sub}`}
+                    style={({ pressed }) => [styles.pill, active && styles.pillActive, pressed && styles.pressed]}
+                  >
+                    <MaterialIcons name={item.icon} size={15} color={active ? "#9A6201" : "#667085"} />
+                    <Text style={[styles.pillLabel, active && styles.pillLabelActive]} numberOfLines={1}>{item.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Field label="Titre de la course" value={title} error={titleIssue} onBlur={() => { setTouched((current) => ({ ...current, title: true })); setInputIssues((current) => ({ ...current, title: deliveryTextInputIssue(title) })); }} onChangeText={(value) => { const issue = !isAllowedDeliveryText(value) ? "Caractères non autorisés." : ""; setTitle(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setInputIssues((current) => ({ ...current, title: issue || (touched.title ? deliveryTextInputIssue(value) : "") })); }} placeholder={deliveryType === "Plis" ? "Ex. Documents de bureau" : deliveryType === "Personne" ? "Ex. Trajet vers l’aéroport" : "Ex. Petit matériel"} />
+            <Field label="Consignes — facultatif" value={details} error={detailsIssue} onBlur={() => { setTouched((current) => ({ ...current, details: true })); setInputIssues((current) => ({ ...current, details: detailsInputIssue(details) })); }} onChangeText={(value) => { const issue = !isAllowedDeliveryText(value) ? "Caractères non autorisés." : ""; setDetails(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setInputIssues((current) => ({ ...current, details: issue || (touched.details ? detailsInputIssue(value) : "") })); }} placeholder="Ex. Demander Awa à l’accueil, 2e étage" multiline />
+            {deliveryType === "Personne" ? (
+              <Field label="Nombre de personnes" value={passengers} error={passengerIssue} onBlur={() => { setTouched((current) => ({ ...current, passengers: true })); }} onChangeText={(value) => { setPassengers(value.replace(/\D/g, "").slice(0, 1)); setInputIssues((current) => ({ ...current, passengers: /\D/.test(value) ? "Caractères non autorisés." : "" })); }} placeholder="1" keyboardType="number-pad" icon="groups" />
+            ) : null}
+            {deliveryType === "Autre" ? (
+              <View style={styles.measureCard}>
+                <Text style={styles.measureTitle}>Poids et dimensions — facultatif</Text>
+                <Text style={styles.measureSubtitle}>Ils affinent l’estimation et choisissent l’engin à votre place.</Text>
+                <Field label="Poids (kg)" value={weightKg} onChangeText={(value) => setWeightKg(value.replace(/[^0-9.]/g, "").slice(0, 6))} placeholder="Ex. 12" keyboardType="decimal-pad" icon="scale" />
+                <Text style={styles.fieldLabel}>Dimensions (cm)</Text>
+                <View style={styles.dimensionRow}>
+                  <MiniNumber value={lengthCm} onChangeText={setLengthCm} placeholder="Long." />
+                  <MiniNumber value={widthCm} onChangeText={setWidthCm} placeholder="Larg." />
+                  <MiniNumber value={heightCm} onChangeText={setHeightCm} placeholder="Haut." />
+                </View>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={styles.section}>
+            <View style={styles.sectionHeadRow}>
+              <Text style={styles.sectionTitle}>L’engin</Text>
+              {!vehicleChosen ? <Text style={styles.sectionHint}>suggéré d’après le colis</Text> : null}
+            </View>
+            <View style={styles.pillRow}>
+              {VEHICLES.map((item) => {
+                const active = vehicle === item;
+                return (
+                  <Pressable
+                    key={item}
+                    onPress={() => { setChosenVehicle(item); setVehicleChosen(true); }}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={item}
+                    style={({ pressed }) => [styles.vehiclePill, active && styles.pillActive, pressed && styles.pressed]}
+                  >
+                    <MaterialIcons name={VEHICLE_ICON[item]} size={17} color={active ? "#9A6201" : "#667085"} />
+                    <Text style={[styles.vehicleLabel, active && styles.pillLabelActive]} numberOfLines={1}>{item}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* En dernier, et pas avant le colis : l'estimation dépend du type, du nombre de
+              personnes, du poids/volume et de l'engin autant que de la distance
+              (`estimateDeliveryPrice`, lib/geo-rules.ts). Placée plus haut, elle demandait un prix
+              sur des données encore incomplètes, puis bougeait dans le dos de l'expéditeur — un
+              colis lourd renseigné après coup pouvait tripler l'estimation sans toucher au montant
+              déjà saisi. */}
+          <View style={styles.section}>
             <Text style={styles.sectionTitle}>Votre offre</Text>
             {!route ? (
               // Sans itinéraire il n'y a pas d'estimation, et la carte complète
@@ -409,6 +489,13 @@ export default function CreateDeliveryScreen() {
                 ) : null}
                 {priceInputError ? (
                   <Text style={styles.offerError}>{priceInputError}</Text>
+                ) : isBelowEstimate ? (
+                  // Reste atteignable même le prix en dernier : l'expéditeur peut remonter changer
+                  // le colis après avoir saisi son montant. Le dire vaut mieux que laisser partir
+                  // une course sous-payée qui restera en bas de la liste des livreurs.
+                  <Text style={styles.offerWarning}>
+                    {`${Math.abs(priceDifference)} % sous l’estimation : votre course passera après les autres. Touchez ${estimate.toLocaleString("fr-FR")} F pour vous aligner.`}
+                  </Text>
                 ) : (
                   <Text style={styles.offerNote}>
                     {priceDifference > 0
@@ -419,71 +506,6 @@ export default function CreateDeliveryScreen() {
               </View>
             </View>
             )}
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Ce que vous envoyez</Text>
-            <View style={styles.pillRow}>
-              {DELIVERY_TYPES.map((item) => {
-                const active = deliveryType === item.value;
-                return (
-                  <Pressable
-                    key={item.value}
-                    onPress={() => setDeliveryType(item.value)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    accessibilityLabel={`${item.label} — ${item.sub}`}
-                    style={({ pressed }) => [styles.pill, active && styles.pillActive, pressed && styles.pressed]}
-                  >
-                    <MaterialIcons name={item.icon} size={15} color={active ? "#9A6201" : "#667085"} />
-                    <Text style={[styles.pillLabel, active && styles.pillLabelActive]} numberOfLines={1}>{item.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <Field label="Titre de la course" value={title} error={titleIssue} onBlur={() => { setTouched((current) => ({ ...current, title: true })); setInputIssues((current) => ({ ...current, title: deliveryTextInputIssue(title) })); }} onChangeText={(value) => { const issue = !isAllowedDeliveryText(value) ? "Caractères non autorisés." : ""; setTitle(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setInputIssues((current) => ({ ...current, title: issue || (touched.title ? deliveryTextInputIssue(value) : "") })); }} placeholder={deliveryType === "Plis" ? "Ex. Documents de bureau" : deliveryType === "Personne" ? "Ex. Trajet vers l’aéroport" : "Ex. Petit matériel"} />
-            <Field label="Consignes — facultatif" value={details} error={detailsIssue} onBlur={() => { setTouched((current) => ({ ...current, details: true })); setInputIssues((current) => ({ ...current, details: deliveryTextInputIssue(details) })); }} onChangeText={(value) => { const issue = !isAllowedDeliveryText(value) ? "Caractères non autorisés." : ""; setDetails(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setInputIssues((current) => ({ ...current, details: issue || (touched.details ? deliveryTextInputIssue(value) : "") })); }} placeholder="Ex. Demander Awa à l’accueil, 2e étage" multiline />
-            {deliveryType === "Personne" ? (
-              <Field label="Nombre de personnes" value={passengers} error={passengerIssue} onBlur={() => { setTouched((current) => ({ ...current, passengers: true })); }} onChangeText={(value) => { setPassengers(value.replace(/\D/g, "").slice(0, 1)); setInputIssues((current) => ({ ...current, passengers: /\D/.test(value) ? "Caractères non autorisés." : "" })); }} placeholder="1" keyboardType="number-pad" icon="groups" />
-            ) : null}
-            {deliveryType === "Autre" ? (
-              <View style={styles.measureCard}>
-                <Text style={styles.measureTitle}>Poids et dimensions — facultatif</Text>
-                <Text style={styles.measureSubtitle}>Ils affinent l’estimation et choisissent l’engin à votre place.</Text>
-                <Field label="Poids (kg)" value={weightKg} onChangeText={(value) => setWeightKg(value.replace(/[^0-9.]/g, "").slice(0, 6))} placeholder="Ex. 12" keyboardType="decimal-pad" icon="scale" />
-                <Text style={styles.fieldLabel}>Dimensions (cm)</Text>
-                <View style={styles.dimensionRow}>
-                  <MiniNumber value={lengthCm} onChangeText={setLengthCm} placeholder="Long." />
-                  <MiniNumber value={widthCm} onChangeText={setWidthCm} placeholder="Larg." />
-                  <MiniNumber value={heightCm} onChangeText={setHeightCm} placeholder="Haut." />
-                </View>
-              </View>
-            ) : null}
-          </View>
-
-          <View style={styles.section}>
-            <View style={styles.sectionHeadRow}>
-              <Text style={styles.sectionTitle}>L’engin</Text>
-              {!vehicleChosen ? <Text style={styles.sectionHint}>suggéré d’après le colis</Text> : null}
-            </View>
-            <View style={styles.pillRow}>
-              {VEHICLES.map((item) => {
-                const active = vehicle === item;
-                return (
-                  <Pressable
-                    key={item}
-                    onPress={() => { setChosenVehicle(item); setVehicleChosen(true); }}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    accessibilityLabel={item}
-                    style={({ pressed }) => [styles.vehiclePill, active && styles.pillActive, pressed && styles.pressed]}
-                  >
-                    <MaterialIcons name={VEHICLE_ICON[item]} size={17} color={active ? "#9A6201" : "#667085"} />
-                    <Text style={[styles.vehicleLabel, active && styles.pillLabelActive]} numberOfLines={1}>{item}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
           </View>
 
           {loading ? <Text style={styles.publicationHint}>{publicationStage || "Publication en cours…"}</Text> : null}
@@ -647,6 +669,8 @@ const styles = StyleSheet.create({
   suggestionNoteActive: { color: "#9A6201", fontWeight: "600" },
   offerNote: { color: "#667085", fontSize: 11.5, lineHeight: 17, marginTop: 11 },
   offerError: { color: "#A43740", fontSize: 11.5, fontWeight: "600", lineHeight: 17, marginTop: 11 },
+  // Ambre et non rouge : proposer moins que l'estimation reste un choix valide, pas une erreur.
+  offerWarning: { color: "#9A6201", fontSize: 11.5, fontWeight: "600", lineHeight: 17, marginTop: 11 },
 
   pillRow: { flexDirection: "row", gap: 7 },
   pill: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 6, borderRadius: 10, borderWidth: 1, borderColor: "#E8ECF2", backgroundColor: "#FFFFFF" },

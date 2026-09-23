@@ -3,7 +3,14 @@ import { SignJWT, jwtVerify } from "jose";
 const SESSION_ISSUER = "tikis-mobile";
 const SESSION_AUDIENCE = "tikis-profile";
 const PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
-export const TIKIS_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+/**
+ * Un an, et non trente jours : on ne redemande pas son numéro à quelqu'un parce qu'il n'a pas
+ * ouvert l'application depuis un mois. La contrepartie habituelle d'un jeton longue durée — ne
+ * plus pouvoir le rappeler — ne s'applique pas ici : `isSessionRevoked` (server/sessions.ts) est
+ * vérifié à chaque requête, donc une déconnexion depuis un autre appareil coupe l'accès
+ * immédiatement, quelle que soit l'échéance inscrite dans le jeton.
+ */
+export const TIKIS_SESSION_TTL_SECONDS = 365 * 24 * 60 * 60;
 
 function signingKey() {
   const value = process.env.TIKIS_SESSION_SECRET ?? process.env.JWT_SECRET;
@@ -21,7 +28,7 @@ export async function createTikisProfileSession(phone: string) {
     .setAudience(SESSION_AUDIENCE)
     .setSubject(phone)
     .setIssuedAt()
-    .setExpirationTime("30d")
+    .setExpirationTime(`${TIKIS_SESSION_TTL_SECONDS}s`)
     .sign(signingKey());
 }
 

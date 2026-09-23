@@ -13,8 +13,11 @@ import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { tikisProfileSessions } from "../drizzle/schema";
 import { hashSessionToken, tokenLast4 } from "./_test-helpers/sessions-hash";
+import { TIKIS_SESSION_TTL_SECONDS } from "./tikis-session";
 
-const ACTIVE_SESSION_WINDOW_DAYS = 30;
+/** Aligné sur la durée de vie du jeton : une session encore valide doit rester listée, sinon
+ *  l'utilisateur ne peut plus révoquer un appareil qui, lui, continue d'accéder à son compte. */
+const ACTIVE_SESSION_WINDOW_DAYS = TIKIS_SESSION_TTL_SECONDS / (24 * 60 * 60);
 
 export { hashSessionToken, tokenLast4 };
 

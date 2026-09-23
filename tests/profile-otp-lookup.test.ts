@@ -4,7 +4,12 @@ import type { TrpcContext } from "../server/_core/context";
 
 const dbMock = vi.hoisted(() => ({ getTikisProfileByPhone: vi.fn(), linkTikisProfileToSupabaseUser: vi.fn() }));
 vi.mock("../server/db", () => dbMock);
-vi.mock("../server/tikis-session", () => ({ createTikisProfileSession: vi.fn().mockResolvedValue("session_tikis_signee") }));
+// Mock partiel : seule la signature est remplacée. Remplacer tout le module effaçait aussi
+// `TIKIS_SESSION_TTL_SECONDS`, dont dépend la durée du cookie de session (server/_core/cookies.ts).
+vi.mock("../server/tikis-session", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../server/tikis-session")>()),
+  createTikisProfileSession: vi.fn().mockResolvedValue("session_tikis_signee"),
+}));
 
 import { appRouter } from "../server/routers";
 
