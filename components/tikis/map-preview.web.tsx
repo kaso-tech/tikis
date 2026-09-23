@@ -88,7 +88,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate, 
       </View>
       {approximate ? (
         <View style={styles.approximate}>
-          <MaterialIcons name="privacy-tip" size={11} color="#9A6201" />
+          <MaterialIcons name="privacy-tip" size={11} color="#FF9800" />
           <Text style={styles.approximateText}>Aperçu indicatif</Text>
         </View>
       ) : null}
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   routeLine: {
     position: "absolute",
     height: 2,
-    backgroundColor: "#9A6201",
+    backgroundColor: "#FF9800",
     borderRadius: 1,
   },
   // Les marqueurs sont ancrés par leur pointe : on place leur coin haut-gauche.
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   approximateText: {
-    color: "#9A6201",
+    color: "#FF9800",
     fontSize: 10,
     fontWeight: "600",
   },
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#9A6201",
+    backgroundColor: "#FF9800",
   },
   legendDotDropoff: {
     width: 8,

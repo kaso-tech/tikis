@@ -195,7 +195,7 @@ export default function ProfileScreen() {
                 <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
               )}
               <View style={styles.avatarEdit}>
-                <MaterialIcons name="photo-camera" size={12} color="#9A6201" />
+                <MaterialIcons name="photo-camera" size={12} color="#FF9800" />
               </View>
             </Pressable>
             <View style={styles.headerIdentity}>
@@ -203,7 +203,7 @@ export default function ProfileScreen() {
               <Text style={styles.roleLine} numberOfLines={1}>{roleLine}</Text>
             </View>
             <Pressable onPress={openEditor} style={({ pressed }) => [styles.editBtn, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Modifier mon profil">
-              <MaterialIcons name="edit" size={16} color="#9A6201" />
+              <MaterialIcons name="edit" size={16} color="#FF9800" />
             </Pressable>
           </View>
 
@@ -479,13 +479,13 @@ export default function ProfileScreen() {
             <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Modifier mon profil</Text>
             <Pressable onPress={() => void pickPhoto()} style={({ pressed }) => [styles.photoPicker, pressed && styles.pressed]}>
               <View style={styles.photoPickerIcon}>
-                <MaterialIcons name="add-a-photo" size={22} color="#9A6201" />
+                <MaterialIcons name="add-a-photo" size={22} color="#FF9800" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.photoPickerText}>{photoBase64 || photoUri ? "Changer la photo" : "Ajouter une photo"}</Text>
                 <Text style={styles.photoPickerSub}>Format carré, JPEG/PNG/WebP</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={16} color="#9A6201" />
+              <MaterialIcons name="chevron-right" size={16} color="#FF9800" />
             </Pressable>
             <Text style={[styles.fieldLabel, isDark && { color: theme.muted }]}>NOM COMPLET</Text>
             <TextInput
@@ -517,7 +517,7 @@ function StatTile({ icon, value, label }: { icon: React.ComponentProps<typeof Ma
   return (
     <View style={styles.statTile}>
       <View style={styles.statHead}>
-        <MaterialIcons name={icon} size={14} color="#9A6201" />
+        <MaterialIcons name={icon} size={14} color="#FF9800" />
         <Text style={styles.statValue} numberOfLines={1}>{value}</Text>
       </View>
       <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
@@ -544,7 +544,7 @@ function MenuRow({ icon, label, sub, tone = "default", onPress, last }: { icon: 
       style={({ pressed }) => [styles.menuRow, !last && styles.menuRowBorder, pressed && styles.pressed]}
     >
       <View style={[styles.menuIcon, danger && styles.menuIconDanger]}>
-        <MaterialIcons name={icon} size={15} color={danger ? "#A43740" : "#9A6201"} />
+        <MaterialIcons name={icon} size={15} color={danger ? "#A43740" : "#FF9800"} />
       </View>
       <View style={styles.menuBody}>
         <Text style={[styles.menuLabel, danger && styles.menuLabelDanger]} numberOfLines={1}>{label}</Text>
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "center", gap: 13 },
   headerIdentity: { flex: 1, minWidth: 0 },
   avatarWrap: { position: "relative" },
-  avatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
+  avatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: "#FF9800", alignItems: "center", justifyContent: "center" },
   avatarImage: { width: 58, height: 58, borderRadius: 29 },
   avatarText: { color: "#FFFFFF", fontSize: 19, fontWeight: "700" },
   avatarEdit: { position: "absolute", right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: "#FFFFFF", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", alignItems: "center", justifyContent: "center" },
@@ -608,7 +608,7 @@ const styles = StyleSheet.create({
 
   photoPicker: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, backgroundColor: "#FFFFFF", borderRadius: 10, marginTop: 14 },
   photoPickerIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
-  photoPickerText: { color: "#9A6201", fontSize: 12, fontWeight: "600" },
+  photoPickerText: { color: "#FF9800", fontSize: 12, fontWeight: "600" },
   photoPickerSub: { color: "#667085", fontSize: 10, marginTop: 2 },
 
   vehiclesList: { gap: 2, marginTop: 12 },
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
   vehicleLabel: { fontSize: 14, fontWeight: "600", flex: 1 },
 
   fieldLabel: { color: "#667085", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
-  input: { backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: 1, borderColor: "#E3E3E3", paddingHorizontal: 12, paddingVertical: 12, color: "#9A6201", fontSize: 13, fontWeight: "500" },
+  input: { backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: 1, borderColor: "#E3E3E3", paddingHorizontal: 12, paddingVertical: 12, color: "#FF9800", fontSize: 13, fontWeight: "500" },
   countryOptionText: { fontSize: 13, fontWeight: "600" },
   countryRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 10, borderWidth: 1, marginBottom: 8 },
   countryRowFlag: { fontSize: 20 },

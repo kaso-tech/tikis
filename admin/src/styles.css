@@ -1,13 +1,15 @@
 /* ============================================================
    Tikis Admin — design system (aligné sur theme.config.js)
-   Tokens : primary brun #9A6201, fond #EEEDF3, surface #FFFFFF
+   Tokens : primary orange #FF9800, fond #EEEDF3, surface #FFFFFF
    Densité moyenne, sobre, sans ombre, hairline borders.
    ============================================================ */
 
 :root {
-  --primary: #9A6201;
-  --primary-soft: #F7EFE5;
-  --primary-hover: #B57A1A;
+  --primary: #FF9800;
+  /* Teinte et nuance foncée de #FF9800 (Material Orange 50 / 700), pour rester dans la même famille
+     plutôt que d'inventer une couleur sans rapport avec le nouveau primary. */
+  --primary-soft: #FFF3E0;
+  --primary-hover: #F57C00;
   --background: #EEEDF3;
   --surface: #FFFFFF;
   --surface-2: #FAF8F5;

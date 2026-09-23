@@ -27,9 +27,9 @@ const operationMeta: Record<WalletOperation, { label: string; icon: React.Compon
 };
 
 const TONE_COLOR: Record<Tone, string> = {
-  primary: "#9A6201",
+  primary: "#FF9800",
   success: "#176C52",
-  warning: "#9A6201",
+  warning: "#FF9800",
   error: "#A43740",
   neutral: "#667085",
 };
@@ -218,7 +218,7 @@ export default function WalletScreen() {
             <View style={styles.sheetGrip} />
             {payment ? (
               <>
-                <View style={styles.modalIcon}><MaterialIcons name="verified-user" size={22} color="#9A6201" /></View>
+                <View style={styles.modalIcon}><MaterialIcons name="verified-user" size={22} color="#FF9800" /></View>
                 <Text style={styles.modalTitle}>Validation YengaPay</Text>
                 <Text style={styles.modalSub}>Mode test : confirmez le résultat de votre paiement de {formatMoney(payment.amount)}. Votre Wallet ne changera qu’après cette confirmation serveur.</Text>
                 <View style={styles.referenceCard}>
@@ -233,7 +233,7 @@ export default function WalletScreen() {
               </>
             ) : (
               <>
-                <View style={styles.modalIcon}><MaterialIcons name={requestType === "deposit" ? "add-card" : "account-balance-wallet"} size={22} color="#9A6201" /></View>
+                <View style={styles.modalIcon}><MaterialIcons name={requestType === "deposit" ? "add-card" : "account-balance-wallet"} size={22} color="#FF9800" /></View>
                 <Text style={styles.modalTitle}>Recharger mon compte</Text>
                 <Text style={styles.modalSub}>{requestType === "deposit" ? "Initialisez un dépôt de test. Le solde ne sera crédité qu'après la confirmation suivante." : "Initialisez un retrait de test. Le solde ne sera débité qu'après la confirmation suivante."}</Text>
                 <View style={styles.amountWrap}>
@@ -269,10 +269,10 @@ const styles = StyleSheet.create({
 
   scroll: { padding: 8, paddingBottom: 24, gap: 12 },
 
-  balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#9A6201", position: "relative", overflow: "hidden" },
-  balanceCardDriver: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#9A6201", borderWidth: 0, overflow: "hidden" },
-  balanceCardSender: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#9A6201", borderWidth: 0, overflow: "hidden" },
-  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#D7A447", opacity: 0.25, borderRadius: 14 },
+  balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#FF9800", position: "relative", overflow: "hidden" },
+  balanceCardDriver: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#FF9800", borderWidth: 0, overflow: "hidden" },
+  balanceCardSender: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#FF9800", borderWidth: 0, overflow: "hidden" },
+  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#FF9800", opacity: 0.25, borderRadius: 14 },
   balanceEyebrow: { color: "rgba(255,255,255,0.6)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   balanceEyebrowLight: { color: "rgba(255,255,255,0.7)" },
   balanceValueRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
@@ -309,13 +309,13 @@ const styles = StyleSheet.create({
   quickStatLabel: { color: "#667085", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
 
   senderInfo: { marginHorizontal: 8, padding: 12, backgroundColor: "#FFFFFF", borderRadius: 10, flexDirection: "row", gap: 10, alignItems: "center" },
-  senderInfoIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  senderInfoText: { flex: 1, color: "#9A6201", fontSize: 11, lineHeight: 16 },
+  senderInfoIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#FF9800", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  senderInfoText: { flex: 1, color: "#FF9800", fontSize: 11, lineHeight: 16 },
   senderInfoTextBold: { fontWeight: "700" },
 
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 10, marginTop: 6 },
   sectionTitle: { color: "#667085", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
-  sectionAction: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
+  sectionAction: { color: "#FF9800", fontSize: 11, fontWeight: "600" },
 
   listCard: { borderRadius: 12, overflow: "hidden" },
   txRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 12 },
@@ -354,8 +354,8 @@ const styles = StyleSheet.create({
   referenceValue: { color: "#111111", fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4, letterSpacing: 0.3 },
   requestError: { color: "#A43740", fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: 6 },
   amountWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: 1, borderColor: "#E3E3E3", paddingHorizontal: 12, marginTop: 14 },
-  amountInput: { flex: 1, color: "#9A6201", fontSize: 15, fontWeight: "500", minHeight: 46 },
-  amountCurrency: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
+  amountInput: { flex: 1, color: "#FF9800", fontSize: 15, fontWeight: "500", minHeight: 46 },
+  amountCurrency: { color: "#FF9800", fontSize: 11, fontWeight: "600" },
   modalActions: { flexDirection: "row", gap: 8, marginTop: 16 },
   modalAction: { flex: 1, minHeight: 42 },
 });

@@ -10,7 +10,7 @@ type ButtonPalette = { background: string; foreground: string; border?: string }
 const DISABLED_PALETTE: ButtonPalette = { background: "#EEF1F6", foreground: "#7A8699", border: "#DDE3EC" };
 
 const buttonColors: Record<ButtonVariant, ButtonPalette> = {
-  primary: { background: "#FFFFFF", foreground: "#9A6201", border: "#E3E3E3" },
+  primary: { background: "#FFFFFF", foreground: "#FF9800", border: "#E3E3E3" },
   secondary: { background: "#FFFFFF", foreground: "#111111", border: "#E3E3E3" },
   ghost: { background: "#F0F3F8", foreground: "#111111", border: "#E3E3E3" },
   danger: { background: "#FFFFFF", foreground: "#A43740", border: "#E3E3E3" },
@@ -43,7 +43,7 @@ export function TikisButton({
 }) {
   const blocked = disabled || loading;
   const activePalette: ButtonPalette = authStyle && variant === "primary"
-    ? { background: "#9A6201", foreground: "#FFFFFF", border: "#9A6201" }
+    ? { background: "#FF9800", foreground: "#FFFFFF", border: "#FF9800" }
     : buttonColors[variant];
   // Un bouton bloqué ne recevait que `opacity: 0.84` : sur un fond saturé, seize
   // pour cent d'atténuation ne se voient pas, et l'écran proposait une action
@@ -81,7 +81,7 @@ export function Avatar({ initials, color = "#111111", size = 44 }: { initials: s
 export const tikisStyles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#F0F3F8" },
   screenContent: { paddingHorizontal: 16, paddingBottom: 104 },
-  eyebrow: { color: "#9A6201", fontSize: 12, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },
+  eyebrow: { color: "#FF9800", fontSize: 12, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },
   title: { color: "#111111", fontSize: 26, lineHeight: 32, fontWeight: "600", letterSpacing: -0.35 },
   subtitle: { color: "#667085", fontSize: 14, lineHeight: 20 },
   body: { color: "#111111", fontSize: 14, lineHeight: 20 },
@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 13, borderWidth: 1, borderColor: "#E3E3E3" },
   sectionHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   sectionTitle: { fontSize: 17, fontWeight: "600", color: "#111111", letterSpacing: -0.15 },
-  sectionAction: { color: "#9A6201", fontSize: 13, fontWeight: "600" },
+  sectionAction: { color: "#FF9800", fontSize: 13, fontWeight: "600" },
   statusBadge: { alignSelf: "flex-start", paddingHorizontal: 8, height: 24, borderRadius: 6, flexDirection: "row", alignItems: "center", gap: 5 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 11, fontWeight: "600" },

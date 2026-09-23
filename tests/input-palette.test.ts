@@ -25,7 +25,7 @@ describe("palette des champs et menus", () => {
   it("harmonise les formulaires principaux avec les surfaces du thème", () => {
     for (const formSource of [createDeliverySource, contactSource, reviewSource, reportSource, profileSource, walletSource]) {
       expect(formSource).toMatch(/#FFFFFF|backgroundColor: theme\.input/);
-      expect(formSource).toContain("#9A6201");
+      expect(formSource).toContain("#FF9800");
     }
   });
 
@@ -34,7 +34,7 @@ describe("palette des champs et menus", () => {
     expect(yangoSource).toContain("backgroundColor: theme.input");
     for (const pickerSource of [nativeHomeSource, webHomeSource]) {
       expect(pickerSource).toContain("#FFFFFF");
-      expect(pickerSource).toContain("#9A6201");
+      expect(pickerSource).toContain("#FF9800");
     }
   });
 
@@ -42,6 +42,6 @@ describe("palette des champs et menus", () => {
     // Un par écran du parcours : accueil, numéro, code, rôle, engins, nom.
     expect((authSource.match(/<TikisButton authStyle/g) ?? []).length).toBe(6);
     expect(buttonSource).toContain('authStyle && variant === "primary"');
-    expect(buttonSource).toContain('background: "#9A6201", foreground: "#FFFFFF"');
+    expect(buttonSource).toContain('background: "#FF9800", foreground: "#FFFFFF"');
   });
 });

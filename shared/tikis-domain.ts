@@ -277,7 +277,7 @@ export const deliveryStatusMeta: Record<
   { label: string; color: string; background: string }
 > = {
   draft: { label: "Brouillon", color: "#7A6E61", background: "#EEE8E0" },
-  open: { label: "Active", color: "#9A6201", background: "#F8E8CE" },
+  open: { label: "Active", color: "#FF9800", background: "#F8E8CE" },
   pending_confirmation: { label: "À confirmer", color: "#7A5600", background: "#F4E9D2" },
   active: { label: "Attribuée", color: "#176C52", background: "#DDEFE7" },
   completed: { label: "Terminée", color: "#4F6A5A", background: "#E6EFE9" },

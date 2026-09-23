@@ -9,10 +9,10 @@ const webHomeSource = readFileSync(join(process.cwd(), "components/tikis/screens
 const deliverySource = readFileSync(join(process.cwd(), "app/delivery/[id].tsx"), "utf8");
 
 describe("palette des boutons hors authentification", () => {
-  it("utilise le fond blanc et le texte brun pour le bouton primaire partagé", () => {
-    expect(buttonSource).toContain('primary: { background: "#FFFFFF", foreground: "#9A6201"');
+  it("utilise le fond blanc et le texte orange pour le bouton primaire partagé", () => {
+    expect(buttonSource).toContain('primary: { background: "#FFFFFF", foreground: "#FF9800"');
     expect(buttonSource).toContain('authStyle && variant === "primary"');
-    expect(buttonSource).toContain('background: "#9A6201", foreground: "#FFFFFF"');
+    expect(buttonSource).toContain('background: "#FF9800", foreground: "#FFFFFF"');
   });
 
   it("préserve explicitement les boutons du flux d’authentification", () => {
@@ -30,14 +30,14 @@ describe("palette des boutons hors authentification", () => {
   it("applique la même palette aux actions personnalisées hors authentification", () => {
     // Les cartes de l'accueil ont changé de forme — « Trajet » côté expéditeur,
     // « Registre » côté livreur — mais pas de palette : l'action primaire y reste
-    // blanche à texte brun, l'emphase passant par la bordure.
+    // blanche à texte orange, l'emphase passant par la bordure.
     for (const source of [nativeHomeSource, webHomeSource]) {
       expect(source).toContain('tripCta: {');
-      expect(source).toContain('backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#9A6201"');
-      expect(source).toContain('tripCtaText: { fontSize: 12.5, fontWeight: "700", color: "#9A6201" }');
-      expect(source).toContain('compactAction: { fontSize: 11.5, fontWeight: "700", color: "#9A6201" }');
+      expect(source).toContain('backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#FF9800"');
+      expect(source).toContain('tripCtaText: { fontSize: 12.5, fontWeight: "700", color: "#FF9800" }');
+      expect(source).toContain('compactAction: { fontSize: 11.5, fontWeight: "700", color: "#FF9800" }');
     }
     expect(deliverySource).toContain('trackButton: { backgroundColor: "#FFFFFF"');
-    expect(deliverySource).toContain('trackButtonText: { color: "#9A6201"');
+    expect(deliverySource).toContain('trackButtonText: { color: "#FF9800"');
   });
 });

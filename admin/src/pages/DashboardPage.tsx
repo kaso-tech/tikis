@@ -59,7 +59,7 @@ export default function DashboardPage(_props: { search?: string }) {
   }, [period]);
 
   const completionRate = metrics && metrics.deliveriesTotal > 0 ? Math.round((metrics.deliveriesCompleted / metrics.deliveriesTotal) * 100) : 0;
-  const vehicleColors = ["#9A6201", "#176C52", "#2C5BA8", "#A65300", "#A43740"];
+  const vehicleColors = ["#FF9800", "#176C52", "#2C5BA8", "#A65300", "#A43740"];
 
   const maxSeries = useMemo(() => {
     if (!metrics?.timeseries) return 1;

@@ -131,7 +131,7 @@ export function TikisDrawer() {
               accessibilityLabel="Activer le mode sombre"
               value={isDark}
               onValueChange={toggleDarkMode}
-              trackColor={{ false: "#E3E3E3", true: "#D7A447" }}
+              trackColor={{ false: "#E3E3E3", true: "#FF9800" }}
               thumbColor={isDark ? "#FBF7F0" : "#FFFFFF"}
             />
           </View>
@@ -150,7 +150,7 @@ export function TikisDrawer() {
           </View>
           <View style={styles.drawerFooter}>
             <View style={styles.securityRow}>
-              <MaterialIcons name="verified-user" size={16} color={isDark ? "#D7A447" : "#9A6201"} />
+              <MaterialIcons name="verified-user" size={16} color="#FF9800" />
               <Text style={[styles.securityText, isDark && styles.securityTextDark]}>Compte sécurisé par Tikis</Text>
             </View>
             <Pressable accessibilityRole="button" accessibilityLabel="Se déconnecter" onPress={openLogoutConfirmation} style={({ pressed }) => [styles.signOut, isDark && styles.signOutDark, pressed && styles.pressed]}>
@@ -168,7 +168,7 @@ function DrawerRow({ item, active, onPress, isDark }: { item: DrawerItem; active
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.menuRow, active && styles.menuRowActive, isDark && styles.menuRowDark, active && isDark && styles.menuRowActiveDark, pressed && styles.pressed]}>
       <View style={[styles.menuIcon, active && styles.menuIconActive, isDark && !active && styles.menuIconDark]}>
-        <MaterialIcons name={item.icon} size={18} color={active ? "#FFFFFF" : (isDark ? "#D7A447" : "#9A6201")} />
+        <MaterialIcons name={item.icon} size={18} color={active ? "#FFFFFF" : "#FF9800"} />
       </View>
       <View style={styles.menuText}>
         <Text style={[styles.menuTitle, active && styles.menuTitleActive, isDark && !active && styles.menuTitleDark]} numberOfLines={1}>{item.label}</Text>
@@ -206,8 +206,8 @@ const styles = StyleSheet.create({
   profileName: { color: "#111111", fontSize: 15, fontWeight: "600" },
   profileNameDark: { color: "#FBF7F0" },
   rolePill: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
-  roleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#9A6201" },
-  roleDotDark: { backgroundColor: "#D7A447" },
+  roleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#FF9800" },
+  roleDotDark: { backgroundColor: "#FF9800" },
   roleLabel: { color: "#667085", fontSize: 11, fontWeight: "500" },
   roleLabelDark: { color: "#C8BCAA" },
   themeRow: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", gap: 10 },
@@ -223,9 +223,9 @@ const styles = StyleSheet.create({
   menuRow: { minHeight: 48, borderRadius: 8, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", gap: 9 },
   menuRowActive: { backgroundColor: "#111111" },
   menuRowDark: { backgroundColor: "transparent" },
-  menuRowActiveDark: { backgroundColor: "#D7A447" },
+  menuRowActiveDark: { backgroundColor: "#FF9800" },
   menuIcon: { width: 32, height: 32, borderRadius: 7, alignItems: "center", justifyContent: "center", backgroundColor: "#F0F3F8" },
-  menuIconActive: { backgroundColor: "#9A6201" },
+  menuIconActive: { backgroundColor: "#FF9800" },
   menuIconDark: { backgroundColor: "#231A10" },
   menuText: { flex: 1 },
   menuTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },

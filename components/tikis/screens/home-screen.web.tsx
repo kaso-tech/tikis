@@ -25,7 +25,7 @@ import { useThemeColors } from "@/lib/use-theme-colors";
 /** Le ton renvoyé par `deliveryCardTone`, traduit en couleur. La couleur reste
  *  ici : la logique de carte dit l'état, elle ne peint pas. */
 const TONE_COLOR: Record<ReturnType<typeof deliveryCardTone>, string> = {
-  open: "#9A6201",
+  open: "#FF9800",
   assigned: "#A65300",
   active: "#176C52",
   done: "#667085",
@@ -496,20 +496,20 @@ export function HomeScreen() {
                   setIsManualRefreshing(false);
                 }
               }}
-              tintColor="#9A6201"
-              colors={["#9A6201"]}
+              tintColor="#FF9800"
+              colors={["#FF9800"]}
               progressBackgroundColor="#FFFFFF"
             />
           }
         >
           {isDriver && !profile?.photoUrl ? (
             <Pressable onPress={() => router.push("/(tabs)/profile" as any)} style={({ pressed }) => [styles.kycBanner, pressed && styles.pressed]} accessibilityLabel="Vérifier mon profil">
-              <MaterialIcons name="verified-user" size={18} color="#9A6201" />
+              <MaterialIcons name="verified-user" size={18} color="#FF9800" />
               <View style={styles.kycBannerCopy}>
                 <Text style={styles.kycBannerTitle}>Profil à vérifier</Text>
                 <Text style={styles.kycBannerText}>Ajoutez votre photo et vos documents pour pouvoir candidater aux livraisons.</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={18} color="#9A6201" />
+              <MaterialIcons name="chevron-right" size={18} color="#FF9800" />
             </Pressable>
           ) : null}
 
@@ -547,7 +547,7 @@ export function HomeScreen() {
           <Animated.View style={[styles.tabContent, { opacity: filterTransition, transform: [{ translateY: filterTranslateY }] }]}>
           {!hasInitialData && deliveriesQuery.isLoading ? (
             <View style={styles.loadingState}>
-              <ActivityIndicator color="#9A6201" />
+              <ActivityIndicator color="#FF9800" />
               <Text style={styles.loadingText}>Chargement de vos livraisons…</Text>
             </View>
           ) : !selected ? (
@@ -817,7 +817,7 @@ function DeliveryRow({
           </View>
           <Text style={styles.compactMeta} numberOfLines={1}>{tripLine} · {dateInfo.primary.toLocaleLowerCase("fr")}</Text>
           <View style={styles.compactDistance}>
-            <MaterialIcons name="explore" size={15} color="#9A6201" />
+            <MaterialIcons name="explore" size={15} color="#FF9800" />
             <Text style={styles.compactDistanceText} numberOfLines={1}>à {driverDistText} de vous</Text>
           </View>
         </View>
@@ -832,7 +832,7 @@ function DeliveryRow({
               accessibilityLabel={`${driverAction} — ${delivery.title}`}
               style={({ pressed }) => [applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
             >
-              {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.compactAction}>{driverAction}</Text>}
+              {applying ? <ActivityIndicator size="small" color="#FF9800" /> : <Text style={styles.compactAction}>{driverAction}</Text>}
             </Pressable>
           ) : null}
           {/* « Ouvrir » ne s'affichait qu'à défaut d'action, c'est-à-dire sur
@@ -918,7 +918,7 @@ function DeliveryRow({
             accessibilityLabel={`${senderLabel} — ${delivery.title}`}
             style={({ pressed }) => [styles.tripCta, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
           >
-            {applying ? <ActivityIndicator size="small" color="#9A6201" /> : <Text style={styles.tripCtaText}>{senderLabel}</Text>}
+            {applying ? <ActivityIndicator size="small" color="#FF9800" /> : <Text style={styles.tripCtaText}>{senderLabel}</Text>}
           </Pressable>
         ) : null}
       </View>
@@ -935,7 +935,7 @@ const styles = StyleSheet.create({
   mapRoad1: { top: "30%", left: "-10%", right: "-10%", height: 18, transform: [{ rotate: "-12deg" }] },
   mapRoad2: { top: "56%", left: "-20%", width: "80%", height: 14, transform: [{ rotate: "6deg" }] },
   mapRoad3: { top: "78%", left: "20%", right: "-10%", height: 12, transform: [{ rotate: "-4deg" }] },
-  routeLine: { position: "absolute", height: 3, backgroundColor: "#9A6201", borderRadius: 2 } as any,
+  routeLine: { position: "absolute", height: 3, backgroundColor: "#FF9800", borderRadius: 2 } as any,
   approachLine: { position: "absolute", height: 3, backgroundColor: "#176C52", borderRadius: 2 } as any,
   // Les extrémités se posaient à des pourcentages fixes, sans rapport avec le
   // tracé calculé juste au-dessus : elles flottaient à côté de leur propre
@@ -944,7 +944,7 @@ const styles = StyleSheet.create({
   mapChip: { position: "absolute" },
 
   fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3", zIndex: 10 },
-  sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
+  sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FF9800", alignItems: "center", justifyContent: "center" },
 
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
@@ -952,35 +952,35 @@ const styles = StyleSheet.create({
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
   greetingBlock: { flex: 1, minWidth: 0 },
   driverGainsRow: { flexDirection: "row", alignItems: "baseline", gap: 6, flexWrap: "wrap" },
-  driverGainsValue: { color: "#9A6201", fontSize: 14, fontWeight: "700" },
+  driverGainsValue: { color: "#FF9800", fontSize: 14, fontWeight: "700" },
   sheetTitle: { color: "#111111", fontSize: 14, fontWeight: "700", lineHeight: 18 },
   sheetSubtitle: { color: "#667085", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 
   servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#F0F3F8", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E3E3E3" },
   servicePillOffline: { backgroundColor: "#F0F3F8", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", shadowOpacity: 0, elevation: 0 },
   servicePillNeutral: { backgroundColor: "#F0F3F8", shadowOpacity: 0, elevation: 0 },
-  serviceText: { color: "#9A6201", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
+  serviceText: { color: "#FF9800", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   serviceTextOffline: { color: "#111111" },
-  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9A6201" },
+  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FF9800" },
   onlineDotOffline: { backgroundColor: "#667085" },
 
   searchRow: { paddingTop: 10, paddingBottom: 6 },
   kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: "#F0F3F8", borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3" },
   kycBannerCopy: { flex: 1 },
-  kycBannerTitle: { color: "#9A6201", fontSize: 12, fontWeight: "700" },
-  kycBannerText: { color: "#9A6201", fontSize: 11, marginTop: 2, lineHeight: 16 },
+  kycBannerTitle: { color: "#FF9800", fontSize: 12, fontWeight: "700" },
+  kycBannerText: { color: "#FF9800", fontSize: 11, marginTop: 2, lineHeight: 16 },
   searchPill: { height: 40, backgroundColor: "#F0F3F8", borderRadius: 11, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
-  searchInput: { flex: 1, color: "#9A6201", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
+  searchInput: { flex: 1, color: "#FF9800", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
 
 
   filterRow: { flexDirection: "row", gap: 6, paddingBottom: 10, alignItems: "center" },
   filterScroll: { flexGrow: 0 },
   chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#F0F3F8", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", gap: 6 },
-  chipActive: { backgroundColor: "#9A620114", borderColor: "#9A6201", borderWidth: 1 },
-  chipText: { color: "#9A6201", fontSize: 11, fontWeight: "600" },
-  chipTextActive: { color: "#9A6201" },
-  chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
-  chipCountActive: { backgroundColor: "#9A6201" },
+  chipActive: { backgroundColor: "#FF980014", borderColor: "#FF9800", borderWidth: 1 },
+  chipText: { color: "#FF9800", fontSize: 11, fontWeight: "600" },
+  chipTextActive: { color: "#FF9800" },
+  chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#FF9800", alignItems: "center", justifyContent: "center" },
+  chipCountActive: { backgroundColor: "#FF9800" },
   chipCountText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700", lineHeight: 12 },
   tabContent: { minHeight: 1 },
 
@@ -996,13 +996,13 @@ const styles = StyleSheet.create({
   cardPressed: { backgroundColor: "#E7ECF4" },
   // La sélection cerne la carte au lieu de la repeindre : la liste ne change plus
   // de couleur autour de l'élément choisi.
-  cardSelected: { borderColor: "#9A6201", borderWidth: 1.5 },
+  cardSelected: { borderColor: "#FF9800", borderWidth: 1.5 },
   cardRail: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3 },
 
   cardTrip: { paddingVertical: 13, paddingLeft: 17, paddingRight: 14, gap: 11 },
   tripHead: { flexDirection: "row", alignItems: "flex-start", gap: 11 },
   tripRail: { width: 12, alignItems: "center", paddingTop: 5, alignSelf: "stretch" },
-  tripDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 2.5, borderColor: "#9A6201" },
+  tripDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 2.5, borderColor: "#FF9800" },
   tripLine: { flex: 1, width: 1.5, minHeight: 16, backgroundColor: "#E3E3E3", marginVertical: 2 },
   tripPin: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#A43740" },
   tripStops: { flex: 1, minWidth: 0, gap: 10 },
@@ -1016,8 +1016,8 @@ const styles = StyleSheet.create({
   tripState: { fontWeight: "700" },
   tripFoot: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#E3E3E3" },
   tripGhost: { fontSize: 12.5, fontWeight: "600", color: "#667085" },
-  tripCta: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#9A6201", minWidth: 96, alignItems: "center" },
-  tripCtaText: { fontSize: 12.5, fontWeight: "700", color: "#9A6201" },
+  tripCta: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#FF9800", minWidth: 96, alignItems: "center" },
+  tripCtaText: { fontSize: 12.5, fontWeight: "700", color: "#FF9800" },
   tripCtaQuiet: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#A43740", minWidth: 96, alignItems: "center" },
   tripCtaQuietText: { fontSize: 12.5, fontWeight: "700", color: "#A43740" },
 
@@ -1029,10 +1029,10 @@ const styles = StyleSheet.create({
   compactTo: { flexShrink: 1, minWidth: 0, fontSize: 13.5, fontWeight: "600", color: "#111111" },
   compactMeta: { fontSize: 11.5, color: "#667085" },
   compactDistance: { flexDirection: "row", alignItems: "center", gap: 5, position: "relative" },
-  compactDistanceText: { fontSize: 11.5, fontWeight: "700", color: "#9A6201" },
+  compactDistanceText: { fontSize: 11.5, fontWeight: "700", color: "#FF9800" },
   compactRight: { flexShrink: 0, alignItems: "flex-end", gap: 6 },
   compactPrice: { fontSize: 14.5, fontWeight: "800", color: "#111111", fontVariant: ["tabular-nums"] },
-  compactAction: { fontSize: 11.5, fontWeight: "700", color: "#9A6201" },
+  compactAction: { fontSize: 11.5, fontWeight: "700", color: "#FF9800" },
   compactGhost: { fontSize: 11.5, fontWeight: "600", color: "#667085" },
 
   listSection: { marginTop: 4, gap: 8 },

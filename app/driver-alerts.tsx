@@ -153,7 +153,7 @@ export default function DriverAlertsScreen() {
               onValueChange={(next) => void togglePush(next)}
               disabled={saving}
               trackColor={{ false: theme.border, true: "#C6A26A" }}
-              thumbColor={preferences.opportunityPushEnabled ? "#9A6201" : "#FFFFFF"}
+              thumbColor={preferences.opportunityPushEnabled ? "#FF9800" : "#FFFFFF"}
             />
           </View>
           <Text style={styles.cardNote}>
@@ -185,7 +185,7 @@ export default function DriverAlertsScreen() {
 
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <View style={styles.cardIcon}><MaterialIcons name="my-location" size={17} color="#9A6201" /></View>
+            <View style={styles.cardIcon}><MaterialIcons name="my-location" size={17} color="#FF9800" /></View>
             <Text style={styles.cardTitle}>Position de référence</Text>
           </View>
           <Text style={styles.cardText}>
@@ -258,7 +258,7 @@ function RadiusSection({ styles, icon, title, description, value, cityName, disa
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <View style={styles.cardIcon}><MaterialIcons name={icon} size={17} color="#9A6201" /></View>
+        <View style={styles.cardIcon}><MaterialIcons name={icon} size={17} color="#FF9800" /></View>
         <Text style={styles.cardTitle}>{title}</Text>
       </View>
       <Text style={styles.cardText}>{description}</Text>
@@ -299,14 +299,14 @@ function makeStyles(theme: ThemedColors) {
     cardTitle: { color: theme.foreground, fontSize: 14, fontWeight: "700" },
     cardText: { color: theme.muted, fontSize: 12.5, lineHeight: 18 },
     cardNote: { color: theme.muted, fontSize: 11.5, lineHeight: 17, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border, paddingTop: 9 },
-    cardCurrent: { color: "#9A6201", fontSize: 11.5, fontWeight: "700" },
+    cardCurrent: { color: "#FF9800", fontSize: 11.5, fontWeight: "700" },
     switchRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
     switchCopy: { flex: 1, gap: 4 },
     choices: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 2 },
     choice: { paddingHorizontal: 12, minHeight: 38, justifyContent: "center", borderRadius: 9, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.background },
-    choiceSelected: { borderColor: "#9A6201", backgroundColor: "#F8F0E5" },
+    choiceSelected: { borderColor: "#FF9800", backgroundColor: "#F8F0E5" },
     choiceText: { color: theme.foreground, fontSize: 12.5, fontWeight: "600" },
-    choiceTextSelected: { color: "#9A6201" },
+    choiceTextSelected: { color: "#FF9800" },
     baseStatus: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },
     baseStatusOk: { backgroundColor: "#E6F4ED" },
     baseStatusMissing: { backgroundColor: "#FEF6E2" },

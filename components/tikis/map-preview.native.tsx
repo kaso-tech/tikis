@@ -46,7 +46,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate, 
             { latitude: pickup.latitude, longitude: pickup.longitude },
             { latitude: dropoff.latitude, longitude: dropoff.longitude },
           ]}
-          strokeColor="#9A6201"
+          strokeColor="#FF9800"
           strokeWidth={3}
           lineCap="round"
         />
@@ -59,7 +59,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate, 
       </MapView>
       {approximate ? (
         <View style={styles.approximate}>
-          <MaterialIcons name="privacy-tip" size={11} color="#9A6201" />
+          <MaterialIcons name="privacy-tip" size={11} color="#FF9800" />
           <Text style={styles.approximateText}>Aperçu indicatif</Text>
         </View>
       ) : null}
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   approximateText: {
-    color: "#9A6201",
+    color: "#FF9800",
     fontSize: 10,
     fontWeight: "600",
   },
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#9A6201",
+    backgroundColor: "#FF9800",
   },
   legendDotDropoff: {
     width: 8,

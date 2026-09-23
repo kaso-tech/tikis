@@ -113,22 +113,22 @@ export default function ContactScreen() {
                 {REASONS.map((item) => {
                   const active = item.value === reason;
                   return (
-                    <Pressable key={item.value} accessibilityRole="button" accessibilityLabel={`Motif : ${item.label}`} onPress={() => pickReason(item.value)} style={({ pressed }) => [styles.reason, { backgroundColor: theme.surface }, active && { backgroundColor: isDark ? "#171108" : "#FFFFFF", borderWidth: 1, borderColor: isDark ? "#9A6201" : "#E3E3E3" }, pressed && styles.pressed]}>
-                      <Text style={[styles.reasonText, { color: theme.foreground }, active && { color: "#9A6201" }]}>{item.label}</Text>
-                      <Text style={[styles.reasonHelper, { color: theme.muted }, active && { color: isDark ? "#9A6201" : "#BBBBBB" }]}>{item.helper}</Text>
+                    <Pressable key={item.value} accessibilityRole="button" accessibilityLabel={`Motif : ${item.label}`} onPress={() => pickReason(item.value)} style={({ pressed }) => [styles.reason, { backgroundColor: theme.surface }, active && { backgroundColor: isDark ? "#171108" : "#FFFFFF", borderWidth: 1, borderColor: isDark ? "#FF9800" : "#E3E3E3" }, pressed && styles.pressed]}>
+                      <Text style={[styles.reasonText, { color: theme.foreground }, active && { color: "#FF9800" }]}>{item.label}</Text>
+                      <Text style={[styles.reasonHelper, { color: theme.muted }, active && { color: isDark ? "#FF9800" : "#BBBBBB" }]}>{item.helper}</Text>
                     </Pressable>
                   );
                 })}
               </View>
 
               <Text style={[styles.label, { color: theme.muted }]}>SUJET</Text>
-              <View style={[styles.inputWrap, { backgroundColor: isDark ? "#171108" : "#FFFFFF", borderColor: isDark ? "#9A6201" : "#E3E3E3" }]}>
-                <TextInput value={subject} onChangeText={(value) => { setSubject(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={120} placeholder="Décrivez votre sujet en quelques mots" placeholderTextColor={theme.placeholder} style={[styles.input, { color: "#9A6201" }]} />
+              <View style={[styles.inputWrap, { backgroundColor: isDark ? "#171108" : "#FFFFFF", borderColor: isDark ? "#FF9800" : "#E3E3E3" }]}>
+                <TextInput value={subject} onChangeText={(value) => { setSubject(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={120} placeholder="Décrivez votre sujet en quelques mots" placeholderTextColor={theme.placeholder} style={[styles.input, { color: "#FF9800" }]} />
               </View>
 
               <Text style={[styles.label, { color: theme.muted }]}>VOTRE MESSAGE</Text>
-              <View style={[styles.inputWrap, styles.textareaWrap, { backgroundColor: isDark ? "#171108" : "#FFFFFF", borderColor: isDark ? "#9A6201" : "#E3E3E3" }]}>
-                <TextInput value={message} onChangeText={(value) => { setMessage(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={1000} multiline placeholder="Donnez-nous le maximum de détails pour vous aider au mieux." placeholderTextColor={theme.placeholder} style={[styles.input, styles.textarea, { color: "#9A6201" }]} textAlignVertical="top" />
+              <View style={[styles.inputWrap, styles.textareaWrap, { backgroundColor: isDark ? "#171108" : "#FFFFFF", borderColor: isDark ? "#FF9800" : "#E3E3E3" }]}>
+                <TextInput value={message} onChangeText={(value) => { setMessage(sanitizeDeliveryText(value, { preserveTrailingSpace: true })); setError(""); }} maxLength={1000} multiline placeholder="Donnez-nous le maximum de détails pour vous aider au mieux." placeholderTextColor={theme.placeholder} style={[styles.input, styles.textarea, { color: "#FF9800" }]} textAlignVertical="top" />
                 <Text style={[styles.counter, { color: theme.muted }]}>{message.length}/1000</Text>
               </View>
 
