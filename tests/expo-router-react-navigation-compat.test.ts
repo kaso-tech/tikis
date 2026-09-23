@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 describe("compatibilité expo-router / react-navigation (SDK 56+)", () => {
   it("aucun fichier de l'app n'importe @react-navigation/* directement", () => {
     const output = execSync(
-      "git grep -l \"@react-navigation\" -- '*.ts' '*.tsx' ':!node_modules' || true",
+      "git grep -l \"@react-navigation\" -- '*.ts' '*.tsx' ':!node_modules' ':!tests/**' || true",
       { cwd: process.cwd(), encoding: "utf8" },
     ).trim();
     expect(output).toBe("");
