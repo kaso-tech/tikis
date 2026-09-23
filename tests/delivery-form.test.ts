@@ -105,6 +105,17 @@ describe("l'écran de publication", () => {
     expect(source).toContain("detailsInputIssue(details)");
   });
 
+  it("le serveur accepte lui aussi des consignes vides — le bouton n'était plus le seul obstacle", () => {
+    // Le client autorisait déjà un champ vide (test précédent), mais `deliveryInputSchema` validait
+    // encore `details` avec le même `min(3)` que `title` : Publier avec des consignes vides restait
+    // possible côté écran, impossible côté serveur — TRPCClientError "too_small" sur `details`,
+    // bouton actif, publication qui échoue sans qu'aucun message ne le dise à l'écran.
+    const routers = readFileSync(join(process.cwd(), "server/routers.ts"), "utf8");
+    expect(routers).toContain("deliveryDetailsSchema");
+    expect(routers).toContain("details: deliveryDetailsSchema");
+    expect(routers).not.toMatch(/details:\s*deliveryTextSchema/);
+  });
+
   it("a renoncé à la barre de progression et à son pourcentage", () => {
     expect(source).not.toContain("progressFill");
     expect(source).not.toContain("totalFields");

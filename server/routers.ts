@@ -232,10 +232,14 @@ const precisionSchema = z.enum(["exact", "street", "area", "city", "unknown"]);
 const placeSchema = z.object({ name: z.string().max(140), district: z.string().max(120), city: z.string().max(120), latitude: coordinateSchema.min(-90).max(90), longitude: coordinateSchema.min(-180).max(180), googlePlaceId: z.string().max(255).optional(), mapboxId: z.string().max(255).optional(), mapboxSessionToken: z.string().uuid().optional(), formattedAddress: z.string().max(255).optional(), street: z.string().max(160).optional(), province: z.string().max(120).optional(), country: z.string().max(120).optional(), source: z.enum(["search", "retrieve", "reverse", "forward", "favorite", "manual", "legacy"]).optional(), featureType: featureTypeSchema.optional(), precision: precisionSchema.optional() });
 const favoriteLabelSchema = z.string().trim().min(1).max(80).regex(/^[\p{L}\p{N}]+(?:[ .,'’()\-][\p{L}\p{N}]+)*$/u, "Libellé de favori invalide.");
 const deliveryTextSchema = z.string().trim().min(3).max(450);
+// Les consignes sont facultatives (voir "Consignes — facultatif" côté client) : ni le champ, ni la base
+// (colonne NOT NULL mais sans longueur minimale) n'exigent de contenu. Un `min(3)` ici a longtemps fait
+// échouer silencieusement toute publication où le champ était laissé vide.
+const deliveryDetailsSchema = z.string().trim().max(450);
 const deliveryVehicleSchema = z.enum(["Vélo", "Moto", "Tricycle", "Voiture"]);
 const deliveryInputSchema = z.object({
   title: deliveryTextSchema.max(120),
-  details: deliveryTextSchema,
+  details: deliveryDetailsSchema,
   type: z.enum(["Plis", "Personne", "Autre"]),
   pickup: placeSchema,
   dropoff: placeSchema,
