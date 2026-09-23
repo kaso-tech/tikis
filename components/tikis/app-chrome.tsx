@@ -150,7 +150,7 @@ export function TikisDrawer() {
           </View>
           <View style={styles.drawerFooter}>
             <View style={styles.securityRow}>
-              <MaterialIcons name="verified-user" size={16} color="#FF9800" />
+              <MaterialIcons name="verified-user" size={16} color="#667085" />
               <Text style={[styles.securityText, isDark && styles.securityTextDark]}>Compte sécurisé par Tikis</Text>
             </View>
             <Pressable accessibilityRole="button" accessibilityLabel="Se déconnecter" onPress={openLogoutConfirmation} style={({ pressed }) => [styles.signOut, isDark && styles.signOutDark, pressed && styles.pressed]}>
@@ -168,7 +168,7 @@ function DrawerRow({ item, active, onPress, isDark }: { item: DrawerItem; active
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.menuRow, active && styles.menuRowActive, isDark && styles.menuRowDark, active && isDark && styles.menuRowActiveDark, pressed && styles.pressed]}>
       <View style={[styles.menuIcon, active && styles.menuIconActive, isDark && !active && styles.menuIconDark]}>
-        <MaterialIcons name={item.icon} size={18} color={active ? "#FFFFFF" : "#FF9800"} />
+        <MaterialIcons name={item.icon} size={18} color={active ? "#111111" : "#667085"} />
       </View>
       <View style={styles.menuText}>
         <Text style={[styles.menuTitle, active && styles.menuTitleActive, isDark && !active && styles.menuTitleDark]} numberOfLines={1}>{item.label}</Text>
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   menuIconDark: { backgroundColor: "#231A10" },
   menuText: { flex: 1 },
   menuTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },
-  menuTitleActive: { color: "#FFFFFF" },
+  menuTitleActive: { color: "#111111" },
   menuTitleDark: { color: "#FBF7F0" },
   menuCaption: { color: "#667085", fontSize: 11, marginTop: 1 },
   menuCaptionActive: { color: "#C9C9C9" },

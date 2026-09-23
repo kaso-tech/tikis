@@ -18,14 +18,18 @@ const yangoSource = source("components/tikis/yango-address-picker.tsx");
 const authSource = source("components/tikis/auth-flow.tsx");
 
 describe("palette des champs et menus", () => {
-  it("expose le fond crème comme token d’entrée", () => {
-    expect(themeSource).toContain('input: scheme === "light" ? "#F7EFE5" : "#3A2B1A"');
+  it("expose un fond de champ neutre, pas une teinte de la couleur de marque", () => {
+    // Le crème #F7EFE5 venait du brun d'origine : chaque champ arrivait teinté. Les quatre écrans
+    // qui lisent ce token posent tous une bordure par-dessus, donc un fond neutre reste visible.
+    expect(themeSource).toContain('input: scheme === "light" ? "#F0F3F8" : "#3A2B1A"');
   });
 
-  it("harmonise les formulaires principaux avec les surfaces du thème", () => {
+  it("rend en noir le texte que l'utilisateur tape, jamais dans la couleur de marque", () => {
+    // Numéro de téléphone, code reçu, nom, montant, recherche, commentaire d'avis, description d'un
+    // signalement : tous s'affichaient en #FF9800, soit 2,16:1 sur leur fond blanc.
     for (const formSource of [createDeliverySource, contactSource, reviewSource, reportSource, profileSource, walletSource]) {
       expect(formSource).toMatch(/#FFFFFF|backgroundColor: theme\.input/);
-      expect(formSource).toContain("#FF9800");
+      expect(formSource).not.toMatch(/(input|textarea|comment)[a-zA-Z]*: \{[^}]*color: "#FF9800"/);
     }
   });
 
@@ -34,14 +38,14 @@ describe("palette des champs et menus", () => {
     expect(yangoSource).toContain("backgroundColor: theme.input");
     for (const pickerSource of [nativeHomeSource, webHomeSource]) {
       expect(pickerSource).toContain("#FFFFFF");
-      expect(pickerSource).toContain("#FF9800");
+      expect(pickerSource).toContain('searchInput: { flex: 1, color: "#111111"');
     }
   });
 
-  it("ne modifie pas la palette de fond des boutons d’authentification", () => {
-    // Un par écran du parcours : accueil, numéro, code, rôle, engins, nom.
-    expect((authSource.match(/<TikisButton authStyle/g) ?? []).length).toBe(6);
-    expect(buttonSource).toContain('authStyle && variant === "primary"');
-    expect(buttonSource).toContain('background: "#FF9800", foreground: "#FFFFFF"');
+  it("le parcours d'authentification prend la palette commune, sans variante à lui", () => {
+    // Un bouton par écran : accueil, numéro, code, rôle, engins, nom. Ils avaient leur propre palette
+    // (fond orange, texte blanc, 2,16:1) ; ils prennent maintenant celle de tout le monde.
+    expect((authSource.match(/<TikisButton /g) ?? []).length).toBe(6);
+    expect(buttonSource).toContain('primary: { background: "#FF9800", foreground: "#111111"');
   });
 });

@@ -25,7 +25,9 @@ function buildThemed(scheme: ColorScheme): ThemedColors {
     tabIconDefault: base.muted,
     tabIconSelected: base.primary,
     border: base.border,
-    input: scheme === "light" ? "#F7EFE5" : "#3A2B1A",
+    // Fond de champ neutre : le crème #F7EFE5 venait du brun d'origine et teintait chaque saisie.
+    // Les quatre usages posent tous une bordure par-dessus, donc un fond neutre reste visible.
+    input: scheme === "light" ? "#F0F3F8" : "#3A2B1A",
     placeholder: base.muted,
     pressed: scheme === "light" ? "#E3DFEA" : "#2A2018",
     overlay: scheme === "light" ? "rgba(0,0,0,0.42)" : "rgba(0,0,0,0.62)",

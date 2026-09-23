@@ -59,7 +59,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate, 
       </MapView>
       {approximate ? (
         <View style={styles.approximate}>
-          <MaterialIcons name="privacy-tip" size={11} color="#FF9800" />
+          <MaterialIcons name="privacy-tip" size={11} color="#667085" />
           <Text style={styles.approximateText}>Aperçu indicatif</Text>
         </View>
       ) : null}
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   approximateText: {
-    color: "#FF9800",
+    color: "#667085",
     fontSize: 10,
     fontWeight: "600",
   },

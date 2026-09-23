@@ -159,7 +159,7 @@ export default function WalletScreen() {
 
         {isDriver ? null : (
           <View style={[styles.senderInfo, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <View style={[styles.senderInfoIcon, { backgroundColor: theme.primary }]}><MaterialIcons name="handshake" size={16} color="#FFFFFF" /></View>
+            <View style={[styles.senderInfoIcon, { backgroundColor: theme.primary }]}><MaterialIcons name="handshake" size={16} color="#111111" /></View>
             <Text style={[styles.senderInfoText, { color: theme.foreground }]}>
               <Text style={[styles.senderInfoTextBold, { color: theme.foreground }]}>Paiement direct au livreur. </Text>
               Le règlement de la course se fait à la remise. Les mouvements Tikis sont réservés aux règles de mise en relation.
@@ -218,7 +218,7 @@ export default function WalletScreen() {
             <View style={styles.sheetGrip} />
             {payment ? (
               <>
-                <View style={styles.modalIcon}><MaterialIcons name="verified-user" size={22} color="#FF9800" /></View>
+                <View style={styles.modalIcon}><MaterialIcons name="verified-user" size={22} color="#667085" /></View>
                 <Text style={styles.modalTitle}>Validation YengaPay</Text>
                 <Text style={styles.modalSub}>Mode test : confirmez le résultat de votre paiement de {formatMoney(payment.amount)}. Votre Wallet ne changera qu’après cette confirmation serveur.</Text>
                 <View style={styles.referenceCard}>
@@ -233,7 +233,7 @@ export default function WalletScreen() {
               </>
             ) : (
               <>
-                <View style={styles.modalIcon}><MaterialIcons name={requestType === "deposit" ? "add-card" : "account-balance-wallet"} size={22} color="#FF9800" /></View>
+                <View style={styles.modalIcon}><MaterialIcons name={requestType === "deposit" ? "add-card" : "account-balance-wallet"} size={22} color="#667085" /></View>
                 <Text style={styles.modalTitle}>Recharger mon compte</Text>
                 <Text style={styles.modalSub}>{requestType === "deposit" ? "Initialisez un dépôt de test. Le solde ne sera crédité qu'après la confirmation suivante." : "Initialisez un retrait de test. Le solde ne sera débité qu'après la confirmation suivante."}</Text>
                 <View style={styles.amountWrap}>
@@ -269,10 +269,13 @@ const styles = StyleSheet.create({
 
   scroll: { padding: 8, paddingBottom: 24, gap: 12 },
 
-  balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#FF9800", position: "relative", overflow: "hidden" },
-  balanceCardDriver: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#FF9800", borderWidth: 0, overflow: "hidden" },
-  balanceCardSender: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#FF9800", borderWidth: 0, overflow: "hidden" },
-  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#FF9800", opacity: 0.25, borderRadius: 14 },
+  // Le solde est une information, pas une action : il se lit sur une carte sombre, comme dans les applications
+  // bancaires, et non sur un aplat de la couleur de marque — où le blanc ne donnait que 2,16:1 (et 1,51:1 pour les
+  // libellés à 55 % d'opacité). Le voile orange conserve la chaleur de la marque sans toucher à la lisibilité.
+  balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#111111", position: "relative", overflow: "hidden" },
+  balanceCardDriver: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#111111", borderWidth: 0, overflow: "hidden" },
+  balanceCardSender: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#111111", borderWidth: 0, overflow: "hidden" },
+  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#FF9800", opacity: 0.18, borderRadius: 14 },
   balanceEyebrow: { color: "rgba(255,255,255,0.6)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   balanceEyebrowLight: { color: "rgba(255,255,255,0.7)" },
   balanceValueRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
@@ -285,7 +288,7 @@ const styles = StyleSheet.create({
   balanceDividerLight: { backgroundColor: "rgba(255,255,255,0.18)" },
   balanceRows: { flexDirection: "row", gap: 12 },
   balanceCol: { flex: 1 },
-  balanceLabel: { color: "rgba(255,255,255,0.55)", fontSize: 10, fontWeight: "600" },
+  balanceLabel: { color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "600" },
   balanceLabelLight: { color: "rgba(255,255,255,0.7)" },
   balanceSub: { color: "#FFFFFF", fontSize: 12, fontWeight: "600", marginTop: 2 },
   balanceSubPending: { color: "#FBBF24" },
@@ -310,12 +313,12 @@ const styles = StyleSheet.create({
 
   senderInfo: { marginHorizontal: 8, padding: 12, backgroundColor: "#FFFFFF", borderRadius: 10, flexDirection: "row", gap: 10, alignItems: "center" },
   senderInfoIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#FF9800", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  senderInfoText: { flex: 1, color: "#FF9800", fontSize: 11, lineHeight: 16 },
+  senderInfoText: { flex: 1, color: "#667085", fontSize: 11, lineHeight: 16 },
   senderInfoTextBold: { fontWeight: "700" },
 
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 10, marginTop: 6 },
   sectionTitle: { color: "#667085", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
-  sectionAction: { color: "#FF9800", fontSize: 11, fontWeight: "600" },
+  sectionAction: { color: "#111111", fontSize: 11, fontWeight: "600" },
 
   listCard: { borderRadius: 12, overflow: "hidden" },
   txRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 12 },
@@ -354,8 +357,8 @@ const styles = StyleSheet.create({
   referenceValue: { color: "#111111", fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4, letterSpacing: 0.3 },
   requestError: { color: "#A43740", fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: 6 },
   amountWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: 1, borderColor: "#E3E3E3", paddingHorizontal: 12, marginTop: 14 },
-  amountInput: { flex: 1, color: "#FF9800", fontSize: 15, fontWeight: "500", minHeight: 46 },
-  amountCurrency: { color: "#FF9800", fontSize: 11, fontWeight: "600" },
+  amountInput: { flex: 1, color: "#111111", fontSize: 15, fontWeight: "500", minHeight: 46 },
+  amountCurrency: { color: "#667085", fontSize: 11, fontWeight: "600" },
   modalActions: { flexDirection: "row", gap: 8, marginTop: 16 },
   modalAction: { flex: 1, minHeight: 42 },
 });

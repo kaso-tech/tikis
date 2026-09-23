@@ -504,12 +504,12 @@ export function HomeScreen() {
         >
           {isDriver && !profile?.photoUrl ? (
             <Pressable onPress={() => router.push("/(tabs)/profile" as any)} style={({ pressed }) => [styles.kycBanner, pressed && styles.pressed]} accessibilityLabel="Vérifier mon profil">
-              <MaterialIcons name="verified-user" size={18} color="#FF9800" />
+              <MaterialIcons name="verified-user" size={18} color="#667085" />
               <View style={styles.kycBannerCopy}>
                 <Text style={styles.kycBannerTitle}>Profil à vérifier</Text>
                 <Text style={styles.kycBannerText}>Ajoutez votre photo et vos documents pour pouvoir candidater aux livraisons.</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={18} color="#FF9800" />
+              <MaterialIcons name="chevron-right" size={18} color="#667085" />
             </Pressable>
           ) : null}
 
@@ -547,7 +547,7 @@ export function HomeScreen() {
           <Animated.View style={[styles.tabContent, { opacity: filterTransition, transform: [{ translateY: filterTranslateY }] }]}>
           {!hasInitialData && deliveriesQuery.isLoading ? (
             <View style={styles.loadingState}>
-              <ActivityIndicator color="#FF9800" />
+              <ActivityIndicator color="#667085" />
               <Text style={styles.loadingText}>Chargement de vos livraisons…</Text>
             </View>
           ) : !selected ? (
@@ -817,7 +817,7 @@ function DeliveryRow({
           </View>
           <Text style={styles.compactMeta} numberOfLines={1}>{tripLine} · {dateInfo.primary.toLocaleLowerCase("fr")}</Text>
           <View style={styles.compactDistance}>
-            <MaterialIcons name="explore" size={15} color="#FF9800" />
+            <MaterialIcons name="explore" size={15} color="#667085" />
             <Text style={styles.compactDistanceText} numberOfLines={1}>à {driverDistText} de vous</Text>
           </View>
         </View>
@@ -832,7 +832,7 @@ function DeliveryRow({
               accessibilityLabel={`${driverAction} — ${delivery.title}`}
               style={({ pressed }) => [applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
             >
-              {applying ? <ActivityIndicator size="small" color="#FF9800" /> : <Text style={styles.compactAction}>{driverAction}</Text>}
+              {applying ? <ActivityIndicator size="small" color="#667085" /> : <Text style={styles.compactAction}>{driverAction}</Text>}
             </Pressable>
           ) : null}
           {/* « Ouvrir » ne s'affichait qu'à défaut d'action, c'est-à-dire sur
@@ -918,7 +918,7 @@ function DeliveryRow({
             accessibilityLabel={`${senderLabel} — ${delivery.title}`}
             style={({ pressed }) => [styles.tripCta, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
           >
-            {applying ? <ActivityIndicator size="small" color="#FF9800" /> : <Text style={styles.tripCtaText}>{senderLabel}</Text>}
+            {applying ? <ActivityIndicator size="small" color="#667085" /> : <Text style={styles.tripCtaText}>{senderLabel}</Text>}
           </Pressable>
         ) : null}
       </View>
@@ -952,14 +952,14 @@ const styles = StyleSheet.create({
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
   greetingBlock: { flex: 1, minWidth: 0 },
   driverGainsRow: { flexDirection: "row", alignItems: "baseline", gap: 6, flexWrap: "wrap" },
-  driverGainsValue: { color: "#FF9800", fontSize: 14, fontWeight: "700" },
+  driverGainsValue: { color: "#111111", fontSize: 14, fontWeight: "700" },
   sheetTitle: { color: "#111111", fontSize: 14, fontWeight: "700", lineHeight: 18 },
   sheetSubtitle: { color: "#667085", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 
   servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#F0F3F8", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E3E3E3" },
   servicePillOffline: { backgroundColor: "#F0F3F8", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", shadowOpacity: 0, elevation: 0 },
   servicePillNeutral: { backgroundColor: "#F0F3F8", shadowOpacity: 0, elevation: 0 },
-  serviceText: { color: "#FF9800", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
+  serviceText: { color: "#667085", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   serviceTextOffline: { color: "#111111" },
   onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#FF9800" },
   onlineDotOffline: { backgroundColor: "#667085" },
@@ -967,21 +967,21 @@ const styles = StyleSheet.create({
   searchRow: { paddingTop: 10, paddingBottom: 6 },
   kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: "#F0F3F8", borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3" },
   kycBannerCopy: { flex: 1 },
-  kycBannerTitle: { color: "#FF9800", fontSize: 12, fontWeight: "700" },
-  kycBannerText: { color: "#FF9800", fontSize: 11, marginTop: 2, lineHeight: 16 },
+  kycBannerTitle: { color: "#111111", fontSize: 12, fontWeight: "700" },
+  kycBannerText: { color: "#667085", fontSize: 11, marginTop: 2, lineHeight: 16 },
   searchPill: { height: 40, backgroundColor: "#F0F3F8", borderRadius: 11, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
-  searchInput: { flex: 1, color: "#FF9800", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
+  searchInput: { flex: 1, color: "#111111", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
 
 
   filterRow: { flexDirection: "row", gap: 6, paddingBottom: 10, alignItems: "center" },
   filterScroll: { flexGrow: 0 },
   chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#F0F3F8", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", gap: 6 },
   chipActive: { backgroundColor: "#FF980014", borderColor: "#FF9800", borderWidth: 1 },
-  chipText: { color: "#FF9800", fontSize: 11, fontWeight: "600" },
-  chipTextActive: { color: "#FF9800" },
+  chipText: { color: "#667085", fontSize: 11, fontWeight: "600" },
+  chipTextActive: { color: "#111111" },
   chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#FF9800", alignItems: "center", justifyContent: "center" },
   chipCountActive: { backgroundColor: "#FF9800" },
-  chipCountText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700", lineHeight: 12 },
+  chipCountText: { color: "#111111", fontSize: 10, fontWeight: "700", lineHeight: 12 },
   tabContent: { minHeight: 1 },
 
   scrollArea: { flex: 1, marginTop: 2 },
@@ -1017,7 +1017,7 @@ const styles = StyleSheet.create({
   tripFoot: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#E3E3E3" },
   tripGhost: { fontSize: 12.5, fontWeight: "600", color: "#667085" },
   tripCta: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#FF9800", minWidth: 96, alignItems: "center" },
-  tripCtaText: { fontSize: 12.5, fontWeight: "700", color: "#FF9800" },
+  tripCtaText: { fontSize: 12.5, fontWeight: "700", color: "#111111" },
   tripCtaQuiet: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#A43740", minWidth: 96, alignItems: "center" },
   tripCtaQuietText: { fontSize: 12.5, fontWeight: "700", color: "#A43740" },
 
@@ -1029,10 +1029,10 @@ const styles = StyleSheet.create({
   compactTo: { flexShrink: 1, minWidth: 0, fontSize: 13.5, fontWeight: "600", color: "#111111" },
   compactMeta: { fontSize: 11.5, color: "#667085" },
   compactDistance: { flexDirection: "row", alignItems: "center", gap: 5, position: "relative" },
-  compactDistanceText: { fontSize: 11.5, fontWeight: "700", color: "#FF9800" },
+  compactDistanceText: { fontSize: 11.5, fontWeight: "700", color: "#667085" },
   compactRight: { flexShrink: 0, alignItems: "flex-end", gap: 6 },
   compactPrice: { fontSize: 14.5, fontWeight: "800", color: "#111111", fontVariant: ["tabular-nums"] },
-  compactAction: { fontSize: 11.5, fontWeight: "700", color: "#FF9800" },
+  compactAction: { fontSize: 11.5, fontWeight: "700", color: "#111111" },
   compactGhost: { fontSize: 11.5, fontWeight: "600", color: "#667085" },
 
   listSection: { marginTop: 4, gap: 8 },
