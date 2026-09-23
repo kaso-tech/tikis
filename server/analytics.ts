@@ -1,19 +1,17 @@
 /**
- * Analytics personnelles du driver — agrégations SQL sur les livraisons terminées.
+ * Analytics personnelles du livreur : la projection de gains affichée sur l'écran Gains.
  *
- * Pas de route Express ni tRPC ici : c'est de la logique pure qui prend un db
- * en paramètre. Les routers tRPC font le glue avec currentTikisProfile.
+ * Elle part des MÊMES enregistrements que l'historique de cet écran (`getDriverCompletedDeliveryEarnings`)
+ * au lieu de refaire sa propre somme en SQL. C'était le cas jusqu'ici, et les deux calculs divergeaient :
+ * la projection additionnait `offeredPrice` brut, commission comprise, et comptait zéro pour toute course
+ * publiée sans offre (SUM ignore les NULL, sans repli sur `estimatedPrice`). Le même écran affichait donc,
+ * sous l'intitulé « 7 derniers jours », un montant différent de celui de son propre historique.
+ *
+ * Fonction pure : le routeur lui passe les enregistrements, elle ne touche pas à la base.
  */
-
-import { and, count, desc, eq, gte, sql, sum } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
-import { tikisDeliveries } from "../drizzle/schema";
+import type { FinancialRecord } from "../shared/tikis-domain";
 import { computeProjection30Days as project30, computeTrendPct as trendPct } from "./_test-helpers/driver-earnings-projection";
 
-type DbHandle = ReturnType<typeof drizzle>;
-
-/** Projection 30 jours pour un driver : moyenne journalière des gains sur les 7 derniers jours
- *  × 30. Si aucune activité, retourne 0. */
 export type DriverEarningsProjection = {
   totalLast7Days: number;
   averagePerDay: number;
@@ -24,59 +22,40 @@ export type DriverEarningsProjection = {
   topDays: Array<{ date: string; amount: number }>;
 };
 
-export async function computeDriverEarningsProjection(db: DbHandle, driverPhone: string, now: Date = new Date()): Promise<DriverEarningsProjection> {
-  const since30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const since7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-  const since14 = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-  // Total 7 derniers jours
-  const last7Rows = await db
-    .select({ total: sum(tikisDeliveries.offeredPrice), count: count() })
-    .from(tikisDeliveries)
-    .where(and(
-      eq(tikisDeliveries.driverPhone, driverPhone),
-      eq(tikisDeliveries.status, "completed"),
-      gte(tikisDeliveries.completedAt, since7),
-    ));
-  const totalLast7 = Number(last7Rows[0]?.total ?? 0);
+export function computeDriverEarningsProjection(
+  earnings: ReadonlyArray<Pick<FinancialRecord, "amount" | "createdAt">>,
+  now: Date = new Date(),
+): DriverEarningsProjection {
+  const at = now.getTime();
+  const inWindow = (from: number, to: number) =>
+    earnings.filter((entry) => {
+      const time = new Date(entry.createdAt).getTime();
+      return time >= at - from * DAY_MS && time < at - to * DAY_MS;
+    });
+  const total = (rows: ReadonlyArray<Pick<FinancialRecord, "amount">>) => rows.reduce((sum, entry) => sum + entry.amount, 0);
 
-  // Total 7 jours d'avant
-  const prev7Rows = await db
-    .select({ total: sum(tikisDeliveries.offeredPrice) })
-    .from(tikisDeliveries)
-    .where(and(
-      eq(tikisDeliveries.driverPhone, driverPhone),
-      eq(tikisDeliveries.status, "completed"),
-      gte(tikisDeliveries.completedAt, since14),
-      sql`${tikisDeliveries.completedAt} < ${since7.toISOString()}`,
-    ));
-  const totalPrev7 = Number(prev7Rows[0]?.total ?? 0);
+  const totalLast7 = total(inWindow(7, 0));
+  const totalPrev7 = total(inWindow(14, 7));
 
-  // Top 5 jours sur 30 jours
-  const topDaysRaw = await db
-    .select({
-      date: sql<string>`DATE_FORMAT(${tikisDeliveries.completedAt}, '%Y-%m-%d')`,
-      amount: sum(tikisDeliveries.offeredPrice),
-    })
-    .from(tikisDeliveries)
-    .where(and(
-      eq(tikisDeliveries.driverPhone, driverPhone),
-      eq(tikisDeliveries.status, "completed"),
-      gte(tikisDeliveries.completedAt, since30),
-    ))
-    .groupBy(sql`DATE_FORMAT(${tikisDeliveries.completedAt}, '%Y-%m-%d')`)
-    .orderBy(desc(sum(tikisDeliveries.offeredPrice)))
-    .limit(5);
+  // Jour civil UTC — le Burkina Faso vit à UTC+0, et c'est la clé que lisait déjà l'ancienne requête.
+  const byDay = new Map<string, number>();
+  for (const entry of inWindow(30, 0)) {
+    const key = new Date(entry.createdAt).toISOString().slice(0, 10);
+    byDay.set(key, (byDay.get(key) ?? 0) + entry.amount);
+  }
+  const topDays = [...byDay.entries()]
+    .map(([date, amount]) => ({ date, amount }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 5);
 
   const averagePerDay = Math.round(totalLast7 / 7);
-  const projection30Days = project30(averagePerDay);
-  const trend = trendPct(totalLast7, totalPrev7);
-
   return {
     totalLast7Days: totalLast7,
     averagePerDay,
-    projection30Days,
-    trendPct: trend,
-    topDays: topDaysRaw.map((row) => ({ date: row.date, amount: Number(row.amount ?? 0) })),
+    projection30Days: project30(averagePerDay),
+    trendPct: trendPct(totalLast7, totalPrev7),
+    topDays,
   };
 }

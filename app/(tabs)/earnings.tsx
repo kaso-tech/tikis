@@ -14,7 +14,7 @@ type FlowFilter = "earnings" | "bonus" | "all";
 
 const PERIOD_META: Record<Period, { label: string; icon: React.ComponentProps<typeof MaterialIcons>["name"]; description: string }> = {
   day: { label: "Aujourd'hui", icon: "wb-sunny", description: "Gains et courses sur la journée en cours." },
-  week: { label: "7 derniers jours", icon: "date-range", description: "Vue d'ensemble hebdomadaire de votre activité." },
+  week: { label: "Cette semaine", icon: "date-range", description: "Gains et courses depuis lundi." },
   month: { label: "Ce mois", icon: "calendar-month", description: "Bilan mensuel de vos performances livreur." },
 };
 
@@ -44,6 +44,17 @@ function startOfMonth(date: Date): Date {
   return next;
 }
 
+/** Clé AAAA-MM-JJ du jour civil local, et sa relecture — à ne jamais confier à `toISOString()`/`new Date(clé)`,
+ *  qui passent tous deux par UTC. */
+function localDayKey(value: string): string {
+  const date = new Date(value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+function dateFromDayKey(key: string): Date {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 function periodStart(period: Period, now: Date): Date {
   if (period === "day") return startOfDay(now);
   if (period === "week") return startOfWeek(now);
@@ -69,8 +80,10 @@ export default function EarningsScreen() {
   // livraisons terminées, jamais depuis le Wallet, qui n'est jamais crédité par une livraison.
   const earningsHistoryQuery = trpc.wallet.driverEarningsHistory.useQuery(undefined, { enabled: Boolean(profile?.phone) });
   const wallet = walletQuery.data?.wallet;
-  const journal = walletQuery.data?.journal ?? [];
-  const earningsHistory = earningsHistoryQuery.data ?? [];
+  // Stabilisés : un `?? []` nu fabrique un tableau neuf à chaque rendu, et relançait tous les calculs
+  // mémoïsés qui en dépendent.
+  const journal = useMemo(() => walletQuery.data?.journal ?? [], [walletQuery.data?.journal]);
+  const earningsHistory = useMemo(() => earningsHistoryQuery.data ?? [], [earningsHistoryQuery.data]);
   const isLoading = walletQuery.isLoading || earningsHistoryQuery.isLoading;
   const hasError = walletQuery.error || earningsHistoryQuery.error;
 
@@ -86,7 +99,7 @@ export default function EarningsScreen() {
 
     const dayMap = new Map<string, number>();
     for (const entry of visible) {
-      const key = new Date(entry.createdAt).toISOString().slice(0, 10);
+      const key = localDayKey(entry.createdAt);
       dayMap.set(key, (dayMap.get(key) ?? 0) + entry.amount);
     }
     const dayList = Array.from(dayMap.entries())
@@ -127,7 +140,11 @@ export default function EarningsScreen() {
   }, [journal, earningsHistory, period, flow, now]);
 
   const todayEarnings = useMemo(() => deliveryMetricsForDay(earningsHistory).earnings, [earningsHistory]);
-  const lastEarningDate = history[0] ? new Date(history[0].createdAt) : null;
+  // La dernière course terminée, quels que soient la période et le filtre affichés.
+  const lastEarningDate = useMemo(() => {
+    const times = earningsHistory.filter(isDeliveryEarning).map((entry) => new Date(entry.createdAt).getTime());
+    return times.length === 0 ? null : new Date(Math.max(...times));
+  }, [earningsHistory]);
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
@@ -233,18 +250,18 @@ export default function EarningsScreen() {
               <Text style={[styles.cardTitle, { color: theme.foreground }]}>Répartition par jour</Text>
               {bestDay ? (
                 <Text style={[styles.cardSubtitle, { color: theme.muted }]}>
-                  Pic : {formatMoney(bestDay.amount)} · {new Date(bestDay.dateKey).toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "short" })}
+                  Pic : {formatMoney(bestDay.amount)} · {dateFromDayKey(bestDay.dateKey).toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "short" })}
                 </Text>
               ) : null}
             </View>
-            {dailyBreakdown.slice(0, 7).map((day, idx) => {
-              const max = Math.max(...dailyBreakdown.map((entry) => entry.amount));
+            {dailyBreakdown.slice(0, 7).map((day, idx, shown) => {
+              const max = Math.max(...shown.map((entry) => entry.amount));
               const widthPct = max === 0 ? 0 : Math.max(8, Math.round((day.amount / max) * 100));
-              const isLast = idx === dailyBreakdown.length - 1;
+              const isLast = idx === shown.length - 1;
               return (
                 <View key={day.dateKey} style={[styles.barRow, !isLast && { borderBottomColor: theme.border }]}>
                   <View style={styles.barLabel}>
-                    <Text style={[styles.barDate, { color: theme.foreground }]}>{new Date(day.dateKey).toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" })}</Text>
+                    <Text style={[styles.barDate, { color: theme.foreground }]}>{dateFromDayKey(day.dateKey).toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" })}</Text>
                     <Text style={[styles.barValue, { color: theme.primary }]}>{formatMoney(day.amount)}</Text>
                   </View>
                   <View style={[styles.barTrack, { backgroundColor: theme.background }]}>
@@ -256,26 +273,24 @@ export default function EarningsScreen() {
           </View>
         ) : null}
 
-        <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.foreground }]}>{flow === "bonus" ? "Historique des bonus" : flow === "all" ? "Historique complet" : "Historique des gains"}</Text>
-          <Text style={[styles.sectionAction, { color: theme.muted }]}>{history.length} mouvement{history.length > 1 ? "s" : ""}</Text>
-        </View>
-
         {isLoading ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.emptyText, { color: theme.muted }]}>Chargement sécurisé de vos gains…</Text></View>
         ) : hasError ? (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}><Text style={[styles.emptyText, { color: theme.muted }]}>L’historique des gains est momentanément indisponible.</Text></View>
         ) : (
-          <>
-            <DriverEarningsProjection phone={profile?.phone ?? null} />
-          </>
+          <DriverEarningsProjection phone={profile?.phone ?? null} />
         )}
+
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: theme.foreground }]}>{flow === "bonus" ? "Historique des bonus" : flow === "all" ? "Historique complet" : "Historique des gains"}</Text>
+          <Text style={[styles.sectionAction, { color: theme.muted }]}>{history.length} mouvement{history.length > 1 ? "s" : ""}</Text>
+        </View>
 
         {isLoading ? null : hasError ? null : history.length === 0 ? (
           <View style={[styles.empty, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View style={[styles.emptyIcon, { backgroundColor: theme.background }]}><MaterialIcons name="savings" size={26} color={theme.muted} /></View>
             <Text style={[styles.emptyTitle, { color: theme.foreground }]}>Aucun gain sur cette période</Text>
-            <Text style={[styles.emptySub, { color: theme.muted }]}>Vos crédits de course apparaîtront ici dès que vous terminez une livraison.</Text>
+            <Text style={[styles.emptySub, { color: theme.muted }]}>Vos gains de course apparaîtront ici dès que vous terminez une livraison.</Text>
           </View>
         ) : (
           <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -306,7 +321,7 @@ export default function EarningsScreen() {
 
         <View style={styles.disclaimer}>
           <MaterialIcons name="verified-user" size={14} color={theme.muted} />
-          <Text style={[styles.disclaimerText, { color: theme.muted }]}>Les montants affichés correspondent aux crédits de course après commission Tikis.</Text>
+          <Text style={[styles.disclaimerText, { color: theme.muted }]}>Les montants affichés sont vos gains de course, commission Tikis déduite. Ils ne sont pas versés sur votre Wallet : l’expéditeur vous paie directement.</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

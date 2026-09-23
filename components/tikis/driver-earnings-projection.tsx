@@ -38,7 +38,7 @@ export function DriverEarningsProjection({ phone }: { phone: string | null }) {
     return (
       <View style={styles.card}>
         <View style={styles.header}><MaterialIcons name="auto-graph" size={18} color={theme.primary} /><Text style={styles.title}>Projection gains</Text></View>
-        <Text style={styles.empty}>Termine des courses cette semaine pour activer la projection 30 jours.</Text>
+        <Text style={styles.empty}>Terminez des courses pour activer la projection : elle se calcule sur vos 7 derniers jours.</Text>
       </View>
     );
   }
@@ -71,7 +71,7 @@ export function DriverEarningsProjection({ phone }: { phone: string | null }) {
       <View style={styles.projectionBox}>
         <Text style={styles.projectionLabel}>ESTIMATION 30 PROCHAINS JOURS</Text>
         <Text style={styles.projectionValue}>{formatMoney(projection.projection30Days)}</Text>
-        <Text style={styles.projectionFoot}>Basée sur la moyenne de tes 7 derniers jours. Les variations saisonnières ne sont pas prises en compte.</Text>
+        <Text style={styles.projectionFoot}>Basée sur la moyenne de vos 7 derniers jours, commission déduite. Les variations saisonnières ne sont pas prises en compte.</Text>
       </View>
 
       {projection.topDays.length > 0 ? (
