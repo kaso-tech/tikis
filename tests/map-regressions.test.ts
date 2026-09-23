@@ -54,6 +54,21 @@ describe("le marqueur de collecte survit à un aller-retour d'écran", () => {
     expect(tracked).toContain("useFocusEffect");
   });
 
+  it("le retour sur l'écran recrée le marqueur natif, il ne se contente pas de redemander l'instantané", () => {
+    // Observé sur Android : après un aller-retour entre onglets, remettre `tracksViewChanges` à vrai ne
+    // ramenait pas le point de collecte, alors qu'un changement de livraison — donc une clé différente, donc
+    // un marqueur natif neuf — le ramenait à tous les coups. `epoch` sert de clé au `Marker` interne pour
+    // reproduire cette recréation à chaque retour de focus.
+    expect(tracked).toContain("<Marker key={epoch}");
+    expect(tracked).toContain("setEpoch((previous) => previous + 1)");
+    // Jamais au tout premier affichage : le marqueur vient de naître, le remonter ne ferait que clignoter.
+    expect(tracked).toContain("if (everFocused.current)");
+    // Les deux changements d'état partent du même appel, donc du même rendu : le marqueur neuf naît avec
+    // `tracksViewChanges` déjà à vrai et n'a jamais l'occasion d'afficher une image vide.
+    const remount = tracked.slice(tracked.indexOf("const remountAndRetake"), tracked.indexOf("useEffect(()"));
+    expect(remount).toContain("retake();");
+  });
+
   it("le livreur redessine son cap sans dépendre de sa coordonnée", () => {
     // `redrawKey` doit changer avec le cap affiché, jamais avec la position :
     // sinon chaque point GPS reprendrait un instantané, en continu.

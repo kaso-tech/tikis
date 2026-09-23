@@ -9,6 +9,7 @@ import { publishWalletBroadcast } from "./supabase-realtime";
 import { sendPushToTokens, type PushMessage } from "./push";
 import { isValidExpoPushTokenShape } from "./_test-helpers/push-token-shape";
 import type { Delivery, DeliveryReview, DriverCandidate, FinancialRecord, InAppNotification, LocationLabel, SelectableVehicleType, WalletOperation, WalletSnapshot } from "../shared/tikis-domain";
+import { netDriverEarning } from "../shared/tikis-domain";
 import { candidateMovementVersion, computeReplacementSettlement } from "../shared/wallet-commission";
 import { BASE_POSITION_MAX_AGE_MS, DEFAULT_DRIVER_PERIMETER, distanceKmBetween, evaluatePerimeter, isValidPerimeterRadius, MAX_PERIMETER_RADIUS_KM, MIN_PERIMETER_RADIUS_KM, type DriverPerimeterPreferences } from "../shared/driver-perimeter";
 import { DELIVERY_EXPIRATION_MS, deliveryActivityTimestamp, deliveryExpirationOutcome } from "../shared/delivery-expiration";
@@ -936,13 +937,24 @@ export async function listTikisWalletLedger(profilePhone: string): Promise<Finan
 
 /** Historique informatif des gains d'un livreur, calculé à partir des livraisons terminées — jamais depuis le
  *  Wallet, qui n'est jamais crédité par une livraison (le paiement de la course se fait hors application). Le
- *  format reprend celui de `FinancialRecord` pour rester compatible avec les écrans "Gains" existants. */
+ *  format reprend celui de `FinancialRecord` pour rester compatible avec les écrans "Gains" existants.
+ *
+ *  Le gain est net de commission. Le livreur encaisse bien le prix de la course auprès de l'expéditeur, mais la
+ *  commission Tikis a déjà quitté son Wallet au moment où il a confirmé sa disponibilité (mouvement
+ *  `commission_debit`) : une course à 2 000 FCFA commissionnée à 10 % lui rapporte 1 800 FCFA, pas 2 000.
+ *  L'afficher brute surestimait chaque gain, et donc tous les totaux qui en découlent ("Gains du jour" de
+ *  l'accueil, onglet Gains, meilleure journée).
+ *
+ *  Le calcul lui-même vit dans `netDriverEarning` (shared/tikis-domain.ts), qui documente pourquoi on
+ *  soustrait `accruedCommission` plutôt qu'une commission recalculée depuis le barème du jour. */
 export async function getDriverCompletedDeliveryEarnings(driverPhone: string): Promise<FinancialRecord[]> {
   const db = await getDb();
   if (!db) return [];
   const rows = await db.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.driverPhone, driverPhone), eq(tikisDeliveries.status, "completed"))).orderBy(desc(tikisDeliveries.completedAt));
   return rows.map((row) => {
-    const amount = Math.round(row.offeredPrice ?? row.estimatedPrice);
+    const gross = Math.round(row.offeredPrice ?? row.estimatedPrice);
+    const commission = row.accruedCommission ?? 0;
+    const amount = netDriverEarning(gross, commission);
     return {
       id: `${row.id}:earning`,
       deliveryId: row.id,
@@ -951,7 +963,9 @@ export async function getDriverCompletedDeliveryEarnings(driverPhone: string): P
       amount,
       balanceBefore: 0,
       balanceAfter: 0,
-      reason: "Gain de livraison (payé directement par l’expéditeur, non crédité au Wallet Tikis)",
+      reason: commission > 0
+        ? `Gain net : ${gross} FCFA encaissés moins ${commission} FCFA de commission Tikis déjà prélevés sur votre Wallet`
+        : "Gain de livraison (payé directement par l’expéditeur, non crédité au Wallet Tikis)",
     } satisfies FinancialRecord;
   });
 }

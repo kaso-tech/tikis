@@ -234,6 +234,22 @@ export const SIMULATION_OTP = "730512";
 export const commissionFor = (price: number, policy: CommissionPolicy) =>
   Math.round(price * policy.rate);
 
+/**
+ * Ce qu'une course terminée rapporte réellement au livreur.
+ *
+ * Il encaisse le prix de la course auprès de l'expéditeur, mais la commission Tikis a déjà quitté son Wallet
+ * quand il a confirmé sa disponibilité : une course à 2 000 FCFA commissionnée à 10 % lui laisse 1 800 FCFA.
+ *
+ * `accruedCommission` est le montant réellement prélevé à ce livreur-là, et non une commission recalculée
+ * depuis le barème du jour — le taux a pu changer depuis, et une course qui a changé de livreur en cours de
+ * route a pu être commissionnée à un autre montant. Quand il manque (livraisons terminées avant l'existence
+ * du champ), on rend le montant brut : rien ne permet de reconstituer le prélèvement, et inventer un chiffre
+ * tromperait plus que de laisser l'ancien tel quel.
+ */
+export const netDriverEarning = (grossPrice: number, accruedCommission: number | null | undefined) =>
+  // Jamais négatif : une commission qui dépasserait le prix ne doit pas retrancher aux autres courses du total.
+  Math.max(0, Math.round(grossPrice) - (accruedCommission ?? 0));
+
 export const availableWalletBalance = (wallet: WalletSnapshot) => wallet.total - wallet.blocked;
 
 export type LocationPresentation = Pick<LocationLabel, "name" | "district" | "city" | "formattedAddress" | "street" | "province" | "country" | "featureType">;
