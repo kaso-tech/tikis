@@ -19,8 +19,8 @@
 import { StyleSheet, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
-/** Couleur du point de collecte : le turquoise de la marque. */
-export const PICKUP_COLOR = "#01A7BD";
+/** Couleur du point de collecte : le brun de la marque. */
+export const PICKUP_COLOR = "#9A6201";
 /** Couleur de la destination : le rouge des états terminaux. */
 export const DROPOFF_COLOR = "#A43740";
 /** Couleur du livreur : l'encre, pour qu'il ressorte des deux extrémités. */

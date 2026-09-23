@@ -27,9 +27,9 @@ const operationMeta: Record<WalletOperation, { label: string; icon: React.Compon
 };
 
 const TONE_COLOR: Record<Tone, string> = {
-  primary: "#01A7BD",
+  primary: "#9A6201",
   success: "#176C52",
-  warning: "#01A7BD",
+  warning: "#9A6201",
   error: "#A43740",
   neutral: "#667085",
 };
@@ -159,7 +159,7 @@ export default function WalletScreen() {
 
         {isDriver ? null : (
           <View style={[styles.senderInfo, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <View style={[styles.senderInfoIcon, { backgroundColor: theme.primary }]}><MaterialIcons name="handshake" size={16} color="#111111" /></View>
+            <View style={[styles.senderInfoIcon, { backgroundColor: theme.primary }]}><MaterialIcons name="handshake" size={16} color="#FFFFFF" /></View>
             <Text style={[styles.senderInfoText, { color: theme.foreground }]}>
               <Text style={[styles.senderInfoTextBold, { color: theme.foreground }]}>Paiement direct au livreur. </Text>
               Le règlement de la course se fait à la remise. Les mouvements Tikis sont réservés aux règles de mise en relation.
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
   balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#111111", position: "relative", overflow: "hidden" },
   balanceCardDriver: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#111111", borderWidth: 0, overflow: "hidden" },
   balanceCardSender: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#111111", borderWidth: 0, overflow: "hidden" },
-  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#01A7BD", opacity: 0.18, borderRadius: 14 },
+  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#9A6201", opacity: 0.18, borderRadius: 14 },
   balanceEyebrow: { color: "rgba(255,255,255,0.6)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   balanceEyebrowLight: { color: "rgba(255,255,255,0.7)" },
   balanceValueRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   quickStatLabel: { color: "#667085", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
 
   senderInfo: { marginHorizontal: 8, padding: 12, backgroundColor: "#FFFFFF", borderRadius: 10, flexDirection: "row", gap: 10, alignItems: "center" },
-  senderInfoIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#01A7BD", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  senderInfoIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   senderInfoText: { flex: 1, color: "#667085", fontSize: 11, lineHeight: 16 },
   senderInfoTextBold: { fontWeight: "700" },
 

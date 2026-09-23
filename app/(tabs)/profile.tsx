@@ -385,7 +385,7 @@ export default function ProfileScreen() {
                     style={({ pressed }) => [styles.vehicleRow, { borderColor: theme.border, backgroundColor: theme.background }, pressed && { backgroundColor: theme.pressed }]}
                   >
                     <View style={[styles.vehicleCheckbox, { borderColor: theme.border, backgroundColor: checked ? theme.primary : "transparent" }]}>
-                      {checked ? <MaterialIcons name="check" size={14} color="#111111" /> : null}
+                      {checked ? <MaterialIcons name="check" size={14} color="#FFFFFF" /> : null}
                     </View>
                     <Text style={[styles.vehicleLabel, { color: theme.foreground }]}>{option}</Text>
                     <MaterialIcons name={option === "Vélo" ? "directions-bike" : option === "Moto" ? "two-wheeler" : option === "Tricycle" ? "electric-rickshaw" : "directions-car"} size={20} color={theme.muted} />
@@ -563,9 +563,9 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "center", gap: 13 },
   headerIdentity: { flex: 1, minWidth: 0 },
   avatarWrap: { position: "relative" },
-  avatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: "#01A7BD", alignItems: "center", justifyContent: "center" },
+  avatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
   avatarImage: { width: 58, height: 58, borderRadius: 29 },
-  avatarText: { color: "#111111", fontSize: 19, fontWeight: "700" },
+  avatarText: { color: "#FFFFFF", fontSize: 19, fontWeight: "700" },
   avatarEdit: { position: "absolute", right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: "#FFFFFF", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", alignItems: "center", justifyContent: "center" },
   name: { color: "#111111", fontSize: 18, fontWeight: "700", letterSpacing: -0.2 },
   roleLine: { color: "#667085", fontSize: 12, marginTop: 3 },

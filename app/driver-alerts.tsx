@@ -153,7 +153,7 @@ export default function DriverAlertsScreen() {
               onValueChange={(next) => void togglePush(next)}
               disabled={saving}
               trackColor={{ false: theme.border, true: "#C6A26A" }}
-              thumbColor={preferences.opportunityPushEnabled ? "#01A7BD" : "#FFFFFF"}
+              thumbColor={preferences.opportunityPushEnabled ? "#9A6201" : "#FFFFFF"}
             />
           </View>
           <Text style={styles.cardNote}>
@@ -304,7 +304,7 @@ function makeStyles(theme: ThemedColors) {
     switchCopy: { flex: 1, gap: 4 },
     choices: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 2 },
     choice: { paddingHorizontal: 12, minHeight: 38, justifyContent: "center", borderRadius: 9, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.background },
-    choiceSelected: { borderColor: "#01A7BD", backgroundColor: "#E7F7F9" },
+    choiceSelected: { borderColor: "#9A6201", backgroundColor: "#F7EFE5" },
     choiceText: { color: theme.foreground, fontSize: 12.5, fontWeight: "600" },
     choiceTextSelected: { color: "#111111" },
     baseStatus: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },

@@ -55,21 +55,21 @@ export async function configurePushNotifications(): Promise<NotificationsModule 
         importance: Notifications.AndroidImportance.HIGH,
         sound: "default",
         vibrationPattern: [0, 180, 100, 180],
-        lightColor: "#01A7BD",
+        lightColor: "#9A6201",
       }),
       Notifications.setNotificationChannelAsync(PUSH_CHANNELS.opportunities, {
         name: "Nouvelles courses",
         importance: Notifications.AndroidImportance.DEFAULT,
         sound: "default",
         vibrationPattern: [0, 120],
-        lightColor: "#01A7BD",
+        lightColor: "#9A6201",
       }),
       Notifications.setNotificationChannelAsync(PUSH_CHANNELS.tracking, {
         name: "Suivi de livraison",
         importance: Notifications.AndroidImportance.HIGH,
         sound: "default",
         vibrationPattern: [0, 180, 100, 180],
-        lightColor: "#01A7BD",
+        lightColor: "#9A6201",
       }),
     ]);
     channelsConfigured = true;

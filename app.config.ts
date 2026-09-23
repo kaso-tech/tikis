@@ -110,7 +110,7 @@ const config: ExpoConfig = {
     [
       "expo-notifications",
       {
-        color: "#01A7BD",
+        color: "#9A6201",
         defaultChannel: "tikis-transactional",
       },
     ],

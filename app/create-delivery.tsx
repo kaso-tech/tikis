@@ -378,7 +378,7 @@ export default function CreateDeliveryScreen() {
                     accessibilityLabel={`${item.label} — ${item.sub}`}
                     style={({ pressed }) => [styles.pill, active && styles.pillActive, pressed && styles.pressed]}
                   >
-                    <MaterialIcons name={item.icon} size={15} color={active ? "#01A7BD" : "#667085"} />
+                    <MaterialIcons name={item.icon} size={15} color={active ? "#9A6201" : "#667085"} />
                     <Text style={[styles.pillLabel, active && styles.pillLabelActive]} numberOfLines={1}>{item.label}</Text>
                   </Pressable>
                 );
@@ -421,7 +421,7 @@ export default function CreateDeliveryScreen() {
                     accessibilityLabel={item}
                     style={({ pressed }) => [styles.vehiclePill, active && styles.pillActive, pressed && styles.pressed]}
                   >
-                    <MaterialIcons name={VEHICLE_ICON[item]} size={17} color={active ? "#01A7BD" : "#667085"} />
+                    <MaterialIcons name={VEHICLE_ICON[item]} size={17} color={active ? "#9A6201" : "#667085"} />
                     <Text style={[styles.vehicleLabel, active && styles.pillLabelActive]} numberOfLines={1}>{item}</Text>
                   </Pressable>
                 );
@@ -550,7 +550,7 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
           l'intérieur, et le web en ferait un <button> dans un <button>. */}
       <Pressable onPress={onPress} accessibilityLabel={value ? `${label} : ${locationTitle(value)}. Changer` : `Choisir le lieu de ${isPickup ? "récupération" : "destination"}`} style={({ pressed }) => [styles.routeInput, pressed && styles.pressed]}>
         <View style={[styles.routeInputIcon, isPickup ? styles.routeInputIconFrom : styles.routeInputIconTo]}>
-          <MaterialIcons name={isPickup ? "inventory-2" : "sports-score"} size={14} color={isPickup ? "#01A7BD" : "#A43740"} />
+          <MaterialIcons name={isPickup ? "inventory-2" : "sports-score"} size={14} color={isPickup ? "#9A6201" : "#A43740"} />
         </View>
         <View style={styles.routeInputContent}>
           <Text style={[styles.routeInputLabel, invalid && styles.routeInputLabelInvalid]}>{label}</Text>
@@ -624,7 +624,7 @@ const styles = StyleSheet.create({
   routeCard: { backgroundColor: "#FFFFFF", borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", paddingVertical: 4 },
   routeInput: { flexDirection: "row", alignItems: "center", gap: 11, paddingHorizontal: 12, paddingVertical: 11 },
   routeInputIcon: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  routeInputIconFrom: { backgroundColor: "#E7F7F9" },
+  routeInputIconFrom: { backgroundColor: "#F7EFE5" },
   routeInputIconTo: { backgroundColor: "#F7EAEB" },
   routeInputContent: { flex: 1, minWidth: 0 },
   routeInputLabel: { color: "#667085", fontSize: 9.5, fontWeight: "700", letterSpacing: 0.7 },
@@ -635,7 +635,7 @@ const styles = StyleSheet.create({
   routeFavoriteBtn: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", alignItems: "center", justifyContent: "center" },
   favoriteInputRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 51, paddingRight: 12, paddingBottom: 8 },
   favoriteInput: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", paddingHorizontal: 10, paddingVertical: 9, color: "#111111", fontSize: 12.5 },
-  favoriteSaveBtn: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 9, borderWidth: 1, borderColor: "#01A7BD", backgroundColor: "#FFFFFF" },
+  favoriteSaveBtn: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 9, borderWidth: 1, borderColor: "#9A6201", backgroundColor: "#FFFFFF" },
   favoriteSaveBtnText: { color: "#111111", fontSize: 12.5, fontWeight: "700" },
 
   routeConnector: { flexDirection: "row", alignItems: "center", gap: 9, paddingLeft: 25, paddingRight: 12 },
@@ -651,7 +651,7 @@ const styles = StyleSheet.create({
   offerWaiting: { flexDirection: "row", alignItems: "center", gap: 9, backgroundColor: "#FFFFFF", borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", paddingHorizontal: 13, paddingVertical: 13 },
   offerWaitingText: { flex: 1, color: "#667085", fontSize: 12.5, lineHeight: 17 },
   offerCard: { backgroundColor: "#FFFFFF", borderRadius: 15, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", overflow: "hidden" },
-  offerHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", backgroundColor: "#E7F7F9", paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
+  offerHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", backgroundColor: "#F7EFE5", paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
   offerHeadLabel: { color: "#6B4600", fontSize: 11.5, fontWeight: "600", flex: 1 },
   offerHeadValue: { color: "#6B4600", fontSize: 14, fontWeight: "800" },
   offerBody: { padding: 14 },
@@ -662,7 +662,7 @@ const styles = StyleSheet.create({
   offerSuffix: { color: "#667085", fontSize: 14, fontWeight: "700" },
   suggestionRow: { flexDirection: "row", gap: 7, marginTop: 12 },
   suggestion: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 44, borderRadius: 9, borderWidth: 1, borderColor: "#E8ECF2", backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", gap: 1, paddingHorizontal: 4 },
-  suggestionActive: { borderColor: "#01A7BD", borderWidth: 1.5 },
+  suggestionActive: { borderColor: "#9A6201", borderWidth: 1.5 },
   suggestionAmount: { color: "#111111", fontSize: 13, fontWeight: "700" },
   suggestionAmountActive: { color: "#111111", fontWeight: "800" },
   suggestionNote: { color: "#667085", fontSize: 9.5 },
@@ -674,7 +674,7 @@ const styles = StyleSheet.create({
 
   pillRow: { flexDirection: "row", gap: 7 },
   pill: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 6, borderRadius: 10, borderWidth: 1, borderColor: "#E8ECF2", backgroundColor: "#FFFFFF" },
-  pillActive: { borderColor: "#01A7BD", borderWidth: 1.5, backgroundColor: "#E7F7F9" },
+  pillActive: { borderColor: "#9A6201", borderWidth: 1.5, backgroundColor: "#F7EFE5" },
   pillLabel: { color: "#344054", fontSize: 12.5, fontWeight: "600" },
   pillLabelActive: { color: "#111111", fontWeight: "800" },
   vehiclePill: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 46, alignItems: "center", justifyContent: "center", gap: 2, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1, borderColor: "#E8ECF2", backgroundColor: "#FFFFFF" },

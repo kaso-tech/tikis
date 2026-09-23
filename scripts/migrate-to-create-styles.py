@@ -13,7 +13,7 @@ import os
 HEX_TO_THEME = {
     '#FFFFFF': 'theme.surface',
     '#111111': 'theme.foreground',
-    '#01A7BD': 'theme.primary',
+    '#9A6201': 'theme.primary',
     '#9A6200': 'theme.warning',
     '#167A55': 'theme.success',
     '#176C52': 'theme.success',
@@ -27,7 +27,7 @@ HEX_TO_THEME = {
     '#5FC497': 'theme.success',
     '#E4B257': 'theme.warning',
     '#F28B93': 'theme.error',
-    '#01A7BD': 'theme.primary',  # dark mode primary
+    '#9A6201': 'theme.primary',  # dark mode primary
     '#22A6B8': 'theme.primary',  # dark mode primary alt
     '#FBF7F0': 'theme.foreground',  # dark mode foreground
     '#171108': 'theme.background',  # dark mode background

@@ -9,13 +9,14 @@ const webHomeSource = readFileSync(join(process.cwd(), "components/tikis/screens
 const deliverySource = readFileSync(join(process.cwd(), "app/delivery/[id].tsx"), "utf8");
 
 describe("palette des boutons", () => {
-  it("l'action principale est le seul aplat de la couleur de marque, et son texte y est sombre", () => {
-    // Le bouton existait en deux variantes, toutes deux sous le seuil lisible : fond blanc à texte
-    // orange (2,16:1) hors authentification, fond orange à texte blanc (2,16:1) dans le parcours de
-    // création de compte. Une seule palette désormais, et #111111 sur #01A7BD donne 6,53:1.
-    expect(buttonSource).toContain('primary: { background: "#01A7BD", foreground: "#111111", border: "#01A7BD" }');
-    expect(buttonSource).not.toContain('foreground: "#01A7BD"');
-    expect(buttonSource).not.toContain('foreground: "#FFFFFF"');
+  it("l'action principale est le seul aplat de la couleur de marque, et son texte y est lisible", () => {
+    // Le bouton existait en deux variantes, toutes deux sous le seuil lisible à l'époque de l'orange :
+    // fond blanc à texte orange (2,16:1) hors authentification, fond orange à texte blanc (2,16:1)
+    // dans le parcours de création de compte. Une seule palette désormais, et le brun étant sombre,
+    // c'est le blanc qui s'y pose : 5,10:1.
+    expect(buttonSource).toContain('primary: { background: "#9A6201", foreground: "#FFFFFF", border: "#9A6201" }');
+    // Ce qui ne doit jamais revenir : la couleur de marque en texte, quelle qu'elle soit.
+    expect(buttonSource).not.toContain('foreground: "#9A6201"');
   });
 
   it("n'a plus de variante réservée à l'authentification", () => {
@@ -29,9 +30,9 @@ describe("palette des boutons", () => {
 
   it("les actions écrites en toutes lettres se lisent en neutre, pas en orange pâle", () => {
     // Les cartes de l'accueil — « Trajet » côté expéditeur, « Registre » côté livreur — portaient
-    // leur libellé en #01A7BD sur fond blanc. La bordure suffit à marquer l'action.
+    // leur libellé en #9A6201 sur fond blanc. La bordure suffit à marquer l'action.
     for (const source of [nativeHomeSource, webHomeSource]) {
-      expect(source).toContain('backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#01A7BD"');
+      expect(source).toContain('backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#9A6201"');
       expect(source).toContain('tripCtaText: { fontSize: 12.5, fontWeight: "700", color: "#111111" }');
       expect(source).toContain('compactAction: { fontSize: 11.5, fontWeight: "700", color: "#111111" }');
     }

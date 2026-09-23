@@ -25,7 +25,7 @@ import { useThemeColors } from "@/lib/use-theme-colors";
 /** Le ton renvoyé par `deliveryCardTone`, traduit en couleur. La couleur reste
  *  ici : la logique de carte dit l'état, elle ne peint pas. */
 const TONE_COLOR: Record<ReturnType<typeof deliveryCardTone>, string> = {
-  open: "#01A7BD",
+  open: "#9A6201",
   assigned: "#A65300",
   active: "#176C52",
   done: "#667085",
@@ -496,8 +496,8 @@ export function HomeScreen() {
                   setIsManualRefreshing(false);
                 }
               }}
-              tintColor="#01A7BD"
-              colors={["#01A7BD"]}
+              tintColor="#9A6201"
+              colors={["#9A6201"]}
               progressBackgroundColor="#FFFFFF"
             />
           }
@@ -935,7 +935,7 @@ const styles = StyleSheet.create({
   mapRoad1: { top: "30%", left: "-10%", right: "-10%", height: 18, transform: [{ rotate: "-12deg" }] },
   mapRoad2: { top: "56%", left: "-20%", width: "80%", height: 14, transform: [{ rotate: "6deg" }] },
   mapRoad3: { top: "78%", left: "20%", right: "-10%", height: 12, transform: [{ rotate: "-4deg" }] },
-  routeLine: { position: "absolute", height: 3, backgroundColor: "#01A7BD", borderRadius: 2 } as any,
+  routeLine: { position: "absolute", height: 3, backgroundColor: "#9A6201", borderRadius: 2 } as any,
   approachLine: { position: "absolute", height: 3, backgroundColor: "#176C52", borderRadius: 2 } as any,
   // Les extrémités se posaient à des pourcentages fixes, sans rapport avec le
   // tracé calculé juste au-dessus : elles flottaient à côté de leur propre
@@ -944,7 +944,7 @@ const styles = StyleSheet.create({
   mapChip: { position: "absolute" },
 
   fab: { position: "absolute", right: 14, bottom: 440, width: 50, height: 50, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3", zIndex: 10 },
-  sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#01A7BD", alignItems: "center", justifyContent: "center" },
+  sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
 
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
@@ -961,7 +961,7 @@ const styles = StyleSheet.create({
   servicePillNeutral: { backgroundColor: "#F0F3F8", shadowOpacity: 0, elevation: 0 },
   serviceText: { color: "#667085", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
   serviceTextOffline: { color: "#111111" },
-  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#01A7BD" },
+  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9A6201" },
   onlineDotOffline: { backgroundColor: "#667085" },
 
   searchRow: { paddingTop: 10, paddingBottom: 6 },
@@ -976,12 +976,12 @@ const styles = StyleSheet.create({
   filterRow: { flexDirection: "row", gap: 6, paddingBottom: 10, alignItems: "center" },
   filterScroll: { flexGrow: 0 },
   chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#F0F3F8", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", gap: 6 },
-  chipActive: { backgroundColor: "#01A7BD14", borderColor: "#01A7BD", borderWidth: 1 },
+  chipActive: { backgroundColor: "#9A620114", borderColor: "#9A6201", borderWidth: 1 },
   chipText: { color: "#667085", fontSize: 11, fontWeight: "600" },
   chipTextActive: { color: "#111111" },
-  chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#01A7BD", alignItems: "center", justifyContent: "center" },
-  chipCountActive: { backgroundColor: "#01A7BD" },
-  chipCountText: { color: "#111111", fontSize: 10, fontWeight: "700", lineHeight: 12 },
+  chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
+  chipCountActive: { backgroundColor: "#9A6201" },
+  chipCountText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700", lineHeight: 12 },
   tabContent: { minHeight: 1 },
 
   scrollArea: { flex: 1, marginTop: 2 },
@@ -996,13 +996,13 @@ const styles = StyleSheet.create({
   cardPressed: { backgroundColor: "#E7ECF4" },
   // La sélection cerne la carte au lieu de la repeindre : la liste ne change plus
   // de couleur autour de l'élément choisi.
-  cardSelected: { borderColor: "#01A7BD", borderWidth: 1.5 },
+  cardSelected: { borderColor: "#9A6201", borderWidth: 1.5 },
   cardRail: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3 },
 
   cardTrip: { paddingVertical: 13, paddingLeft: 17, paddingRight: 14, gap: 11 },
   tripHead: { flexDirection: "row", alignItems: "flex-start", gap: 11 },
   tripRail: { width: 12, alignItems: "center", paddingTop: 5, alignSelf: "stretch" },
-  tripDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 2.5, borderColor: "#01A7BD" },
+  tripDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 2.5, borderColor: "#9A6201" },
   tripLine: { flex: 1, width: 1.5, minHeight: 16, backgroundColor: "#E3E3E3", marginVertical: 2 },
   tripPin: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#A43740" },
   tripStops: { flex: 1, minWidth: 0, gap: 10 },
@@ -1016,7 +1016,7 @@ const styles = StyleSheet.create({
   tripState: { fontWeight: "700" },
   tripFoot: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#E3E3E3" },
   tripGhost: { fontSize: 12.5, fontWeight: "600", color: "#667085" },
-  tripCta: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#01A7BD", minWidth: 96, alignItems: "center" },
+  tripCta: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#9A6201", minWidth: 96, alignItems: "center" },
   tripCtaText: { fontSize: 12.5, fontWeight: "700", color: "#111111" },
   tripCtaQuiet: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#A43740", minWidth: 96, alignItems: "center" },
   tripCtaQuietText: { fontSize: 12.5, fontWeight: "700", color: "#A43740" },

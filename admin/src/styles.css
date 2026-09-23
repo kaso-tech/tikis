@@ -1,17 +1,18 @@
 /* ============================================================
    Tikis Admin — design system (aligné sur theme.config.js)
-   Tokens : primary turquoise #01A7BD, fond #EEEDF3, surface #FFFFFF
+   Tokens : primary brun #9A6201, fond #EEEDF3, surface #FFFFFF
    Densité moyenne, sobre, sans ombre, hairline borders.
    ============================================================ */
 
 :root {
-  /* --primary remplit et borde ; il ne porte jamais de texte : #01A7BD sur blanc ne donne que 2,89:1.
-     --primary-ink est la même teinte assombrie jusqu'à devenir lisible (5,4:1 sur blanc, 4,9:1 sur la
-     teinte claire) — c'est elle que prennent les liens, les valeurs et les pastilles. */
-  --primary: #01A7BD;
-  --primary-ink: #017584;
-  --primary-soft: #E7F7F9;
-  --primary-hover: #018698;
+  /* --primary remplit et borde. Ce brun-ci tiendrait en texte sur blanc (5,10:1), contrairement à
+     l'orange et au turquoise qui l'ont précédé, mais il reste sous le seuil une fois posé sur la
+     teinte claire (4,47:1) — d'où --primary-ink, la même teinte un cran plus sombre : 6,04:1 sur
+     blanc, 5,30:1 sur la teinte. C'est elle que prennent les liens, les valeurs et les pastilles. */
+  --primary: #9A6201;
+  --primary-ink: #8A5800;
+  --primary-soft: #F7EFE5;
+  --primary-hover: #875600;
   --background: #EEEDF3;
   --surface: #FFFFFF;
   --surface-2: #FAF8F5;
@@ -78,7 +79,7 @@ a:hover { text-decoration: underline; }
 }
 .sidebar-brand-mark {
   width: 28px; height: 28px; border-radius: var(--radius-sm);
-  background: var(--primary); color: #111111;
+  background: var(--primary); color: #FFFFFF;
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 14px;
 }
@@ -293,7 +294,7 @@ a:hover { text-decoration: underline; }
   white-space: nowrap;
 }
 .btn:hover { background: var(--surface-2); }
-.btn-primary { background: var(--primary); border-color: var(--primary); color: #111111; }
+.btn-primary { background: var(--primary); border-color: var(--primary); color: #FFFFFF; }
 .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
 .btn-ghost { border-color: transparent; background: transparent; }
 .btn-ghost:hover { background: var(--surface-2); }
@@ -314,7 +315,7 @@ a:hover { text-decoration: underline; }
   outline: none;
   transition: border-color 120ms;
 }
-/* L'anneau de focus prend l'encre, pas l'aplat : à 2,89:1 il ne se voyait pas assez, WCAG en demande 3:1. */
+/* L'anneau de focus prend l'encre, un cran plus sombre que l'aplat : plus franc sur un champ blanc. */
 .input:focus, .select:focus, .textarea:focus { border-color: var(--primary-ink); }
 .input::placeholder { color: var(--muted); }
 .field-label { font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 4px; display: block; text-transform: uppercase; letter-spacing: 0.4px; }

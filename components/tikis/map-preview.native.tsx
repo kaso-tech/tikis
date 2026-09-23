@@ -46,7 +46,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate, 
             { latitude: pickup.latitude, longitude: pickup.longitude },
             { latitude: dropoff.latitude, longitude: dropoff.longitude },
           ]}
-          strokeColor="#01A7BD"
+          strokeColor="#9A6201"
           strokeWidth={3}
           lineCap="round"
         />
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#01A7BD",
+    backgroundColor: "#9A6201",
   },
   legendDotDropoff: {
     width: 8,

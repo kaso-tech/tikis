@@ -131,7 +131,7 @@ export function TikisDrawer() {
               accessibilityLabel="Activer le mode sombre"
               value={isDark}
               onValueChange={toggleDarkMode}
-              trackColor={{ false: "#E3E3E3", true: "#01A7BD" }}
+              trackColor={{ false: "#E3E3E3", true: "#9A6201" }}
               thumbColor={isDark ? "#FBF7F0" : "#FFFFFF"}
             />
           </View>
@@ -168,12 +168,12 @@ function DrawerRow({ item, active, onPress, isDark }: { item: DrawerItem; active
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.menuRow, active && styles.menuRowActive, isDark && styles.menuRowDark, active && isDark && styles.menuRowActiveDark, pressed && styles.pressed]}>
       <View style={[styles.menuIcon, active && styles.menuIconActive, isDark && !active && styles.menuIconDark]}>
-        <MaterialIcons name={item.icon} size={18} color={active ? "#111111" : "#667085"} />
+        <MaterialIcons name={item.icon} size={18} color={active ? "#FFFFFF" : "#667085"} />
       </View>
       <View style={styles.menuText}>
-        <Text style={[styles.menuTitle, active && styles.menuTitleActive, isDark && !active && styles.menuTitleDark]} numberOfLines={1}>{item.label}</Text>
+        <Text style={[styles.menuTitle, active && styles.menuTitleActive, active && isDark && styles.menuTitleActiveDark, isDark && !active && styles.menuTitleDark]} numberOfLines={1}>{item.label}</Text>
         {item.caption ? (
-          <Text style={[styles.menuCaption, active && styles.menuCaptionActive, isDark && !active && styles.menuCaptionDark]} numberOfLines={1}>{item.caption}</Text>
+          <Text style={[styles.menuCaption, active && styles.menuCaptionActive, active && isDark && styles.menuCaptionActiveDark, isDark && !active && styles.menuCaptionDark]} numberOfLines={1}>{item.caption}</Text>
         ) : null}
       </View>
       {item.badge && item.badge > 0 ? (
@@ -206,8 +206,8 @@ const styles = StyleSheet.create({
   profileName: { color: "#111111", fontSize: 15, fontWeight: "600" },
   profileNameDark: { color: "#FBF7F0" },
   rolePill: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
-  roleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#01A7BD" },
-  roleDotDark: { backgroundColor: "#01A7BD" },
+  roleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#9A6201" },
+  roleDotDark: { backgroundColor: "#D7A447" },
   roleLabel: { color: "#667085", fontSize: 11, fontWeight: "500" },
   roleLabelDark: { color: "#C8BCAA" },
   themeRow: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", gap: 10 },
@@ -223,16 +223,20 @@ const styles = StyleSheet.create({
   menuRow: { minHeight: 48, borderRadius: 8, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", gap: 9 },
   menuRowActive: { backgroundColor: "#111111" },
   menuRowDark: { backgroundColor: "transparent" },
-  menuRowActiveDark: { backgroundColor: "#01A7BD" },
+  menuRowActiveDark: { backgroundColor: "#D7A447" },
   menuIcon: { width: 32, height: 32, borderRadius: 7, alignItems: "center", justifyContent: "center", backgroundColor: "#F0F3F8" },
-  menuIconActive: { backgroundColor: "#01A7BD" },
+  menuIconActive: { backgroundColor: "#9A6201" },
   menuIconDark: { backgroundColor: "#231A10" },
   menuText: { flex: 1 },
   menuTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },
-  menuTitleActive: { color: "#111111" },
+  menuTitleActive: { color: "#FFFFFF" },
+  // La rangée active est noire en clair, dorée en sombre : son libellé ne peut pas être le même.
+  // #FFFFFF donne 18,88:1 sur le noir mais 2,26:1 sur l'or ; #111111 y donne 8,35:1.
+  menuTitleActiveDark: { color: "#111111" },
   menuTitleDark: { color: "#FBF7F0" },
   menuCaption: { color: "#667085", fontSize: 11, marginTop: 1 },
   menuCaptionActive: { color: "#C9C9C9" },
+  menuCaptionActiveDark: { color: "#3A2B1A" },
   menuCaptionDark: { color: "#C8BCAA" },
   menuBadge: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: "#A43740", paddingHorizontal: 5, alignItems: "center", justifyContent: "center" },
   menuBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "600" },
