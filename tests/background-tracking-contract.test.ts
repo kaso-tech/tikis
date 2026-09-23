@@ -68,4 +68,18 @@ describe("le suivi de position du livreur survit à l'arrière-plan", () => {
     expect(task).toContain("httpLink({");
     expect(task).not.toContain("httpBatchLink");
   });
+
+  it("un rejet GPS/géofence attendu ne journalise jamais en console.error (écran rouge LogBox pour rien)", () => {
+    const routers = read("server/routers.ts");
+    const constants = read("shared/const.ts");
+    // Les deux messages viennent d'une seule source partagée : server/routers.ts (qui les lève)
+    // et lib/background-location-task.ts (qui les compare) ne peuvent pas diverger silencieusement.
+    expect(constants).toContain("LIVE_POSITION_GPS_JUMP_ERR_MSG");
+    expect(constants).toContain("LIVE_POSITION_OUT_OF_ZONE_ERR_MSG");
+    expect(routers).toContain("throw new Error(LIVE_POSITION_GPS_JUMP_ERR_MSG)");
+    expect(routers).toContain("throw new Error(LIVE_POSITION_OUT_OF_ZONE_ERR_MSG)");
+    expect(task).toContain("cause instanceof TRPCClientError");
+    expect(task).toContain("cause.message === LIVE_POSITION_GPS_JUMP_ERR_MSG || cause.message === LIVE_POSITION_OUT_OF_ZONE_ERR_MSG");
+    expect(task).toContain('console.warn("[background-location] point ignoré"');
+  });
 });

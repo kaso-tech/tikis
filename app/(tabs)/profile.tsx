@@ -183,7 +183,7 @@ export default function ProfileScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top"]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         <View style={styles.header}>
@@ -556,7 +556,7 @@ function MenuRow({ icon, label, sub, tone = "default", onPress, last }: { icon: 
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#FAFAFA" },
+  safe: { flex: 1 },
   content: { paddingBottom: 32 },
 
   header: { backgroundColor: "#FFFFFF", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#E8ECF2", paddingHorizontal: 16, paddingTop: 14, paddingBottom: 14, gap: 13 },

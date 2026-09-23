@@ -10,8 +10,11 @@ import { describe, expect, it } from "vitest";
 // laissés en dépendance directe (et deux fichiers qui les importaient encore) après la migration SDK 57.
 describe("compatibilité expo-router / react-navigation (SDK 56+)", () => {
   it("aucun fichier de l'app n'importe @react-navigation/* directement", () => {
+    // Cherché uniquement dans le code exécuté par Metro — jamais tests/, sous peine que ce
+    // fichier-ci, qui nomme le paquet en toutes lettres dans ses propres commentaires, se
+    // signale lui-même.
     const output = execSync(
-      "git grep -l \"@react-navigation\" -- '*.ts' '*.tsx' ':!node_modules' || true",
+      "git grep -l \"@react-navigation\" -- app components lib hooks shared server || true",
       { cwd: process.cwd(), encoding: "utf8" },
     ).trim();
     expect(output).toBe("");

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { COOKIE_NAME } from "../shared/const";
+import { COOKIE_NAME, LIVE_POSITION_GPS_JUMP_ERR_MSG, LIVE_POSITION_OUT_OF_ZONE_ERR_MSG } from "../shared/const";
 import type { DriverCandidate } from "../shared/tikis-domain";
 import { randomInt, randomUUID } from "node:crypto";
 import * as db from "./db";
@@ -619,7 +619,7 @@ export const appRouter = router({
       if (profile.accountType !== "driver") throw new Error("Seul le livreur assigné peut partager sa position.");
       const countryCode = profile.country ?? findCountryForPhone(profile.phone).id;
       if (!isCoordinateInCountry(input.latitude, input.longitude, countryCode)) {
-        throw new Error("La position partagée est en dehors de la zone de service. Vérifie ton GPS.");
+        throw new Error(LIVE_POSITION_OUT_OF_ZONE_ERR_MSG);
       }
       const previous = await db.getTikisDeliveryLiveLocation(input.deliveryId);
       if (previous) {
@@ -627,7 +627,7 @@ export const appRouter = router({
         const elapsedSec = (Date.now() - new Date(previous.recordedAt).getTime()) / 1000;
         const maxAllowedKm = Math.max(0.05, 0.055 * Math.max(elapsedSec, 1));
         if (distanceKm > maxAllowedKm) {
-          throw new Error("Le saut de position détecté est trop important. Vérifie ta connexion GPS et réessaie.");
+          throw new Error(LIVE_POSITION_GPS_JUMP_ERR_MSG);
         }
       }
       const position = await db.saveTikisDeliveryLiveLocation({ ...input, driverPhone: profile.phone });

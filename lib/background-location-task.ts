@@ -22,12 +22,13 @@ import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
-import { createTRPCClient, httpLink } from "@trpc/client";
+import { createTRPCClient, httpLink, TRPCClientError } from "@trpc/client";
 import superjson from "superjson";
 import type { AppRouter } from "@/server/routers";
 import { getApiBaseUrl } from "@/constants/oauth";
 import { getTikisSessionToken } from "@/lib/tikis-session";
 import { safeHeading } from "@/lib/background-location-rules";
+import { LIVE_POSITION_GPS_JUMP_ERR_MSG, LIVE_POSITION_OUT_OF_ZONE_ERR_MSG } from "@/shared/const";
 
 export const BACKGROUND_DRIVER_LOCATION_TASK = "tikis-driver-background-location";
 const ACTIVE_DELIVERY_STORAGE_KEY = "tikis:background-tracking:active-delivery-id";
@@ -70,7 +71,13 @@ if (Platform.OS !== "web") {
     } catch (cause) {
       // Best-effort : le premier plan reste la source de réactivité principale une fois
       // l'application rouverte, et le prochain réveil de la tâche retentera de lui-même.
-      console.error("[background-location] publication échouée", cause);
+      // Un rejet GPS/géofence est un résultat attendu de la cadence grossière du suivi en
+      // arrière-plan (dérive GPS, point resté hors zone) — pas une panne, donc pas de
+      // console.error qui déclencherait l'écran rouge de LogBox pour rien.
+      const isExpectedRejection = cause instanceof TRPCClientError
+        && (cause.message === LIVE_POSITION_GPS_JUMP_ERR_MSG || cause.message === LIVE_POSITION_OUT_OF_ZONE_ERR_MSG);
+      if (isExpectedRejection) console.warn("[background-location] point ignoré", cause.message);
+      else console.error("[background-location] publication échouée", cause);
     }
   });
 }
