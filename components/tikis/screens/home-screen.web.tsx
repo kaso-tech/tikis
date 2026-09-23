@@ -14,7 +14,7 @@ import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
 import { formatDistanceKm, formatDeliveryCreationDate } from "@/lib/date-format";
 import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
 import { ActionConfirmationModal } from "@/components/tikis/action-confirmation-modal";
-import { availableWalletBalance, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus } from "@/shared/tikis-domain";
+import { availableWalletBalance, isPickupPending, commissionFor, formatMoney, isDeliveryCompletedToday, isDeliveryCompletedWithinLast24Hours, type Delivery, type DeliveryStatus } from "@/shared/tikis-domain";
 import { resolveDriverHomeAction, resolveSenderHomeAction, senderHomeActionLabel } from "@/shared/delivery-home-action";
 import { sortDriverOpportunities } from "@/shared/driver-opportunities";
 import { deliveryCardContext, deliveryCardSignal, deliveryCardStateLabel, deliveryCardTone } from "@/lib/delivery-card";
@@ -643,7 +643,9 @@ export function HomeScreen() {
 }
 
 function MapBackground({ selected, role, driverPosition, driverHeading }: { selected: Delivery | null | undefined; role: "sender" | "driver"; driverPosition: { latitude: number; longitude: number } | null; driverHeading: number | null }) {
-  const hasDriver = Boolean(selected?.status === "active" && driverPosition);
+  // Même règle que l'accueil natif : le livreur voit son approche — et donc sa position — dès qu'une
+  // course attend sa collecte ; l'expéditeur, seulement pendant la course.
+  const showsApproach = role === "driver" ? isPickupPending(selected?.status) : selected?.status === "active";
   const pickup = selected?.pickup;
   const dropoff = selected?.dropoff;
   const routeLine = useMemo(() => {
@@ -668,7 +670,7 @@ function MapBackground({ selected, role, driverPosition, driverHeading }: { sele
     return { left: projection.originX, top: projection.originY, length, angle };
   }, [pickup, dropoff]);
   const approachLine = useMemo(() => {
-    if (!pickup || !driverPosition || selected?.status !== "active") return null;
+    if (!pickup || !driverPosition || !showsApproach) return null;
     const points = [driverPosition, pickup, ...(dropoff ? [dropoff] : [])];
     const minLat = Math.min(...points.map((point) => point.latitude));
     const maxLat = Math.max(...points.map((point) => point.latitude));
@@ -680,7 +682,7 @@ function MapBackground({ selected, role, driverPosition, driverHeading }: { sele
     const dx = projection.x - projection.originX;
     const dy = projection.y - projection.originY;
     return { left: projection.originX, top: projection.originY, length: Math.max(1, Math.hypot(dx, dy)), angle: (Math.atan2(dy, dx) * 180) / Math.PI };
-  }, [driverPosition, dropoff, pickup, selected?.status]);
+  }, [driverPosition, dropoff, pickup, showsApproach]);
 
   return (
     <View style={styles.mapBg} pointerEvents="none">
@@ -739,7 +741,7 @@ function MapBackground({ selected, role, driverPosition, driverHeading }: { sele
           </View>
         </>
       ) : null}
-      {hasDriver && approachLine ? (
+      {approachLine ? (
         <View style={[styles.mapChip, { left: approachLine.left - 22, top: approachLine.top - 22 }]}>
           <DriverMarker heading={driverHeading} />
         </View>

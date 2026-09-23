@@ -688,7 +688,6 @@ function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeadin
   const pickup = selected?.pickup;
   const dropoff = selected?.dropoff;
   const selectedDeliveryStatus = selected?.status;
-  const hasDriver = Boolean(selected?.status === "active" && driverPosition);
   const { coordinates: routeCoordinates } = useRouteCoordinates(pickup, dropoff);
   /**
    * L'approche livreur → récupération.
@@ -699,6 +698,14 @@ function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeadin
    * cours, seul moment où la position d'un livreur le concerne.
    */
   const showsApproach = role === "driver" ? isPickupPending(selectedDeliveryStatus) : selectedDeliveryStatus === "active";
+  /**
+   * Le marqueur du livreur. Côté livreur, c'est sa propre position : elle s'affiche dès qu'elle est
+   * connue, puisque c'est d'elle que part l'approche. Elle n'apparaissait qu'une fois la course active,
+   * et le point « Votre position » seulement sans course sélectionnée — sur une course ouverte ou à
+   * confirmer, le cas courant, la ligne verte partait donc d'un point que rien ne marquait.
+   * Côté expéditeur, la position du livreur ne le concerne que pendant la course.
+   */
+  const showsDriverMarker = Boolean(driverPosition) && (role === "driver" || selectedDeliveryStatus === "active");
   const approachCoordinates = useApproachRoute({ from: driverPosition, to: pickup, enabled: showsApproach });
   const region = useMemo(() => {
     if (!selected) return { latitude: 5.3599, longitude: -4.0083, latitudeDelta: 0.12, longitudeDelta: 0.12 };
@@ -803,7 +810,7 @@ function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeadin
             <TrackedMarker key={`dropoff-${selected.id}`} coordinate={{ latitude: selected.dropoff.latitude, longitude: selected.dropoff.longitude }} anchor={PIN_ANCHOR} zIndex={MAP_Z.pin}>
               <DropoffMarker />
             </TrackedMarker>
-            {hasDriver && driverPosition ? (
+            {showsDriverMarker && driverPosition ? (
               <TrackedMarker key="driver-position" coordinate={driverPosition} anchor={CHIP_ANCHOR} zIndex={MAP_Z.driver} redrawKey={driverHeading ?? "no-heading"}>
                 <DriverMarker heading={driverHeading} />
               </TrackedMarker>

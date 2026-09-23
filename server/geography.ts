@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { normalizeLocation, sanitizePlaceText } from "../lib/geo-rules";
+import { geodesicDistanceKm, normalizeLocation, sanitizePlaceText } from "../lib/geo-rules";
 import { COUNTRIES } from "../lib/registration-rules";
 import { countryNameMatches, isoCountry } from "../shared/iso-countries";
 import type { LocationLabel, PlaceSuggestion } from "../shared/tikis-domain";
@@ -488,6 +488,42 @@ export async function geocodeAddress(address: string, countryCode?: string) {
   } catch (cause) { recordGeographicMetric("forward", "failure", Date.now() - startedAt); throw cause; }
 }
 
+/**
+ * Raccorde un tracé routier aux points réellement demandés.
+ *
+ * Mapbox accroche chaque extrémité à la route la plus proche sur laquelle il sait circuler, et c'est là
+ * que commence et finit sa géométrie. Quand un point de collecte se trouve dans un quartier dont les rues
+ * ne figurent pas dans ce réseau — pistes non revêtues, fréquentes au Burkina Faso —, le tracé s'arrête sur
+ * l'axe praticable le plus proche, parfois la route principale du centre, loin de l'épingle. Le livreur
+ * voyait alors son itinéraire finir au milieu de la ville au lieu du point de collecte.
+ *
+ * On ajoute le point demandé au bout du tracé dès que l'écart dépasse la tolérance, pour que la ligne
+ * rejoigne toujours l'épingle. La distance de l'itinéraire, elle, n'est pas modifiée : c'est la distance
+ * routière calculée par Mapbox, sur laquelle repose le prix.
+ */
+export const ROUTE_ENDPOINT_TOLERANCE_METERS = 30;
+/** Au-delà, l'écart n'est plus une imprécision mais un vrai raccord : il est signalé dans les journaux. */
+export const ROUTE_ENDPOINT_WARN_METERS = 300;
+
+type RoutePoint = { latitude: number; longitude: number };
+
+export function bridgeRouteEndpoints(coordinates: RoutePoint[], origin: RoutePoint, destination: RoutePoint) {
+  if (coordinates.length === 0) return { coordinates, startGapMeters: 0, endGapMeters: 0 };
+  const startGapMeters = Math.round(geodesicDistanceKm(coordinates[0], origin) * 1000);
+  const endGapMeters = Math.round(geodesicDistanceKm(coordinates[coordinates.length - 1], destination) * 1000);
+  const start = { latitude: origin.latitude, longitude: origin.longitude };
+  const end = { latitude: destination.latitude, longitude: destination.longitude };
+  return {
+    coordinates: [
+      ...(startGapMeters > ROUTE_ENDPOINT_TOLERANCE_METERS ? [start] : []),
+      ...coordinates,
+      ...(endGapMeters > ROUTE_ENDPOINT_TOLERANCE_METERS ? [end] : []),
+    ],
+    startGapMeters,
+    endGapMeters,
+  };
+}
+
 export async function computeRoute(origin: LocationLabel, destination: LocationLabel) {
   const cacheKey = routeCacheKey(origin, destination);
   const cached = readCache(routeCache, cacheKey);
@@ -506,7 +542,12 @@ export async function computeRoute(origin: LocationLabel, destination: LocationL
     const coordinates = Array.isArray(route.geometry?.coordinates)
       ? route.geometry.coordinates.flatMap((value) => Array.isArray(value) && value.length >= 2 && Number.isFinite(Number(value[0])) && Number.isFinite(Number(value[1])) ? [{ latitude: Number(value[1]), longitude: Number(value[0]) }] : [])
       : [];
-    const result = { distanceKm: route.distance / 1000, durationMinutes: Math.max(1, Math.round((route.duration ?? 0) / 60)), coordinates };
+    const bridged = bridgeRouteEndpoints(coordinates, origin, destination);
+    // Seulement les écarts, jamais les coordonnées : elles désignent un domicile ou la position d'un livreur.
+    if (Math.max(bridged.startGapMeters, bridged.endGapMeters) > ROUTE_ENDPOINT_WARN_METERS) {
+      console.warn("[route] extrémité hors réseau routier, raccordée", { departM: bridged.startGapMeters, arriveeM: bridged.endGapMeters });
+    }
+    const result = { distanceKm: route.distance / 1000, durationMinutes: Math.max(1, Math.round((route.duration ?? 0) / 60)), coordinates: bridged.coordinates };
     writeCache(routeCache, cacheKey, result, ROUTE_CACHE_TTL_MS);
     recordGeographicMetric("route", "success", Date.now() - startedAt);
     return result;
