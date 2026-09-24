@@ -5,6 +5,7 @@ import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleShee
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
+import { WalletDirectDepositScreen } from "@/components/tikis/wallet-direct-deposit";
 import { offeredPriceError, parseOfferedPrice, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
 import { useTikisStore } from "@/lib/tikis-store";
 import { trpc } from "@/lib/trpc";
@@ -46,6 +47,7 @@ export default function WalletScreen() {
   const settleMutation = trpc.wallet.settleYengaPayTest.useMutation();
   const [requestType, setRequestType] = useState<"deposit" | "withdrawal" | null>(null);
   const [amountInput, setAmountInput] = useState("");
+  const [directModalVisible, setDirectModalVisible] = useState(false);
   const [requestError, setRequestError] = useState("");
   const [paymentNotice, setPaymentNotice] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -165,11 +167,18 @@ export default function WalletScreen() {
         </View>
 
         <View style={styles.actionsRow}>
-          <Pressable onPress={() => openRequest("deposit")} style={({ pressed }) => [styles.actionCardFull, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]}>
+          <Pressable onPress={() => openRequest("deposit")} style={({ pressed }) => [styles.actionCard, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]}>
             <View style={[styles.actionIcon, { backgroundColor: theme.background }]}><MaterialIcons name="add-card" size={15} color={theme.primary} /></View>
             <View style={styles.actionText}>
-              <Text style={[styles.actionLabel, { color: theme.foreground }]}>Recharger mon compte</Text>
+              <Text style={[styles.actionLabel, { color: theme.foreground }]}>Recharger</Text>
               <Text style={[styles.actionSub, { color: theme.muted }]}>YengaPay sécurisé</Text>
+            </View>
+          </Pressable>
+          <Pressable onPress={() => setDirectModalVisible(true)} style={({ pressed }) => [styles.actionCard, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]}>
+            <View style={[styles.actionIcon, { backgroundColor: theme.background }]}><MaterialIcons name="phone-iphone" size={15} color={theme.primary} /></View>
+            <View style={styles.actionText}>
+              <Text style={[styles.actionLabel, { color: theme.foreground }]}>Dépôt direct</Text>
+              <Text style={[styles.actionSub, { color: theme.muted }]}>Mobile Money in-app</Text>
             </View>
           </Pressable>
         </View>
@@ -267,6 +276,12 @@ export default function WalletScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <WalletDirectDepositScreen
+        visible={directModalVisible}
+        onClose={() => setDirectModalVisible(false)}
+        onSuccess={() => { void utilities.wallet.snapshot.invalidate(); }}
+      />
     </SafeAreaView>
   );
 }
