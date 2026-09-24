@@ -79,7 +79,7 @@ function generateTestReference(prefix: string) {
   return `${prefix}_test_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function asNonEmptyString(value: unknown) {
+export function asNonEmptyString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 

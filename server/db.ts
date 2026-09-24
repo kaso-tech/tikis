@@ -1033,8 +1033,8 @@ function paymentTransactionToDirectDeposit(record: typeof tikisPaymentTransactio
   };
 }
 
-/** Crée un record de paiement direct (mode test : pas d'appel YengaPay). */
-export async function recordDirectDepositTestIntent(input: {
+/** Crée un record de paiement direct, sans créditer le Wallet avant confirmation PSP. */
+export async function recordDirectDepositIntent(input: {
   transactionId: string;
   profilePhone: string;
   amount: number;
@@ -1044,10 +1044,11 @@ export async function recordDirectDepositTestIntent(input: {
   ussdCode: string;
   expiresAt: string;
   providerReference?: string;
+  mode?: "test" | "sandbox" | "live";
 }) {
   const db = await getDb();
   if (!db) throw new Error("Le paiement direct est temporairement indisponible.");
-  const providerName = "yengapay_direct_test" as const;
+  const providerName = input.mode === "sandbox" ? "yengapay_direct_sandbox" as const : input.mode === "live" ? "yengapay_direct_live" as const : "yengapay_direct_test" as const;
   await db.insert(tikisPaymentTransactions).values({
     id: input.transactionId,
     profilePhone: input.profilePhone,
@@ -1066,6 +1067,9 @@ export async function recordDirectDepositTestIntent(input: {
     idempotencyKey: `direct:${input.profilePhone}:${input.transactionId}`,
   });
 }
+
+/** @deprecated Utiliser recordDirectDepositIntent avec un mode explicite. */
+export const recordDirectDepositTestIntent = recordDirectDepositIntent;
 
 /** Lit le record d'un paiement direct par transactionId. */
 export async function getDirectDepositIntent(transactionId: string, profilePhone: string): Promise<DirectDepositRecord | null> {
@@ -1121,8 +1125,8 @@ export async function refuseTikisWalletDepositRequest(input: { profilePhone: str
 type YengaPayTestPaymentView = { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; checkoutUrl?: string; mode: "test" | "sandbox" | "live"; createdAt: string; settledAt?: string };
 type YengaPayTestPaymentSettlement = { payment: YengaPayTestPaymentView; wallet: WalletSnapshot };
 
-function yengaPayTestPaymentToView(payment: { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; provider: "ligdi_simulated" | "yengapay_test" | "yengapay_sandbox" | "yengapay_live"; providerReference: string; checkoutUrl: string | null; createdAt: Date; settledAt: Date | null }): YengaPayTestPaymentView {
-  const mode = payment.provider === "yengapay_sandbox" ? "sandbox" : payment.provider === "yengapay_live" ? "live" : "test";
+function yengaPayTestPaymentToView(payment: { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; provider: "ligdi_simulated" | "yengapay_test" | "yengapay_sandbox" | "yengapay_live" | "yengapay_direct_test" | "yengapay_direct_sandbox" | "yengapay_direct_live"; providerReference: string; checkoutUrl: string | null; createdAt: Date; settledAt: Date | null }): YengaPayTestPaymentView {
+  const mode = payment.provider.endsWith("_sandbox") ? "sandbox" : payment.provider.endsWith("_live") ? "live" : "test";
   return { id: payment.id, type: payment.type, amount: payment.amount, status: payment.status, providerReference: payment.providerReference, mode, ...(payment.checkoutUrl ? { checkoutUrl: payment.checkoutUrl } : {}), createdAt: payment.createdAt.toISOString(), ...(payment.settledAt ? { settledAt: payment.settledAt.toISOString() } : {}) };
 }
 

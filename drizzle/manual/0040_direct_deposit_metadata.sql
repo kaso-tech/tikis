@@ -8,6 +8,9 @@
 -- Cette migration est idempotente (IF NOT EXISTS sur les colonnes / indexes).
 
 ALTER TABLE `tikis_payment_transactions`
+  MODIFY COLUMN `provider` enum('ligdi_simulated','yengapay_test','yengapay_sandbox','yengapay_live','yengapay_direct_test','yengapay_direct_sandbox','yengapay_direct_live') NOT NULL DEFAULT 'yengapay_test';
+
+ALTER TABLE `tikis_payment_transactions`
   ADD COLUMN IF NOT EXISTS `ussdCode` varchar(64) DEFAULT NULL AFTER `checkoutUrl`,
   ADD COLUMN IF NOT EXISTS `phoneE164` varchar(24) DEFAULT NULL AFTER `ussdCode`,
   ADD COLUMN IF NOT EXISTS `operatorCode` varchar(16) DEFAULT NULL AFTER `phoneE164`,

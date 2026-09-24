@@ -102,16 +102,11 @@ function isPublicPlaceName(location: LocationPresentation) {
  */
 function localPart(location: LocationPresentation) {
   if (isPublicPlaceName(location)) return location.name;
-  return location.district || location.street || (!isGenericName(location) ? location.name : undefined) || location.city || location.province || location.formattedAddress || "Lieu sélectionné";
+  return location.district || location.street || (!isGenericName(location) ? location.name : undefined) || location.city || location.province || location.formattedAddress || "Point sélectionné";
 }
 
 export function locationTitle(location: LocationPresentation) {
-  // Quand le nom du lieu est generique (vide, egal a la ville, ou egal au label "Point
-  // selectionne" pose par le serveur de reverse geocoding en absence de POI precis), on veut
-  // afficher la precision la plus fine disponible. On delegue a localPart() qui applique la
-  // priorite : quartier > rue > ville > region > adresse formatee. Cela permet d'afficher le
-  // nom du quartier quand il existe, plutot que la ville ou le label technique du serveur.
-  // On ne touche pas a la branche "nom precis" : isPublicPlaceName() gere deja les POI.
+  if (location.name && samePart(location.name, location.city) && !location.district && !location.street) return "Point sélectionné";
   return localPart(location);
 }
 

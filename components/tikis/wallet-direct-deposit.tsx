@@ -1,7 +1,7 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import * as Linking from "expo-linking";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { COUNTRIES, countryFlagEmoji, type CountrySpec } from "@/lib/registration-rules";
@@ -79,6 +79,23 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess }: { vis
   );
   const settleTestMutation = trpc.wallet.settleDirectDepositTest.useMutation();
 
+  const resetForm = useCallback(() => {
+    setStage("form");
+    setAmount("2500");
+    setPhoneLocal("");
+    setOtpDigits(["", "", "", "", "", ""]);
+    setSubmitError("");
+    setPollError("");
+    setDeposit(null);
+    setOperator("orange_money");
+    setCountryIndex(0);
+    setSecondsLeft(POLL_TIMEOUT_MS / 1000);
+  }, []);
+  const closeModal = useCallback(() => {
+    resetForm();
+    onClose();
+  }, [onClose, resetForm]);
+
   // ===== Soumission =====
   const onSubmit = useCallback(async () => {
     setSubmitError("");
@@ -106,9 +123,12 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess }: { vis
     if (stage !== "pending" || !deposit) return;
     const data = statusQuery.data;
     if (!data) return;
-    if (data.status === "succeeded") { setStage("success"); onSuccess?.(); }
-    else if (data.status === "failed" || data.status === "cancelled") setStage("failed");
-    else if (data.status === "expired") setStage("failed");
+    if (data.status === "pending") return;
+    const transition = setTimeout(() => {
+      if (data.status === "succeeded") { setStage("success"); onSuccess?.(); }
+      else setStage("failed");
+    }, 0);
+    return () => clearTimeout(transition);
   }, [statusQuery.data, stage, deposit, onSuccess]);
 
   useEffect(() => {
@@ -119,23 +139,12 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess }: { vis
 
   useEffect(() => {
     if (stage !== "pending") return;
-    if (secondsLeft <= 0) { setStage("failed"); setPollError("La demande a expiré avant confirmation."); }
+    const expiration = setTimeout(() => {
+      setStage("failed");
+      setPollError("La demande a expiré avant confirmation.");
+    }, Math.max(0, secondsLeft) * 1000);
+    return () => clearTimeout(expiration);
   }, [secondsLeft, stage]);
-
-  useEffect(() => {
-    if (!visible) {
-      // reset quand on ferme
-      setStage("form");
-      setAmount("2500");
-      setPhoneLocal("");
-      setOtpDigits(["", "", "", "", "", ""]);
-      setSubmitError("");
-      setPollError("");
-      setDeposit(null);
-      setOperator("orange_money");
-      setCountryIndex(0);
-    }
-  }, [visible]);
 
   // ===== Téléphone : USSD =====
   const onCallUSSD = useCallback(async () => {
@@ -201,10 +210,10 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess }: { vis
   // ===== Render =====
   if (!visible) return null;
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={visible} animationType="slide" onRequestClose={closeModal} statusBarTranslucent>
       <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
         <View style={[styles.header, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onClose} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={closeModal} style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}>
             <MaterialIcons name="close" size={20} color={theme.foreground} />
           </Pressable>
           <View style={{ flex: 1 }}>
@@ -252,11 +261,11 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess }: { vis
         ) : null}
 
         {stage === "success" && deposit ? (
-          <SuccessStage theme={theme} styles={styles} deposit={deposit} onClose={onClose} />
+          <SuccessStage theme={theme} styles={styles} deposit={deposit} onClose={closeModal} />
         ) : null}
 
         {stage === "failed" ? (
-          <FailedStage theme={theme} styles={styles} message={pollError || "Le paiement n'a pas pu être confirmé."} onRetry={() => setStage("form")} onClose={onClose} />
+          <FailedStage theme={theme} styles={styles} message={pollError || "Le paiement n'a pas pu être confirmé."} onRetry={() => setStage("form")} onClose={closeModal} />
         ) : null}
       </SafeAreaView>
     </Modal>
@@ -394,7 +403,7 @@ function PendingStage(props: {
         <Text style={[styles.label, { color: theme.muted, marginBottom: 10 }]}>CODE USSD À COMPOSER</Text>
         <Text style={[styles.ussdCode, { color: theme.foreground }]}>{formatUSSDForDisplay(deposit.ussdCode)}</Text>
         <TikisButton label="Appeler maintenant" icon="phone" onPress={onCallUSSD} style={{ marginTop: 14 }} />
-        <Text style={[styles.ussdHint, { color: theme.muted }]}>L'application téléphone s'ouvre avec le code pré-rempli. Validez avec votre code secret {buildOtpLabel(deposit.operator)}.</Text>
+        <Text style={[styles.ussdHint, { color: theme.muted }]}>{"L'application téléphone s'ouvre avec le code pré-rempli. Validez avec votre code secret "}{buildOtpLabel(deposit.operator)}.</Text>
       </View>
 
       <Text style={[styles.label, { color: theme.muted, marginTop: 22, marginBottom: 10 }]}>CODE OTP REÇU PAR SMS (optionnel)</Text>
@@ -449,10 +458,10 @@ function SuccessStage(props: { theme: ReturnType<typeof useThemeColors>["colors"
       <Text style={[styles.centerTitle, { color: theme.foreground }]}>Dépôt réussi</Text>
       <Text style={[styles.centerSubtitle, { color: theme.muted }]}>Votre Wallet Tikis a été crédité. Vous pouvez maintenant utiliser ce solde pour vos livraisons.</Text>
       <View style={[styles.recap, { backgroundColor: theme.background }]}>
-        <RecapRow theme={theme} label="Opérateur" value={buildOtpLabel(deposit.operator)} />
-        <RecapRow theme={theme} label="Numéro" value={deposit.phone} />
-        <RecapRow theme={theme} label="Montant" value={`${deposit.amount.toLocaleString("fr-FR")} FCFA`} />
-        <RecapRow theme={theme} label="Référence" value={deposit.providerReference} />
+        <RecapRow theme={theme} styles={styles} label="Opérateur" value={buildOtpLabel(deposit.operator)} />
+        <RecapRow theme={theme} styles={styles} label="Numéro" value={deposit.phone} />
+        <RecapRow theme={theme} styles={styles} label="Montant" value={`${deposit.amount.toLocaleString("fr-FR")} FCFA`} />
+        <RecapRow theme={theme} styles={styles} label="Référence" value={deposit.providerReference} />
       </View>
       <TikisButton label="Terminer" icon="check" onPress={onClose} style={styles.cta} />
     </View>
@@ -476,11 +485,11 @@ function FailedStage(props: { theme: ReturnType<typeof useThemeColors>["colors"]
   );
 }
 
-function RecapRow(props: { theme: ReturnType<typeof useThemeColors>["colors"]; label: string; value: string }) {
+function RecapRow(props: { theme: ReturnType<typeof useThemeColors>["colors"]; styles: ReturnType<typeof makeStyles>; label: string; value: string }) {
   return (
-    <View style={styles.recapRow}>
-      <Text style={[styles.recapLabel, { color: props.theme.muted }]}>{props.label}</Text>
-      <Text style={[styles.recapValue, { color: props.theme.foreground }]}>{props.value}</Text>
+    <View style={props.styles.recapRow}>
+      <Text style={[props.styles.recapLabel, { color: props.theme.muted }]}>{props.label}</Text>
+      <Text style={[props.styles.recapValue, { color: props.theme.foreground }]}>{props.value}</Text>
     </View>
   );
 }

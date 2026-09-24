@@ -63,7 +63,7 @@ export async function createYengapayDirectDeposit(input: YengapayDirectDepositRe
 
   if (config.mode === "test") {
     // Mode test : pas d'appel YengaPay. On stocke un record factice pour le polling.
-    await db.recordDirectDepositTestIntent({
+    await db.recordDirectDepositIntent({
       transactionId,
       profilePhone: input.profilePhone,
       amount: input.amount,
@@ -72,6 +72,7 @@ export async function createYengapayDirectDeposit(input: YengapayDirectDepositRe
       countryCode: input.countryCode,
       ussdCode,
       expiresAt,
+      mode: "test",
     });
     return {
       transactionId,
@@ -127,7 +128,7 @@ export async function createYengapayDirectDeposit(input: YengapayDirectDepositRe
   const providerReference = asNonEmptyString(data.paymentIntentId) ?? asNonEmptyString(data.id) ?? asNonEmptyString(data.reference);
   if (!providerReference) throw new Error("YengaPay n'a pas retourné d'identifiant de paiement.");
 
-  await db.recordDirectDepositTestIntent({
+  await db.recordDirectDepositIntent({
     transactionId,
     profilePhone: input.profilePhone,
     amount: input.amount,
@@ -137,6 +138,7 @@ export async function createYengapayDirectDeposit(input: YengapayDirectDepositRe
     ussdCode,
     expiresAt,
     providerReference,
+    mode: config.mode,
   });
 
   return {
@@ -216,11 +218,9 @@ export async function getYengapayDirectDepositStatus(input: { profilePhone: stri
   else if (["FAILED", "FAIL", "DECLINED", "REJECTED"].includes(remoteStatus)) normalized = "failed";
   else if (["CANCELLED", "CANCELED", "EXPIRED"].includes(remoteStatus)) normalized = "cancelled";
 
-  if (normalized === "succeeded" && stored.status !== "succeeded") {
-    await db.settleDirectDeposit({ transactionId: input.transactionId, status: "succeeded" });
+  if (normalized === "succeeded") {
     await db.settleTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
-  } else if (normalized === "failed" && stored.status !== "failed") {
-    await db.settleDirectDeposit({ transactionId: input.transactionId, status: "failed" });
+  } else if (normalized === "failed") {
     await db.refuseTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
   }
 
@@ -239,7 +239,6 @@ export async function getYengapayDirectDepositStatus(input: { profilePhone: stri
 
 /** Permet de simuler manuellement succès/échec en mode test. */
 export async function settleYengapayDirectDepositTest(input: { profilePhone: string; transactionId: string; outcome: "succeeded" | "failed" }): Promise<YengapayDirectDeposit> {
-  await db.settleDirectDeposit({ transactionId: input.transactionId, status: input.outcome });
   if (input.outcome === "succeeded") {
     await db.settleTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
   } else {
