@@ -7,6 +7,7 @@ import MapView from "react-native-maps";
 import { TikisButton } from "@/components/tikis/ui";
 import { SaveAddressDialog } from "@/components/tikis/save-address-dialog";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
+import { useThemeColors } from "@/lib/use-theme-colors";
 import { useSearchLocationBias } from "@/hooks/use-search-location-bias";
 import { trpc } from "@/lib/trpc";
 import type { LocationLabel } from "@/shared/tikis-domain";
@@ -49,6 +50,7 @@ export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, 
   const [saveDialogVisible, setSaveDialogVisible] = useState(false);
   const [expoGoFallbackCoord, setExpoGoFallbackCoord] = useState<Coordinate | null>(null);
   const reverse = trpc.geography.reverse.useMutation();
+  const { colors } = useThemeColors();
   const { status: gpsStatus, requestBias } = useSearchLocationBias();
   const expoGoMode = isRunningInExpoGo();
 
@@ -128,7 +130,7 @@ export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, 
   return <Modal visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent><View style={styles.screen}>
     {expoGoMode ? (
       <View style={styles.expoGoFallback}>
-        <MaterialIcons name="map" size={48} color="#9A6201" />
+        <MaterialIcons name="map" size={48} color={colors.primary} />
         <Text style={styles.expoGoTitle}>Carte indisponible dans Expo Go</Text>
         <Text style={styles.expoGoSubtitle}>
           {expoGoFallbackCoord ? `${expoGoFallbackCoord.latitude.toFixed(5)}, ${expoGoFallbackCoord.longitude.toFixed(5)}` : "Ajustez le point avec les flèches"}
