@@ -112,7 +112,6 @@ export function locationTitle(location: LocationPresentation) {
   // priorite : quartier > rue > ville > region > adresse formatee. Cela permet d'afficher le
   // nom du quartier quand il existe, plutot que la ville ou le label technique du serveur.
   // On ne touche pas a la branche "nom precis" : isPublicPlaceName() gere deja les POI.
-  if (isGenericName(location) && !location.street && !location.district && location.city) return "Point sélectionné";
   return localPart(location);
 }
 
