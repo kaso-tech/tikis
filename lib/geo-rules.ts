@@ -106,7 +106,11 @@ function localPart(location: LocationPresentation) {
 }
 
 export function locationTitle(location: LocationPresentation) {
-  if (isGenericName(location) && !location.street && !location.district && location.city) return "Point sélectionné";
+  if (isGenericName(location) && !location.street && !location.district) {
+    if (location.city) return location.city;
+    if (location.district) return location.district;
+    return "Lieu sélectionné";
+  }
   return localPart(location);
 }
 
