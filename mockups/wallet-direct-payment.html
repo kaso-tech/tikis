@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tikis — Paiement Mobile Money direct (Option B)</title>
+<style>
+  :root {
+    --primary: #9A6201;
+    --primary-soft: #C2891F;
+    --bg: #F5F5F5;
+    --surface: #FFFFFF;
+    --foreground: #111111;
+    --muted: #667085;
+    --border: #E3E3E3;
+    --success: #176C52;
+    --success-soft: #DDEFE7;
+    --warning: #A65300;
+    --error: #A43740;
+    --error-soft: #F8E8E9;
+    --om: #FF7900;   /* Orange Money */
+    --moov: #0033A0; /* Moov Money */
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #2A2018;
+    color: var(--foreground);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 12px;
+  }
+
+  .page-title { color: #FBF7F0; font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .page-subtitle { color: #C8BCAA; font-size: 12px; margin-bottom: 24px; }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: var(--bg);
+    border-radius: 44px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5), 0 0 0 8px #1F1206, 0 0 0 9px #4A3823;
+  }
+
+  /* === Phone state nav === */
+  .state-nav {
+    position: absolute;
+    bottom: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+  }
+  .state-nav button {
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: #231A10;
+    border: 1px solid #4A3823;
+    color: #C8BCAA;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .state-nav button.active {
+    background: var(--primary);
+    color: #FFFFFF;
+    border-color: var(--primary);
+  }
+
+  /* === Common === */
+  .screen {
+    position: absolute;
+    inset: 0;
+    background: var(--bg);
+    display: none;
+    flex-direction: column;
+  }
+  .screen.active { display: flex; }
+
+  /* Header (commun aux écrans 1-3) */
+  .header {
+    padding: 56px 16px 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .icon-button {
+    width: 40px;
+    height: 40px;
+    border-radius: 9px;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--foreground);
+    cursor: pointer;
+    border: 0;
+  }
+  .header-title {
+    flex: 1;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--foreground);
+    letter-spacing: -0.2px;
+  }
+
+  /* === Écran 1 : montant + opérateur === */
+  .body { padding: 16px; flex: 1; overflow-y: auto; }
+  .label {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .amount-display {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+  .amount-label {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .amount-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--foreground);
+    letter-spacing: -0.6px;
+  }
+  .amount-suffix {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+
+  .quick-amounts {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 22px;
+  }
+  .quick-amount {
+    padding: 9px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--foreground);
+    cursor: pointer;
+  }
+
+  .operator-section { margin-bottom: 16px; }
+  .operator-row {
+    display: flex;
+    gap: 10px;
+  }
+  .operator-card {
+    flex: 1;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 120ms;
+  }
+  .operator-card.active {
+    border-color: var(--primary);
+    background: #F7EFE5;
+  }
+  .operator-logo {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .operator-logo.om { background: var(--om); }
+  .operator-logo.moov { background: var(--moov); }
+  .operator-info { flex: 1; }
+  .operator-name {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+  .operator-fees {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+
+  .phone-input-section { margin-bottom: 16px; }
+  .phone-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .country-picker {
+    flex: 0 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0 12px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .country-picker:focus,
+  .phone-input-split:focus { outline: none; border-color: var(--primary); }
+  .country-flag {
+    font-size: 22px;
+    line-height: 1;
+  }
+  .country-code {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--foreground);
+  }
+  .phone-input-split {
+    flex: 1;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0 14px;
+    height: 46px;
+    font-size: 16px;
+    color: var(--foreground);
+    font-family: inherit;
+  }
+  .phone-input-hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* OTP cells (6 digits) */
+  .otp-section { margin-bottom: 18px; }
+  .otp-row {
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+  .otp-cell {
+    flex: 1;
+    aspect-ratio: 1;
+    max-width: 48px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--foreground);
+    text-align: center;
+    font-family: inherit;
+    caret-color: var(--primary);
+  }
+  .otp-cell:focus {
+    outline: none;
+    border-color: var(--primary);
+    border-width: 2px;
+  }
+
+  /* USSD call-to-action */
+  .ussd-call-section { margin-bottom: 18px; }
+  .ussd-call-hint {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 17px;
+    margin-bottom: 10px;
+  }
+  .btn-ussd {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 120ms;
+  }
+  .btn-ussd:hover { border-color: var(--primary); background: #FBF7F0; }
+  .btn-ussd svg { color: var(--foreground); flex-shrink: 0; }
+  .ussd-code {
+    flex: 1;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--foreground);
+    letter-spacing: 0.3px;
+    font-family: ui-monospace, "SF Mono", monospace;
+    text-align: left;
+  }
+  .ussd-action {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--primary);
+    flex-shrink: 0;
+  }
+  .ussd-call-info {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 8px;
+    line-height: 15px;
+  }
+
+  /* Bottom CTA */
+  .cta-bar {
+    padding: 12px 16px 24px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+  .btn-primary {
+    width: 100%;
+    height: 50px;
+    background: var(--primary);
+    color: #FFFFFF;
+    border: 0;
+    border-radius: 9px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn-primary:disabled {
+    background: var(--border);
+    color: var(--muted);
+    cursor: not-allowed;
+  }
+  .btn-secondary {
+    width: 100%;
+    height: 50px;
+    background: var(--surface);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  /* === Écran 2 : USSD pending === */
+  .ussd-screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--surface);
+  }
+  .pulse-circle {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: var(--success-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 28px;
+    position: relative;
+  }
+  .pulse-circle::before {
+    content: "";
+    position: absolute;
+    inset: -16px;
+    border-radius: 50%;
+    border: 2px solid var(--success);
+    opacity: 0.3;
+    animation: ussd-pulse 1.8s ease-out infinite;
+  }
+  .pulse-circle::after {
+    content: "";
+    position: absolute;
+    inset: -32px;
+    border-radius: 50%;
+    border: 2px solid var(--success);
+    opacity: 0.15;
+    animation: ussd-pulse 1.8s ease-out 0.4s infinite;
+  }
+  @keyframes ussd-pulse {
+    0% { transform: scale(1); opacity: 0.4; }
+    100% { transform: scale(1.15); opacity: 0; }
+  }
+  .pulse-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--success);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ussd-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--foreground);
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .ussd-subtitle {
+    font-size: 14px;
+    color: var(--muted);
+    text-align: center;
+    line-height: 20px;
+    margin-bottom: 24px;
+    max-width: 280px;
+  }
+  .ussd-instructions {
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 16px;
+    width: 100%;
+    margin-bottom: 16px;
+  }
+  .ussd-step {
+    flex-direction: row;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+  .ussd-step:last-child { margin-bottom: 0; }
+  .ussd-step-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 11px;
+    background: var(--primary);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .ussd-step-text {
+    font-size: 13px;
+    color: var(--foreground);
+    line-height: 19px;
+  }
+  .ussd-step-text strong {
+    color: var(--primary);
+    font-family: monospace;
+    font-weight: 600;
+  }
+  .ussd-timer {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  /* === Écran 3 : succès === */
+  .success-screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--surface);
+    text-align: center;
+  }
+  .success-check {
+    width: 96px;
+    height: 96px;
+    border-radius: 48px;
+    background: var(--success);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+  .success-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--foreground);
+    margin-bottom: 8px;
+    letter-spacing: -0.4px;
+  }
+  .success-subtitle {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 28px;
+    max-width: 280px;
+    line-height: 20px;
+  }
+  .success-recap {
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 16px;
+    width: 100%;
+    margin-bottom: 24px;
+  }
+  .recap-row {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .recap-row:last-child { border-bottom: 0; }
+  .recap-label {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .recap-value {
+    font-size: 13px;
+    color: var(--foreground);
+    font-weight: 700;
+  }
+
+  /* === Écran 4 : échec === */
+  .error-icon {
+    width: 96px;
+    height: 96px;
+    border-radius: 48px;
+    background: var(--error);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+  .error-reasons {
+    width: 100%;
+    background: var(--bg);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    text-align: left;
+  }
+  .reason-row {
+    flex-direction: row;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 8px 0;
+    font-size: 13px;
+    color: var(--foreground);
+    line-height: 18px;
+  }
+
+  /* === Composants communs === */
+  .error-text {
+    font-size: 13px;
+    color: var(--error);
+    background: var(--error-soft);
+    padding: 12px;
+    border-radius: 9px;
+    margin-bottom: 12px;
+    line-height: 18px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">Tikis — Paiement Mobile Money direct (Option B)</div>
+<div class="page-subtitle">4 écrans : saisie → USSD pending → succès / échec</div>
+
+<div class="phone">
+  <!-- ============ ÉCRAN 1 : montant + opérateur + numéro ============ -->
+  <div class="screen active" id="screen-1">
+    <div class="header">
+      <button class="icon-button" onclick="showScreen('screen-1')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+      </button>
+      <div class="header-title">Dépôt Mobile Money</div>
+    </div>
+
+    <div class="body">
+      <div class="amount-display">
+        <div class="amount-label">MONTANT</div>
+        <div>
+          <span class="amount-value">2 500</span>
+          <span class="amount-suffix">FCFA</span>
+        </div>
+      </div>
+
+      <div class="label">MONTANTS RAPIDES</div>
+      <div class="quick-amounts">
+        <button class="quick-amount">1 000</button>
+        <button class="quick-amount">2 500</button>
+        <button class="quick-amount">5 000</button>
+        <button class="quick-amount">10 000</button>
+        <button class="quick-amount">25 000</button>
+      </div>
+
+      <div class="operator-section">
+        <div class="label">OPÉRATEUR</div>
+        <div class="operator-row">
+          <div class="operator-card active">
+            <div class="operator-logo om">OM</div>
+            <div class="operator-info">
+              <div class="operator-name">Orange Money</div>
+              <div class="operator-fees">Frais : 1,5%</div>
+            </div>
+          </div>
+          <div class="operator-card">
+            <div class="operator-logo moov">MV</div>
+            <div class="operator-info">
+              <div class="operator-name">Moov Money</div>
+              <div class="operator-fees">Frais : 2%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="phone-input-section">
+        <div class="label">NUMÉRO DE TÉLÉPHONE</div>
+        <div class="phone-row">
+          <button class="country-picker" onclick="cycleCountry()">
+            <span class="country-flag" id="country-flag">🇧🇫</span>
+            <span class="country-code" id="country-code">+226</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <input class="phone-input-split" id="phone-input" maxlength="8" placeholder="70707070" />
+        </div>
+        <div class="phone-input-hint" id="phone-hint">Burkina Faso · 8 chiffres attendus</div>
+      </div>
+
+      <div class="otp-section">
+        <div class="label">CODE OTP REÇU PAR SMS</div>
+        <div class="otp-row">
+          <input class="otp-cell" maxlength="1" />
+          <input class="otp-cell" maxlength="1" />
+          <input class="otp-cell" maxlength="1" />
+          <input class="otp-cell" maxlength="1" />
+          <input class="otp-cell" maxlength="1" />
+          <input class="otp-cell" maxlength="1" />
+        </div>
+      </div>
+
+      <div class="ussd-call-section">
+        <div class="label">CONFIRMER LE PAIEMENT PAR USSD</div>
+        <div class="ussd-call-hint">Composez le code suivant sur votre numéro Orange Money pour recevoir un OTP par SMS :</div>
+        <button class="btn-ussd" onclick="callUSSD()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          <span class="ussd-code" id="ussd-code">*144*4*6*513#</span>
+          <span class="ussd-action">Appeler →</span>
+        </button>
+        <div class="ussd-call-info">L'application téléphone s'ouvre automatiquement avec le code pré-rempli.</div>
+      </div>
+    </div>
+
+    <div class="cta-bar">
+      <button class="btn-primary" onclick="showScreen('screen-2')">
+        Payer 513 FCFA
+      </button>
+    </div>
+  </div>
+
+  <!-- ============ ÉCRAN 2 : USSD pending ============ -->
+  <div class="screen" id="screen-2">
+    <div class="header">
+      <button class="icon-button" onclick="showScreen('screen-1')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+      </button>
+      <div class="header-title">Confirmation Orange Money</div>
+    </div>
+
+    <div class="ussd-screen">
+      <div class="pulse-circle">
+        <div class="pulse-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        </div>
+      </div>
+      <div class="ussd-title">Confirmez sur votre téléphone</div>
+      <div class="ussd-subtitle">Vous avez reçu une demande USSD sur votre mobile Orange Money. Validez-la pour confirmer le paiement.</div>
+
+      <div class="ussd-instructions">
+        <div class="ussd-step">
+          <div class="ussd-step-num">1</div>
+          <div class="ussd-step-text">Cherchez le message USSD commençant par <strong>#150*4*6*</strong> sur votre téléphone</div>
+        </div>
+        <div class="ussd-step">
+          <div class="ussd-step-num">2</div>
+          <div class="ussd-step-text">Saisissez votre <strong>code secret Orange Money</strong></div>
+        </div>
+        <div class="ussd-step">
+          <div class="ussd-step-num">3</div>
+          <div class="ussd-step-text">Confirmez le paiement de <strong>2 500 FCFA</strong></div>
+        </div>
+      </div>
+
+      <div class="ussd-timer">Cette demande expire dans <strong>4:32</strong></div>
+    </div>
+
+    <div class="cta-bar">
+      <button class="btn-secondary" onclick="showScreen('screen-4')">Annuler</button>
+    </div>
+  </div>
+
+  <!-- ============ ÉCRAN 3 : succès ============ -->
+  <div class="screen" id="screen-3">
+    <div class="success-screen">
+      <div class="success-check">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div class="success-title">Dépôt réussi</div>
+      <div class="success-subtitle">Votre Wallet Tikis a été crédité. Vous pouvez maintenant utiliser ce solde pour vos livraisons.</div>
+
+      <div class="success-recap">
+        <div class="recap-row">
+          <span class="recap-label">Opérateur</span>
+          <span class="recap-value">Orange Money</span>
+        </div>
+        <div class="recap-row">
+          <span class="recap-label">Numéro</span>
+          <span class="recap-value">+226 70 12 34 56</span>
+        </div>
+        <div class="recap-row">
+          <span class="recap-label">Montant</span>
+          <span class="recap-value">2 500 FCFA</span>
+        </div>
+        <div class="recap-row">
+          <span class="recap-label">Frais</span>
+          <span class="recap-value">37 FCFA</span>
+        </div>
+        <div class="recap-row">
+          <span class="recap-label">Référence</span>
+          <span class="recap-value">YP-7A3F-2K1P</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cta-bar">
+      <button class="btn-primary" onclick="showScreen('screen-1')">Terminer</button>
+    </div>
+  </div>
+
+  <!-- ============ ÉCRAN 4 : échec ============ -->
+  <div class="screen" id="screen-4">
+    <div class="success-screen">
+      <div class="error-icon">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </div>
+      <div class="success-title">Paiement refusé</div>
+      <div class="success-subtitle">Le paiement n'a pas pu être confirmé. Vérifiez les points ci-dessous puis réessayez.</div>
+
+      <div class="error-reasons">
+        <div class="reason-row">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A43740" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Vous avez annulé ou expiré la demande sur votre téléphone</span>
+        </div>
+        <div class="reason-row">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A43740" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Solde Orange Money insuffisant pour couvrir les frais</span>
+        </div>
+        <div class="reason-row">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A43740" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Le numéro saisi ne correspond pas à un compte Orange Money</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="cta-bar" style="display: flex; gap: 8px;">
+      <button class="btn-secondary" style="flex: 1;" onclick="showScreen('screen-1')">Modifier</button>
+      <button class="btn-primary" style="flex: 1.4;" onclick="showScreen('screen-2')">Réessayer</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- State nav -->
+<div class="state-nav">
+  <button class="active" onclick="showScreen('screen-1')">1 · Saisie</button>
+  <button onclick="showScreen('screen-2')">2 · USSD</button>
+  <button onclick="showScreen('screen-3')">3 · Succès</button>
+  <button onclick="showScreen('screen-4')">4 · Échec</button>
+</div>
+
+<script>
+  // ===== Country picker =====
+  const COUNTRIES = [
+    { id: "BF", flag: "🇧🇫", name: "Burkina Faso", dialCode: "+226", digits: 8 },
+    { id: "CI", flag: "🇨🇮", name: "Côte d'Ivoire", dialCode: "+225", digits: 10 },
+    { id: "SN", flag: "🇸🇳", name: "Sénégal", dialCode: "+221", digits: 9 },
+    { id: "ML", flag: "🇲🇱", name: "Mali", dialCode: "+223", digits: 8 },
+    { id: "BJ", flag: "🇧🇯", name: "Bénin", dialCode: "+229", digits: 10 },
+    { id: "NE", flag: "🇳🇪", name: "Niger", dialCode: "+227", digits: 8 },
+    { id: "TG", flag: "🇹🇬", name: "Togo", dialCode: "+228", digits: 8 },
+    { id: "GH", flag: "🇬🇭", name: "Ghana", dialCode: "+233", digits: 9 },
+  ];
+  let currentCountryIndex = 0;
+
+  function cycleCountry() {
+    currentCountryIndex = (currentCountryIndex + 1) % COUNTRIES.length;
+    updateCountryUI();
+  }
+
+  function updateCountryUI() {
+    const c = COUNTRIES[currentCountryIndex];
+    document.getElementById("country-flag").textContent = c.flag;
+    document.getElementById("country-code").textContent = c.dialCode;
+    const input = document.getElementById("phone-input");
+    input.maxLength = c.digits;
+    input.placeholder = "0".repeat(c.digits);
+    input.value = "";
+    document.getElementById("phone-hint").textContent = `${c.name} · ${c.digits} chiffres attendus`;
+    updateUSSDCode();
+  }
+
+  // ===== USSD code (Orange Money: *144*4*6*<montant>#) =====
+  function updateUSSDCode() {
+    const amount = 513; // mock : ce sera le montant réel
+    const ussd = `*144*4*6*${amount}#`;
+    document.getElementById("ussd-code").textContent = ussd;
+    // Stocke pour le handler tel:
+    window.__lastUSSD = ussd;
+  }
+
+  function callUSSD() {
+    const ussd = window.__lastUSSD || "*144*4*6*513#";
+    // tel: URI scheme — encodeURI pour gérer les * et #
+    const telUri = "tel:" + encodeURI(ussd);
+    // Sur un vrai device mobile : window.location.href = telUri ouvre l'app téléphone
+    // Pour la démo on simule
+    alert(`Sur device réel, ouvrirait l'app téléphone avec : ${telUri}\n\nTu composerais ensuite ton code secret Orange Money.`);
+  }
+
+  // ===== OTP cells : auto-advance =====
+  document.addEventListener("DOMContentLoaded", () => {
+    const cells = document.querySelectorAll(".otp-cell");
+    cells.forEach((cell, idx) => {
+      cell.addEventListener("input", (e) => {
+        // Auto-advance
+        if (e.target.value && idx < cells.length - 1) cells[idx + 1].focus();
+      });
+      cell.addEventListener("keydown", (e) => {
+        // Backspace = recule
+        if (e.key === "Backspace" && !e.target.value && idx > 0) cells[idx - 1].focus();
+      });
+    });
+    updateCountryUI();
+  });
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    document.querySelectorAll('.state-nav button').forEach((b, i) => {
+      b.classList.remove('active');
+      if ((id === 'screen-1' && i === 0) ||
+          (id === 'screen-2' && i === 1) ||
+          (id === 'screen-3' && i === 2) ||
+          (id === 'screen-4' && i === 3)) {
+        b.classList.add('active');
+      }
+    });
+  }
+</script>
+
+</body>
+</html>

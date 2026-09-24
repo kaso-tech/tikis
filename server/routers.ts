@@ -14,6 +14,7 @@ import { clientIp } from "./_core/security";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, tikisProtectedProcedure, tikisSessionProcedure } from "./_core/trpc";
 import { findCountryForPhone } from "../lib/registration-rules";
+import { COUNTRIES } from "../lib/registration-rules";
 import { createTikisProfileSession } from "./tikis-session";
 import { recordGeographicMetric } from "./geography-observability";
 import { isAllowedDeliveryText, sanitizeDeliveryText } from "../lib/tikis-engine";
@@ -821,6 +822,43 @@ export const appRouter = router({
     settleYengaPayTest: tikisProtectedProcedure.input(z.object({ paymentId: z.string().uuid(), outcome: z.enum(["succeeded", "failed"]) })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       return db.settleYengaPayTestPayment({ ...input, profilePhone: profile.phone });
+    }),
+    // ===== Paiement Mobile Money direct (in-app, sans redirection web) =====
+    // Flow : le client envoie un numéro + opérateur, on crée un payment intent
+    //   YengaPay avec paymentSource: orange_money | moov_money, le serveur renvoie
+    //   l'identifiant de transaction + le code USSD à composer. Le client compose le code
+    //   via tel:, l'OTP arrive par SMS, le webhook payment.succeeded crédite le Wallet.
+    //   En mode test (pas de clé sandbox), on simule la requête et on crédite directement
+    //   après validation manuelle côté serveur (cf. markDirectDepositTestSettled).
+    requestDirectDeposit: tikisProtectedProcedure.input(z.object({
+      amount: z.number().int().min(100).max(10_000_000),
+      countryCode: z.string().length(2),
+      phoneLocal: z.string().regex(/^[0-9]{6,12}$/),
+      operator: z.enum(["orange_money", "moov_money"]),
+    })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      const country = COUNTRIES.find((c) => c.id === input.countryCode);
+      if (!country) throw new Error("Pays non supporté.");
+      if (input.phoneLocal.length !== country.digits) throw new Error(`Le numéro doit contenir ${country.digits} chiffres pour ${country.name}.`);
+      const phone = `${country.dialCode}${input.phoneLocal.replace(/^0+/, "")}`;
+      const { createYengapayDirectDeposit } = await import("./yengapay-direct");
+      return createYengapayDirectDeposit({
+        profilePhone: profile.phone,
+        amount: input.amount,
+        phone,
+        operator: input.operator,
+        countryCode: input.countryCode,
+      });
+    }),
+    checkDirectDepositStatus: tikisProtectedProcedure.input(z.object({ transactionId: z.string().uuid() })).query(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      const { getYengapayDirectDepositStatus } = await import("./yengapay-direct");
+      return getYengapayDirectDepositStatus({ profilePhone: profile.phone, transactionId: input.transactionId });
+    }),
+    settleDirectDepositTest: tikisProtectedProcedure.input(z.object({ transactionId: z.string().uuid(), outcome: z.enum(["succeeded", "failed"]) })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      const { settleYengapayDirectDepositTest } = await import("./yengapay-direct");
+      return settleYengapayDirectDepositTest({ profilePhone: profile.phone, ...input });
     }),
   }),
   notifications: router({
