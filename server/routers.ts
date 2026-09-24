@@ -813,6 +813,11 @@ export const appRouter = router({
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       return db.initiateYengaPayTestPayment({ ...input, profilePhone: profile.phone });
     }),
+    initiateYengaPay: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000), idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{16,96}$/) })).mutation(async ({ ctx, input }) => {
+      if (input.type === "withdrawal") throw new Error("Les retraits ne sont plus proposés : le Wallet sert uniquement à recharger votre compte pour effectuer des livraisons.");
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      return db.initiateYengaPayPayment({ ...input, profilePhone: profile.phone });
+    }),
     settleYengaPayTest: tikisProtectedProcedure.input(z.object({ paymentId: z.string().uuid(), outcome: z.enum(["succeeded", "failed"]) })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       return db.settleYengaPayTestPayment({ ...input, profilePhone: profile.phone });

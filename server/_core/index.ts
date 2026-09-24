@@ -150,16 +150,22 @@ async function startServer() {
   // Idempotent : on enregistre l'événement, on vérifie la signature, on applique le settlement.
   app.post("/api/webhooks/yengapay", async (req, res) => {
     const config = readYengapayConfig();
+    if (config.mode === "test") return res.status(503).json({ error: "YengaPay externe est désactivé." });
     const rawBody = (req as { rawBody?: string }).rawBody ?? JSON.stringify(req.body ?? {});
-    const signature = (req.headers["x-yengapay-signature"] as string | undefined) ?? null;
+    const signature = (req.headers["x-webhook-hash"] as string | undefined) ?? (req.headers["x-yengapay-signature"] as string | undefined) ?? null;
     if (!verifyYengapayWebhookSignature(rawBody, signature, config.webhookSecret)) {
       return res.status(400).json({ error: "Signature invalide" });
     }
     try {
-      const event = parseYengapayWebhookEvent(rawBody, signature);
-      const recorded = await db.recordYengapayWebhookEvent({ providerEventId: event.providerEventId, eventType: event.eventType, paymentTransactionId: null, payload: rawBody, signature });
+      const headerEvent = (req.headers["x-yengapay-event"] as string | undefined) ?? null;
+      const event = parseYengapayWebhookEvent(rawBody, signature, headerEvent);
+      const provider = config.mode === "sandbox" ? "yengapay_sandbox" : "yengapay_live";
+      const recorded = await db.recordYengapayWebhookEvent({ provider, providerEventId: event.providerEventId, eventType: event.eventType, paymentTransactionId: null, payload: rawBody, signature });
       if (recorded.duplicate) {
         return res.status(200).json({ ok: true, duplicate: true });
+      }
+      if (event.eventType.endsWith("pending")) {
+        return res.status(202).json({ ok: true, pending: true });
       }
       const outcome: "succeeded" | "failed" | "cancelled" = event.eventType.endsWith("succeeded") ? "succeeded" : event.eventType.endsWith("cancelled") ? "cancelled" : "failed";
       try {

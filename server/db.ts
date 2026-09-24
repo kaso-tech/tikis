@@ -996,18 +996,19 @@ export async function requestTikisWalletOperation(profilePhone: string, type: "d
   return { success: true } as const;
 }
 
-type YengaPayTestPaymentView = { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; createdAt: string; settledAt?: string };
+type YengaPayTestPaymentView = { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; checkoutUrl?: string; mode: "test" | "sandbox" | "live"; createdAt: string; settledAt?: string };
 type YengaPayTestPaymentSettlement = { payment: YengaPayTestPaymentView; wallet: WalletSnapshot };
 
-function yengaPayTestPaymentToView(payment: { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; createdAt: Date; settledAt: Date | null }): YengaPayTestPaymentView {
-  return { id: payment.id, type: payment.type, amount: payment.amount, status: payment.status, providerReference: payment.providerReference, createdAt: payment.createdAt.toISOString(), ...(payment.settledAt ? { settledAt: payment.settledAt.toISOString() } : {}) };
+function yengaPayTestPaymentToView(payment: { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; provider: "ligdi_simulated" | "yengapay_test" | "yengapay_sandbox" | "yengapay_live"; providerReference: string; checkoutUrl: string | null; createdAt: Date; settledAt: Date | null }): YengaPayTestPaymentView {
+  const mode = payment.provider === "yengapay_sandbox" ? "sandbox" : payment.provider === "yengapay_live" ? "live" : "test";
+  return { id: payment.id, type: payment.type, amount: payment.amount, status: payment.status, providerReference: payment.providerReference, mode, ...(payment.checkoutUrl ? { checkoutUrl: payment.checkoutUrl } : {}), createdAt: payment.createdAt.toISOString(), ...(payment.settledAt ? { settledAt: payment.settledAt.toISOString() } : {}) };
 }
 
 function walletSnapshotFromRecord(wallet: { availableBalance: number; heldBalance: number }): WalletSnapshot {
   return { total: wallet.availableBalance + wallet.heldBalance, blocked: wallet.heldBalance };
 }
 
-export async function initiateYengaPayTestPayment(input: { profilePhone: string; type: "deposit" | "withdrawal"; amount: number; idempotencyKey: string }) {
+export async function initiateYengaPayPayment(input: { profilePhone: string; type: "deposit" | "withdrawal"; amount: number; idempotencyKey: string }) {
   if (!Number.isSafeInteger(input.amount) || input.amount < 100 || input.amount > 10_000_000) throw new Error("Le montant demandé est invalide.");
   if (!/^[A-Za-z0-9_-]{16,96}$/.test(input.idempotencyKey)) throw new Error("Référence de paiement invalide.");
   const db = await getDb();
@@ -1023,23 +1024,29 @@ export async function initiateYengaPayTestPayment(input: { profilePhone: string;
     if (input.type === "withdrawal" && wallet.availableBalance < input.amount) throw new Error("Votre solde disponible est insuffisant pour ce retrait.");
     const id = randomUUID();
     let providerReference = `YENGA-TEST-${randomUUID().replace(/-/g, "").slice(0, 20).toUpperCase()}`;
-    let providerName: "yengapay_test" | "yengapay_live" = "yengapay_test";
-    if (config.mode === "live") {
+    let checkoutUrl: string | null = null;
+    let providerName: "yengapay_test" | "yengapay_sandbox" | "yengapay_live" = "yengapay_test";
+    if (config.mode !== "test") {
       try {
         const intent = await createYengapayPaymentIntent({ paymentTransactionId: id, amount: input.amount, type: input.type, phone: input.profilePhone });
         providerReference = intent.providerReference;
-        providerName = "yengapay_live";
+        checkoutUrl = intent.checkoutUrl ?? null;
+        providerName = config.mode === "sandbox" ? "yengapay_sandbox" : "yengapay_live";
       } catch (cause) {
-        throw new Error(`YengaPay (live) indisponible : ${cause instanceof Error ? cause.message : "erreur inconnue"}`);
+        throw new Error(`YengaPay (${config.mode}) indisponible : ${cause instanceof Error ? cause.message : "erreur inconnue"}`);
       }
     }
-    await tx.insert(tikisPaymentTransactions).values({ id, profilePhone: input.profilePhone, type: input.type, provider: providerName, amount: input.amount, status: "pending", providerReference, idempotencyKey: input.idempotencyKey });
-    await tx.insert(tikisWalletLedger).values({ id: randomUUID(), profilePhone: input.profilePhone, deliveryId: null, operation: input.type === "deposit" ? "deposit_request" : "withdrawal_request", amount: input.amount, availableBefore: wallet.availableBalance, availableAfter: wallet.availableBalance, heldBefore: wallet.heldBalance, heldAfter: wallet.heldBalance, reason: `Demande ${input.type === "deposit" ? "de dépôt" : "de retrait"} YengaPay en mode ${providerName === "yengapay_live" ? "live" : "test"}`, idempotencyKey: `${id}:requested` });
+    await tx.insert(tikisPaymentTransactions).values({ id, profilePhone: input.profilePhone, type: input.type, provider: providerName, amount: input.amount, status: "pending", providerReference, checkoutUrl, idempotencyKey: input.idempotencyKey });
+    const providerMode = providerName === "yengapay_sandbox" ? "sandbox" : providerName === "yengapay_live" ? "live" : "test";
+    await tx.insert(tikisWalletLedger).values({ id: randomUUID(), profilePhone: input.profilePhone, deliveryId: null, operation: input.type === "deposit" ? "deposit_request" : "withdrawal_request", amount: input.amount, availableBefore: wallet.availableBalance, availableAfter: wallet.availableBalance, heldBefore: wallet.heldBalance, heldAfter: wallet.heldBalance, reason: `Demande ${input.type === "deposit" ? "de dépôt" : "de retrait"} YengaPay en mode ${providerMode}`, idempotencyKey: `${id}:requested` });
     const created = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, id)).limit(1))[0];
     if (!created) throw new Error("La demande de paiement n’a pas pu être créée.");
     return yengaPayTestPaymentToView(created);
   });
 }
+
+/** @deprecated Utiliser initiateYengaPayPayment. Conservé pour les clients déjà déployés. */
+export const initiateYengaPayTestPayment = initiateYengaPayPayment;
 
 export async function settleYengaPayTestPayment(input: { profilePhone: string; paymentId: string; outcome: "succeeded" | "failed" }) {
   const db = await getDb();
@@ -1751,13 +1758,13 @@ export async function listTikisDeliveryReviewsForProfile(profilePhone: string, r
 }
 
 /** YengaPay : enregistrement idempotent d'un événement webhook. */
-export async function recordYengapayWebhookEvent(input: { providerEventId: string; eventType: string; paymentTransactionId: string | null; payload: string; signature: string | null }) {
+export async function recordYengapayWebhookEvent(input: { provider: "yengapay_sandbox" | "yengapay_live"; providerEventId: string; eventType: string; paymentTransactionId: string | null; payload: string; signature: string | null }) {
   const db = await getDb();
   if (!db) throw new Error("Le paiement est temporairement indisponible.");
-  const existing = (await db.select().from(tikisYengapayWebhookEvents).where(and(eq(tikisYengapayWebhookEvents.provider, "yengapay_live"), eq(tikisYengapayWebhookEvents.providerEventId, input.providerEventId))).limit(1))[0];
+  const existing = (await db.select().from(tikisYengapayWebhookEvents).where(and(eq(tikisYengapayWebhookEvents.provider, input.provider), eq(tikisYengapayWebhookEvents.providerEventId, input.providerEventId))).limit(1))[0];
   if (existing) return { duplicate: true, id: existing.id };
   const id = randomUUID();
-  await db.insert(tikisYengapayWebhookEvents).values({ id, provider: "yengapay_live", providerEventId: input.providerEventId, eventType: input.eventType, paymentTransactionId: input.paymentTransactionId, payload: input.payload, signature: input.signature, status: "received" });
+  await db.insert(tikisYengapayWebhookEvents).values({ id, provider: input.provider, providerEventId: input.providerEventId, eventType: input.eventType, paymentTransactionId: input.paymentTransactionId, payload: input.payload, signature: input.signature, status: "received" });
   return { duplicate: false, id };
 }
 
@@ -1791,7 +1798,7 @@ export async function settleYengapayLivePayment(input: { providerReference: stri
 /** YengaPay : réconciliation manuelle — vérifie l'état réel d'un intent en cas d'incident webhook. */
 export async function reconcileYengapayPayment(providerReference: string) {
   const config = readYengapayConfig();
-  if (config.mode !== "live") throw new Error("La réconciliation YengaPay nécessite le mode live.");
+  if (config.mode === "test") throw new Error("La réconciliation YengaPay nécessite le mode sandbox ou live.");
   const remote = await verifyYengapayPayment({ providerReference });
   if (remote.status === "pending") return { pending: true, providerReference };
   return settleYengapayLivePayment({ providerReference, outcome: remote.status });

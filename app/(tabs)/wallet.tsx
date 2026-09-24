@@ -1,5 +1,6 @@
 import { useState } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { openBrowserAsync } from "expo-web-browser";
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -41,13 +42,15 @@ export default function WalletScreen() {
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 12_000, refetchOnMount: "always", refetchOnWindowFocus: true });
   const wallet = walletQuery.data?.wallet;
   const journal = walletQuery.data?.journal ?? [];
-  const initiateMutation = trpc.wallet.initiateYengaPayTest.useMutation();
+  const initiateMutation = trpc.wallet.initiateYengaPay.useMutation();
   const settleMutation = trpc.wallet.settleYengaPayTest.useMutation();
   const [requestType, setRequestType] = useState<"deposit" | "withdrawal" | null>(null);
   const [amountInput, setAmountInput] = useState("");
   const [requestError, setRequestError] = useState("");
-  const [payment, setPayment] = useState<{ id: string; type: "deposit" | "withdrawal"; amount: number; providerReference: string } | null>(null);
-  const requestLoading = initiateMutation.isPending || settleMutation.isPending;
+  const [paymentNotice, setPaymentNotice] = useState("");
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [payment, setPayment] = useState<{ id: string; type: "deposit" | "withdrawal"; amount: number; providerReference: string; checkoutUrl?: string; mode: "test" | "sandbox" | "live" } | null>(null);
+  const requestLoading = initiateMutation.isPending || settleMutation.isPending || checkoutLoading;
   const isDriver = role === "driver";
   const available = wallet ? availableWalletBalance(wallet) : null;
   const displayWalletAmount = (amount: number | null) => {
@@ -68,7 +71,7 @@ export default function WalletScreen() {
     })
     .reduce((sum, entry) => sum + entry.amount, 0);
 
-  function openRequest(type: "deposit" | "withdrawal") { setRequestError(""); setAmountInput(""); setPayment(null); setRequestType(type); }
+  function openRequest(type: "deposit" | "withdrawal") { setRequestError(""); setPaymentNotice(""); setAmountInput(""); setPayment(null); setRequestType(type); }
   async function confirmRequest() {
     const amount = parseOfferedPrice(amountInput);
     const error = offeredPriceError(amountInput) ?? (!amount || amount < 100 ? "Saisissez au moins 100 FCFA." : "");
@@ -91,6 +94,20 @@ export default function WalletScreen() {
       await walletQuery.refetch();
       setPayment(null); setRequestType(null); setAmountInput("");
     } catch (cause) { setRequestError(cause instanceof Error ? cause.message : "La confirmation YengaPay a échoué."); }
+  }
+  async function openCheckout() {
+    if (!payment?.checkoutUrl) { setRequestError("Le lien de paiement sécurisé est indisponible. Réessayez plus tard."); return; }
+    try {
+      setRequestError("");
+      setCheckoutLoading(true);
+      await openBrowserAsync(payment.checkoutUrl);
+      setPaymentNotice("Paiement en attente de confirmation sécurisée par YengaPay.");
+      await walletQuery.refetch();
+    } catch (cause) {
+      setRequestError(cause instanceof Error ? cause.message : "La page YengaPay n’a pas pu être ouverte.");
+    } finally {
+      setCheckoutLoading(false);
+    }
   }
 
   return (
@@ -152,7 +169,7 @@ export default function WalletScreen() {
             <View style={[styles.actionIcon, { backgroundColor: theme.background }]}><MaterialIcons name="add-card" size={15} color={theme.primary} /></View>
             <View style={styles.actionText}>
               <Text style={[styles.actionLabel, { color: theme.foreground }]}>Recharger mon compte</Text>
-              <Text style={[styles.actionSub, { color: theme.muted }]}>YengaPay · test</Text>
+              <Text style={[styles.actionSub, { color: theme.muted }]}>YengaPay sécurisé</Text>
             </View>
           </Pressable>
         </View>
@@ -219,17 +236,17 @@ export default function WalletScreen() {
             {payment ? (
               <>
                 <View style={styles.modalIcon}><MaterialIcons name="verified-user" size={22} color="#667085" /></View>
-                <Text style={styles.modalTitle}>Validation YengaPay</Text>
-                <Text style={styles.modalSub}>Mode test : confirmez le résultat de votre paiement de {formatMoney(payment.amount)}. Votre Wallet ne changera qu’après cette confirmation serveur.</Text>
+                <Text style={styles.modalTitle}>{payment.mode === "test" ? "Validation YengaPay" : "Paiement YengaPay Sandbox"}</Text>
+                <Text style={styles.modalSub}>{payment.mode === "test" ? `Mode test : confirmez le résultat de votre paiement de ${formatMoney(payment.amount)}. Votre Wallet ne changera qu’après cette confirmation serveur.` : `Ouvrez la page YengaPay pour finaliser votre dépôt de ${formatMoney(payment.amount)}. Votre Wallet sera crédité uniquement après la notification sécurisée de YengaPay.`}</Text>
                 <View style={styles.referenceCard}>
-                  <Text style={styles.referenceLabel}>RÉFÉRENCE YENGAPAY TEST</Text>
+                  <Text style={styles.referenceLabel}>RÉFÉRENCE YENGAPAY {payment.mode.toUpperCase()}</Text>
                   <Text style={styles.referenceValue}>{payment.providerReference}</Text>
                 </View>
-                {requestError ? <Text style={styles.requestError}>{requestError}</Text> : <Text style={styles.modalHint}>Aucun moyen de paiement réel n’est débité dans ce mode.</Text>}
-                {__DEV__ ? <View style={styles.modalActions}>
+                {requestError ? <Text style={styles.requestError}>{requestError}</Text> : <Text style={styles.modalHint}>{paymentNotice || (payment.mode === "test" ? "Aucun moyen de paiement réel n’est débité dans ce mode." : "Le statut est mis à jour automatiquement dès la confirmation YengaPay.")}</Text>}
+                {payment.mode === "test" && __DEV__ ? <View style={styles.modalActions}>
                   <TikisButton label="Échouer" variant="secondary" disabled={requestLoading} onPress={() => void settlePayment("failed")} style={styles.modalAction} />
                   <TikisButton label="Simuler réussite" icon="check-circle" loading={requestLoading} disabled={requestLoading} onPress={() => void settlePayment("succeeded")} style={styles.modalAction} />
-                </View> : null}
+                </View> : payment.checkoutUrl ? <View style={styles.modalActions}><TikisButton label="Fermer" variant="secondary" disabled={requestLoading} onPress={() => setRequestType(null)} style={styles.modalAction} /><TikisButton label="Ouvrir YengaPay" icon="open-in-new" loading={checkoutLoading} disabled={requestLoading} onPress={() => void openCheckout()} style={styles.modalAction} /></View> : null}
               </>
             ) : (
               <>
