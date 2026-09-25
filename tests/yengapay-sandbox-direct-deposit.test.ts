@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { createYengapayDirectDeposit, readYengapayConfig } from "../server/yengapay-direct";
-import { readYengapayConfig as readBaseConfig } from "../server/yengapay";
+import { createYengapayDirectDeposit } from "../server/yengapay-direct";
+import { readYengapayConfig, readYengapayConfig as readBaseConfig } from "../server/yengapay";
 
 /**
  * Test d'intégration YengaPay Sandbox pour les paiements directs Mobile Money.

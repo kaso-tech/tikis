@@ -36,6 +36,7 @@ export type YengapayDirectDeposit = {
   amount: number;
   phone: string;
   operator: YengapayDirectOperator;
+  countryCode: string;
   expiresAt: string;         // ISO 8601, expiration de la demande USSD
   status: "pending" | "succeeded" | "failed" | "cancelled" | "expired";
   mode: "test" | "sandbox" | "live";
@@ -81,6 +82,7 @@ export async function createYengapayDirectDeposit(input: YengapayDirectDepositRe
       amount: input.amount,
       phone: input.phone,
       operator: input.operator,
+      countryCode: input.countryCode,
       expiresAt,
       status: "pending",
       mode: "test",
@@ -148,6 +150,7 @@ export async function createYengapayDirectDeposit(input: YengapayDirectDepositRe
     amount: input.amount,
     phone: input.phone,
     operator: input.operator,
+    countryCode: input.countryCode,
     expiresAt,
     status: "pending",
     mode: config.mode,
@@ -169,6 +172,7 @@ export async function getYengapayDirectDepositStatus(input: { profilePhone: stri
       amount: stored.amount,
       phone: stored.phone,
       operator: stored.operator,
+      countryCode: stored.countryCode,
       expiresAt: stored.expiresAt,
       status: stored.status,
       mode: "test",
@@ -186,6 +190,7 @@ export async function getYengapayDirectDepositStatus(input: { profilePhone: stri
       amount: stored.amount,
       phone: stored.phone,
       operator: stored.operator,
+      countryCode: stored.countryCode,
       expiresAt: stored.expiresAt,
       status: stored.status,
       mode: config.mode,
@@ -206,6 +211,7 @@ export async function getYengapayDirectDepositStatus(input: { profilePhone: stri
       amount: stored.amount,
       phone: stored.phone,
       operator: stored.operator,
+      countryCode: stored.countryCode,
       expiresAt: stored.expiresAt,
       status: stored.status,
       mode: config.mode,
@@ -231,6 +237,7 @@ export async function getYengapayDirectDepositStatus(input: { profilePhone: stri
     amount: stored.amount,
     phone: stored.phone,
     operator: stored.operator,
+    countryCode: stored.countryCode,
     expiresAt: stored.expiresAt,
     status: normalized,
     mode: config.mode,

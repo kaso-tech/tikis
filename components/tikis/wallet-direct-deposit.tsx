@@ -108,13 +108,16 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   useEffect(() => {
     if (!visible) return;
     if (!initialDeposit) return;
-    setDeposit(initialDeposit);
-    setOperator(initialDeposit.operator);
-    setStage("pending");
-    setOtpDigits(["", "", "", "", "", ""]);
-    setSubmitError("");
-    setPollError("");
-    setSecondsLeft(Math.max(0, Math.round((new Date(initialDeposit.expiresAt).getTime() - Date.now()) / 1000)));
+    const resume = setTimeout(() => {
+      setDeposit(initialDeposit);
+      setOperator(initialDeposit.operator);
+      setStage("pending");
+      setOtpDigits(["", "", "", "", "", ""]);
+      setSubmitError("");
+      setPollError("");
+      setSecondsLeft(Math.max(0, Math.round((new Date(initialDeposit.expiresAt).getTime() - Date.now()) / 1000)));
+    }, 0);
+    return () => clearTimeout(resume);
   }, [visible, initialDeposit]);
 
   // ===== Soumission =====
