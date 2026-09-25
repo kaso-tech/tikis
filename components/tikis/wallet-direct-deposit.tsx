@@ -5,7 +5,6 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressa
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { COUNTRIES, countryFlagEmoji, type CountrySpec } from "@/lib/registration-rules";
-import { formatMoney } from "@/shared/tikis-domain";
 import { trpc } from "@/lib/trpc";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { buildUssdCode, operatorLabel, type YengapayOperatorCode } from "@/shared/yengapay-ussd";
@@ -111,7 +110,9 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
 
   // Reset quand le modal se ferme
   useEffect(() => {
-    if (!visible) reset();
+    if (visible) return;
+    const resetTimer = setTimeout(reset, 0);
+    return () => clearTimeout(resetTimer);
   }, [visible, reset]);
 
   // Reprise d'un dépôt en attente (depuis la bannière du wallet)
@@ -193,15 +194,21 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     if (stage !== "waiting" || !deposit) return;
     const data = statusQuery.data;
     if (!data) return;
-    if (data.status === "succeeded") { setStage("success"); onSuccess?.(); }
-    else if (data.status === "failed" || data.status === "cancelled" || data.status === "expired") {
+    if (data.status !== "succeeded" && data.status !== "failed" && data.status !== "cancelled" && data.status !== "expired") return;
+    const transition = setTimeout(() => {
+      if (data.status === "succeeded") {
+        setStage("success");
+        onSuccess?.();
+        return;
+      }
       setPollError(
         data.status === "expired" ? "La demande a expiré avant confirmation."
         : data.status === "cancelled" ? "Le paiement a été annulé."
         : "Le paiement n'a pas pu être confirmé.",
       );
       setStage("failed");
-    }
+    }, 0);
+    return () => clearTimeout(transition);
   }, [statusQuery.data, stage, deposit, onSuccess]);
 
   // ===== Rendu =====
@@ -367,7 +374,7 @@ function InputStage(props: {
             textContentType="oneTimeCode"
           />
           <Text style={[styles.hint, { color: theme.muted }]}>
-            Après composition de l'USSD, votre opérateur envoie un code à 6 chiffres par SMS. Saisissez-le ici (optionnel — la confirmation vient de YengaPay).
+            Après composition de l&apos;USSD, votre opérateur envoie un code à 6 chiffres par SMS. Saisissez-le ici (optionnel — la confirmation vient de YengaPay).
           </Text>
         </View>
 
@@ -386,7 +393,7 @@ function InputStage(props: {
             </Text>
           </Pressable>
           <Text style={[styles.ussdLinkHint, { color: theme.muted }]}>
-            Touchez pour ouvrir l'app téléphone avec le code pré-rempli.
+            Touchez pour ouvrir l&apos;app téléphone avec le code pré-rempli.
           </Text>
         </View>
 
