@@ -1014,9 +1014,14 @@ export type DirectDepositRecord = {
   expiresAt: string;
   createdAt: string;
   settledAt: string | null;
+  /** Mode dérivé du provider : utile au client pour adapter l'UI (ex: carte __DEV__). */
+  mode: "test" | "sandbox" | "live";
 };
 
 function paymentTransactionToDirectDeposit(record: typeof tikisPaymentTransactions.$inferSelect): DirectDepositRecord {
+  const isLive = record.provider === "yengapay_direct_live";
+  const isSandbox = record.provider === "yengapay_direct_sandbox";
+  const mode: DirectDepositRecord["mode"] = isLive ? "live" : isSandbox ? "sandbox" : "test";
   return {
     transactionId: record.id,
     profilePhone: record.profilePhone,
@@ -1030,6 +1035,7 @@ function paymentTransactionToDirectDeposit(record: typeof tikisPaymentTransactio
     expiresAt: record.expiresAt ? record.expiresAt.toISOString() : new Date(Date.now() + 60_000).toISOString(),
     createdAt: record.createdAt.toISOString(),
     settledAt: record.settledAt ? record.settledAt.toISOString() : null,
+    mode,
   };
 }
 
@@ -1085,6 +1091,41 @@ export async function settleDirectDeposit(input: { transactionId: string; status
   const db = await getDb();
   if (!db) throw new Error("Le paiement direct est temporairement indisponible.");
   await db.update(tikisPaymentTransactions).set({ status: input.status, settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, input.transactionId));
+}
+
+/**
+ * Liste les paiements directs encore en attente pour un profil donné. Sert à la reprise côté
+ * client quand l'utilisateur a fermé l'app pendant le polling : on ne perd pas le dépôt, il
+ * reste interrogeable tant qu'il n'a pas expiré et que le webhook n'a pas fired.
+ *
+ * Filtre : provider LIKE 'yengapay_direct_%' AND status='pending' AND expiresAt > NOW().
+ * On exclut les expirés — ils sont déjà rattrapés par le webhook handler (qui les passe à
+ * `failed`) ou bien le client les verra dans son journal comme échoués.
+ *
+ * Tri : du plus récent au plus ancien, pour que la bannière wallet montre en priorité le dernier
+ * dépôt initié.
+ */
+export async function listPendingDirectDeposits(profilePhone: string): Promise<DirectDepositRecord[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const records = await db
+    .select()
+    .from(tikisPaymentTransactions)
+    .where(and(
+      eq(tikisPaymentTransactions.profilePhone, profilePhone),
+      eq(tikisPaymentTransactions.type, "deposit"),
+      eq(tikisPaymentTransactions.status, "pending"),
+      // `provider` est un enum MySQL, pas un LIKE arbitraire : on teste les 3 valeurs direct
+      // explicitement. Si on ajoute un nouveau provider direct un jour, mettre à jour ici aussi.
+      inArray(tikisPaymentTransactions.provider, ["yengapay_direct_test", "yengapay_direct_sandbox", "yengapay_direct_live"]),
+      // Expiré = `expiresAt` est dans le passé. SQL brut : comparaison directe avec NOW().
+      // On garde les rows dont expiresAt est NULL OU dans le futur — un expiresAt NULL signifie
+      // "pas d'expiration" (cas dégénéré, mais on reste permissif).
+      or(sql`${tikisPaymentTransactions.expiresAt} IS NULL`, sql`${tikisPaymentTransactions.expiresAt} > NOW()`),
+    ))
+    .orderBy(desc(tikisPaymentTransactions.createdAt))
+    .limit(10);
+  return records.map(paymentTransactionToDirectDeposit);
 }
 
 /** Crédite le Wallet suite à un dépôt direct réussi. */
