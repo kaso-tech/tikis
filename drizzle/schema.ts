@@ -371,7 +371,7 @@ export type TikisKycSubmission = typeof tikisKycSubmissions.$inferSelect;
  *  Idempotence garantie par la contrainte unique sur (provider, providerEventId). */
 export const tikisYengapayWebhookEvents = mysqlTable("tikis_yengapay_webhook_events", {
   id: varchar("id", { length: 40 }).primaryKey(),
-  provider: mysqlEnum("provider", ["yengapay_sandbox", "yengapay_live"]).notNull().default("yengapay_live"),
+  provider: mysqlEnum("provider", ["yengapay_sandbox", "yengapay_live", "yengapay_direct_sandbox", "yengapay_direct_live"]).notNull().default("yengapay_live"),
   providerEventId: varchar("providerEventId", { length: 120 }).notNull(),
   eventType: varchar("eventType", { length: 60 }).notNull(),
   paymentTransactionId: varchar("paymentTransactionId", { length: 40 }),

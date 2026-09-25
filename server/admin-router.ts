@@ -164,6 +164,16 @@ export const tikisAdminRouter = router({
       await audit(ctx, "payment_transaction_settled", "payment_transaction", input.paymentId, { outcome: input.outcome, notes: input.notes });
       return result;
     }),
+    // Réconciliation YengaPay : interroge le PSP pour connaître l'état réel d'une transaction
+    // dont le webhook a échoué (503 YengaPay, signature invalide transitoire, timeout réseau,
+    // DB temporairement indisponible au moment du settle). Le mode test renvoie une erreur —
+    // il n'y a rien à réconcilier puisque aucun PSP n'est appelé. Réservé super_admin/finance.
+    reconcileYengapayPayment: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ providerReference: z.string().min(8).max(80) })).mutation(async ({ ctx, input }) => {
+      if (!ctx.tikisAdmin) throw new Error("Session invalide.");
+      const result = await db.reconcileYengapayPayment(input.providerReference);
+      await audit(ctx, "yengapay_payment_reconciled", "payment_transaction", input.providerReference, { result });
+      return result;
+    }),
     sendBonus: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string(), amount: z.number().int().positive().max(1000000), reason: z.string().max(300), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await adminDb.adminRewardWallet({ ...input, adminId: ctx.tikisAdmin.adminId });

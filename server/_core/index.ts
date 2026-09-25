@@ -148,6 +148,9 @@ async function startServer() {
 
   // Webhook YengaPay — appelé par le PSP pour confirmer un paiement (deposit/withdrawal).
   // Idempotent : on enregistre l'événement, on vérifie la signature, on applique le settlement.
+  // Pour les paiements directs (Mobile Money in-app), le settlement déclenche aussi une
+  // notification push au client : sans elle, un paiement confirmé alors que l'app est fermée
+  // ne serait visible qu'au retour sur le wallet (polling raté).
   app.post("/api/webhooks/yengapay", async (req, res) => {
     const config = readYengapayConfig();
     if (config.mode === "test") return res.status(503).json({ error: "YengaPay externe est désactivé." });
@@ -159,8 +162,18 @@ async function startServer() {
     try {
       const headerEvent = (req.headers["x-yengapay-event"] as string | undefined) ?? null;
       const event = parseYengapayWebhookEvent(rawBody, signature, headerEvent);
-      const provider = config.mode === "sandbox" ? "yengapay_sandbox" : "yengapay_live";
-      const recorded = await db.recordYengapayWebhookEvent({ provider, providerEventId: event.providerEventId, eventType: event.eventType, paymentTransactionId: null, payload: rawBody, signature });
+      // Le provider exact (sandbox/live + checkout/direct) est déterminé par la transaction
+      // déjà enregistrée en base : on lit d'abord son provider pour logguer et router la notif
+      // correctement. Si la transaction n'existe pas encore (race : webhook arrive avant que
+      // l'appel API n'ait commité la ligne), on retombe sur le provider par défaut du mode
+      // courant et le settle échouera avec un message clair — le webhook réessayé plus tard
+      // trouvera la transaction.
+      const preLookup = await db.lookupTikisPaymentByProviderReference(event.providerReference);
+      const isDirect = preLookup?.provider.startsWith("yengapay_direct_") ?? false;
+      const provider = isDirect
+        ? (config.mode === "sandbox" ? "yengapay_direct_sandbox" : "yengapay_direct_live")
+        : (config.mode === "sandbox" ? "yengapay_sandbox" : "yengapay_live");
+      const recorded = await db.recordYengapayWebhookEvent({ provider, providerEventId: event.providerEventId, eventType: event.eventType, paymentTransactionId: preLookup?.id ?? null, payload: rawBody, signature });
       if (recorded.duplicate) {
         return res.status(200).json({ ok: true, duplicate: true });
       }
@@ -169,7 +182,34 @@ async function startServer() {
       }
       const outcome: "succeeded" | "failed" | "cancelled" = event.eventType.endsWith("succeeded") ? "succeeded" : event.eventType.endsWith("cancelled") ? "cancelled" : "failed";
       try {
-        await db.settleYengapayLivePayment({ providerReference: event.providerReference, outcome });
+        const settled = await db.settleYengapayLivePayment({ providerReference: event.providerReference, outcome });
+        // Notif push : paiement direct + succès ou échec → l'utilisateur est prévenu même
+        // app fermée. Pour les paiements checkout (redirection web), la notif est redondante
+        // puisque l'utilisateur voit déjà l'écran de confirmation dans le navigateur YengaPay.
+        if (isDirect && preLookup?.profilePhone && settled?.payment?.id) {
+          const phone = preLookup.profilePhone;
+          if (outcome === "succeeded") {
+            void db.enqueuePushToPhone({
+              phone,
+              title: "Dépôt Mobile Money confirmé",
+              body: `${settled.payment.amount.toLocaleString("fr-FR")} FCFA crédités sur votre Wallet Tikis.`,
+              data: { kind: "wallet_direct_deposit_succeeded", transactionId: settled.payment.id },
+              channelId: "tikis-wallet",
+            }).catch((pushError) => {
+              console.error("[webhook:yengapay] push failed", pushError);
+            });
+          } else if (outcome === "failed" || outcome === "cancelled") {
+            void db.enqueuePushToPhone({
+              phone,
+              title: "Dépôt Mobile Money échoué",
+              body: "Le paiement n'a pas été confirmé par votre opérateur. Le solde de votre Wallet est inchangé.",
+              data: { kind: "wallet_direct_deposit_failed", transactionId: settled.payment.id },
+              channelId: "tikis-wallet",
+            }).catch((pushError) => {
+              console.error("[webhook:yengapay] push failed", pushError);
+            });
+          }
+        }
         return res.status(200).json({ ok: true });
       } catch (settleError) {
         const reason = settleError instanceof Error ? settleError.message : "Erreur inconnue";

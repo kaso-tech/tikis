@@ -1884,7 +1884,7 @@ export async function listTikisDeliveryReviewsForProfile(profilePhone: string, r
 }
 
 /** YengaPay : enregistrement idempotent d'un événement webhook. */
-export async function recordYengapayWebhookEvent(input: { provider: "yengapay_sandbox" | "yengapay_live"; providerEventId: string; eventType: string; paymentTransactionId: string | null; payload: string; signature: string | null }) {
+export async function recordYengapayWebhookEvent(input: { provider: "yengapay_sandbox" | "yengapay_live" | "yengapay_direct_sandbox" | "yengapay_direct_live"; providerEventId: string; eventType: string; paymentTransactionId: string | null; payload: string; signature: string | null }) {
   const db = await getDb();
   if (!db) throw new Error("Le paiement est temporairement indisponible.");
   const existing = (await db.select().from(tikisYengapayWebhookEvents).where(and(eq(tikisYengapayWebhookEvents.provider, input.provider), eq(tikisYengapayWebhookEvents.providerEventId, input.providerEventId))).limit(1))[0];
@@ -1892,6 +1892,17 @@ export async function recordYengapayWebhookEvent(input: { provider: "yengapay_sa
   const id = randomUUID();
   await db.insert(tikisYengapayWebhookEvents).values({ id, provider: input.provider, providerEventId: input.providerEventId, eventType: input.eventType, paymentTransactionId: input.paymentTransactionId, payload: input.payload, signature: input.signature, status: "received" });
   return { duplicate: false, id };
+}
+
+/** YengaPay : lookup rapide par providerReference pour le webhook handler. Renvoie le `provider`
+ *  de la transaction (utile pour distinguer checkout web vs paiement direct) et la FK. Si la
+ *  transaction n'existe pas encore (race webhook arrive avant la confirmation API), renvoie null
+ *  — le webhook handler tombera sur le provider par défaut et le settle échouera proprement. */
+export async function lookupTikisPaymentByProviderReference(providerReference: string): Promise<{ id: string; provider: typeof tikisPaymentTransactions.$inferSelect.provider; type: "deposit" | "withdrawal"; profilePhone: string } | null> {
+  const db = await getDb();
+  if (!db) throw new Error("Le paiement est temporairement indisponible.");
+  const record = (await db.select({ id: tikisPaymentTransactions.id, provider: tikisPaymentTransactions.provider, type: tikisPaymentTransactions.type, profilePhone: tikisPaymentTransactions.profilePhone }).from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.providerReference, providerReference)).limit(1))[0];
+  return record ?? null;
 }
 
 /** YengaPay : applique un événement de paiement sur le wallet (succeeded / failed / cancelled). */
