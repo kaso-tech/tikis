@@ -35,7 +35,7 @@ const QUICK_AMOUNTS = [1_000, 2_500, 5_000, 10_000, 25_000];
 const POLL_INTERVAL_MS = 3_000;
 const POLL_TIMEOUT_MS = 5 * 60_000;
 
-type DirectDepositView = {
+export type DirectDepositView = {
   transactionId: string;
   providerReference: string;
   ussdCode: string;
@@ -55,7 +55,7 @@ function buildOtpLabel(operator: Operator): string {
   return operator === "orange_money" ? "Orange Money" : "Moov Money";
 }
 
-export function WalletDirectDepositScreen({ visible, onClose, onSuccess }: { visible: boolean; onClose: () => void; onSuccess?: () => void }) {
+export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initialDeposit }: { visible: boolean; onClose: () => void; onSuccess?: () => void; initialDeposit?: DirectDepositView | null }) {
   const { colors: theme } = useThemeColors();
   const styles = makeStyles(theme);
 
@@ -95,6 +95,27 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess }: { vis
     resetForm();
     onClose();
   }, [onClose, resetForm]);
+
+  // ===== Reprise d'un dépôt en attente =====
+  // Si le parent passe `initialDeposit`, on saute directement à `stage="pending"` avec
+  // le deposit pré-rempli et le compte à rebours recadré sur l'expiration réelle.
+  // Cas d'usage : l'utilisateur a fermé l'app pendant le polling d'un paiement direct,
+  // le serveur l'a gardé en `pending`, et au retour sur le wallet la bannière lui permet
+  // de reprendre la confirmation sans tout recommencer.
+  // On utilise `useEffect` plutôt que d'initialiser `useState` car `initialDeposit` peut
+  // changer pendant que le modal est visible (l'utilisateur clique une bannière puis
+  // ferme, puis reclique sur une autre).
+  useEffect(() => {
+    if (!visible) return;
+    if (!initialDeposit) return;
+    setDeposit(initialDeposit);
+    setOperator(initialDeposit.operator);
+    setStage("pending");
+    setOtpDigits(["", "", "", "", "", ""]);
+    setSubmitError("");
+    setPollError("");
+    setSecondsLeft(Math.max(0, Math.round((new Date(initialDeposit.expiresAt).getTime() - Date.now()) / 1000)));
+  }, [visible, initialDeposit]);
 
   // ===== Soumission =====
   const onSubmit = useCallback(async () => {

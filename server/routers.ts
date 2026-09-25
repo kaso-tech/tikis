@@ -855,6 +855,15 @@ export const appRouter = router({
       const { getYengapayDirectDepositStatus } = await import("./yengapay-direct");
       return getYengapayDirectDepositStatus({ profilePhone: profile.phone, transactionId: input.transactionId });
     }),
+    // Liste les paiements directs encore en attente pour le profil courant. Sert à la reprise
+    // côté client quand l'utilisateur a fermé l'app pendant le polling initial : le dépôt
+    // reste en `pending` jusqu'à expiration ou webhook `payment.succeeded/failed/cancelled`.
+    // Filtré par le serveur pour qu'un client malveillant ne voie pas les transactions d'un
+    // autre profil.
+    listPendingDirectDeposits: tikisProtectedProcedure.query(async ({ ctx }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      return db.listPendingDirectDeposits(profile.phone);
+    }),
     settleDirectDepositTest: tikisProtectedProcedure.input(z.object({ transactionId: z.string().uuid(), outcome: z.enum(["succeeded", "failed"]) })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       const { settleYengapayDirectDepositTest } = await import("./yengapay-direct");

@@ -43,11 +43,18 @@ export default function WalletScreen() {
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 12_000, refetchOnMount: "always", refetchOnWindowFocus: true });
   const wallet = walletQuery.data?.wallet;
   const journal = walletQuery.data?.journal ?? [];
+  // Paiements directs encore en attente côté serveur. Re-fetch toutes les 10s pour qu'un
+  // paiement confirmé par le webhook YengaPay pendant que l'app est ouverte soit évacué
+  // de la bannière rapidement sans attendre que l'utilisateur touche à quoi que ce soit.
+  const pendingDirectDepositsQuery = trpc.wallet.listPendingDirectDeposits.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 10_000, refetchOnMount: "always", refetchOnWindowFocus: true });
+  const pendingDirectDeposits = pendingDirectDepositsQuery.data ?? [];
+  const topPendingDirectDeposit = pendingDirectDeposits[0] ?? null;
   const initiateMutation = trpc.wallet.initiateYengaPay.useMutation();
   const settleMutation = trpc.wallet.settleYengaPayTest.useMutation();
   const [requestType, setRequestType] = useState<"deposit" | "withdrawal" | null>(null);
   const [amountInput, setAmountInput] = useState("");
   const [directModalVisible, setDirectModalVisible] = useState(false);
+  const [directResumeDeposit, setDirectResumeDeposit] = useState<import("@/components/tikis/wallet-direct-deposit").DirectDepositView | null>(null);
   const [requestError, setRequestError] = useState("");
   const [paymentNotice, setPaymentNotice] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -166,6 +173,29 @@ export default function WalletScreen() {
           </View>
         </View>
 
+        {topPendingDirectDeposit ? (
+          <Pressable
+            // Cast : DirectDepositRecord (server/db.ts) et DirectDepositView (modal) sont
+            // structurellement compatibles depuis que le serveur expose `mode` (cf.
+            // paymentTransactionToDirectDeposit). Le modal ne lit que les champs qu'il a
+            // déclarés, donc les champs supplémentaires du record (profilePhone, createdAt,
+            // settledAt) sont ignorés sans risque.
+            onPress={() => { setDirectResumeDeposit(topPendingDirectDeposit as unknown as import("@/components/tikis/wallet-direct-deposit").DirectDepositView); setDirectModalVisible(true); }}
+            style={({ pressed }) => [styles.pendingDirectCard, { backgroundColor: theme.surface, borderColor: theme.primary }, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Reprendre la confirmation d'un dépôt Mobile Money en attente"
+          >
+            <View style={[styles.pendingDirectIcon, { backgroundColor: theme.primary + "22" }]}><MaterialIcons name="hourglass-top" size={16} color={theme.primary} /></View>
+            <View style={styles.pendingDirectText}>
+              <Text style={[styles.pendingDirectTitle, { color: theme.foreground }]}>Dépôt Mobile Money en attente</Text>
+              <Text style={[styles.pendingDirectSub, { color: theme.muted }]} numberOfLines={1}>
+                {formatMoney(topPendingDirectDeposit.amount)} · {topPendingDirectDeposit.operator === "orange_money" ? "Orange Money" : "Moov Money"} · touchez pour reprendre
+              </Text>
+            </View>
+            <MaterialIcons name="chevron-right" size={18} color={theme.muted} />
+          </Pressable>
+        ) : null}
+
         <View style={styles.actionsRow}>
           <Pressable onPress={() => openRequest("deposit")} style={({ pressed }) => [styles.actionCard, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]}>
             <View style={[styles.actionIcon, { backgroundColor: theme.background }]}><MaterialIcons name="add-card" size={15} color={theme.primary} /></View>
@@ -279,8 +309,13 @@ export default function WalletScreen() {
 
       <WalletDirectDepositScreen
         visible={directModalVisible}
-        onClose={() => setDirectModalVisible(false)}
-        onSuccess={() => { void utilities.wallet.snapshot.invalidate(); }}
+        initialDeposit={directResumeDeposit}
+        onClose={() => { setDirectModalVisible(false); setDirectResumeDeposit(null); }}
+        onSuccess={() => {
+          void utilities.wallet.snapshot.invalidate();
+          void utilities.wallet.listPendingDirectDeposits.invalidate();
+          setDirectResumeDeposit(null);
+        }}
       />
     </SafeAreaView>
   );
@@ -347,6 +382,15 @@ const styles = StyleSheet.create({
   senderInfoIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", flexShrink: 0 },
   senderInfoText: { flex: 1, color: "#667085", fontSize: 11, lineHeight: 16 },
   senderInfoTextBold: { fontWeight: "700" },
+
+  // Bannière "dépôt Mobile Money en attente" — sert à la reprise quand l'utilisateur a
+  // fermé l'app pendant le polling. Card pleine largeur comme `senderInfo`, mais border
+  // primary pour signaler l'attention.
+  pendingDirectCard: { marginHorizontal: 8, padding: 12, borderRadius: 10, borderWidth: 1, flexDirection: "row", gap: 10, alignItems: "center" },
+  pendingDirectIcon: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  pendingDirectText: { flex: 1 },
+  pendingDirectTitle: { fontSize: 12, fontWeight: "700" },
+  pendingDirectSub: { fontSize: 11, lineHeight: 15, marginTop: 2 },
 
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 10, marginTop: 6 },
   sectionTitle: { color: "#667085", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
