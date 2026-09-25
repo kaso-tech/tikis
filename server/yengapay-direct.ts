@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readYengapayConfig, asNonEmptyString } from "./yengapay";
 import * as db from "./db";
+import { buildUssdCode, type YengapayOperatorCode } from "../shared/yengapay-ussd";
 
 /**
  * Paiement Mobile Money direct (in-app, sans redirection web).
@@ -19,13 +20,13 @@ import * as db from "./db";
  * permet de créditer ou refuser manuellement.
  */
 
-export type YengapayDirectOperator = "orange_money" | "moov_money";
+export type YengapayDirectOperator = YengapayOperatorCode;
 
 export type YengapayDirectDepositRequest = {
   profilePhone: string;
   amount: number;
   phone: string;          // E.164 international, ex: +22670707070
-  operator: YengapayDirectOperator;
+  operator: YengapayOperatorCode;
   countryCode: string;
 };
 
@@ -35,20 +36,12 @@ export type YengapayDirectDeposit = {
   ussdCode: string;          // Code USSD à composer (*144*4*6*<montant># ou similaire)
   amount: number;
   phone: string;
-  operator: YengapayDirectOperator;
-  countryCode: string;
+  operator: YengapayOperatorCode;
+  countryCode: string;       // Code ISO du pays (BF, CI, BJ, etc.)
   expiresAt: string;         // ISO 8601, expiration de la demande USSD
   status: "pending" | "succeeded" | "failed" | "cancelled" | "expired";
   mode: "test" | "sandbox" | "live";
 };
-
-/** Construit le code USSD Orange Money / Moov Money selon l'opérateur et le montant.
- *  Pattern Orange : *144*4*6*<montant># (dépôt, code marchand 4*6, le 6 étant un placeholder API YengaPay).
- *  Pattern Moov :   *555*4*<montant># (à vérifier avec la sandbox YengaPay). */
-function buildUssdCode(operator: YengapayDirectOperator, amount: number): string {
-  if (operator === "orange_money") return `*144*4*6*${amount}#`;
-  return `*555*4*${amount}#`; // Moov Money — à valider avec la sandbox YengaPay réelle
-}
 
 /** Crée la demande de dépôt direct.
  *  - En mode test : génère un transactionId interne et un providerReference factice.

@@ -1,39 +1,49 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import * as Linking from "expo-linking";
-import { useCallback, useEffect, useState } from "react";
-import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { COUNTRIES, countryFlagEmoji, type CountrySpec } from "@/lib/registration-rules";
 import { formatMoney } from "@/shared/tikis-domain";
 import { trpc } from "@/lib/trpc";
 import { useThemeColors } from "@/lib/use-theme-colors";
+import { buildUssdCode, operatorLabel, type YengapayOperatorCode } from "@/shared/yengapay-ussd";
 
 /**
- * Paiement Mobile Money direct (in-app) : Orange Money / Moov Money via YengaPay Direct API.
+ * Paiement Mobile Money direct (in-app, sans redirection web) — Orange Money / Moov Money
+ * via YengaPay Direct API.
  *
- * Flow :
- *  1. L'utilisateur saisit le montant + opérateur + numéro (sélecteur de pays comme à l'auth).
- *  2. Soumission -> mutation tRPC wallet.requestDirectDeposit
- *  3. Le serveur crée un payment intent YengaPay + un code USSD
- *  4. Le client compose le code via Linking.openURL("tel:*144*4*6*<montant>#")
- *     qui ouvre l'app téléphone pré-rempli avec le code USSD.
- *  5. L'utilisateur saisit son code secret OM/MM sur son téléphone -> USSD envoyé.
- *  6. SMS OTP envoyé au numéro -> l'utilisateur le saisit dans les 6 cellules.
- *  7. Polling toutes les 3s : wallet.checkDirectDepositStatus
- *  8. Webhook YengaPay -> serveur crédite le Wallet.
- *  9. Client reçoit status='succeeded' -> écran de succès.
+ * Flow unifié sur une seule page (vs. ancien form/pending en deux étapes) :
  *
- * En mode test, l'utilisateur final peut forcer le succès/échec via les boutons
- * __DEV__ dans le footer de l'écran pending (wallet.settleDirectDepositTest).
+ *  1. Page unique de saisie :
+ *     - Sélecteur pays (8 UEMOA + Ghana).
+ *     - Montant + raccourcis 1k/2,5k/5k/10k/25k.
+ *     - Cartes opérateur Orange/Moov (le code USSD du bouton se met à jour live).
+ *     - Numéro E.164 (split indicatif + national, maxLength dynamique par pays).
+ *     - Code OTP : un seul champ TextInput paste-friendly (vs. 6 cellules manuelles).
+ *     - Lien USSD : titre = code USSD (*144*4*6*<montant>#) ; tap = Linking.openURL("tel:…").
+ *     - CTA "Valider le paiement" qui soumet.
+ *
+ *  2. Page "Validation en cours" :
+ *     - Spinner + récap opérateur/numéro/montant/référence.
+ *     - Polling 3s sur wallet.checkDirectDepositStatus.
+ *     - Boutons __DEV__ pour forcer succès/échec en mode test.
+ *     - Bouton Annuler.
+ *
+ *  3. Page "Paiement effectué" : gros check vert + récap + bouton Terminer.
+ *
+ *  4. Page "Paiement échoué" : gros X rouge + cause + Modifier/Fermer.
+ *
+ * Le serveur crédite réellement le Wallet via webhook YengaPay ou via settleDirectDepositTest
+ * (DEV). La confirmation côté client arrive via le polling status.
  */
 
-type Operator = "orange_money" | "moov_money";
-type Stage = "form" | "pending" | "success" | "failed";
+type Stage = "input" | "waiting" | "success" | "failed";
+type Operator = YengapayOperatorCode;
 
 const QUICK_AMOUNTS = [1_000, 2_500, 5_000, 10_000, 25_000];
 const POLL_INTERVAL_MS = 3_000;
-const POLL_TIMEOUT_MS = 5 * 60_000;
 
 export type DirectDepositView = {
   transactionId: string;
@@ -47,133 +57,91 @@ export type DirectDepositView = {
   mode: "test" | "sandbox" | "live";
 };
 
-function formatUSSDForDisplay(ussd: string): string {
-  return ussd.replace(/\*/g, "*");
-}
-
-function buildOtpLabel(operator: Operator): string {
-  return operator === "orange_money" ? "Orange Money" : "Moov Money";
-}
-
 export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initialDeposit }: { visible: boolean; onClose: () => void; onSuccess?: () => void; initialDeposit?: DirectDepositView | null }) {
   const { colors: theme } = useThemeColors();
   const styles = makeStyles(theme);
 
-  // ===== ÉTAT FORM =====
+  // ===== ÉTAT FORM (page unique) =====
   const [countryIndex, setCountryIndex] = useState(0);
   const country: CountrySpec = COUNTRIES[countryIndex];
   const [amount, setAmount] = useState<string>("2500");
   const [phoneLocal, setPhoneLocal] = useState<string>("");
   const [operator, setOperator] = useState<Operator>("orange_money");
-  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
-  const [stage, setStage] = useState<Stage>("form");
+  const [otpCode, setOtpCode] = useState<string>("");
+
+  // ===== ÉTAT STAGE =====
+  const [stage, setStage] = useState<Stage>("input");
+  const [deposit, setDeposit] = useState<DirectDepositView | null>(null);
   const [submitError, setSubmitError] = useState<string>("");
   const [pollError, setPollError] = useState<string>("");
-  const [secondsLeft, setSecondsLeft] = useState<number>(POLL_TIMEOUT_MS / 1000);
-  const [deposit, setDeposit] = useState<DirectDepositView | null>(null);
 
   const requestMutation = trpc.wallet.requestDirectDeposit.useMutation();
   const statusQuery = trpc.wallet.checkDirectDepositStatus.useQuery(
     { transactionId: deposit?.transactionId ?? "" },
-    { enabled: Boolean(deposit?.transactionId) && stage === "pending", refetchInterval: POLL_INTERVAL_MS },
+    { enabled: Boolean(deposit?.transactionId) && stage === "waiting", refetchInterval: POLL_INTERVAL_MS },
   );
   const settleTestMutation = trpc.wallet.settleDirectDepositTest.useMutation();
 
-  const resetForm = useCallback(() => {
-    setStage("form");
+  // ===== Calculs dérivés =====
+  const amountNum = useMemo(() => parseInt(amount, 10), [amount]);
+  const isAmountValid = Number.isFinite(amountNum) && amountNum >= 100 && amountNum <= 10_000_000;
+  const isPhoneValid = phoneLocal.length === country.digits;
+  // L'OTP est techniquement optionnel : la vraie confirmation vient du webhook YengaPay.
+  // On l'affiche et le rend éditable, mais on ne bloque pas le submit dessus.
+  const canSubmit = isAmountValid && isPhoneValid && !requestMutation.isPending;
+
+  const ussdCode = useMemo(() => buildUssdCode(operator, amountNum), [operator, amountNum]);
+
+  // ===== Reset =====
+  const reset = useCallback(() => {
+    setStage("input");
     setAmount("2500");
     setPhoneLocal("");
-    setOtpDigits(["", "", "", "", "", ""]);
+    setOtpCode("");
     setSubmitError("");
     setPollError("");
     setDeposit(null);
     setOperator("orange_money");
     setCountryIndex(0);
-    setSecondsLeft(POLL_TIMEOUT_MS / 1000);
   }, []);
   const closeModal = useCallback(() => {
-    resetForm();
+    reset();
     onClose();
-  }, [onClose, resetForm]);
+  }, [onClose, reset]);
 
-  // ===== Reprise d'un dépôt en attente =====
-  // Si le parent passe `initialDeposit`, on saute directement à `stage="pending"` avec
-  // le deposit pré-rempli et le compte à rebours recadré sur l'expiration réelle.
-  // Cas d'usage : l'utilisateur a fermé l'app pendant le polling d'un paiement direct,
-  // le serveur l'a gardé en `pending`, et au retour sur le wallet la bannière lui permet
-  // de reprendre la confirmation sans tout recommencer.
-  // On utilise `useEffect` plutôt que d'initialiser `useState` car `initialDeposit` peut
-  // changer pendant que le modal est visible (l'utilisateur clique une bannière puis
-  // ferme, puis reclique sur une autre).
+  // Reset quand le modal se ferme
+  useEffect(() => {
+    if (!visible) reset();
+  }, [visible, reset]);
+
+  // Reprise d'un dépôt en attente (depuis la bannière du wallet)
+  // Si le parent passe `initialDeposit`, on saute directement au stage "waiting" avec le
+  // deposit pré-rempli — l'USSD a déjà été composé, on attend juste la confirmation PSP.
+  // Le setTimeout(0) évite les warnings React "setState during render" si le parent re-render
+  // simultanément (cf. fix Manus 433bbe0). cleanup clearTimeout au démontage du composant.
   useEffect(() => {
     if (!visible) return;
     if (!initialDeposit) return;
     const resume = setTimeout(() => {
       setDeposit(initialDeposit);
       setOperator(initialDeposit.operator);
-      setStage("pending");
-      setOtpDigits(["", "", "", "", "", ""]);
+      setStage("waiting");
+      setOtpCode("");
       setSubmitError("");
       setPollError("");
-      setSecondsLeft(Math.max(0, Math.round((new Date(initialDeposit.expiresAt).getTime() - Date.now()) / 1000)));
     }, 0);
     return () => clearTimeout(resume);
   }, [visible, initialDeposit]);
 
-  // ===== Soumission =====
-  const onSubmit = useCallback(async () => {
-    setSubmitError("");
-    const amountNum = parseInt(amount, 10);
-    if (!Number.isFinite(amountNum) || amountNum < 100 || amountNum > 10_000_000) {
-      setSubmitError("Le montant doit être compris entre 100 FCFA et 10 000 000 FCFA.");
-      return;
-    }
-    if (phoneLocal.length !== country.digits) {
-      setSubmitError(`Le numéro doit contenir ${country.digits} chiffres pour ${country.name}.`);
-      return;
-    }
-    try {
-      const result = await requestMutation.mutateAsync({ amount: amountNum, countryCode: country.id, phoneLocal, operator });
-      setDeposit(result);
-      setStage("pending");
-      setSecondsLeft(Math.max(0, Math.round((new Date(result.expiresAt).getTime() - Date.now()) / 1000)));
-    } catch (cause) {
-      setSubmitError(cause instanceof Error ? cause.message : "La demande de paiement n'a pas pu être créée.");
-    }
-  }, [amount, phoneLocal, country, operator, requestMutation]);
+  // ===== Handlers =====
+  const onChangeCountry = useCallback(() => {
+    setCountryIndex((idx) => (idx + 1) % COUNTRIES.length);
+    setPhoneLocal("");
+  }, []);
 
-  // ===== Polling =====
-  useEffect(() => {
-    if (stage !== "pending" || !deposit) return;
-    const data = statusQuery.data;
-    if (!data) return;
-    if (data.status === "pending") return;
-    const transition = setTimeout(() => {
-      if (data.status === "succeeded") { setStage("success"); onSuccess?.(); }
-      else setStage("failed");
-    }, 0);
-    return () => clearTimeout(transition);
-  }, [statusQuery.data, stage, deposit, onSuccess]);
-
-  useEffect(() => {
-    if (stage !== "pending") return;
-    const id = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000);
-    return () => clearInterval(id);
-  }, [stage]);
-
-  useEffect(() => {
-    if (stage !== "pending") return;
-    const expiration = setTimeout(() => {
-      setStage("failed");
-      setPollError("La demande a expiré avant confirmation.");
-    }, Math.max(0, secondsLeft) * 1000);
-    return () => clearTimeout(expiration);
-  }, [secondsLeft, stage]);
-
-  // ===== Téléphone : USSD =====
   const onCallUSSD = useCallback(async () => {
-    if (!deposit) return;
-    const telUri = `tel:${encodeURIComponent(deposit.ussdCode)}`;
+    if (!ussdCode) return;
+    const telUri = `tel:${encodeURIComponent(ussdCode)}`;
     try {
       const supported = await Linking.canOpenURL(telUri).catch(() => true);
       if (!supported) {
@@ -184,38 +152,32 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     } catch (cause) {
       Alert.alert("Erreur", cause instanceof Error ? cause.message : "Impossible d'ouvrir l'application téléphone.");
     }
-  }, [deposit]);
+  }, [ussdCode]);
 
-  // ===== OTP cells =====
-  const onOtpChange = useCallback((index: number, value: string) => {
-    setOtpDigits((prev) => {
-      const next = [...prev];
-      next[index] = value.slice(-1);
-      return next;
-    });
-  }, []);
-
-  const onOtpKeyDown = useCallback((index: number, key: string) => {
-    if (key === "Backspace" && index > 0) setOtpDigits((prev) => {
-      const next = [...prev];
-      next[index - 1] = "";
-      return next;
-    });
-  }, []);
-
-  const onOtpSubmit = useCallback(() => {
-    const code = otpDigits.join("");
-    if (code.length !== 6) {
-      Alert.alert("Code incomplet", "Saisissez les 6 chiffres de l'OTP.");
+  const onSubmit = useCallback(async () => {
+    setSubmitError("");
+    if (!isAmountValid) {
+      setSubmitError("Le montant doit être compris entre 100 FCFA et 10 000 000 FCFA.");
       return;
     }
-    // L'OTP est saisi côté téléphone (USSD), pas dans l'app. Ce code n'est utile que pour
-    // confirmer visuellement à l'utilisateur qu'il a bien reçu et noté le code. La confirmation
-    // réelle passe par le webhook YengaPay + le polling status.
-    Alert.alert("Code noté", "Si l'OTP est correct, votre paiement sera confirmé automatiquement dans quelques secondes.");
-  }, [otpDigits]);
+    if (!isPhoneValid) {
+      setSubmitError(`Le numéro doit contenir ${country.digits} chiffres pour ${country.name}.`);
+      return;
+    }
+    try {
+      const result = await requestMutation.mutateAsync({ amount: amountNum, countryCode: country.id, phoneLocal, operator });
+      setDeposit(result);
+      setStage("waiting");
+    } catch (cause) {
+      setSubmitError(cause instanceof Error ? cause.message : "La demande de paiement n'a pas pu être créée.");
+    }
+  }, [amountNum, phoneLocal, country, operator, requestMutation, isAmountValid, isPhoneValid]);
 
-  // ===== Test helpers (DEV) =====
+  const onCancelWaiting = useCallback(() => {
+    setPollError("Paiement annulé. Vous pouvez modifier les informations et réessayer.");
+    setStage("failed");
+  }, []);
+
   const onDevSettle = useCallback(async (outcome: "succeeded" | "failed") => {
     if (!deposit) return;
     try {
@@ -226,12 +188,23 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     }
   }, [deposit, settleTestMutation]);
 
-  const onChangeCountry = useCallback(() => {
-    setCountryIndex((idx) => (idx + 1) % COUNTRIES.length);
-    setPhoneLocal("");
-  }, []);
+  // ===== Polling =====
+  useEffect(() => {
+    if (stage !== "waiting" || !deposit) return;
+    const data = statusQuery.data;
+    if (!data) return;
+    if (data.status === "succeeded") { setStage("success"); onSuccess?.(); }
+    else if (data.status === "failed" || data.status === "cancelled" || data.status === "expired") {
+      setPollError(
+        data.status === "expired" ? "La demande a expiré avant confirmation."
+        : data.status === "cancelled" ? "Le paiement a été annulé."
+        : "Le paiement n'a pas pu être confirmé.",
+      );
+      setStage("failed");
+    }
+  }, [statusQuery.data, stage, deposit, onSuccess]);
 
-  // ===== Render =====
+  // ===== Rendu =====
   if (!visible) return null;
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={closeModal} statusBarTranslucent>
@@ -241,45 +214,44 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
             <MaterialIcons name="close" size={20} color={theme.foreground} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.headerTitle, { color: theme.foreground }]}>
-              {stage === "form" ? "Dépôt Mobile Money" : stage === "pending" ? `Confirmation ${buildOtpLabel(operator)}` : stage === "success" ? "Dépôt réussi" : "Paiement échoué"}
+            <Text style={[styles.headerTitle, { color: theme.foreground }]} numberOfLines={1}>
+              {stage === "input" ? "Dépôt Mobile Money" : stage === "waiting" ? "Validation en cours" : stage === "success" ? "Paiement effectué" : "Paiement échoué"}
             </Text>
           </View>
         </View>
 
-        {stage === "form" ? (
-          <FormStage
+        {stage === "input" ? (
+          <InputStage
             theme={theme}
             styles={styles}
             country={country}
             amount={amount}
             phoneLocal={phoneLocal}
             operator={operator}
+            otpCode={otpCode}
+            ussdCode={ussdCode}
             submitError={submitError}
             submitting={requestMutation.isPending}
+            canSubmit={canSubmit}
             onChangeCountry={onChangeCountry}
             onChangeAmount={setAmount}
             onChangePhone={setPhoneLocal}
             onChangeOperator={setOperator}
+            onChangeOtp={setOtpCode}
+            onCallUSSD={onCallUSSD}
             onSubmit={onSubmit}
           />
         ) : null}
 
-        {stage === "pending" && deposit ? (
-          <PendingStage
+        {stage === "waiting" && deposit ? (
+          <WaitingStage
             theme={theme}
             styles={styles}
             deposit={deposit}
-            otpDigits={otpDigits}
-            secondsLeft={secondsLeft}
             pollError={pollError}
             isTest={deposit.mode === "test"}
             settling={settleTestMutation.isPending}
-            onOtpChange={onOtpChange}
-            onOtpKeyDown={onOtpKeyDown}
-            onOtpSubmit={onOtpSubmit}
-            onCallUSSD={onCallUSSD}
-            onCancel={() => setStage("failed")}
+            onCancel={onCancelWaiting}
             onDevSettle={onDevSettle}
           />
         ) : null}
@@ -289,7 +261,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
         ) : null}
 
         {stage === "failed" ? (
-          <FailedStage theme={theme} styles={styles} message={pollError || "Le paiement n'a pas pu être confirmé."} onRetry={() => setStage("form")} onClose={closeModal} />
+          <FailedStage theme={theme} styles={styles} message={pollError || "Le paiement n'a pas pu être confirmé."} onRetry={() => setStage("input")} onClose={closeModal} />
         ) : null}
       </SafeAreaView>
     </Modal>
@@ -297,25 +269,31 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
 }
 
 // =====================================================================
-// Stages
+// Page 1 — Saisie unifiée (form + lien USSD + OTP + CTA)
 // =====================================================================
 
-function FormStage(props: {
+function InputStage(props: {
   theme: ReturnType<typeof useThemeColors>["colors"];
   styles: ReturnType<typeof makeStyles>;
   country: CountrySpec;
   amount: string;
   phoneLocal: string;
   operator: Operator;
+  otpCode: string;
+  ussdCode: string;
   submitError: string;
   submitting: boolean;
+  canSubmit: boolean;
   onChangeCountry: () => void;
   onChangeAmount: (value: string) => void;
   onChangePhone: (value: string) => void;
   onChangeOperator: (op: Operator) => void;
+  onChangeOtp: (value: string) => void;
+  onCallUSSD: () => void;
   onSubmit: () => void;
 }) {
-  const { theme, styles, country, amount, phoneLocal, operator, submitError, submitting, onChangeCountry, onChangeAmount, onChangePhone, onChangeOperator, onSubmit } = props;
+  const { theme, styles, country, amount, phoneLocal, operator, otpCode, ussdCode, submitError, submitting, canSubmit, onChangeCountry, onChangeAmount, onChangePhone, onChangeOperator, onChangeOtp, onCallUSSD, onSubmit } = props;
+  const otpValid = otpCode.length === 0 || /^\d{0,6}$/.test(otpCode);
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
@@ -371,9 +349,57 @@ function FormStage(props: {
           <Text style={[styles.hint, { color: theme.muted }]}>{country.name} · {country.digits} chiffres attendus</Text>
         </View>
 
+        {/* OTP : un seul champ paste-friendly — l'utilisateur tape directement les 6 chiffres
+            reçus par SMS après avoir composé l'USSD. Pas de cellules manuelles. */}
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.label, { color: theme.muted }]}>CODE OTP REÇU PAR SMS</Text>
+          <TextInput
+            value={otpCode}
+            onChangeText={(value) => { if (/^\d{0,6}$/.test(value)) onChangeOtp(value); }}
+            keyboardType="number-pad"
+            maxLength={6}
+            placeholder="6 chiffres"
+            placeholderTextColor={theme.muted}
+            style={[styles.otpInput, { color: theme.foreground, backgroundColor: theme.background, borderColor: theme.border }, !otpValid && { borderColor: theme.error }]}
+            accessibilityLabel="Code OTP à 6 chiffres reçu par SMS"
+            returnKeyType="done"
+            autoComplete="one-time-code"
+            textContentType="oneTimeCode"
+          />
+          <Text style={[styles.hint, { color: theme.muted }]}>
+            Après composition de l'USSD, votre opérateur envoie un code à 6 chiffres par SMS. Saisissez-le ici (optionnel — la confirmation vient de YengaPay).
+          </Text>
+        </View>
+
+        {/* Lien USSD : titre = code USSD calculé live, tap = Linking.openURL("tel:...").
+            Style minimal : texte primary souligné, comme un lien hypertexte. */}
+        <View style={styles.ussdLinkWrap}>
+          <Pressable
+            onPress={onCallUSSD}
+            disabled={!ussdCode}
+            style={({ pressed }) => [styles.ussdLink, pressed && styles.pressed, !ussdCode && styles.ussdLinkDisabled]}
+            accessibilityRole="link"
+            accessibilityLabel={ussdCode ? `Appeler le code USSD ${ussdCode}` : "Code USSD indisponible tant que le montant n'est pas valide"}
+          >
+            <Text style={[styles.ussdLinkText, { color: theme.primary }, !ussdCode && { color: theme.muted }]} numberOfLines={1}>
+              {ussdCode || "—"}
+            </Text>
+          </Pressable>
+          <Text style={[styles.ussdLinkHint, { color: theme.muted }]}>
+            Touchez pour ouvrir l'app téléphone avec le code pré-rempli.
+          </Text>
+        </View>
+
         {submitError ? <Text style={[styles.errorText, { color: theme.error, backgroundColor: "#F8E8E9" }]}>{submitError}</Text> : null}
 
-        <TikisButton label={submitting ? "Création du paiement…" : `Payer ${formatMoney(parseInt(amount, 10) || 0)}`} icon="send" onPress={onSubmit} loading={submitting} style={styles.cta} />
+        <TikisButton
+          label={submitting ? "Envoi en cours…" : "Valider le paiement"}
+          icon="check-circle"
+          onPress={onSubmit}
+          loading={submitting}
+          disabled={!canSubmit}
+          style={styles.cta}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -383,77 +409,49 @@ function OperatorCard(props: { theme: ReturnType<typeof useThemeColors>["colors"
   const { theme, styles, operator, active, onPress } = props;
   const isOM = operator === "orange_money";
   const color = isOM ? "#FF7900" : "#0033A0";
-  const label = isOM ? "Orange Money" : "Moov Money";
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.operatorCard, { backgroundColor: active ? "#F7EFE5" : theme.surface, borderColor: active ? theme.primary : theme.border }, pressed && styles.pressed]} accessibilityRole="radio" accessibilityState={{ selected: active }}>
       <View style={[styles.operatorLogo, { backgroundColor: color }]}>
         <Text style={styles.operatorLogoText}>{isOM ? "OM" : "MV"}</Text>
       </View>
-      <Text style={[styles.operatorName, { color: theme.foreground }]}>{label}</Text>
-      <Text style={[styles.operatorFees, { color: theme.muted }]}>{isOM ? "Frais 1,5%" : "Frais 2%"}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.operatorName, { color: theme.foreground }]}>{operatorLabel(operator)}</Text>
+        <Text style={[styles.operatorFees, { color: theme.muted }]} numberOfLines={1}>{isOM ? "Frais 1,5%" : "Frais 2%"}</Text>
+      </View>
+      {active ? <MaterialIcons name="check-circle" size={16} color={theme.primary} /> : null}
     </Pressable>
   );
 }
 
-function PendingStage(props: {
+// =====================================================================
+// Page 2 — Validation en cours (polling + recap)
+// =====================================================================
+
+function WaitingStage(props: {
   theme: ReturnType<typeof useThemeColors>["colors"];
   styles: ReturnType<typeof makeStyles>;
   deposit: DirectDepositView;
-  otpDigits: string[];
-  secondsLeft: number;
   pollError: string;
   isTest: boolean;
   settling: boolean;
-  onOtpChange: (index: number, value: string) => void;
-  onOtpKeyDown: (index: number, key: string) => void;
-  onOtpSubmit: () => void;
-  onCallUSSD: () => void;
   onCancel: () => void;
   onDevSettle: (outcome: "succeeded" | "failed") => void;
 }) {
-  const { theme, styles, deposit, otpDigits, secondsLeft, pollError, isTest, settling, onOtpChange, onOtpKeyDown, onOtpSubmit, onCallUSSD, onCancel, onDevSettle } = props;
+  const { theme, styles, deposit, pollError, isTest, settling, onCancel, onDevSettle } = props;
   return (
-    <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-      <View style={styles.ussdPulse}>
-        <View style={[styles.ussdPulseCircle, { backgroundColor: "#DDEFE7" }]}>
-          <MaterialIcons name="phone-in-talk" size={36} color="#176C52" />
-        </View>
+    <View style={[styles.waitingStage, { backgroundColor: theme.surface }]}>
+      <ActivityIndicator size="large" color={theme.primary} />
+      <Text style={[styles.waitingTitle, { color: theme.foreground }]}>Validation en cours</Text>
+      <Text style={[styles.waitingSubtitle, { color: theme.muted }]}>Confirmation par {operatorLabel(deposit.operator)}. Cela peut prendre quelques secondes.</Text>
+
+      <View style={[styles.recap, { backgroundColor: theme.background }]}>
+        <RecapRow theme={theme} styles={styles} label="Opérateur" value={operatorLabel(deposit.operator)} />
+        <RecapRow theme={theme} styles={styles} label="Numéro" value={deposit.phone} />
+        <RecapRow theme={theme} styles={styles} label="Montant" value={`${deposit.amount.toLocaleString("fr-FR")} FCFA`} />
+        <RecapRow theme={theme} styles={styles} label="Référence" value={deposit.providerReference} />
       </View>
 
-      <Text style={[styles.pendingTitle, { color: theme.foreground }]}>Confirmez sur votre téléphone</Text>
-      <Text style={[styles.pendingSubtitle, { color: theme.muted }]}>Composez le code ci-dessous sur votre numéro {buildOtpLabel(deposit.operator)}. Vous recevrez un OTP par SMS à saisir sur votre téléphone.</Text>
-
-      <View style={[styles.ussdCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-        <Text style={[styles.label, { color: theme.muted, marginBottom: 10 }]}>CODE USSD À COMPOSER</Text>
-        <Text style={[styles.ussdCode, { color: theme.foreground }]}>{formatUSSDForDisplay(deposit.ussdCode)}</Text>
-        <TikisButton label="Appeler maintenant" icon="phone" onPress={onCallUSSD} style={{ marginTop: 14 }} />
-        <Text style={[styles.ussdHint, { color: theme.muted }]}>{"L'application téléphone s'ouvre avec le code pré-rempli. Validez avec votre code secret "}{buildOtpLabel(deposit.operator)}.</Text>
-      </View>
-
-      <Text style={[styles.label, { color: theme.muted, marginTop: 22, marginBottom: 10 }]}>CODE OTP REÇU PAR SMS (optionnel)</Text>
-      <View style={styles.otpRow}>
-        {otpDigits.map((digit, idx) => (
-          <TextInput
-            key={idx}
-            value={digit}
-            onChangeText={(v) => onOtpChange(idx, v)}
-            onKeyPress={({ nativeEvent }) => onOtpKeyDown(idx, nativeEvent.key)}
-            keyboardType="number-pad"
-            maxLength={1}
-            style={[styles.otpCell, { color: theme.foreground, backgroundColor: theme.surface, borderColor: theme.border }]}
-            accessibilityLabel={`Chiffre ${idx + 1} du code OTP`}
-            returnKeyType={idx === 5 ? "done" : "next"}
-            onSubmitEditing={idx === 5 ? onOtpSubmit : undefined}
-          />
-        ))}
-      </View>
-      <Text style={[styles.hint, { color: theme.muted, marginTop: 6 }]}>Saisissez les 6 chiffres reçus par SMS (confirmation visuelle uniquement — la confirmation réelle passe par YengaPay).</Text>
-
-      <Text style={[styles.timer, { color: theme.muted }]}>
-        Expire dans <Text style={{ color: theme.foreground, fontWeight: "700" }}>{Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, "0")}</Text>
-      </Text>
-
-      {pollError ? <Text style={[styles.errorText, { color: theme.error, backgroundColor: "#F8E8E9" }]}>{pollError}</Text> : null}
+      {pollError ? <Text style={[styles.errorText, { color: theme.error, backgroundColor: "#F8E8E9", marginTop: 12 }]}>{pollError}</Text> : null}
 
       {isTest ? (
         <View style={[styles.devCard, { backgroundColor: "#F7EFE5", borderColor: theme.primary }]}>
@@ -468,9 +466,13 @@ function PendingStage(props: {
       <Pressable onPress={onCancel} style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}>
         <Text style={[styles.cancelText, { color: theme.muted }]}>Annuler</Text>
       </Pressable>
-    </ScrollView>
+    </View>
   );
 }
+
+// =====================================================================
+// Page 3 & 4 — Résultat
+// =====================================================================
 
 function SuccessStage(props: { theme: ReturnType<typeof useThemeColors>["colors"]; styles: ReturnType<typeof makeStyles>; deposit: DirectDepositView; onClose: () => void }) {
   const { theme, styles, deposit, onClose } = props;
@@ -479,10 +481,10 @@ function SuccessStage(props: { theme: ReturnType<typeof useThemeColors>["colors"
       <View style={[styles.bigCheck, { backgroundColor: theme.success }]}>
         <MaterialIcons name="check" size={48} color="#FFFFFF" />
       </View>
-      <Text style={[styles.centerTitle, { color: theme.foreground }]}>Dépôt réussi</Text>
+      <Text style={[styles.centerTitle, { color: theme.foreground }]}>Paiement effectué</Text>
       <Text style={[styles.centerSubtitle, { color: theme.muted }]}>Votre Wallet Tikis a été crédité. Vous pouvez maintenant utiliser ce solde pour vos livraisons.</Text>
       <View style={[styles.recap, { backgroundColor: theme.background }]}>
-        <RecapRow theme={theme} styles={styles} label="Opérateur" value={buildOtpLabel(deposit.operator)} />
+        <RecapRow theme={theme} styles={styles} label="Opérateur" value={operatorLabel(deposit.operator)} />
         <RecapRow theme={theme} styles={styles} label="Numéro" value={deposit.phone} />
         <RecapRow theme={theme} styles={styles} label="Montant" value={`${deposit.amount.toLocaleString("fr-FR")} FCFA`} />
         <RecapRow theme={theme} styles={styles} label="Référence" value={deposit.providerReference} />
@@ -513,7 +515,7 @@ function RecapRow(props: { theme: ReturnType<typeof useThemeColors>["colors"]; s
   return (
     <View style={props.styles.recapRow}>
       <Text style={[props.styles.recapLabel, { color: props.theme.muted }]}>{props.label}</Text>
-      <Text style={[props.styles.recapValue, { color: props.theme.foreground }]}>{props.value}</Text>
+      <Text style={[props.styles.recapValue, { color: props.theme.foreground }]} numberOfLines={1}>{props.value}</Text>
     </View>
   );
 }
@@ -556,20 +558,22 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
     errorText: { padding: 12, borderRadius: 9, fontSize: 13, lineHeight: 18 },
     cta: { marginTop: 8, minHeight: 50 },
 
-    ussdPulse: { alignItems: "center", marginTop: 18, marginBottom: 14 },
-    ussdPulseCircle: { width: 96, height: 96, borderRadius: 48, alignItems: "center", justifyContent: "center" },
-    pendingTitle: { fontSize: 18, fontWeight: "700", textAlign: "center", marginBottom: 6 },
-    pendingSubtitle: { fontSize: 13, textAlign: "center", lineHeight: 19, marginBottom: 18, paddingHorizontal: 12 },
-    ussdCard: { padding: 16, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
-    ussdCode: { fontSize: 20, fontWeight: "700", textAlign: "center", letterSpacing: 0.4, fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }) },
-    ussdHint: { fontSize: 11, textAlign: "center", marginTop: 10, lineHeight: 16 },
+    // OTP : un seul champ paste-friendly.
+    otpInput: { fontSize: 22, fontWeight: "700", letterSpacing: 6, paddingHorizontal: 14, height: 50, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth },
 
-    otpRow: { flexDirection: "row", gap: 8, justifyContent: "center" },
-    otpCell: { width: 44, height: 50, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, fontSize: 22, fontWeight: "700", textAlign: "center" },
+    // Lien USSD : titre = code USSD calculé live, style lien simple.
+    ussdLinkWrap: { alignItems: "center", gap: 4, paddingVertical: 6 },
+    ussdLink: { paddingVertical: 8, paddingHorizontal: 12 },
+    ussdLinkDisabled: { opacity: 0.4 },
+    ussdLinkText: { fontSize: 18, fontWeight: "700", letterSpacing: 0.5, textDecorationLine: "underline", fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }) },
+    ussdLinkHint: { fontSize: 11, textAlign: "center" },
 
-    timer: { fontSize: 12, textAlign: "center", marginTop: 14 },
+    // Waiting : spinner centré + récap.
+    waitingStage: { flex: 1, padding: 24, alignItems: "center", justifyContent: "center", gap: 14 },
+    waitingTitle: { fontSize: 18, fontWeight: "700", textAlign: "center", marginTop: 16 },
+    waitingSubtitle: { fontSize: 13, textAlign: "center", lineHeight: 19, maxWidth: 280 },
 
-    devCard: { padding: 12, borderRadius: 10, borderWidth: 1, gap: 10 },
+    devCard: { padding: 12, borderRadius: 10, borderWidth: 1, gap: 10, width: "100%", marginTop: 8 },
     devLabel: { fontSize: 10, fontWeight: "700", letterSpacing: 0.7, textTransform: "uppercase" },
     devActions: { flexDirection: "row", gap: 8 },
     devBtn: { flex: 1 },
@@ -582,9 +586,9 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
     centerTitle: { fontSize: 22, fontWeight: "700", textAlign: "center", letterSpacing: -0.4 },
     centerSubtitle: { fontSize: 14, textAlign: "center", lineHeight: 20, maxWidth: 280 },
     recap: { width: "100%", padding: 14, borderRadius: 12, gap: 6 },
-    recapRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6 },
+    recapRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 6, gap: 12 },
     recapLabel: { fontSize: 12, fontWeight: "500" },
-    recapValue: { fontSize: 13, fontWeight: "700" },
+    recapValue: { fontSize: 13, fontWeight: "700", flexShrink: 1, textAlign: "right" },
     failActions: { flexDirection: "row", gap: 8, width: "100%" },
   });
 }
