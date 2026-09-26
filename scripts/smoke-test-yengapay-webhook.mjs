@@ -108,7 +108,7 @@ try {
 }
 console.log();
 
-console.log("[smoke] Scénario 3 : event pending → 202 + pending:true (si mode ≠ test)");
+console.log("[smoke] Scénario 3 : event pending ou rejeu idempotent");
 const PENDING_PAYLOAD = {
   type: "payment.pending",
   id: "evt_smoke_test_pending",
@@ -126,9 +126,9 @@ try {
     headers: { "Content-Type": "application/json", "x-webhook-hash": pendingSig },
     body: pendingBody,
   });
-  // En mode test : 503. En sandbox/live : 202 si l'intent n'existe pas en DB (le handler
-  // log l'event mais le settle échoue). On accepte 202 ou 503.
-  await check("event pending", res, res.status, (text) => res.status === 503 || text.includes("pending"));
+  // En mode test : 503. En sandbox/live : l’événement peut être en attente, ou déjà
+  // enregistré par un précédent smoke test ; les deux réponses valident le handler.
+  await check("event pending", res, res.status, (text) => res.status === 503 || text.includes("pending") || text.includes('"duplicate":true'));
 } catch (cause) {
   console.log(`✗ event pending — erreur réseau: ${cause instanceof Error ? cause.message : cause}`);
   failed++;

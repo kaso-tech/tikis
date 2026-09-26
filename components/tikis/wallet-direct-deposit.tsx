@@ -1,13 +1,12 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import * as Linking from "expo-linking";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { COUNTRIES, countryFlagEmoji, formatLocalPhone, sanitizePhoneInput, type CountrySpec } from "@/lib/registration-rules";
 import { trpc } from "@/lib/trpc";
 import { useThemeColors } from "@/lib/use-theme-colors";
-import { buildUssdCode, operatorLabel, type YengapayOperatorCode } from "@/shared/yengapay-ussd";
+import { operatorLabel, type YengapayOperatorCode } from "@/shared/yengapay-ussd";
 import { useTikisStore } from "@/lib/tikis-store";
 
 /**
@@ -22,14 +21,14 @@ import { useTikisStore } from "@/lib/tikis-store";
  *     - Cartes opérateur Orange/Moov (le code USSD du bouton se met à jour live).
  *     - Numéro E.164 (split indicatif + national, maxLength dynamique par pays).
  *     - Code OTP : un seul champ TextInput paste-friendly (vs. 6 cellules manuelles).
- *     - Lien USSD : titre = code USSD (*144*4*6*<montant>#) ; tap = Linking.openURL("tel:…").
+ *     - Information claire : YengaPay envoie la demande à l'opérateur et Tikis reste ouvert.
  *     - CTA "Valider le paiement" qui soumet.
  *
  *  2. Page "Validation en cours" :
  *     - Spinner + récap opérateur/numéro/montant/référence.
  *     - Polling 3s sur wallet.checkDirectDepositStatus.
- *     - Boutons __DEV__ pour forcer succès/échec en mode test.
- *     - Bouton Annuler.
+ *     - Bouton de vérification immédiate en complément du polling automatique.
+ *     - Annulation persistée côté serveur.
  *
  *  3. Page "Paiement effectué" : gros check vert + récap + bouton Terminer.
  *
@@ -45,6 +44,10 @@ type Operator = YengapayOperatorCode;
 const QUICK_AMOUNTS = [1_000, 2_500, 5_000, 10_000, 25_000];
 const POLL_INTERVAL_MS = 3_000;
 
+function createDirectPaymentKey() {
+  return `direct_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 14)}`;
+}
+
 export type DirectDepositView = {
   transactionId: string;
   providerReference: string;
@@ -52,6 +55,7 @@ export type DirectDepositView = {
   amount: number;
   phone: string;
   operator: Operator;
+  countryCode: string;
   expiresAt: string;
   status: "pending" | "succeeded" | "failed" | "cancelled" | "expired";
   mode: "test" | "sandbox" | "live";
@@ -74,8 +78,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   const [amount, setAmount] = useState<string>("2500");
   const [phoneLocal, setPhoneLocal] = useState<string>("");
   const [operator, setOperator] = useState<Operator>("orange_money");
-  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
-  const otpRefs = useRef<Array<TextInput | null>>([null, null, null, null, null, null]);
+  const [requestKey, setRequestKey] = useState(createDirectPaymentKey);
 
   // ===== ÉTAT STAGE =====
   const [stage, setStage] = useState<Stage>("input");
@@ -84,6 +87,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   const [pollError, setPollError] = useState<string>("");
 
   const requestMutation = trpc.wallet.requestDirectDeposit.useMutation();
+  const cancelMutation = trpc.wallet.cancelDirectDeposit.useMutation();
   const statusQuery = trpc.wallet.checkDirectDepositStatus.useQuery(
     { transactionId: deposit?.transactionId ?? "" },
     { enabled: Boolean(deposit?.transactionId) && stage === "waiting", refetchInterval: POLL_INTERVAL_MS },
@@ -98,18 +102,16 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   // On l'affiche et le rend éditable, mais on ne bloque pas le submit dessus.
   const canSubmit = isAmountValid && isPhoneValid && !requestMutation.isPending;
 
-  const ussdCode = useMemo(() => buildUssdCode(operator, amountNum), [operator, amountNum]);
-
   // ===== Reset =====
   const reset = useCallback(() => {
     setStage("input");
     setAmount("2500");
     setPhoneLocal("");
-    setOtpDigits(["", "", "", "", "", ""]);
     setSubmitError("");
     setPollError("");
     setDeposit(null);
     setOperator("orange_money");
+    setRequestKey(createDirectPaymentKey());
   }, []);
   const closeModal = useCallback(() => {
     reset();
@@ -135,7 +137,6 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
       setDeposit(initialDeposit);
       setOperator(initialDeposit.operator);
       setStage("waiting");
-      setOtpDigits(["", "", "", "", "", ""]);
       setSubmitError("");
       setPollError("");
     }, 0);
@@ -143,56 +144,6 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   }, [visible, initialDeposit]);
 
   // ===== Handlers =====
-
-  // OTP cells : auto-focus sur la cellule suivante quand l'utilisateur saisit un chiffre.
-  // Si l'utilisateur efface (backspace) une cellule vide, on remonte le focus sur la
-  // cellule précédente. C'est ce comportement qui fluidifie la saisie sur mobile.
-  const onOtpChange = useCallback((index: number, value: string) => {
-    // On n'accepte qu'un seul chiffre par cellule. Si value est vide, c'est un backspace.
-    const digit = value.replace(/\D/g, "").slice(-1);
-    setOtpDigits((prev) => {
-      const next = [...prev];
-      next[index] = digit;
-      return next;
-    });
-    if (digit) {
-      // Avance : focus sur la cellule suivante si elle existe
-      const nextIndex = index + 1;
-      if (nextIndex < 6) otpRefs.current[nextIndex]?.focus();
-    }
-  }, []);
-
-  const onOtpKeyPress = useCallback((index: number, key: string) => {
-    if (key === "Backspace") {
-      // Si la cellule courante est vide et qu'on a un index > 0, on recule le focus
-      // et on efface le chiffre précédent.
-      setOtpDigits((prev) => {
-        if (prev[index]) return prev; // la cellule a un chiffre, on le laisse (le backspace l'effacera)
-        if (index > 0) {
-          const next = [...prev];
-          next[index - 1] = "";
-          // Focus sur la cellule précédente (différé car setState asynchrone)
-          setTimeout(() => otpRefs.current[index - 1]?.focus(), 0);
-          return next;
-        }
-        return prev;
-      });
-    }
-  }, []);
-
-  // Lien tel: : on tente directement Linking.openURL sans pre-check canOpenURL.
-  // canOpenURL("tel:...") retourne false sur iOS sans LSApplicationQueriesSchemes déclaré,
-  // même quand le téléphone peut composer le numéro. On se contente donc d'un try/catch
-  // autour de openURL : si ça échoue vraiment, on remonte l'erreur.
-  const onCallUSSD = useCallback(async () => {
-    if (!ussdCode) return;
-    const telUri = `tel:${encodeURIComponent(ussdCode)}`;
-    try {
-      await Linking.openURL(telUri);
-    } catch (cause) {
-      Alert.alert("Erreur", cause instanceof Error ? cause.message : "Impossible d'ouvrir l'application téléphone.");
-    }
-  }, [ussdCode]);
 
   const onSubmit = useCallback(async () => {
     setSubmitError("");
@@ -205,18 +156,24 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
       return;
     }
     try {
-      const result = await requestMutation.mutateAsync({ amount: amountNum, countryCode: country.id, phoneLocal, operator });
+      const result = await requestMutation.mutateAsync({ amount: amountNum, countryCode: country.id, phoneLocal, operator, idempotencyKey: requestKey });
       setDeposit(result);
       setStage("waiting");
     } catch (cause) {
       setSubmitError(cause instanceof Error ? cause.message : "La demande de paiement n'a pas pu être créée.");
     }
-  }, [amountNum, phoneLocal, country, operator, requestMutation, isAmountValid, isPhoneValid]);
+  }, [amountNum, phoneLocal, country, operator, requestKey, requestMutation, isAmountValid, isPhoneValid]);
 
-  const onCancelWaiting = useCallback(() => {
-    setPollError("Paiement annulé. Vous pouvez modifier les informations et réessayer.");
-    setStage("failed");
-  }, []);
+  const onCancelWaiting = useCallback(async () => {
+    if (!deposit) return;
+    try {
+      await cancelMutation.mutateAsync({ transactionId: deposit.transactionId });
+      setPollError("Paiement annulé. Aucun montant n'a été débité.");
+      setStage("failed");
+    } catch (cause) {
+      setPollError(cause instanceof Error ? cause.message : "Impossible d'annuler le paiement.");
+    }
+  }, [cancelMutation, deposit]);
 
   const onDevSettle = useCallback(async (outcome: "succeeded" | "failed") => {
     if (!deposit) return;
@@ -250,6 +207,10 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     return () => clearTimeout(transition);
   }, [statusQuery.data, stage, deposit, onSuccess]);
 
+  const displayedPollError = pollError || (stage === "waiting" && statusQuery.error
+    ? "La confirmation YengaPay est momentanément indisponible. La vérification automatique va réessayer."
+    : "");
+
   // ===== Rendu =====
   if (!visible) return null;
   return (
@@ -274,18 +235,12 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
             amount={amount}
             phoneLocal={phoneLocal}
             operator={operator}
-            otpDigits={otpDigits}
-            otpRefs={otpRefs}
-            ussdCode={ussdCode}
             submitError={submitError}
             submitting={requestMutation.isPending}
             canSubmit={canSubmit}
             onChangeAmount={setAmount}
             onChangePhone={setPhoneLocal}
             onChangeOperator={setOperator}
-            onOtpChange={onOtpChange}
-            onOtpKeyPress={onOtpKeyPress}
-            onCallUSSD={onCallUSSD}
             onSubmit={onSubmit}
           />
         ) : null}
@@ -295,10 +250,13 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
             theme={theme}
             styles={styles}
             deposit={deposit}
-            pollError={pollError}
+            pollError={displayedPollError}
             isTest={deposit.mode === "test"}
             settling={settleTestMutation.isPending}
-            onCancel={onCancelWaiting}
+            cancelling={cancelMutation.isPending}
+            checking={statusQuery.isFetching}
+            onRefresh={() => void statusQuery.refetch()}
+            onCancel={() => void onCancelWaiting()}
             onDevSettle={onDevSettle}
           />
         ) : null}
@@ -308,7 +266,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
         ) : null}
 
         {stage === "failed" ? (
-          <FailedStage theme={theme} styles={styles} message={pollError || "Le paiement n'a pas pu être confirmé."} onRetry={() => setStage("input")} onClose={closeModal} />
+          <FailedStage theme={theme} styles={styles} message={pollError || "Le paiement n'a pas pu être confirmé."} onRetry={() => { setRequestKey(createDirectPaymentKey()); setStage("input"); }} onClose={closeModal} />
         ) : null}
       </SafeAreaView>
     </Modal>
@@ -316,7 +274,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
 }
 
 // =====================================================================
-// Page 1 — Saisie unifiée (form + lien USSD + OTP + CTA)
+// Page 1 — Saisie unifiée
 // =====================================================================
 
 function InputStage(props: {
@@ -326,30 +284,15 @@ function InputStage(props: {
   amount: string;
   phoneLocal: string;
   operator: Operator;
-  otpDigits: string[];
-  otpRefs: React.MutableRefObject<Array<TextInput | null>>;
-  ussdCode: string;
   submitError: string;
   submitting: boolean;
   canSubmit: boolean;
   onChangeAmount: (value: string) => void;
   onChangePhone: (value: string) => void;
   onChangeOperator: (op: Operator) => void;
-  onOtpChange: (index: number, value: string) => void;
-  onOtpKeyPress: (index: number, key: string) => void;
-  onCallUSSD: () => void;
   onSubmit: () => void;
 }) {
-  const { theme, styles, country, amount, phoneLocal, operator, otpDigits, otpRefs, ussdCode, submitError, submitting, canSubmit, onChangeAmount, onChangePhone, onChangeOperator, onOtpChange, onOtpKeyPress, onCallUSSD, onSubmit } = props;
-  const focusFirstEmptyOtp = () => {
-    const firstEmpty = otpDigits.findIndex((d) => !d);
-    const target = firstEmpty === -1 ? 0 : firstEmpty;
-    otpRefs.current[target]?.focus();
-  };
-  useEffect(() => {
-    if (otpDigits.some((d) => d) || otpDigits.every((d) => !d)) focusFirstEmptyOtp();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { theme, styles, country, amount, phoneLocal, operator, submitError, submitting, canSubmit, onChangeAmount, onChangePhone, onChangeOperator, onSubmit } = props;
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
@@ -396,54 +339,9 @@ function InputStage(props: {
           <Text style={[styles.hint, { color: theme.muted }]}>{country.name} · {country.digits} chiffres attendus</Text>
         </View>
 
-        {/* Lien USSD : titre = code USSD calculé live, tap = Linking.openURL("tel:...").
-            Placé ici au-dessus des cellules OTP comme demandé : l'utilisateur voit le code,
-            appelle, puis saisit l'OTP juste en dessous. Style minimal : texte primary
-            souligné, comme un lien hypertexte. */}
-        <View style={styles.ussdLinkWrap}>
-          <Pressable
-            onPress={onCallUSSD}
-            disabled={!ussdCode}
-            style={({ pressed }) => [styles.ussdLink, pressed && styles.pressed, !ussdCode && styles.ussdLinkDisabled]}
-            accessibilityRole="link"
-            accessibilityLabel={ussdCode ? `Appeler le code USSD ${ussdCode}` : "Code USSD indisponible tant que le montant n'est pas valide"}
-          >
-            <Text style={[styles.ussdLinkText, { color: theme.primary }, !ussdCode && { color: theme.muted }]} numberOfLines={1}>
-              {ussdCode || "—"}
-            </Text>
-          </Pressable>
-          <Text style={[styles.ussdLinkHint, { color: theme.muted }]}>
-            Touchez pour ouvrir l&apos;app téléphone avec le code pré-rempli.
-          </Text>
-        </View>
-
-        {/* OTP : 6 cellules avec auto-focus sur la suivante quand l'utilisateur saisit
-            un chiffre. Backspace sur cellule vide → focus précédent + efface. */}
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.label, { color: theme.muted }]}>CODE OTP REÇU PAR SMS</Text>
-          <View style={styles.otpRow}>
-            {otpDigits.map((digit, idx) => (
-              <TextInput
-                key={idx}
-                ref={(el) => { otpRefs.current[idx] = el; }}
-                value={digit}
-                onChangeText={(value) => onOtpChange(idx, value)}
-                onKeyPress={({ nativeEvent }) => onOtpKeyPress(idx, nativeEvent.key)}
-                keyboardType="number-pad"
-                maxLength={1}
-                selectTextOnFocus
-                style={[styles.otpCell, { color: theme.foreground, backgroundColor: theme.background, borderColor: theme.border }]}
-                accessibilityLabel={`Chiffre ${idx + 1} du code OTP`}
-                returnKeyType={idx === 5 ? "done" : "next"}
-                onSubmitEditing={() => { if (idx < 5) otpRefs.current[idx + 1]?.focus(); }}
-                autoComplete="one-time-code"
-                textContentType="oneTimeCode"
-              />
-            ))}
-          </View>
-          <Text style={[styles.hint, { color: theme.muted }]}>
-            Après composition de l&apos;USSD, votre opérateur envoie un code à 6 chiffres par SMS. Saisissez-le ici (optionnel — la confirmation vient de YengaPay).
-          </Text>
+        <View style={[styles.infoCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
+          <MaterialIcons name="verified-user" size={18} color={theme.primary} />
+          <Text style={[styles.infoText, { color: theme.muted }]}>YengaPay envoie la demande de validation au numéro saisi. La confirmation est suivie ici automatiquement : vous ne quittez pas Tikis.</Text>
         </View>
 
         {submitError ? <Text style={[styles.errorText, { color: theme.error, backgroundColor: "#F8E8E9" }]}>{submitError}</Text> : null}
@@ -490,15 +388,18 @@ function WaitingStage(props: {
   pollError: string;
   isTest: boolean;
   settling: boolean;
+  cancelling: boolean;
+  checking: boolean;
+  onRefresh: () => void;
   onCancel: () => void;
   onDevSettle: (outcome: "succeeded" | "failed") => void;
 }) {
-  const { theme, styles, deposit, pollError, isTest, settling, onCancel, onDevSettle } = props;
+  const { theme, styles, deposit, pollError, isTest, settling, cancelling, checking, onRefresh, onCancel, onDevSettle } = props;
   return (
     <View style={[styles.waitingStage, { backgroundColor: theme.surface }]}>
       <ActivityIndicator size="large" color={theme.primary} />
       <Text style={[styles.waitingTitle, { color: theme.foreground }]}>Validation en cours</Text>
-      <Text style={[styles.waitingSubtitle, { color: theme.muted }]}>Confirmation par {operatorLabel(deposit.operator)}. Cela peut prendre quelques secondes.</Text>
+      <Text style={[styles.waitingSubtitle, { color: theme.muted }]}>Demande envoyée à {operatorLabel(deposit.operator)}. Gardez Tikis ouvert : la confirmation est vérifiée automatiquement.</Text>
 
       <View style={[styles.recap, { backgroundColor: theme.background }]}>
         <RecapRow theme={theme} styles={styles} label="Opérateur" value={operatorLabel(deposit.operator)} />
@@ -508,6 +409,8 @@ function WaitingStage(props: {
       </View>
 
       {pollError ? <Text style={[styles.errorText, { color: theme.error, backgroundColor: "#F8E8E9", marginTop: 12 }]}>{pollError}</Text> : null}
+
+      <TikisButton label="Vérifier maintenant" icon="refresh" loading={checking} disabled={checking || cancelling} onPress={onRefresh} style={styles.refreshButton} />
 
       {isTest ? (
         <View style={[styles.devCard, { backgroundColor: "#F7EFE5", borderColor: theme.primary }]}>
@@ -519,7 +422,7 @@ function WaitingStage(props: {
         </View>
       ) : null}
 
-      <Pressable onPress={onCancel} style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed]}>
+      <Pressable disabled={cancelling || checking} onPress={onCancel} style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed, (cancelling || checking) && { opacity: 0.45 }]}>
         <Text style={[styles.cancelText, { color: theme.muted }]}>Annuler</Text>
       </Pressable>
     </View>
@@ -608,21 +511,12 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
     dialCodeText: { fontSize: 14, fontWeight: "700" },
     phoneInput: { flex: 1, paddingHorizontal: 14, height: 46, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, fontSize: 16 },
     hint: { fontSize: 11, fontWeight: "500" },
+    infoCard: { flexDirection: "row", alignItems: "flex-start", gap: 9, padding: 12, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth },
+    infoText: { flex: 1, fontSize: 12, lineHeight: 18 },
     errorText: { padding: 12, borderRadius: 9, fontSize: 13, lineHeight: 18 },
     cta: { marginTop: 8, minHeight: 50 },
+    refreshButton: { width: "100%", minHeight: 44 },
 
-    // OTP : 6 cellules avec auto-focus.
-    otpRow: { flexDirection: "row", justifyContent: "center", gap: 8 },
-    otpCell: { width: 42, height: 50, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, fontSize: 22, fontWeight: "700", textAlign: "center", paddingVertical: 0, paddingHorizontal: 0 },
-
-    // Lien USSD : titre = code USSD calculé live, style lien simple.
-    ussdLinkWrap: { alignItems: "center", gap: 4, paddingVertical: 6 },
-    ussdLink: { paddingVertical: 8, paddingHorizontal: 12 },
-    ussdLinkDisabled: { opacity: 0.4 },
-    ussdLinkText: { fontSize: 18, fontWeight: "700", letterSpacing: 0.5, textDecorationLine: "underline", fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }) },
-    ussdLinkHint: { fontSize: 11, textAlign: "center" },
-
-    // Waiting : spinner centré + récap.
     waitingStage: { flex: 1, padding: 24, alignItems: "center", justifyContent: "center", gap: 14 },
     waitingTitle: { fontSize: 18, fontWeight: "700", textAlign: "center", marginTop: 16 },
     waitingSubtitle: { fontSize: 13, textAlign: "center", lineHeight: 19, maxWidth: 280 },

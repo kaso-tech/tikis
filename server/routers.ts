@@ -824,17 +824,12 @@ export const appRouter = router({
       return db.settleYengaPayTestPayment({ ...input, profilePhone: profile.phone });
     }),
     // ===== Paiement Mobile Money direct (in-app, sans redirection web) =====
-    // Flow : le client envoie un numéro + opérateur, on crée un payment intent
-    //   YengaPay avec paymentSource: orange_money | moov_money, le serveur renvoie
-    //   l'identifiant de transaction + le code USSD à composer. Le client compose le code
-    //   via tel:, l'OTP arrive par SMS, le webhook payment.succeeded crédite le Wallet.
-    //   En mode test (pas de clé sandbox), on simule la requête et on crédite directement
-    //   après validation manuelle côté serveur (cf. markDirectDepositTestSettled).
     requestDirectDeposit: tikisProtectedProcedure.input(z.object({
       amount: z.number().int().min(100).max(10_000_000),
       countryCode: z.string().length(2),
       phoneLocal: z.string().regex(/^[0-9]{6,12}$/),
       operator: z.enum(["orange_money", "moov_money"]),
+      idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{16,48}$/),
     })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       const country = COUNTRIES.find((c) => c.id === input.countryCode);
@@ -848,12 +843,18 @@ export const appRouter = router({
         phone,
         operator: input.operator,
         countryCode: input.countryCode,
+        idempotencyKey: input.idempotencyKey,
       });
     }),
     checkDirectDepositStatus: tikisProtectedProcedure.input(z.object({ transactionId: z.string().uuid() })).query(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       const { getYengapayDirectDepositStatus } = await import("./yengapay-direct");
       return getYengapayDirectDepositStatus({ profilePhone: profile.phone, transactionId: input.transactionId });
+    }),
+    cancelDirectDeposit: tikisProtectedProcedure.input(z.object({ transactionId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      const { cancelYengapayDirectDeposit } = await import("./yengapay-direct");
+      return cancelYengapayDirectDeposit({ profilePhone: profile.phone, transactionId: input.transactionId });
     }),
     // Liste les paiements directs encore en attente pour le profil courant. Sert à la reprise
     // côté client quand l'utilisateur a fermé l'app pendant le polling initial : le dépôt

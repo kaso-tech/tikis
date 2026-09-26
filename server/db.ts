@@ -1049,6 +1049,7 @@ export async function recordDirectDepositIntent(input: {
   countryCode: string;
   ussdCode: string;
   expiresAt: string;
+  idempotencyKey: string;
   providerReference?: string;
   mode?: "test" | "sandbox" | "live";
 }) {
@@ -1063,14 +1064,13 @@ export async function recordDirectDepositIntent(input: {
     amount: input.amount,
     status: "pending",
     providerReference: input.providerReference ?? `direct_test_${input.transactionId}`,
-    // Le "checkoutUrl" des paiements directs est l'URI tel: pré-rempli avec le code USSD.
-    checkoutUrl: `tel:${encodeURIComponent(input.ussdCode)}`,
+    checkoutUrl: null,
     ussdCode: input.ussdCode,
     phoneE164: input.phone,
     operatorCode: input.operator,
     countryCode: input.countryCode,
     expiresAt: new Date(input.expiresAt),
-    idempotencyKey: `direct:${input.profilePhone}:${input.transactionId}`,
+    idempotencyKey: `direct:${input.profilePhone}:${input.idempotencyKey}`,
   });
 }
 
@@ -1084,6 +1084,17 @@ export async function getDirectDepositIntent(transactionId: string, profilePhone
   const record = (await db.select().from(tikisPaymentTransactions).where(and(eq(tikisPaymentTransactions.id, transactionId), eq(tikisPaymentTransactions.profilePhone, profilePhone))).limit(1))[0];
   if (!record) return null;
   return paymentTransactionToDirectDeposit(record);
+}
+
+/** Retrouve une intention déjà créée après une relance réseau de la même demande. */
+export async function getDirectDepositByIdempotencyKey(profilePhone: string, idempotencyKey: string): Promise<DirectDepositRecord | null> {
+  const db = await getDb();
+  if (!db) throw new Error("Le paiement direct est temporairement indisponible.");
+  const record = (await db.select().from(tikisPaymentTransactions).where(and(
+    eq(tikisPaymentTransactions.profilePhone, profilePhone),
+    eq(tikisPaymentTransactions.idempotencyKey, `direct:${profilePhone}:${idempotencyKey}`),
+  )).limit(1))[0];
+  return record ? paymentTransactionToDirectDeposit(record) : null;
 }
 
 /** Met à jour le statut d'un paiement direct (test uniquement, sandbox/live passe par le webhook). */
@@ -1163,10 +1174,25 @@ export async function refuseTikisWalletDepositRequest(input: { profilePhone: str
   });
 }
 
-type YengaPayTestPaymentView = { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; checkoutUrl?: string; mode: "test" | "sandbox" | "live"; createdAt: string; settledAt?: string };
+/** Ferme explicitement une demande directe sans modifier le solde. */
+export async function cancelTikisWalletDirectDeposit(input: { profilePhone: string; transactionId: string; status: "cancelled" | "expired" }) {
+  const db = await getDb();
+  if (!db) throw new Error("Le paiement direct est temporairement indisponible.");
+  return db.transaction(async (tx) => {
+    const payment = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, input.transactionId)).limit(1).for("update"))[0];
+    if (!payment) throw new Error("Transaction de dépôt direct introuvable.");
+    if (payment.profilePhone !== input.profilePhone) throw new Error("Cette transaction n'appartient pas à ce profil.");
+    if (payment.status === "pending") {
+      await tx.update(tikisPaymentTransactions).set({ status: input.status, settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
+    }
+    return paymentTransactionToDirectDeposit((await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, payment.id)).limit(1))[0]);
+  });
+}
+
+type YengaPayTestPaymentView = { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled" | "expired"; providerReference: string; checkoutUrl?: string; mode: "test" | "sandbox" | "live"; createdAt: string; settledAt?: string };
 type YengaPayTestPaymentSettlement = { payment: YengaPayTestPaymentView; wallet: WalletSnapshot };
 
-function yengaPayTestPaymentToView(payment: { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; provider: "ligdi_simulated" | "yengapay_test" | "yengapay_sandbox" | "yengapay_live" | "yengapay_direct_test" | "yengapay_direct_sandbox" | "yengapay_direct_live"; providerReference: string; checkoutUrl: string | null; createdAt: Date; settledAt: Date | null }): YengaPayTestPaymentView {
+function yengaPayTestPaymentToView(payment: { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled" | "expired"; provider: "ligdi_simulated" | "yengapay_test" | "yengapay_sandbox" | "yengapay_live" | "yengapay_direct_test" | "yengapay_direct_sandbox" | "yengapay_direct_live"; providerReference: string; checkoutUrl: string | null; createdAt: Date; settledAt: Date | null }): YengaPayTestPaymentView {
   const mode = payment.provider.endsWith("_sandbox") ? "sandbox" : payment.provider.endsWith("_live") ? "live" : "test";
   return { id: payment.id, type: payment.type, amount: payment.amount, status: payment.status, providerReference: payment.providerReference, mode, ...(payment.checkoutUrl ? { checkoutUrl: payment.checkoutUrl } : {}), createdAt: payment.createdAt.toISOString(), ...(payment.settledAt ? { settledAt: payment.settledAt.toISOString() } : {}) };
 }

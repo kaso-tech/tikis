@@ -62,6 +62,7 @@ describe("paiement direct YengaPay Sandbox", () => {
       phone: "+22670000000",
       operator: "orange_money",
       countryCode: "BF",
+      idempotencyKey: `sandbox-orange-${randomUUID().replace(/-/g, "")}`,
     });
 
     expect(intent.mode).toBe("sandbox");
@@ -88,6 +89,7 @@ describe("paiement direct YengaPay Sandbox", () => {
       phone: "+22990000000",
       operator: "moov_money",
       countryCode: "BJ",
+      idempotencyKey: `sandbox-moov-${randomUUID().replace(/-/g, "")}`,
     });
 
     expect(intent.mode).toBe("sandbox");
