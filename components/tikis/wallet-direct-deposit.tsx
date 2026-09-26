@@ -442,7 +442,7 @@ function InputStage(props: {
             ))}
           </View>
           <Text style={[styles.hint, { color: theme.muted }]}>
-            Après composition de l'USSD, votre opérateur envoie un code à 6 chiffres par SMS. Saisissez-le ici (optionnel — la confirmation vient de YengaPay).
+            Après composition de l&apos;USSD, votre opérateur envoie un code à 6 chiffres par SMS. Saisissez-le ici (optionnel — la confirmation vient de YengaPay).
           </Text>
         </View>
 
@@ -602,6 +602,7 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
     operatorLogoText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
     operatorName: { fontSize: 13, fontWeight: "600" },
     operatorFees: { fontSize: 10.5 },
+    phoneRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     phoneInput: { flex: 1, paddingHorizontal: 14, height: 46, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, fontSize: 16 },
     hint: { fontSize: 11, fontWeight: "500" },
     errorText: { padding: 12, borderRadius: 9, fontSize: 13, lineHeight: 18 },
