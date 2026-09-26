@@ -17,12 +17,18 @@ describe("paiement direct YengaPay dans Tikis", () => {
     expect(mobile).not.toContain("expo-linking");
     expect(mobile).toContain("Linking.openURL");
     expect(mobile).not.toContain("onCallUSSD");
-    expect(mobile).toContain("vous ne quittez pas Tikis");
+    expect(mobile).not.toContain("YengaPay envoie la demande de validation au numéro saisi");
+    expect(mobile).toContain("Composez le code ci-dessous sur votre téléphone pour obtenir le code OTP :");
     expect(mobile).toContain("Vérifier maintenant");
     expect(mobile).toContain("Confirmer le paiement");
     expect(mobile).toContain("Code OTP à six chiffres");
     expect(mobile).toContain("tel:");
     expect(mobile).toContain("buildUssdCode");
+    expect(mobile).toContain('placeholder="Ex: 2500"');
+    expect(mobile).toContain("const QUICK_AMOUNTS = [1_000, 5_000, 10_000, 25_000]");
+    expect(mobile).toContain('onChangeAmount("500")');
+    expect(mobile).toContain('disabled={!deposit || confirming}');
+    expect(mobile).not.toContain('disabled={!deposit || confirming || checking}');
   });
 
   it("crée une intention idempotente sans inscrire de mouvement Wallet avant le statut fournisseur", () => {

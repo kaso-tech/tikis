@@ -17,11 +17,10 @@ import { useTikisStore } from "@/lib/tikis-store";
  *
  *  1. Page unique de saisie :
  *     - Sélecteur pays (8 UEMOA + Ghana).
- *     - Montant + raccourcis 1k/2,5k/5k/10k/25k.
+ *     - Montant + raccourcis 500/1k/5k/10k/25k.
  *     - Cartes opérateur Orange/Moov (le code USSD du bouton se met à jour live).
  *     - Numéro E.164 (split indicatif + national, maxLength dynamique par pays).
  *     - Code OTP : six cellules numériques avec progression automatique.
- *     - Information claire : YengaPay envoie la demande à l'opérateur et Tikis reste ouvert.
  *     - Bouton USSD ouvrant le composeur avec le code actualisé.
  *     - CTA de confirmation avec chargement puis résultat.
  *
@@ -38,7 +37,7 @@ import { useTikisStore } from "@/lib/tikis-store";
 type Stage = "input" | "success" | "failed";
 type Operator = YengapayOperatorCode;
 
-const QUICK_AMOUNTS = [1_000, 2_500, 5_000, 10_000, 25_000];
+const QUICK_AMOUNTS = [1_000, 5_000, 10_000, 25_000];
 const POLL_INTERVAL_MS = 3_000;
 
 function createDirectPaymentKey() {
@@ -75,7 +74,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   }, [profile?.countryCode]);
 
   // ===== ÉTAT FORM (page unique) =====
-  const [amount, setAmount] = useState<string>("2500");
+  const [amount, setAmount] = useState<string>("");
   const [phoneLocal, setPhoneLocal] = useState<string>("");
   const [operator, setOperator] = useState<Operator>("orange_money");
   const [requestKey, setRequestKey] = useState(createDirectPaymentKey);
@@ -107,7 +106,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   // ===== Reset =====
   const reset = useCallback(() => {
     setStage("input");
-    setAmount("2500");
+    setAmount("");
     setPhoneLocal("");
     setSubmitError("");
     setPollError("");
@@ -278,7 +277,6 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
             submitting={requestMutation.isPending}
             confirming={payMutation.isPending}
             resendingOtp={resendOtpMutation.isPending}
-            checking={statusQuery.isFetching}
             cancelling={cancelMutation.isPending}
             settling={settleTestMutation.isPending}
             pollError={displayedPollError}
@@ -333,7 +331,6 @@ function InputStage(props: {
   submitting: boolean;
   confirming: boolean;
   resendingOtp: boolean;
-  checking: boolean;
   cancelling: boolean;
   settling: boolean;
   pollError: string;
@@ -349,7 +346,7 @@ function InputStage(props: {
   onCancel: () => void;
   onDevSettle: (outcome: "succeeded" | "failed") => void;
 }) {
-  const { theme, styles, country, amount, phoneLocal, operator, submitError, deposit, otpCells, submitting, confirming, resendingOtp, checking, cancelling, settling, pollError, canSubmit, onChangeAmount, onChangePhone, onChangeOperator, onChangeOtpCell, onSubmit, onOpenUssd, onRefresh, onResendOtp, onCancel, onDevSettle } = props;
+  const { theme, styles, country, amount, phoneLocal, operator, submitError, deposit, otpCells, submitting, confirming, resendingOtp, cancelling, settling, pollError, canSubmit, onChangeAmount, onChangePhone, onChangeOperator, onChangeOtpCell, onSubmit, onOpenUssd, onRefresh, onResendOtp, onCancel, onDevSettle } = props;
   const isTest = deposit?.mode === "test";
   const requiresOtp = Boolean(deposit && !isTest && deposit.requiresOtp !== false);
   const showOtpCard = Boolean(deposit) || (Number.isFinite(Number.parseInt(amount, 10)) && phoneLocal.length === country.digits);
@@ -360,10 +357,13 @@ function InputStage(props: {
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[styles.label, { color: theme.muted }]}>MONTANT</Text>
           <View style={styles.amountRow}>
-            <TextInput value={amount} editable={!deposit && !submitting} onChangeText={onChangeAmount} keyboardType="number-pad" maxLength={8} style={[styles.amountInput, { color: theme.foreground, backgroundColor: theme.background, borderColor: theme.border }, deposit && styles.lockedInput]} placeholder="2500" placeholderTextColor={theme.muted} />
+            <TextInput value={amount} editable={!deposit && !submitting} onChangeText={onChangeAmount} keyboardType="number-pad" maxLength={8} style={[styles.amountInput, { color: theme.foreground, backgroundColor: theme.background, borderColor: theme.border }, deposit && styles.lockedInput]} placeholder="Ex: 2500" placeholderTextColor={theme.muted} />
             <Text style={[styles.amountSuffix, { color: theme.muted }]}>FCFA</Text>
           </View>
-          <View style={styles.quickAmounts}>
+        <View style={styles.quickAmounts}>
+            <Pressable key={500} disabled={Boolean(deposit) || submitting} onPress={() => onChangeAmount("500")} style={({ pressed }) => [styles.quickAmount, { backgroundColor: theme.background, borderColor: theme.border }, (deposit || submitting) && { opacity: 0.45 }, pressed && styles.pressed]}>
+              <Text style={[styles.quickAmountText, { color: theme.foreground }]}>500</Text>
+            </Pressable>
             {QUICK_AMOUNTS.map((q) => (
               <Pressable key={q} disabled={Boolean(deposit) || submitting} onPress={() => onChangeAmount(String(q))} style={({ pressed }) => [styles.quickAmount, { backgroundColor: theme.background, borderColor: theme.border }, (deposit || submitting) && { opacity: 0.45 }, pressed && styles.pressed]}>
                 <Text style={[styles.quickAmountText, { color: theme.foreground }]}>{q.toLocaleString("fr-FR")}</Text>
@@ -401,11 +401,6 @@ function InputStage(props: {
           <Text style={[styles.hint, { color: theme.muted }]}>{country.name} · {country.digits} chiffres attendus</Text>
         </View>
 
-        <View style={[styles.infoCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
-          <MaterialIcons name="verified-user" size={18} color={theme.primary} />
-          <Text style={[styles.infoText, { color: theme.muted }]}>YengaPay envoie la demande de validation au numéro saisi. La confirmation est suivie ici automatiquement : vous ne quittez pas Tikis.</Text>
-        </View>
-
         {deposit ? (
           <View style={[styles.paymentCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
             <View style={styles.paymentStatusRow}>
@@ -424,11 +419,11 @@ function InputStage(props: {
         {showOtpCard ? (
           <View style={[styles.otpCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Text style={[styles.label, { color: theme.muted }]}>CONFIRMATION OTP</Text>
-            <Text style={[styles.otpHint, { color: theme.muted }]}>{deposit?.otpInstructions ?? "Validez d'abord les informations pour recevoir ou générer votre code OTP."}</Text>
-            <TikisButton label={ussdCode || "Code USSD indisponible"} icon="phone" variant="secondary" disabled={!ussdCode || confirming || checking} onPress={onOpenUssd} style={styles.ussdButton} />
-            <OtpCells theme={theme} styles={styles} values={otpCells} disabled={!deposit || confirming || checking} onChange={onChangeOtpCell} />
-            {deposit && requiresOtp ? <TikisButton label="Confirmer le paiement" icon="lock-open" loading={confirming} disabled={confirming || checking || otpCells.some((cell) => !cell)} onPress={onSubmit} style={styles.cta} /> : null}
-            {deposit?.operator === "moov_money" ? <TikisButton label="Renvoyer le code OTP" loading={resendingOtp} disabled={resendingOtp || confirming || checking} onPress={onResendOtp} variant="ghost" style={styles.refreshButton} /> : null}
+            <Text style={[styles.otpHint, { color: theme.muted }]}>Composez le code ci-dessous sur votre téléphone pour obtenir le code OTP :</Text>
+            <TikisButton label={ussdCode || "Code USSD indisponible"} icon="phone" variant="secondary" disabled={!ussdCode || confirming} onPress={onOpenUssd} style={styles.ussdButton} />
+            <OtpCells theme={theme} styles={styles} values={otpCells} disabled={!deposit || confirming} onChange={onChangeOtpCell} />
+            {deposit && requiresOtp ? <TikisButton label="Confirmer le paiement" icon="lock-open" loading={confirming} disabled={confirming || otpCells.some((cell) => !cell)} onPress={onSubmit} style={styles.cta} /> : null}
+            {deposit?.operator === "moov_money" ? <TikisButton label="Renvoyer le code OTP" loading={resendingOtp} disabled={resendingOtp || confirming} onPress={onResendOtp} variant="ghost" style={styles.refreshButton} /> : null}
           </View>
         ) : null}
 
@@ -436,12 +431,12 @@ function InputStage(props: {
           label={deposit ? "Vérifier maintenant" : "Valider le paiement"}
           icon="check-circle"
           onPress={deposit ? onRefresh : onSubmit}
-          loading={deposit ? checking : submitting}
-          disabled={deposit ? checking || cancelling : !canSubmit}
+          loading={deposit ? false : submitting}
+          disabled={deposit ? cancelling : !canSubmit}
           style={deposit ? styles.refreshButton : styles.cta}
         />
         {deposit && isTest ? <View style={[styles.devCard, { backgroundColor: "#F7EFE5", borderColor: theme.primary }]}><Text style={[styles.devLabel, { color: theme.primary }]}>MODE TEST (DEV uniquement)</Text><View style={styles.devActions}><TikisButton label="Forcer succès" icon="check-circle" onPress={() => onDevSettle("succeeded")} loading={settling} style={styles.devBtn} /><TikisButton label="Forcer échec" icon="cancel" variant="secondary" onPress={() => onDevSettle("failed")} loading={settling} style={styles.devBtn} /></View></View> : null}
-        {deposit ? <Pressable disabled={cancelling || checking} onPress={onCancel} style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed, (cancelling || checking) && { opacity: 0.45 }]}><Text style={[styles.cancelText, { color: theme.muted }]}>Annuler</Text></Pressable> : null}
+        {deposit ? <Pressable disabled={cancelling} onPress={onCancel} style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed, cancelling && { opacity: 0.45 }]}><Text style={[styles.cancelText, { color: theme.muted }]}>Annuler</Text></Pressable> : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -582,8 +577,6 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
     dialCodeText: { fontSize: 14, fontWeight: "700" },
     phoneInput: { flex: 1, paddingHorizontal: 14, height: 46, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, fontSize: 16 },
     hint: { fontSize: 11, fontWeight: "500" },
-    infoCard: { flexDirection: "row", alignItems: "flex-start", gap: 9, padding: 12, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth },
-    infoText: { flex: 1, fontSize: 12, lineHeight: 18 },
     errorText: { padding: 12, borderRadius: 9, fontSize: 13, lineHeight: 18 },
     cta: { marginTop: 8, minHeight: 50 },
     refreshButton: { width: "100%", minHeight: 44 },
