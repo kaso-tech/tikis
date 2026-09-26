@@ -13,18 +13,16 @@ import { useTikisStore } from "@/lib/tikis-store";
  * Paiement Mobile Money direct (in-app, sans redirection web) — Orange Money / Moov Money
  * via YengaPay Direct API.
  *
- * Flow unifié sur une seule page :
+ * Flow en deux étapes :
  *
- *  1. Page unique de saisie :
+ *  1. Formulaire de demande :
  *     - Sélecteur pays (8 UEMOA + Ghana).
  *     - Montant + raccourcis 500/1k/5k/10k/25k.
- *     - Cartes opérateur Orange/Moov (le code USSD du bouton se met à jour live).
+ *     - Cartes opérateur Orange/Moov.
  *     - Numéro E.164 (split indicatif + national, maxLength dynamique par pays).
- *     - Code OTP : six cellules numériques avec progression automatique.
- *     - Bouton USSD ouvrant le composeur avec le code actualisé.
- *     - CTA de confirmation avec chargement puis résultat.
+ *     - CTA de création de demande.
  *
- *  2. Le statut et les actions restent sous le formulaire sur la même page.
+ *  2. Confirmation : récapitulatif, USSD, OTP à six cellules, modification et annulation.
  *
  *  3. Page "Paiement effectué" : gros check vert + récap + bouton Terminer.
  *
@@ -34,7 +32,7 @@ import { useTikisStore } from "@/lib/tikis-store";
  * (DEV). La confirmation côté client arrive via le polling status.
  */
 
-type Stage = "input" | "success" | "failed";
+type Stage = "request" | "confirmation" | "success" | "failed";
 type Operator = YengapayOperatorCode;
 
 const QUICK_AMOUNTS = [1_000, 5_000, 10_000, 25_000];
@@ -73,7 +71,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     return fromProfile ?? COUNTRIES[0];
   }, [profile?.countryCode]);
 
-  // ===== ÉTAT FORM (page unique) =====
+  // ===== ÉTAT FORMULAIRE =====
   const [amount, setAmount] = useState<string>("");
   const [phoneLocal, setPhoneLocal] = useState<string>("");
   const [operator, setOperator] = useState<Operator>("orange_money");
@@ -82,10 +80,11 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   const otp = otpCells.join("");
 
   // ===== ÉTAT STAGE =====
-  const [stage, setStage] = useState<Stage>("input");
+  const [stage, setStage] = useState<Stage>("request");
   const [deposit, setDeposit] = useState<DirectDepositView | null>(null);
   const [submitError, setSubmitError] = useState<string>("");
   const [pollError, setPollError] = useState<string>("");
+  const [refreshing, setRefreshing] = useState(false);
 
   const requestMutation = trpc.wallet.requestDirectDeposit.useMutation();
   const payMutation = trpc.wallet.payDirectDeposit.useMutation();
@@ -93,7 +92,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   const cancelMutation = trpc.wallet.cancelDirectDeposit.useMutation();
   const statusQuery = trpc.wallet.checkDirectDepositStatus.useQuery(
     { transactionId: deposit?.transactionId ?? "" },
-    { enabled: Boolean(deposit?.transactionId) && stage === "input", refetchInterval: POLL_INTERVAL_MS },
+    { enabled: Boolean(deposit?.transactionId) && stage === "confirmation", refetchInterval: POLL_INTERVAL_MS },
   );
   const settleTestMutation = trpc.wallet.settleDirectDepositTest.useMutation();
 
@@ -105,8 +104,9 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
 
   // ===== Reset =====
   const reset = useCallback(() => {
-    setStage("input");
+    setStage("request");
     setAmount("");
+    setRefreshing(false);
     setPhoneLocal("");
     setSubmitError("");
     setPollError("");
@@ -140,7 +140,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
       const normalizedPhone = initialDeposit.phone.replace(/^\+/, "");
       const dialDigits = country.dialCode.replace(/^\+/, "");
       setPhoneLocal(normalizedPhone.startsWith(dialDigits) ? normalizedPhone.slice(dialDigits.length) : normalizedPhone);
-      setStage("input");
+      setStage("confirmation");
       setSubmitError("");
       setPollError("");
       setOtpCells(Array.from({ length: 6 }, () => ""));
@@ -163,7 +163,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     try {
       const result = await requestMutation.mutateAsync({ amount: amountNum, countryCode: country.id, phoneLocal, operator, idempotencyKey: requestKey });
       setDeposit(result);
-      setStage("input");
+      setStage("confirmation");
     } catch (cause) {
       setSubmitError(cause instanceof Error ? cause.message : "La demande de paiement n'a pas pu être créée.");
     }
@@ -221,9 +221,18 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     }
   }, [deposit, settleTestMutation]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await statusQuery.refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [statusQuery]);
+
   // ===== Polling =====
   useEffect(() => {
-    if (stage !== "input" || !deposit) return;
+    if (stage !== "confirmation" || !deposit) return;
     const data = statusQuery.data;
     if (!data) return;
     if (data.status !== "succeeded" && data.status !== "failed" && data.status !== "cancelled" && data.status !== "expired") return;
@@ -243,7 +252,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     return () => clearTimeout(transition);
   }, [statusQuery.data, stage, deposit, onSuccess]);
 
-  const displayedPollError = pollError || (stage === "input" && statusQuery.error
+  const displayedPollError = pollError || (stage === "confirmation" && statusQuery.error
     ? "La confirmation YengaPay est momentanément indisponible. La vérification automatique va réessayer."
     : "");
 
@@ -258,12 +267,12 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
           </Pressable>
           <View style={{ flex: 1 }}>
             <Text style={[styles.headerTitle, { color: theme.foreground }]} numberOfLines={1}>
-              {stage === "input" ? (deposit ? "Confirmer le paiement" : "Dépôt Mobile Money") : stage === "success" ? "Paiement effectué" : "Paiement échoué"}
+              {stage === "request" ? "Dépôt Mobile Money" : stage === "confirmation" ? "Confirmer le paiement" : stage === "success" ? "Paiement effectué" : "Paiement échoué"}
             </Text>
           </View>
         </View>
 
-        {stage === "input" ? (
+        {stage === "request" || stage === "confirmation" ? (
           <InputStage
             theme={theme}
             styles={styles}
@@ -279,12 +288,22 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
             resendingOtp={resendOtpMutation.isPending}
             cancelling={cancelMutation.isPending}
             settling={settleTestMutation.isPending}
+            refreshing={refreshing}
             pollError={displayedPollError}
             canSubmit={deposit ? otpCells.every(Boolean) : canSubmit}
             onChangeAmount={setAmount}
             onChangePhone={setPhoneLocal}
             onChangeOperator={setOperator}
             onChangeOtpCell={(index, value) => setOtpCells((current) => current.map((cell, cellIndex) => cellIndex === index ? value : cell))}
+            onEdit={() => {
+              setDeposit(null);
+              setOtpCells(Array.from({ length: 6 }, () => ""));
+              setRequestKey(createDirectPaymentKey());
+              setSubmitError("");
+              setPollError("");
+              setRefreshing(false);
+              setStage("request");
+            }}
             onSubmit={deposit ? () => void onPay() : () => void onSubmit()}
             onOpenUssd={async () => {
               const code = deposit?.ussdCode || buildUssdCode(operator, Number.parseInt(amount, 10));
@@ -295,7 +314,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
                 setSubmitError("Impossible d'ouvrir l'application téléphone sur cet appareil.");
               }
             }}
-            onRefresh={() => void statusQuery.refetch()}
+            onRefresh={() => void onRefresh()}
             onResendOtp={() => void onResendOtp()}
             onCancel={() => void onCancelWaiting()}
             onDevSettle={onDevSettle}
@@ -307,7 +326,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
         ) : null}
 
         {stage === "failed" ? (
-          <FailedStage theme={theme} styles={styles} message={pollError || "Le paiement n'a pas pu être confirmé."} onRetry={() => { setRequestKey(createDirectPaymentKey()); setDeposit(null); setOtpCells(Array.from({ length: 6 }, () => "")); setPollError(""); setSubmitError(""); setStage("input"); }} onClose={closeModal} />
+          <FailedStage theme={theme} styles={styles} message={pollError || "Le paiement n'a pas pu être confirmé."} onRetry={() => { setRequestKey(createDirectPaymentKey()); setDeposit(null); setOtpCells(Array.from({ length: 6 }, () => "")); setPollError(""); setSubmitError(""); setStage("request"); }} onClose={closeModal} />
         ) : null}
       </SafeAreaView>
     </Modal>
@@ -315,7 +334,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
 }
 
 // =====================================================================
-// Page 1 — Saisie unifiée
+// Écran de demande et de confirmation
 // =====================================================================
 
 function InputStage(props: {
@@ -333,12 +352,14 @@ function InputStage(props: {
   resendingOtp: boolean;
   cancelling: boolean;
   settling: boolean;
+  refreshing: boolean;
   pollError: string;
   canSubmit: boolean;
   onChangeAmount: (value: string) => void;
   onChangePhone: (value: string) => void;
   onChangeOperator: (op: Operator) => void;
   onChangeOtpCell: (index: number, value: string) => void;
+  onEdit: () => void;
   onSubmit: () => void;
   onOpenUssd: () => void;
   onRefresh: () => void;
@@ -346,26 +367,47 @@ function InputStage(props: {
   onCancel: () => void;
   onDevSettle: (outcome: "succeeded" | "failed") => void;
 }) {
-  const { theme, styles, country, amount, phoneLocal, operator, submitError, deposit, otpCells, submitting, confirming, resendingOtp, cancelling, settling, pollError, canSubmit, onChangeAmount, onChangePhone, onChangeOperator, onChangeOtpCell, onSubmit, onOpenUssd, onRefresh, onResendOtp, onCancel, onDevSettle } = props;
-  const isTest = deposit?.mode === "test";
-  const requiresOtp = Boolean(deposit && !isTest && deposit.requiresOtp !== false);
-  const showOtpCard = Boolean(deposit) || (Number.isFinite(Number.parseInt(amount, 10)) && phoneLocal.length === country.digits);
-  const ussdCode = deposit?.ussdCode || buildUssdCode(operator, Number.parseInt(amount, 10));
+  const { theme, styles, country, amount, phoneLocal, operator, submitError, deposit, otpCells, submitting, confirming, resendingOtp, cancelling, settling, refreshing, pollError, canSubmit, onChangeAmount, onChangePhone, onChangeOperator, onChangeOtpCell, onEdit, onSubmit, onOpenUssd, onRefresh, onResendOtp, onCancel, onDevSettle } = props;
+
+  if (deposit) {
+    return <ConfirmationStage
+      theme={theme}
+      styles={styles}
+      deposit={deposit}
+      otpCells={otpCells}
+      confirming={confirming}
+      resendingOtp={resendingOtp}
+      cancelling={cancelling}
+      settling={settling}
+      refreshing={refreshing}
+      pollError={pollError}
+      onEdit={onEdit}
+      onSubmit={onSubmit}
+      onOpenUssd={onOpenUssd}
+      onRefresh={onRefresh}
+      onResendOtp={onResendOtp}
+      onCancel={onCancel}
+      onChangeOtpCell={onChangeOtpCell}
+      onDevSettle={onDevSettle}
+    />;
+  }
+
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <Text style={[styles.stepLabel, { color: theme.muted }]}>ÉTAPE 1 SUR 2 · INFORMATIONS DE LA DEMANDE</Text>
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[styles.label, { color: theme.muted }]}>MONTANT</Text>
           <View style={styles.amountRow}>
-            <TextInput value={amount} editable={!deposit && !submitting} onChangeText={onChangeAmount} keyboardType="number-pad" maxLength={8} style={[styles.amountInput, { color: theme.foreground, backgroundColor: theme.background, borderColor: theme.border }, deposit && styles.lockedInput]} placeholder="Ex: 2500" placeholderTextColor={theme.muted} />
+            <TextInput value={amount} editable={!submitting} onChangeText={onChangeAmount} keyboardType="number-pad" maxLength={8} style={[styles.amountInput, { color: theme.foreground, backgroundColor: theme.background, borderColor: theme.border }]} placeholder="Ex: 2500" placeholderTextColor={theme.muted} />
             <Text style={[styles.amountSuffix, { color: theme.muted }]}>FCFA</Text>
           </View>
-        <View style={styles.quickAmounts}>
-            <Pressable key={500} disabled={Boolean(deposit) || submitting} onPress={() => onChangeAmount("500")} style={({ pressed }) => [styles.quickAmount, { backgroundColor: theme.background, borderColor: theme.border }, (deposit || submitting) && { opacity: 0.45 }, pressed && styles.pressed]}>
+          <View style={styles.quickAmounts}>
+            <Pressable key={500} disabled={submitting} onPress={() => onChangeAmount("500")} style={({ pressed }) => [styles.quickAmount, { backgroundColor: theme.background, borderColor: theme.border }, submitting && { opacity: 0.45 }, pressed && styles.pressed]}>
               <Text style={[styles.quickAmountText, { color: theme.foreground }]}>500</Text>
             </Pressable>
             {QUICK_AMOUNTS.map((q) => (
-              <Pressable key={q} disabled={Boolean(deposit) || submitting} onPress={() => onChangeAmount(String(q))} style={({ pressed }) => [styles.quickAmount, { backgroundColor: theme.background, borderColor: theme.border }, (deposit || submitting) && { opacity: 0.45 }, pressed && styles.pressed]}>
+              <Pressable key={q} disabled={submitting} onPress={() => onChangeAmount(String(q))} style={({ pressed }) => [styles.quickAmount, { backgroundColor: theme.background, borderColor: theme.border }, submitting && { opacity: 0.45 }, pressed && styles.pressed]}>
                 <Text style={[styles.quickAmountText, { color: theme.foreground }]}>{q.toLocaleString("fr-FR")}</Text>
               </Pressable>
             ))}
@@ -375,8 +417,8 @@ function InputStage(props: {
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[styles.label, { color: theme.muted }]}>OPÉRATEUR</Text>
           <View style={styles.operatorRow}>
-            <OperatorCard theme={theme} styles={styles} operator="orange_money" active={operator === "orange_money"} disabled={Boolean(deposit) || submitting} onPress={() => onChangeOperator("orange_money")} />
-            <OperatorCard theme={theme} styles={styles} operator="moov_money" active={operator === "moov_money"} disabled={Boolean(deposit) || submitting} onPress={() => onChangeOperator("moov_money")} />
+            <OperatorCard theme={theme} styles={styles} operator="orange_money" active={operator === "orange_money"} disabled={submitting} onPress={() => onChangeOperator("orange_money")} />
+            <OperatorCard theme={theme} styles={styles} operator="moov_money" active={operator === "moov_money"} disabled={submitting} onPress={() => onChangeOperator("moov_money")} />
           </View>
         </View>
 
@@ -389,54 +431,80 @@ function InputStage(props: {
             </View>
             <TextInput
               value={formatLocalPhone(phoneLocal, country)}
-              editable={!deposit && !submitting}
+              editable={!submitting}
               onChangeText={(raw) => onChangePhone(sanitizePhoneInput(raw, country))}
               keyboardType="number-pad"
               maxLength={country.digits + country.groups.length - 1}
               placeholder={country.groups.map((g) => "0".repeat(g)).join(" ")}
               placeholderTextColor={theme.muted}
-              style={[styles.phoneInput, { color: theme.foreground, backgroundColor: theme.background, borderColor: theme.border }, deposit && styles.lockedInput]}
+              style={[styles.phoneInput, { color: theme.foreground, backgroundColor: theme.background, borderColor: theme.border }]}
             />
           </View>
-          <Text style={[styles.hint, { color: theme.muted }]}>{country.name} · {country.digits} chiffres attendus</Text>
         </View>
 
-        {deposit ? (
-          <View style={[styles.paymentCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <View style={styles.paymentStatusRow}>
-              <View style={[styles.statusIndicator, { backgroundColor: theme.primary }]} />
-              <Text style={[styles.paymentStatus, { color: theme.foreground }]}>Demande créée · validation en cours</Text>
-            </View>
-            <RecapRow theme={theme} styles={styles} label="Montant" value={`${deposit.amount.toLocaleString("fr-FR")} FCFA`} />
-            <RecapRow theme={theme} styles={styles} label="Opérateur" value={operatorLabel(deposit.operator)} />
-            <RecapRow theme={theme} styles={styles} label="Numéro" value={deposit.phone} />
-          </View>
-        ) : null}
-
         {submitError ? <Text style={[styles.errorText, { color: theme.error, backgroundColor: "#F8E8E9" }]}>{submitError}</Text> : null}
+        <TikisButton label="Valider les informations" icon="arrow-forward" loading={submitting} disabled={!canSubmit} onPress={onSubmit} style={styles.cta} />
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+function ConfirmationStage(props: {
+  theme: ReturnType<typeof useThemeColors>["colors"];
+  styles: ReturnType<typeof makeStyles>;
+  deposit: DirectDepositView;
+  otpCells: string[];
+  confirming: boolean;
+  resendingOtp: boolean;
+  cancelling: boolean;
+  settling: boolean;
+  refreshing: boolean;
+  pollError: string;
+  onEdit: () => void;
+  onSubmit: () => void;
+  onOpenUssd: () => void;
+  onRefresh: () => void;
+  onResendOtp: () => void;
+  onCancel: () => void;
+  onChangeOtpCell: (index: number, value: string) => void;
+  onDevSettle: (outcome: "succeeded" | "failed") => void;
+}) {
+  const { theme, styles, deposit, otpCells, confirming, resendingOtp, cancelling, settling, refreshing, pollError, onEdit, onSubmit, onOpenUssd, onRefresh, onResendOtp, onCancel, onChangeOtpCell, onDevSettle } = props;
+  const isTest = deposit.mode === "test";
+  const requiresOtp = Boolean(!isTest && deposit.requiresOtp !== false);
+  const ussdCode = deposit.ussdCode || buildUssdCode(deposit.operator, deposit.amount);
+
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+        <Text style={[styles.stepLabel, { color: theme.muted }]}>ÉTAPE 2 SUR 2 · CONFIRMATION DU PAIEMENT</Text>
+        <View style={[styles.paymentCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <View style={styles.paymentStatusRow}>
+            <View style={[styles.statusIndicator, { backgroundColor: theme.primary }]} />
+            <Text style={[styles.paymentStatus, { color: theme.foreground }]}>Demande créée · validation en cours</Text>
+          </View>
+          <RecapRow theme={theme} styles={styles} label="Montant" value={`${deposit.amount.toLocaleString("fr-FR")} FCFA`} />
+          <RecapRow theme={theme} styles={styles} label="Opérateur" value={operatorLabel(deposit.operator)} />
+          <RecapRow theme={theme} styles={styles} label="Numéro" value={deposit.phone} />
+        </View>
+
         {pollError ? <Text style={[styles.errorText, { color: theme.error, backgroundColor: "#F8E8E9" }]}>{pollError}</Text> : null}
 
-        {showOtpCard ? (
+        {requiresOtp ? (
           <View style={[styles.otpCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Text style={[styles.label, { color: theme.muted }]}>CONFIRMATION OTP</Text>
             <Text style={[styles.otpHint, { color: theme.muted }]}>Composez le code ci-dessous sur votre téléphone pour obtenir le code OTP :</Text>
             <TikisButton label={ussdCode || "Code USSD indisponible"} icon="phone" variant="secondary" disabled={!ussdCode || confirming} onPress={onOpenUssd} style={styles.ussdButton} />
-            <OtpCells theme={theme} styles={styles} values={otpCells} disabled={!deposit || confirming} onChange={onChangeOtpCell} />
-            {deposit && requiresOtp ? <TikisButton label="Confirmer le paiement" icon="lock-open" loading={confirming} disabled={confirming || otpCells.some((cell) => !cell)} onPress={onSubmit} style={styles.cta} /> : null}
-            {deposit?.operator === "moov_money" ? <TikisButton label="Renvoyer le code OTP" loading={resendingOtp} disabled={resendingOtp || confirming} onPress={onResendOtp} variant="ghost" style={styles.refreshButton} /> : null}
+            <OtpCells theme={theme} styles={styles} values={otpCells} disabled={confirming} onChange={onChangeOtpCell} />
+            <TikisButton label="Confirmer le paiement" icon="lock-open" loading={confirming} disabled={confirming || otpCells.some((cell) => !cell)} onPress={onSubmit} style={styles.cta} />
+            {deposit.operator === "moov_money" ? <TikisButton label="Renvoyer le code OTP" loading={resendingOtp} disabled={resendingOtp || confirming} onPress={onResendOtp} variant="ghost" style={styles.refreshButton} /> : null}
           </View>
         ) : null}
 
-        <TikisButton
-          label={deposit ? "Vérifier maintenant" : "Valider le paiement"}
-          icon="check-circle"
-          onPress={deposit ? onRefresh : onSubmit}
-          loading={deposit ? false : submitting}
-          disabled={deposit ? cancelling : !canSubmit}
-          style={deposit ? styles.refreshButton : styles.cta}
-        />
-        {deposit && isTest ? <View style={[styles.devCard, { backgroundColor: "#F7EFE5", borderColor: theme.primary }]}><Text style={[styles.devLabel, { color: theme.primary }]}>MODE TEST (DEV uniquement)</Text><View style={styles.devActions}><TikisButton label="Forcer succès" icon="check-circle" onPress={() => onDevSettle("succeeded")} loading={settling} style={styles.devBtn} /><TikisButton label="Forcer échec" icon="cancel" variant="secondary" onPress={() => onDevSettle("failed")} loading={settling} style={styles.devBtn} /></View></View> : null}
-        {deposit ? <Pressable disabled={cancelling} onPress={onCancel} style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressed, cancelling && { opacity: 0.45 }]}><Text style={[styles.cancelText, { color: theme.muted }]}>Annuler</Text></Pressable> : null}
+        <TikisButton label="Actualiser le statut" icon="refresh" variant="secondary" loading={refreshing} onPress={onRefresh} disabled={refreshing || confirming || cancelling} style={styles.refreshButton} />
+        {isTest ? <View style={[styles.devCard, { backgroundColor: "#F7EFE5", borderColor: theme.primary }]}><Text style={[styles.devLabel, { color: theme.primary }]}>MODE TEST (DEV uniquement)</Text><View style={styles.devActions}><TikisButton label="Forcer succès" icon="check-circle" onPress={() => onDevSettle("succeeded")} loading={settling} style={styles.devBtn} /><TikisButton label="Forcer échec" icon="cancel" variant="secondary" onPress={() => onDevSettle("failed")} loading={settling} style={styles.devBtn} /></View></View> : null}
+        <TikisButton label="Modifier les informations" icon="edit" variant="secondary" onPress={onEdit} disabled={refreshing || confirming || cancelling} style={styles.refreshButton} />
+        <TikisButton label="Annuler la demande" icon="close" variant="ghost" loading={cancelling} disabled={refreshing || cancelling || confirming} onPress={onCancel} style={styles.refreshButton} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -558,6 +626,7 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
     body: { padding: 16, paddingBottom: 32, gap: 14 },
     card: { padding: 14, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, gap: 10 },
     label: { fontSize: 10.5, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
+    stepLabel: { fontSize: 10.5, fontWeight: "600", letterSpacing: 0.6, textTransform: "uppercase" },
     amountRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     amountInput: { flex: 1, fontSize: 22, fontWeight: "700", paddingHorizontal: 14, height: 46, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth },
     amountSuffix: { fontSize: 13, fontWeight: "600" },
@@ -576,7 +645,6 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
     flag: { fontSize: 18 },
     dialCodeText: { fontSize: 14, fontWeight: "700" },
     phoneInput: { flex: 1, paddingHorizontal: 14, height: 46, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, fontSize: 16 },
-    hint: { fontSize: 11, fontWeight: "500" },
     errorText: { padding: 12, borderRadius: 9, fontSize: 13, lineHeight: 18 },
     cta: { marginTop: 8, minHeight: 50 },
     refreshButton: { width: "100%", minHeight: 44 },

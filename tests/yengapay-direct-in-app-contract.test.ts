@@ -19,7 +19,13 @@ describe("paiement direct YengaPay dans Tikis", () => {
     expect(mobile).not.toContain("onCallUSSD");
     expect(mobile).not.toContain("YengaPay envoie la demande de validation au numéro saisi");
     expect(mobile).toContain("Composez le code ci-dessous sur votre téléphone pour obtenir le code OTP :");
-    expect(mobile).toContain("Vérifier maintenant");
+    expect(mobile).toContain('type Stage = "request" | "confirmation" | "success" | "failed";');
+    expect(mobile).toContain("ÉTAPE 1 SUR 2 · INFORMATIONS DE LA DEMANDE");
+    expect(mobile).toContain("ÉTAPE 2 SUR 2 · CONFIRMATION DU PAIEMENT");
+    expect(mobile).toContain("Valider les informations");
+    expect(mobile).toContain("Actualiser le statut");
+    expect(mobile).toContain("Modifier les informations");
+    expect(mobile).toContain("Annuler la demande");
     expect(mobile).toContain("Confirmer le paiement");
     expect(mobile).toContain("Code OTP à six chiffres");
     expect(mobile).toContain("tel:");
@@ -27,7 +33,7 @@ describe("paiement direct YengaPay dans Tikis", () => {
     expect(mobile).toContain('placeholder="Ex: 2500"');
     expect(mobile).toContain("const QUICK_AMOUNTS = [1_000, 5_000, 10_000, 25_000]");
     expect(mobile).toContain('onChangeAmount("500")');
-    expect(mobile).toContain('disabled={!deposit || confirming}');
+    expect(mobile).toContain('disabled={confirming}');
     expect(mobile).not.toContain('disabled={!deposit || confirming || checking}');
   });
 
