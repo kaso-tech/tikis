@@ -15,11 +15,14 @@ const createDirectSection = direct.slice(
 describe("paiement direct YengaPay dans Tikis", () => {
   it("ne quitte pas l’application pour saisir et confirmer l’OTP", () => {
     expect(mobile).not.toContain("expo-linking");
-    expect(mobile).not.toContain("Linking.openURL");
+    expect(mobile).toContain("Linking.openURL");
     expect(mobile).not.toContain("onCallUSSD");
     expect(mobile).toContain("vous ne quittez pas Tikis");
     expect(mobile).toContain("Vérifier maintenant");
     expect(mobile).toContain("Confirmer le paiement");
+    expect(mobile).toContain("Code OTP à six chiffres");
+    expect(mobile).toContain("tel:");
+    expect(mobile).toContain("buildUssdCode");
   });
 
   it("crée une intention idempotente sans inscrire de mouvement Wallet avant le statut fournisseur", () => {
