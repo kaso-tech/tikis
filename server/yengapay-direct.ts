@@ -3,264 +3,252 @@ import { readYengapayConfig, asNonEmptyString } from "./yengapay";
 import * as db from "./db";
 import { buildUssdCode, type YengapayOperatorCode } from "../shared/yengapay-ussd";
 
-/**
- * Paiement Mobile Money direct (in-app, sans redirection web).
- *
- * Flow complet :
- *  1. Client -> tRPC wallet.requestDirectDeposit({ amount, countryCode, phoneLocal, operator })
- *  2. Serveur -> crée un payment_intent YengaPay avec paymentSource: orange_money | moov_money
- *  3. YengaPay demande la validation à l'opérateur sur le téléphone du client
- *  4. Client -> tRPC wallet.checkDirectDepositStatus({ transactionId }) -> polling
- *  5. Webhook YengaPay -> server/yengapay.ts parseYengapayWebhookEvent -> payment.succeeded
- *  6. Webhook handler crédite le Wallet après confirmation fournisseur
- *
- * En mode test (pas de clé sandbox), on simule le flow : on retourne immédiatement un
- * transactionId, le client suit le même flow de polling, et settleDirectDepositTest
- * permet de créditer ou refuser manuellement.
- */
-
 export type YengapayDirectOperator = YengapayOperatorCode;
+
+type RemoteOperator = "ORANGE" | "MOOV";
+type RemoteFlow = "ONE_STEP" | "TWO_STEP";
+
+type RemoteOperatorInfo = {
+  code?: unknown;
+  name?: unknown;
+  countryCode?: unknown;
+  flow?: unknown;
+  ussdCode?: unknown;
+  ussdDescription?: unknown;
+};
+
+type RemoteDirectResponse = Record<string, unknown> & {
+  status?: unknown;
+  paymentIntentId?: unknown;
+  transactionId?: unknown;
+  amount?: unknown;
+  fees?: unknown;
+  totalAmount?: unknown;
+  availableOperators?: unknown;
+  nextStep?: unknown;
+};
 
 export type YengapayDirectDepositRequest = {
   profilePhone: string;
   amount: number;
-  phone: string;          // E.164 international, ex: +22670707070
+  phone: string;
   operator: YengapayOperatorCode;
   countryCode: string;
   idempotencyKey: string;
 };
 
 export type YengapayDirectDeposit = {
-  transactionId: string;     // ID interne Tikis (UUID)
-  providerReference: string;  // ID YengaPay (paymentIntentId) ou test ref
-  ussdCode: string;          // Valeur technique conservée pour la réconciliation fournisseur
+  transactionId: string;
+  providerReference: string;
+  ussdCode: string;
   amount: number;
   phone: string;
   operator: YengapayOperatorCode;
-  countryCode: string;       // Code ISO du pays (BF, CI, BJ, etc.)
-  expiresAt: string;         // ISO 8601, expiration de la demande opérateur
+  countryCode: string;
+  expiresAt: string;
   status: "pending" | "succeeded" | "failed" | "cancelled" | "expired";
   mode: "test" | "sandbox" | "live";
+  requiresOtp: boolean;
+  flow: RemoteFlow | "TEST";
+  otpInstructions?: string;
 };
 
-/** Crée la demande de dépôt direct.
- *  - En mode test : génère un transactionId interne et un providerReference factice.
- *    L'opérateur peut ensuite appeler settleDirectDepositTest pour simuler succès/échec.
- *  - En mode sandbox/live : appelle l'API REST YengaPay avec paymentSource.
- *    Retourne le paymentIntentId (providerReference) suivi dans Tikis. */
-export async function createYengapayDirectDeposit(input: YengapayDirectDepositRequest): Promise<YengapayDirectDeposit> {
-  const config = readYengapayConfig();
-  const existing = await db.getDirectDepositByIdempotencyKey(input.profilePhone, input.idempotencyKey);
-  if (existing) return existing;
-  const transactionId = randomUUID();
-  const ussdCode = buildUssdCode(input.operator, input.amount);
-  // Expiration 5 minutes : une validation opérateur ne reste jamais ouverte indéfiniment.
-  const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
+function remoteOperator(operator: YengapayOperatorCode): RemoteOperator {
+  return operator === "orange_money" ? "ORANGE" : "MOOV";
+}
 
-  if (config.mode === "test") {
-    const providerReference = `direct_test_${transactionId}`;
-    // Mode test : pas d'appel YengaPay. On stocke un record factice pour le polling.
-    await db.recordDirectDepositIntent({
-      transactionId,
-      profilePhone: input.profilePhone,
-      amount: input.amount,
-      phone: input.phone,
-      operator: input.operator,
-      countryCode: input.countryCode,
-      ussdCode,
-      expiresAt,
-      providerReference,
-      idempotencyKey: input.idempotencyKey,
-      mode: "test",
-    });
-    return {
-      transactionId,
-      providerReference,
-      ussdCode,
-      amount: input.amount,
-      phone: input.phone,
-      operator: input.operator,
-      countryCode: input.countryCode,
-      expiresAt,
-      status: "pending",
-      mode: "test",
-    };
+function localOperator(operator: unknown): YengapayOperatorCode | null {
+  const value = String(operator ?? "").trim().toUpperCase();
+  if (value === "ORANGE" || value === "ORANGE_MONEY" || value === "ORANGEMONEYAPI") return "orange_money";
+  if (value === "MOOV" || value === "MOOV_MONEY" || value === "MOOVMONEYAPI") return "moov_money";
+  return null;
+}
+
+function asAmount(value: unknown, fallback: number) {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount >= 0 ? amount : fallback;
+}
+
+function asFlow(value: unknown, operator: YengapayOperatorCode): RemoteFlow {
+  return String(value ?? "").trim().toUpperCase() === "TWO_STEP" || operator === "moov_money" ? "TWO_STEP" : "ONE_STEP";
+}
+
+function remoteStatus(value: unknown): YengapayDirectDeposit["status"] {
+  const status = String(value ?? "").trim().toUpperCase();
+  if (["DONE", "SUCCESS", "SUCCEEDED", "COMPLETED", "PAID"].includes(status)) return "succeeded";
+  if (["FAILED", "FAIL", "DECLINED", "REJECTED"].includes(status)) return "failed";
+  if (["CANCELLED", "CANCELED"].includes(status)) return "cancelled";
+  if (["EXPIRED", "TIMEOUT", "TIMED_OUT"].includes(status)) return "expired";
+  return "pending";
+}
+
+function directPath(config: ReturnType<typeof readYengapayConfig>, suffix: string) {
+  return `${config.baseUrl.replace(/\/$/, "")}/groups/${encodeURIComponent(config.orgId!)}/projects/${encodeURIComponent(config.projectId!)}/direct-payment${suffix}`;
+}
+
+async function callDirect(config: ReturnType<typeof readYengapayConfig>, suffix: string, body: Record<string, unknown>) {
+  if (!config.apiKey || !config.orgId || !config.projectId || (config.mode !== "sandbox" && config.mode !== "live")) {
+    throw new Error("YengaPay externe requiert un mode sandbox/live et les identifiants du projet.");
   }
-
-  // Mode sandbox / live : appel API YengaPay avec paymentSource.
-  if (!config.apiKey || !config.orgId || !config.projectId) {
-    throw new Error("YengaPay externe requiert YENGAPAY_API_KEY, YENGAPAY_ORG_ID, YENGAPAY_PROJECT_ID.");
-  }
-
-  const reference = `TIKIS-DIRECT-${input.idempotencyKey}`;
-  const url = `${config.baseUrl.replace(/\/$/, "")}/groups/${encodeURIComponent(config.orgId)}/payment-intent/${encodeURIComponent(config.projectId)}`;
-  const response = await fetch(url, {
+  const response = await fetch(directPath(config, suffix), {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": config.apiKey },
     signal: AbortSignal.timeout(15_000),
-    body: JSON.stringify({
-      paymentAmount: input.amount,
-      reference,
-      customerNumber: input.phone,
-      paymentSource: input.operator,
-      articles: [{
-        title: "Rechargement Wallet Tikis",
-        description: "Dépôt Mobile Money direct via YengaPay",
-        price: input.amount,
-      }],
-      additionalInfos: {
-        tikisTransactionId: transactionId,
-        purpose: "wallet_deposit_direct",
-        countryCode: input.countryCode,
-      },
-    }),
+    body: JSON.stringify(body),
   });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`YengaPay ${response.status} : ${text.slice(0, 1200)}`);
+  const text = await response.text().catch(() => "");
+  let data: RemoteDirectResponse = {};
+  try {
+    data = text ? JSON.parse(text) as RemoteDirectResponse : {};
+  } catch {
+    data = {};
   }
-
-  const data = await response.json() as Record<string, unknown>;
-  const providerReference = asNonEmptyString(data.paymentIntentId) ?? asNonEmptyString(data.id) ?? asNonEmptyString(data.reference);
-  if (!providerReference) throw new Error("YengaPay n'a pas retourné d'identifiant de paiement.");
-
-  await db.recordDirectDepositIntent({
-    transactionId,
-    profilePhone: input.profilePhone,
-    amount: input.amount,
-    phone: input.phone,
-    operator: input.operator,
-    countryCode: input.countryCode,
-    ussdCode,
-    expiresAt,
-    providerReference,
-    idempotencyKey: input.idempotencyKey,
-    mode: config.mode,
-  });
-
-  return {
-    transactionId,
-    providerReference,
-    ussdCode,
-    amount: input.amount,
-    phone: input.phone,
-    operator: input.operator,
-    countryCode: input.countryCode,
-    expiresAt,
-    status: "pending",
-    mode: config.mode,
-  };
+  if (!response.ok) throw new Error(`YengaPay ${response.status} : ${text.slice(0, 1200)}`);
+  return data;
 }
 
-/** Status de la demande — appelé en polling depuis le client.
- *  - En mode test : lit la table directe_deposits (mise à jour par settleDirectDepositTest).
- *  - En mode sandbox/live : interroge YengaPay et déclenche le crédit Wallet si succeeded. */
-export async function getYengapayDirectDepositStatus(input: { profilePhone: string; transactionId: string }): Promise<YengapayDirectDeposit> {
-  const config = readYengapayConfig();
-  const stored = await db.getDirectDepositIntent(input.transactionId, input.profilePhone);
-  if (!stored) throw new Error("Transaction de dépôt introuvable ou expirée.");
-  if (stored.status === "pending" && new Date(stored.expiresAt).getTime() <= Date.now()) {
-    const expired = await db.cancelTikisWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status: "expired" });
-    return { ...expired, status: "expired" };
+async function callDirectGet(config: ReturnType<typeof readYengapayConfig>, providerReference: string) {
+  if (!config.apiKey || !config.orgId || !config.projectId || (config.mode !== "sandbox" && config.mode !== "live")) {
+    throw new Error("YengaPay externe requiert un mode sandbox/live et les identifiants du projet.");
   }
-  if (config.mode === "test") {
-    return {
-      transactionId: stored.transactionId,
-      providerReference: stored.providerReference,
-      ussdCode: stored.ussdCode,
-      amount: stored.amount,
-      phone: stored.phone,
-      operator: stored.operator,
-      countryCode: stored.countryCode,
-      expiresAt: stored.expiresAt,
-      status: stored.status,
-      mode: "test",
-    };
-  }
-  // Mode sandbox/live : interroge YengaPay pour récupérer le statut courant.
-  if (!config.apiKey || !config.orgId || !config.projectId) {
-    throw new Error("YengaPay externe requiert YENGAPAY_API_KEY, YENGAPAY_ORG_ID, YENGAPAY_PROJECT_ID.");
-  }
-  if (stored.status === "succeeded" || stored.status === "failed" || stored.status === "cancelled" || stored.status === "expired") {
-    return {
-      transactionId: stored.transactionId,
-      providerReference: stored.providerReference,
-      ussdCode: stored.ussdCode,
-      amount: stored.amount,
-      phone: stored.phone,
-      operator: stored.operator,
-      countryCode: stored.countryCode,
-      expiresAt: stored.expiresAt,
-      status: stored.status,
-      mode: config.mode,
-    };
-  }
-  const url = `${config.baseUrl.replace(/\/$/, "")}/groups/${encodeURIComponent(config.orgId)}/payment-intent/project/${encodeURIComponent(config.projectId)}/intent/${encodeURIComponent(stored.providerReference)}`;
-  const response = await fetch(url, {
-    method: "GET",
-    headers: { "x-api-key": config.apiKey },
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) {
-    // Échec réseau : on conserve le statut pending et on laisse le client réessayer.
-    return {
-      transactionId: stored.transactionId,
-      providerReference: stored.providerReference,
-      ussdCode: stored.ussdCode,
-      amount: stored.amount,
-      phone: stored.phone,
-      operator: stored.operator,
-      countryCode: stored.countryCode,
-      expiresAt: stored.expiresAt,
-      status: stored.status,
-      mode: config.mode,
-    };
-  }
-  const data = await response.json() as Record<string, unknown>;
-  const remoteStatus = String(data.paymentStatus ?? data.transactionStatus ?? data.status ?? "").trim().toUpperCase();
-  let normalized: YengapayDirectDeposit["status"] = "pending";
-  if (["DONE", "SUCCESS", "SUCCEEDED", "COMPLETED", "PAID"].includes(remoteStatus)) normalized = "succeeded";
-  else if (["FAILED", "FAIL", "DECLINED", "REJECTED"].includes(remoteStatus)) normalized = "failed";
-  else if (["CANCELLED", "CANCELED", "EXPIRED"].includes(remoteStatus)) normalized = "cancelled";
+  const url = `${config.baseUrl.replace(/\/$/, "")}/groups/${encodeURIComponent(config.orgId)}/payment-intent/project/${encodeURIComponent(config.projectId)}/intent/${encodeURIComponent(providerReference)}`;
+  const response = await fetch(url, { method: "GET", headers: { "x-api-key": config.apiKey }, signal: AbortSignal.timeout(15_000) });
+  if (!response.ok) return null;
+  return await response.json() as RemoteDirectResponse;
+}
 
-  if (normalized === "succeeded") {
-    await db.settleTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
-  } else if (normalized === "failed") {
-    await db.refuseTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
-  } else if (normalized === "cancelled") {
-    await db.cancelTikisWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status: "cancelled" });
-  }
+function selectedRemoteOperator(data: RemoteDirectResponse, input: YengapayDirectDepositRequest): { flow: RemoteFlow; ussdCode: string; otpInstructions?: string } {
+  const operators = Array.isArray(data.availableOperators) ? data.availableOperators as RemoteOperatorInfo[] : [];
+  const requested = remoteOperator(input.operator);
+  const selected = operators.find((item) => String(item.code ?? "").trim().toUpperCase() === requested);
+  if (!selected) throw new Error(`${input.operator === "orange_money" ? "Orange Money" : "Moov Money"} n'est pas disponible pour ce projet YengaPay.`);
+  const flow = asFlow(selected.flow, input.operator);
+  const ussdCode = asNonEmptyString(selected.ussdCode) ?? buildUssdCode(input.operator, input.amount);
+  const otpInstructions = asNonEmptyString(selected.ussdDescription) ?? (flow === "ONE_STEP"
+    ? `Composez ${ussdCode} pour recevoir votre code OTP, puis saisissez-le ici.`
+    : "YengaPay vous a envoyé votre code OTP par SMS. Saisissez-le ici.");
+  return { flow, ussdCode, otpInstructions };
+}
 
+function viewFromStored(stored: db.DirectDepositRecord, mode: YengapayDirectDeposit["mode"]): YengapayDirectDeposit {
+  const operator = stored.operator;
+  const flow: RemoteFlow | "TEST" = mode === "test" ? "TEST" : operator === "moov_money" ? "TWO_STEP" : "ONE_STEP";
+  const requiresOtp = mode !== "test";
   return {
     transactionId: stored.transactionId,
     providerReference: stored.providerReference,
     ussdCode: stored.ussdCode,
     amount: stored.amount,
     phone: stored.phone,
-    operator: stored.operator,
+    operator,
     countryCode: stored.countryCode,
     expiresAt: stored.expiresAt,
-    status: normalized,
-    mode: config.mode,
+    status: stored.status,
+    mode,
+    requiresOtp,
+    flow,
+    ...(requiresOtp ? { otpInstructions: flow === "ONE_STEP" ? `Composez ${stored.ussdCode} pour recevoir votre code OTP, puis saisissez-le ici.` : "YengaPay vous a envoyé votre code OTP par SMS. Saisissez-le ici." } : {}),
   };
 }
 
-/** Annule une demande encore en attente sans créditer le Wallet. */
-export async function cancelYengapayDirectDeposit(input: { profilePhone: string; transactionId: string }) {
-  const result = await db.cancelTikisWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status: "cancelled" });
-  return { ...result, status: result.status } satisfies YengapayDirectDeposit;
+export async function createYengapayDirectDeposit(input: YengapayDirectDepositRequest): Promise<YengapayDirectDeposit> {
+  const config = readYengapayConfig();
+  const existing = await db.getDirectDepositByIdempotencyKey(input.profilePhone, input.idempotencyKey);
+  if (existing) return viewFromStored(existing, config.mode);
+  const transactionId = randomUUID();
+  const expiresAt = new Date(Date.now() + 15 * 60_000).toISOString();
+
+  if (config.mode === "test") {
+    const providerReference = `direct_test_${transactionId}`;
+    const ussdCode = buildUssdCode(input.operator, input.amount);
+    await db.recordDirectDepositIntent({ transactionId, profilePhone: input.profilePhone, amount: input.amount, phone: input.phone, operator: input.operator, countryCode: input.countryCode, ussdCode, expiresAt, providerReference, idempotencyKey: input.idempotencyKey, mode: "test" });
+    return { transactionId, providerReference, ussdCode, amount: input.amount, phone: input.phone, operator: input.operator, countryCode: input.countryCode, expiresAt, status: "pending", mode: "test", requiresOtp: false, flow: "TEST" };
+  }
+
+  const reference = `TIKIS-DIRECT-${transactionId}`;
+  const initData = await callDirect(config, "/init", {
+    amount: input.amount,
+    articles: [{ title: "Rechargement Wallet Tikis", description: "Dépôt Mobile Money direct via YengaPay", price: input.amount }],
+    reference,
+  });
+  const providerReference = asNonEmptyString(initData.paymentIntentId);
+  if (!providerReference) throw new Error("YengaPay n'a pas retourné de paymentIntentId pour le paiement direct.");
+  const selected = selectedRemoteOperator(initData, input);
+  await db.recordDirectDepositIntent({ transactionId, profilePhone: input.profilePhone, amount: input.amount, phone: input.phone, operator: input.operator, countryCode: input.countryCode, ussdCode: selected.ussdCode, expiresAt, providerReference, idempotencyKey: input.idempotencyKey, mode: config.mode });
+
+  if (selected.flow === "TWO_STEP") {
+    await callDirect(config, "/send-otp", { paymentIntentId: providerReference, operatorCode: remoteOperator(input.operator), countryCode: input.countryCode, customerMSISDN: input.phone.replace(/^\+/, "") });
+  }
+
+  return { transactionId, providerReference, ussdCode: selected.ussdCode, amount: input.amount, phone: input.phone, operator: input.operator, countryCode: input.countryCode, expiresAt, status: "pending", mode: config.mode, requiresOtp: true, flow: selected.flow, otpInstructions: selected.otpInstructions };
 }
 
-/** Permet de simuler manuellement succès/échec en mode test. */
+export async function payYengapayDirectDeposit(input: { profilePhone: string; transactionId: string; otp: string }): Promise<YengapayDirectDeposit> {
+  const config = readYengapayConfig();
+  const stored = await db.getDirectDepositIntent(input.transactionId, input.profilePhone);
+  if (!stored) throw new Error("Transaction de dépôt introuvable ou expirée.");
+  if (stored.status !== "pending") return viewFromStored(stored, config.mode);
+  if (!/^[0-9]{4,12}$/.test(input.otp)) throw new Error("Le code OTP doit contenir uniquement 4 à 12 chiffres.");
+  if (config.mode === "test") return viewFromStored(stored, config.mode);
+
+  const data = await callDirect(config, "/pay", {
+    paymentIntentId: stored.providerReference,
+    operatorCode: remoteOperator(stored.operator),
+    countryCode: stored.countryCode,
+    customerMSISDN: stored.phone.replace(/^\+/, ""),
+    otp: input.otp,
+  });
+  const status = remoteStatus(data.status ?? data.transactionStatus ?? data.paymentStatus);
+  if (status === "succeeded") await db.settleTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
+  else if (status === "failed") await db.refuseTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
+  else if (status === "cancelled" || status === "expired") await db.cancelTikisWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status });
+  const updated = await db.getDirectDepositIntent(input.transactionId, input.profilePhone);
+  if (!updated) throw new Error("La transaction directe n'est plus disponible.");
+  return viewFromStored(updated, config.mode);
+}
+
+export async function resendYengapayDirectOtp(input: { profilePhone: string; transactionId: string }): Promise<YengapayDirectDeposit> {
+  const config = readYengapayConfig();
+  const stored = await db.getDirectDepositIntent(input.transactionId, input.profilePhone);
+  if (!stored) throw new Error("Transaction de dépôt introuvable ou expirée.");
+  if (stored.status !== "pending") return viewFromStored(stored, config.mode);
+  if (config.mode === "test" || stored.operator !== "moov_money") return viewFromStored(stored, config.mode);
+  await callDirect(config, "/send-otp", {
+    paymentIntentId: stored.providerReference,
+    operatorCode: "MOOV",
+    countryCode: stored.countryCode,
+    customerMSISDN: stored.phone.replace(/^\+/, ""),
+  });
+  return viewFromStored(stored, config.mode);
+}
+
+export async function getYengapayDirectDepositStatus(input: { profilePhone: string; transactionId: string }): Promise<YengapayDirectDeposit> {
+  const config = readYengapayConfig();
+  const stored = await db.getDirectDepositIntent(input.transactionId, input.profilePhone);
+  if (!stored) throw new Error("Transaction de dépôt introuvable ou expirée.");
+  if (stored.status === "pending" && new Date(stored.expiresAt).getTime() <= Date.now()) {
+    const expired = await db.cancelTikisWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status: "expired" });
+    return viewFromStored(expired, config.mode);
+  }
+  if (config.mode === "test" || stored.status !== "pending") return viewFromStored(stored, config.mode);
+  const data = await callDirectGet(config, stored.providerReference);
+  if (!data) return viewFromStored(stored, config.mode);
+  const status = remoteStatus(data.paymentStatus ?? data.transactionStatus ?? data.status);
+  if (status === "succeeded") await db.settleTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
+  else if (status === "failed") await db.refuseTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
+  else if (status === "cancelled" || status === "expired") await db.cancelTikisWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status });
+  const updated = await db.getDirectDepositIntent(input.transactionId, input.profilePhone);
+  return updated ? viewFromStored(updated, config.mode) : viewFromStored(stored, config.mode);
+}
+
+export async function cancelYengapayDirectDeposit(input: { profilePhone: string; transactionId: string }) {
+  const result = await db.cancelTikisWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status: "cancelled" });
+  return viewFromStored(result, readYengapayConfig().mode);
+}
+
 export async function settleYengapayDirectDepositTest(input: { profilePhone: string; transactionId: string; outcome: "succeeded" | "failed" }): Promise<YengapayDirectDeposit> {
-  if (readYengapayConfig().mode !== "test") {
-    throw new Error("La simulation d'un dépôt direct est disponible uniquement en mode test.");
-  }
-  if (input.outcome === "succeeded") {
-    await db.settleTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
-  } else {
-    await db.refuseTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
-  }
+  if (readYengapayConfig().mode !== "test") throw new Error("La simulation d'un dépôt direct est disponible uniquement en mode test.");
+  if (input.outcome === "succeeded") await db.settleTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
+  else await db.refuseTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
   return getYengapayDirectDepositStatus({ profilePhone: input.profilePhone, transactionId: input.transactionId });
 }

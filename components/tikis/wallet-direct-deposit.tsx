@@ -20,7 +20,7 @@ import { useTikisStore } from "@/lib/tikis-store";
  *     - Montant + raccourcis 1k/2,5k/5k/10k/25k.
  *     - Cartes opérateur Orange/Moov (le code USSD du bouton se met à jour live).
  *     - Numéro E.164 (split indicatif + national, maxLength dynamique par pays).
- *     - Code OTP : un seul champ TextInput paste-friendly (vs. 6 cellules manuelles).
+ *     - Code OTP : un seul champ TextInput sécurisé et paste-friendly.
  *     - Information claire : YengaPay envoie la demande à l'opérateur et Tikis reste ouvert.
  *     - CTA "Valider le paiement" qui soumet.
  *
@@ -59,6 +59,9 @@ export type DirectDepositView = {
   expiresAt: string;
   status: "pending" | "succeeded" | "failed" | "cancelled" | "expired";
   mode: "test" | "sandbox" | "live";
+  requiresOtp?: boolean;
+  flow?: "ONE_STEP" | "TWO_STEP" | "TEST";
+  otpInstructions?: string;
 };
 
 export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initialDeposit }: { visible: boolean; onClose: () => void; onSuccess?: () => void; initialDeposit?: DirectDepositView | null }) {
@@ -79,6 +82,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   const [phoneLocal, setPhoneLocal] = useState<string>("");
   const [operator, setOperator] = useState<Operator>("orange_money");
   const [requestKey, setRequestKey] = useState(createDirectPaymentKey);
+  const [otp, setOtp] = useState("");
 
   // ===== ÉTAT STAGE =====
   const [stage, setStage] = useState<Stage>("input");
@@ -87,6 +91,8 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   const [pollError, setPollError] = useState<string>("");
 
   const requestMutation = trpc.wallet.requestDirectDeposit.useMutation();
+  const payMutation = trpc.wallet.payDirectDeposit.useMutation();
+  const resendOtpMutation = trpc.wallet.resendDirectDepositOtp.useMutation();
   const cancelMutation = trpc.wallet.cancelDirectDeposit.useMutation();
   const statusQuery = trpc.wallet.checkDirectDepositStatus.useQuery(
     { transactionId: deposit?.transactionId ?? "" },
@@ -98,8 +104,6 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   const amountNum = useMemo(() => parseInt(amount, 10), [amount]);
   const isAmountValid = Number.isFinite(amountNum) && amountNum >= 100 && amountNum <= 10_000_000;
   const isPhoneValid = phoneLocal.length === country.digits;
-  // L'OTP est techniquement optionnel : la vraie confirmation vient du webhook YengaPay.
-  // On l'affiche et le rend éditable, mais on ne bloque pas le submit dessus.
   const canSubmit = isAmountValid && isPhoneValid && !requestMutation.isPending;
 
   // ===== Reset =====
@@ -109,6 +113,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     setPhoneLocal("");
     setSubmitError("");
     setPollError("");
+    setOtp("");
     setDeposit(null);
     setOperator("orange_money");
     setRequestKey(createDirectPaymentKey());
@@ -125,9 +130,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     return () => clearTimeout(resetTimer);
   }, [visible, reset]);
 
-  // Reprise d'un dépôt en attente (depuis la bannière du wallet)
-  // Si le parent passe `initialDeposit`, on saute directement au stage "waiting" avec le
-  // deposit pré-rempli — l'USSD a déjà été composé, on attend juste la confirmation PSP.
+  // Reprise d'un dépôt en attente depuis la bannière du Wallet.
   // Le setTimeout(0) évite les warnings React "setState during render" si le parent re-render
   // simultanément (cf. fix Manus 433bbe0). cleanup clearTimeout au démontage du composant.
   useEffect(() => {
@@ -139,6 +142,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
       setStage("waiting");
       setSubmitError("");
       setPollError("");
+      setOtp("");
     }, 0);
     return () => clearTimeout(resume);
   }, [visible, initialDeposit]);
@@ -174,6 +178,37 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
       setPollError(cause instanceof Error ? cause.message : "Impossible d'annuler le paiement.");
     }
   }, [cancelMutation, deposit]);
+
+  const onPay = useCallback(async () => {
+    if (!deposit || !/^\d{4,12}$/.test(otp)) {
+      setPollError("Saisissez le code OTP reçu ou généré par votre opérateur.");
+      return;
+    }
+    setPollError("");
+    try {
+      const result = await payMutation.mutateAsync({ transactionId: deposit.transactionId, otp });
+      setDeposit(result);
+      if (result.status === "succeeded") {
+        setStage("success");
+        onSuccess?.();
+      } else if (result.status === "failed" || result.status === "cancelled" || result.status === "expired") {
+        setPollError(result.status === "expired" ? "La demande a expiré avant confirmation." : "Le paiement n'a pas pu être confirmé.");
+        setStage("failed");
+      }
+    } catch (cause) {
+      setPollError(cause instanceof Error ? cause.message : "Le paiement direct n'a pas pu être confirmé.");
+    }
+  }, [deposit, onSuccess, otp, payMutation]);
+
+  const onResendOtp = useCallback(async () => {
+    if (!deposit) return;
+    setPollError("");
+    try {
+      await resendOtpMutation.mutateAsync({ transactionId: deposit.transactionId });
+    } catch (cause) {
+      setPollError(cause instanceof Error ? cause.message : "Le code OTP n'a pas pu être renvoyé.");
+    }
+  }, [deposit, resendOtpMutation]);
 
   const onDevSettle = useCallback(async (outcome: "succeeded" | "failed") => {
     if (!deposit) return;
@@ -250,12 +285,18 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
             theme={theme}
             styles={styles}
             deposit={deposit}
+            otp={otp}
+            paying={payMutation.isPending}
+            resendingOtp={resendOtpMutation.isPending}
             pollError={displayedPollError}
             isTest={deposit.mode === "test"}
             settling={settleTestMutation.isPending}
             cancelling={cancelMutation.isPending}
             checking={statusQuery.isFetching}
             onRefresh={() => void statusQuery.refetch()}
+            onChangeOtp={setOtp}
+            onPay={() => void onPay()}
+            onResendOtp={() => void onResendOtp()}
             onCancel={() => void onCancelWaiting()}
             onDevSettle={onDevSettle}
           />
@@ -385,21 +426,27 @@ function WaitingStage(props: {
   theme: ReturnType<typeof useThemeColors>["colors"];
   styles: ReturnType<typeof makeStyles>;
   deposit: DirectDepositView;
+  otp: string;
+  paying: boolean;
+  resendingOtp: boolean;
   pollError: string;
   isTest: boolean;
   settling: boolean;
   cancelling: boolean;
   checking: boolean;
   onRefresh: () => void;
+  onChangeOtp: (value: string) => void;
+  onPay: () => void;
+  onResendOtp: () => void;
   onCancel: () => void;
   onDevSettle: (outcome: "succeeded" | "failed") => void;
 }) {
-  const { theme, styles, deposit, pollError, isTest, settling, cancelling, checking, onRefresh, onCancel, onDevSettle } = props;
+  const { theme, styles, deposit, otp, paying, resendingOtp, pollError, isTest, settling, cancelling, checking, onRefresh, onChangeOtp, onPay, onResendOtp, onCancel, onDevSettle } = props;
   return (
     <View style={[styles.waitingStage, { backgroundColor: theme.surface }]}>
       <ActivityIndicator size="large" color={theme.primary} />
       <Text style={[styles.waitingTitle, { color: theme.foreground }]}>Validation en cours</Text>
-      <Text style={[styles.waitingSubtitle, { color: theme.muted }]}>Demande envoyée à {operatorLabel(deposit.operator)}. Gardez Tikis ouvert : la confirmation est vérifiée automatiquement.</Text>
+      <Text style={[styles.waitingSubtitle, { color: theme.muted }]}>{deposit.otpInstructions ?? `Demande envoyée à ${operatorLabel(deposit.operator)}. Saisissez le code OTP pour confirmer.`}</Text>
 
       <View style={[styles.recap, { backgroundColor: theme.background }]}>
         <RecapRow theme={theme} styles={styles} label="Opérateur" value={operatorLabel(deposit.operator)} />
@@ -409,6 +456,25 @@ function WaitingStage(props: {
       </View>
 
       {pollError ? <Text style={[styles.errorText, { color: theme.error, backgroundColor: "#F8E8E9", marginTop: 12 }]}>{pollError}</Text> : null}
+
+      {!isTest && deposit.requiresOtp !== false ? (
+        <View style={styles.otpBlock}>
+          <Text style={[styles.otpLabel, { color: theme.muted }]}>CODE OTP</Text>
+          <TextInput
+            value={otp}
+            onChangeText={(value) => onChangeOtp(value.replace(/[^0-9]/g, "").slice(0, 12))}
+            keyboardType="number-pad"
+            inputMode="numeric"
+            maxLength={12}
+            placeholder="Saisissez votre code"
+            placeholderTextColor={theme.muted}
+            style={[styles.otpInput, { color: theme.foreground, backgroundColor: theme.background, borderColor: theme.border }]}
+            returnKeyType="done"
+          />
+          <TikisButton label="Confirmer le paiement" icon="lock-open" loading={paying} disabled={paying || checking || otp.length < 4} onPress={onPay} style={styles.refreshButton} />
+          {deposit.operator === "moov_money" ? <TikisButton label="Renvoyer le code OTP" variant="secondary" loading={resendingOtp} disabled={resendingOtp || paying || checking} onPress={onResendOtp} style={styles.refreshButton} /> : null}
+        </View>
+      ) : null}
 
       <TikisButton label="Vérifier maintenant" icon="refresh" loading={checking} disabled={checking || cancelling} onPress={onRefresh} style={styles.refreshButton} />
 
@@ -528,6 +594,9 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
 
     cancelBtn: { alignItems: "center", padding: 14, marginTop: 4 },
     cancelText: { fontSize: 14, fontWeight: "600" },
+    otpBlock: { width: "100%", gap: 8, marginTop: 4 },
+    otpLabel: { fontSize: 10.5, fontWeight: "700", letterSpacing: 0.6 },
+    otpInput: { width: "100%", height: 46, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: 14, fontSize: 18, letterSpacing: 3, textAlign: "center" },
 
     centerStage: { flex: 1, padding: 24, alignItems: "center", justifyContent: "center", gap: 14 },
     bigCheck: { width: 88, height: 88, borderRadius: 44, alignItems: "center", justifyContent: "center" },

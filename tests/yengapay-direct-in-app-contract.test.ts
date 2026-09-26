@@ -13,19 +13,23 @@ const createDirectSection = direct.slice(
 );
 
 describe("paiement direct YengaPay dans Tikis", () => {
-  it("ne quitte pas l’application pour composer un code ou saisir un OTP local", () => {
+  it("ne quitte pas l’application pour saisir et confirmer l’OTP", () => {
     expect(mobile).not.toContain("expo-linking");
     expect(mobile).not.toContain("Linking.openURL");
     expect(mobile).not.toContain("onCallUSSD");
-    expect(mobile).not.toContain("onOtpChange");
     expect(mobile).toContain("vous ne quittez pas Tikis");
     expect(mobile).toContain("Vérifier maintenant");
+    expect(mobile).toContain("Confirmer le paiement");
   });
 
   it("crée une intention idempotente sans inscrire de mouvement Wallet avant le statut fournisseur", () => {
     expect(createDirectSection).toContain("getDirectDepositByIdempotencyKey");
     expect(createDirectSection).toContain("idempotencyKey: input.idempotencyKey");
     expect(createDirectSection).not.toContain("requestTikisWalletOperation");
+    expect(createDirectSection).toContain('callDirect(config, "/init"');
+    expect(createDirectSection).toContain('callDirect(config, "/send-otp"');
+    expect(direct).toContain('callDirect(config, "/pay"');
+    expect(router).toContain("payDirectDeposit");
     expect(direct).toContain("settleTikisWalletDepositRequest");
     expect(database).toContain("checkoutUrl: null");
   });

@@ -84,18 +84,18 @@ describe("paiement direct YengaPay Sandbox", () => {
     expect(readYengapayConfig().mode).toBe("sandbox");
 
     const intent = await createYengapayDirectDeposit({
-      profilePhone: "+22990000000",
+      profilePhone: "+22670000000",
       amount: 500,
-      phone: "+22990000000",
+      phone: "+22670000000",
       operator: "moov_money",
-      countryCode: "BJ",
+      countryCode: "BF",
       idempotencyKey: `sandbox-moov-${randomUUID().replace(/-/g, "")}`,
     });
 
     expect(intent.mode).toBe("sandbox");
     expect(intent.amount).toBe(500);
     expect(intent.operator).toBe("moov_money");
-    expect(intent.countryCode).toBe("BJ");
+    expect(intent.countryCode).toBe("BF");
     expect(intent.ussdCode).toMatch(/^\*555/); // Pattern Moov : *555*...
   }, 25_000);
 });

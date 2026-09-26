@@ -851,6 +851,16 @@ export const appRouter = router({
       const { getYengapayDirectDepositStatus } = await import("./yengapay-direct");
       return getYengapayDirectDepositStatus({ profilePhone: profile.phone, transactionId: input.transactionId });
     }),
+    payDirectDeposit: tikisProtectedProcedure.input(z.object({ transactionId: z.string().uuid(), otp: z.string().regex(/^[0-9]{4,12}$/) })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      const { payYengapayDirectDeposit } = await import("./yengapay-direct");
+      return payYengapayDirectDeposit({ profilePhone: profile.phone, transactionId: input.transactionId, otp: input.otp });
+    }),
+    resendDirectDepositOtp: tikisProtectedProcedure.input(z.object({ transactionId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+      const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      const { resendYengapayDirectOtp } = await import("./yengapay-direct");
+      return resendYengapayDirectOtp({ profilePhone: profile.phone, transactionId: input.transactionId });
+    }),
     cancelDirectDeposit: tikisProtectedProcedure.input(z.object({ transactionId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
       const { cancelYengapayDirectDeposit } = await import("./yengapay-direct");

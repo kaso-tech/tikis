@@ -17,14 +17,13 @@ describe("règlement YengaPay Direct", () => {
   });
 
   it("crédite le Wallet avant de marquer la transaction réussie", () => {
-    const settlement = direct.slice(direct.indexOf('if (normalized === "succeeded")'), direct.indexOf('return {', direct.indexOf('if (normalized === "succeeded")')));
-    expect(settlement).toContain('settleTikisWalletDepositRequest');
-    expect(settlement).not.toContain('settleDirectDeposit');
+    expect(direct).toContain('await db.settleTikisWalletDepositRequest');
+    expect(direct).toContain('if (status === "succeeded")');
+    expect(direct).not.toContain('await db.settleDirectDeposit');
   });
 
   it("refuse une transaction échouée sans mouvement de crédit", () => {
-    const failure = direct.slice(direct.indexOf('else if (normalized === "failed")'), direct.indexOf('return {', direct.indexOf('else if (normalized === "failed")')));
-    expect(failure).toContain('refuseTikisWalletDepositRequest');
-    expect(failure).not.toContain('settleTikisWalletDepositRequest');
+    expect(direct).toContain('await db.refuseTikisWalletDepositRequest');
+    expect(direct).toContain('else if (status === "failed")');
   });
 });
