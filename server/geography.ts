@@ -383,6 +383,17 @@ export async function searchCities(query: string, countryCode: string) {
   }
 }
 
+function normalizeCityName(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("fr").replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+export async function cityBelongsToCountry(city: string, countryCode: string) {
+  const normalizedCity = normalizeCityName(city);
+  if (!normalizedCity || !/^[A-Z]{2}$/.test(countryCode)) return false;
+  const matches = await searchCities(city, countryCode);
+  return matches.some((match) => normalizeCityName(match) === normalizedCity);
+}
+
 export async function searchPlaces(query: string, bias?: { latitude: number; longitude: number }, countryCode?: string, includeCommunityFallback = false) {
   const textQuery = sanitizePlaceText(query, 120);
   if (textQuery.length < 2) return [];

@@ -470,7 +470,13 @@ export const appRouter = router({
       const current = await db.getTikisProfileByPhone(input.phone);
       if (!current) throw new Error("Profil introuvable. Connectez-vous de nouveau pour le créer.");
       if (input.country) await assertCountryEnabled(input.country);
-      const profile = await db.updateTikisProfile(input.phone, { fullName: input.fullName ?? current.fullName, photoKey: photoKey ?? current.photoKey, country: input.country ?? current.country, city: input.city ?? current.city });
+      const nextCountry = input.country ?? current.country;
+      const countryChanged = Boolean(input.country && input.country !== current.country);
+      const nextCity = countryChanged ? null : input.city ?? current.city;
+      if (input.city && (!nextCountry || !(await geography.cityBelongsToCountry(input.city, nextCountry)))) {
+        throw new Error("Cette ville n’appartient pas au pays sélectionné.");
+      }
+      const profile = await db.updateTikisProfile(input.phone, { fullName: input.fullName ?? current.fullName, photoKey: photoKey ?? current.photoKey, country: nextCountry, city: nextCity });
       return toPublicProfile(profile);
     }),
     updateVehicles: tikisProtectedProcedure.input(z.object({ vehicles: z.array(vehicleSchema).min(1).max(5) })).mutation(async ({ ctx, input }) => {

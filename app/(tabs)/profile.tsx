@@ -140,7 +140,7 @@ export default function ProfileScreen() {
     setLocationSaving("country");
     try {
       const saved = await updateMutation.mutateAsync({ phone: profile.phone, otp: "730512", country: countryId });
-      updateProfile({ country: saved.country });
+      updateProfile({ country: saved.country, city: saved.city ?? undefined });
       setCountryEditorOpen(false);
       haptic.success();
     } catch (cause) {

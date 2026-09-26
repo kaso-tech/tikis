@@ -63,13 +63,19 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   const styles = makeStyles(theme);
   const { profile } = useTikisStore();
 
-  // Pays dérivé du profil : on prend le pays d'enregistrement de l'utilisateur plutôt
-  // que de le laisser choisir au moment du paiement. Si profile.countryCode n'est pas
-  // reconnu dans COUNTRIES (cas dégénéré), on retombe sur l'index 0.
+  const profileStatusQuery = trpc.profiles.status.useQuery(undefined, {
+    enabled: visible && Boolean(profile?.phone),
+    staleTime: 0,
+    refetchOnMount: "always",
+  });
+  const profileCountry = profileStatusQuery.data?.country ?? profile?.country;
+
+  // Le pays du paiement provient du pays enregistré sur le profil, jamais du code
+  // pays du téléphone. La requête de statut resynchronise le profil à chaque ouverture.
   const country: CountrySpec = useMemo(() => {
-    const fromProfile = COUNTRIES.find((c) => c.id === profile?.countryCode);
+    const fromProfile = COUNTRIES.find((c) => c.id === profileCountry);
     return fromProfile ?? COUNTRIES[0];
-  }, [profile?.countryCode]);
+  }, [profileCountry]);
 
   // ===== ÉTAT FORMULAIRE =====
   const [amount, setAmount] = useState<string>("");
@@ -126,6 +132,11 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     const resetTimer = setTimeout(reset, 0);
     return () => clearTimeout(resetTimer);
   }, [visible, reset]);
+
+  useEffect(() => {
+    if (!visible || !profile?.phone) return;
+    void profileStatusQuery.refetch();
+  }, [visible, profile?.phone, profileStatusQuery.refetch]);
 
   // Reprise d'un dépôt en attente depuis la bannière du Wallet.
   // Le setTimeout(0) évite les warnings React "setState during render" si le parent re-render
