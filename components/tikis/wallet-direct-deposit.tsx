@@ -84,7 +84,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   const [deposit, setDeposit] = useState<DirectDepositView | null>(null);
   const [submitError, setSubmitError] = useState<string>("");
   const [pollError, setPollError] = useState<string>("");
-  const [refreshing, setRefreshing] = useState(false);
+  const [modifying, setModifying] = useState(false);
 
   const requestMutation = trpc.wallet.requestDirectDeposit.useMutation();
   const payMutation = trpc.wallet.payDirectDeposit.useMutation();
@@ -106,12 +106,12 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   const reset = useCallback(() => {
     setStage("request");
     setAmount("");
-    setRefreshing(false);
     setPhoneLocal("");
     setSubmitError("");
     setPollError("");
     setOtpCells(Array.from({ length: 6 }, () => ""));
     setDeposit(null);
+    setModifying(false);
     setOperator("orange_money");
     setRequestKey(createDirectPaymentKey());
   }, []);
@@ -180,6 +180,24 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     }
   }, [cancelMutation, deposit]);
 
+  const onModify = useCallback(async () => {
+    if (!deposit || modifying) return;
+    setModifying(true);
+    setPollError("");
+    try {
+      await cancelMutation.mutateAsync({ transactionId: deposit.transactionId });
+      setDeposit(null);
+      setOtpCells(Array.from({ length: 6 }, () => ""));
+      setRequestKey(createDirectPaymentKey());
+      setSubmitError("");
+      setStage("request");
+    } catch (cause) {
+      setPollError(cause instanceof Error ? cause.message : "Impossible d'annuler l'ancienne demande.");
+    } finally {
+      setModifying(false);
+    }
+  }, [cancelMutation, deposit, modifying]);
+
   const onPay = useCallback(async () => {
     if (!deposit || !/^\d{6}$/.test(otp)) {
       setPollError("Saisissez les 6 chiffres du code OTP reçu ou généré par votre opérateur.");
@@ -220,15 +238,6 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
       setPollError(cause instanceof Error ? cause.message : "Action impossible.");
     }
   }, [deposit, settleTestMutation]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await statusQuery.refetch();
-    } finally {
-      setRefreshing(false);
-    }
-  }, [statusQuery]);
 
   // ===== Polling =====
   useEffect(() => {
@@ -288,22 +297,14 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
             resendingOtp={resendOtpMutation.isPending}
             cancelling={cancelMutation.isPending}
             settling={settleTestMutation.isPending}
-            refreshing={refreshing}
+            modifying={modifying}
             pollError={displayedPollError}
             canSubmit={deposit ? otpCells.every(Boolean) : canSubmit}
             onChangeAmount={setAmount}
             onChangePhone={setPhoneLocal}
             onChangeOperator={setOperator}
             onChangeOtpCell={(index, value) => setOtpCells((current) => current.map((cell, cellIndex) => cellIndex === index ? value : cell))}
-            onEdit={() => {
-              setDeposit(null);
-              setOtpCells(Array.from({ length: 6 }, () => ""));
-              setRequestKey(createDirectPaymentKey());
-              setSubmitError("");
-              setPollError("");
-              setRefreshing(false);
-              setStage("request");
-            }}
+            onModify={() => void onModify()}
             onSubmit={deposit ? () => void onPay() : () => void onSubmit()}
             onOpenUssd={async () => {
               const code = deposit?.ussdCode || buildUssdCode(operator, Number.parseInt(amount, 10));
@@ -314,7 +315,6 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
                 setSubmitError("Impossible d'ouvrir l'application téléphone sur cet appareil.");
               }
             }}
-            onRefresh={() => void onRefresh()}
             onResendOtp={() => void onResendOtp()}
             onCancel={() => void onCancelWaiting()}
             onDevSettle={onDevSettle}
@@ -352,22 +352,21 @@ function InputStage(props: {
   resendingOtp: boolean;
   cancelling: boolean;
   settling: boolean;
-  refreshing: boolean;
+  modifying: boolean;
   pollError: string;
   canSubmit: boolean;
   onChangeAmount: (value: string) => void;
   onChangePhone: (value: string) => void;
   onChangeOperator: (op: Operator) => void;
   onChangeOtpCell: (index: number, value: string) => void;
-  onEdit: () => void;
   onSubmit: () => void;
   onOpenUssd: () => void;
-  onRefresh: () => void;
+  onModify: () => void;
   onResendOtp: () => void;
   onCancel: () => void;
   onDevSettle: (outcome: "succeeded" | "failed") => void;
 }) {
-  const { theme, styles, country, amount, phoneLocal, operator, submitError, deposit, otpCells, submitting, confirming, resendingOtp, cancelling, settling, refreshing, pollError, canSubmit, onChangeAmount, onChangePhone, onChangeOperator, onChangeOtpCell, onEdit, onSubmit, onOpenUssd, onRefresh, onResendOtp, onCancel, onDevSettle } = props;
+  const { theme, styles, country, amount, phoneLocal, operator, submitError, deposit, otpCells, submitting, confirming, resendingOtp, cancelling, settling, modifying, pollError, canSubmit, onChangeAmount, onChangePhone, onChangeOperator, onChangeOtpCell, onSubmit, onOpenUssd, onModify, onResendOtp, onCancel, onDevSettle } = props;
 
   if (deposit) {
     return <ConfirmationStage
@@ -379,12 +378,11 @@ function InputStage(props: {
       resendingOtp={resendingOtp}
       cancelling={cancelling}
       settling={settling}
-      refreshing={refreshing}
+      modifying={modifying}
       pollError={pollError}
-      onEdit={onEdit}
       onSubmit={onSubmit}
       onOpenUssd={onOpenUssd}
-      onRefresh={onRefresh}
+      onModify={onModify}
       onResendOtp={onResendOtp}
       onCancel={onCancel}
       onChangeOtpCell={onChangeOtpCell}
@@ -393,8 +391,8 @@ function InputStage(props: {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}>
+      <ScrollView contentContainerStyle={styles.keyboardBody} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}>
         <Text style={[styles.stepLabel, { color: theme.muted }]}>ÉTAPE 1 SUR 2 · INFORMATIONS DE LA DEMANDE</Text>
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[styles.label, { color: theme.muted }]}>MONTANT</Text>
@@ -458,25 +456,24 @@ function ConfirmationStage(props: {
   resendingOtp: boolean;
   cancelling: boolean;
   settling: boolean;
-  refreshing: boolean;
+  modifying: boolean;
   pollError: string;
-  onEdit: () => void;
   onSubmit: () => void;
   onOpenUssd: () => void;
-  onRefresh: () => void;
+  onModify: () => void;
   onResendOtp: () => void;
   onCancel: () => void;
   onChangeOtpCell: (index: number, value: string) => void;
   onDevSettle: (outcome: "succeeded" | "failed") => void;
 }) {
-  const { theme, styles, deposit, otpCells, confirming, resendingOtp, cancelling, settling, refreshing, pollError, onEdit, onSubmit, onOpenUssd, onRefresh, onResendOtp, onCancel, onChangeOtpCell, onDevSettle } = props;
+  const { theme, styles, deposit, otpCells, confirming, resendingOtp, cancelling, settling, modifying, pollError, onSubmit, onOpenUssd, onModify, onResendOtp, onCancel, onChangeOtpCell, onDevSettle } = props;
   const isTest = deposit.mode === "test";
   const requiresOtp = Boolean(!isTest && deposit.requiresOtp !== false);
   const ussdCode = deposit.ussdCode || buildUssdCode(deposit.operator, deposit.amount);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}>
+      <ScrollView contentContainerStyle={styles.keyboardBody} keyboardShouldPersistTaps="handled" keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}>
         <Text style={[styles.stepLabel, { color: theme.muted }]}>ÉTAPE 2 SUR 2 · CONFIRMATION DU PAIEMENT</Text>
         <View style={[styles.paymentCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.paymentStatusRow}>
@@ -501,10 +498,11 @@ function ConfirmationStage(props: {
           </View>
         ) : null}
 
-        <TikisButton label="Actualiser le statut" icon="refresh" variant="secondary" loading={refreshing} onPress={onRefresh} disabled={refreshing || confirming || cancelling} style={styles.refreshButton} />
         {isTest ? <View style={[styles.devCard, { backgroundColor: "#F7EFE5", borderColor: theme.primary }]}><Text style={[styles.devLabel, { color: theme.primary }]}>MODE TEST (DEV uniquement)</Text><View style={styles.devActions}><TikisButton label="Forcer succès" icon="check-circle" onPress={() => onDevSettle("succeeded")} loading={settling} style={styles.devBtn} /><TikisButton label="Forcer échec" icon="cancel" variant="secondary" onPress={() => onDevSettle("failed")} loading={settling} style={styles.devBtn} /></View></View> : null}
-        <TikisButton label="Modifier les informations" icon="edit" variant="secondary" onPress={onEdit} disabled={refreshing || confirming || cancelling} style={styles.refreshButton} />
-        <TikisButton label="Annuler la demande" icon="close" variant="ghost" loading={cancelling} disabled={refreshing || cancelling || confirming} onPress={onCancel} style={styles.refreshButton} />
+        <View style={styles.confirmationActions}>
+          <TikisButton label="Modifier" icon="edit" compact variant="secondary" loading={modifying} disabled={modifying || cancelling || confirming} onPress={onModify} style={styles.actionButton} />
+          <TikisButton label="Annuler" icon="close" compact variant="ghost" loading={cancelling} disabled={modifying || cancelling || confirming} onPress={onCancel} style={styles.actionButton} />
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -552,7 +550,6 @@ function OperatorCard(props: { theme: ReturnType<typeof useThemeColors>["colors"
       </View>
       <View style={{ flex: 1 }}>
         <Text style={[styles.operatorName, { color: theme.foreground }]}>{operatorLabel(operator)}</Text>
-        <Text style={[styles.operatorFees, { color: theme.muted }]} numberOfLines={1}>{isOM ? "Frais 1,5%" : "Frais 2%"}</Text>
       </View>
       {active ? <MaterialIcons name="check-circle" size={16} color={theme.primary} /> : null}
     </Pressable>
@@ -639,7 +636,6 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
     operatorLogo: { width: 36, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center" },
     operatorLogoText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
     operatorName: { fontSize: 13, fontWeight: "600" },
-    operatorFees: { fontSize: 10.5 },
     phoneRow: { flexDirection: "row", alignItems: "stretch", gap: 8 },
     dialCodeStatic: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, height: 46, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth },
     flag: { fontSize: 18 },
@@ -648,6 +644,9 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
     errorText: { padding: 12, borderRadius: 9, fontSize: 13, lineHeight: 18 },
     cta: { marginTop: 8, minHeight: 50 },
     refreshButton: { width: "100%", minHeight: 44 },
+    confirmationActions: { flexDirection: "row", gap: 8, width: "100%", marginTop: 2 },
+    actionButton: { flex: 1, minHeight: 40 },
+    keyboardBody: { padding: 16, paddingBottom: 120, gap: 14 },
     paymentCard: { width: "100%", padding: 14, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, gap: 4 },
     paymentStatusRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 },
     statusIndicator: { width: 8, height: 8, borderRadius: 4 },
