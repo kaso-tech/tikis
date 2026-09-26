@@ -1,13 +1,14 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import * as Linking from "expo-linking";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
-import { COUNTRIES, countryFlagEmoji, type CountrySpec } from "@/lib/registration-rules";
+import { COUNTRIES, type CountrySpec } from "@/lib/registration-rules";
 import { trpc } from "@/lib/trpc";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { buildUssdCode, operatorLabel, type YengapayOperatorCode } from "@/shared/yengapay-ussd";
+import { useTikisStore } from "@/lib/tikis-store";
 
 /**
  * Paiement Mobile Money direct (in-app, sans redirection web) — Orange Money / Moov Money
@@ -59,14 +60,22 @@ export type DirectDepositView = {
 export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initialDeposit }: { visible: boolean; onClose: () => void; onSuccess?: () => void; initialDeposit?: DirectDepositView | null }) {
   const { colors: theme } = useThemeColors();
   const styles = makeStyles(theme);
+  const { profile } = useTikisStore();
+
+  // Pays dérivé du profil : on prend le pays d'enregistrement de l'utilisateur plutôt
+  // que de le laisser choisir au moment du paiement. Si profile.countryCode n'est pas
+  // reconnu dans COUNTRIES (cas dégénéré), on retombe sur l'index 0.
+  const country: CountrySpec = useMemo(() => {
+    const fromProfile = COUNTRIES.find((c) => c.id === profile?.countryCode);
+    return fromProfile ?? COUNTRIES[0];
+  }, [profile?.countryCode]);
 
   // ===== ÉTAT FORM (page unique) =====
-  const [countryIndex, setCountryIndex] = useState(0);
-  const country: CountrySpec = COUNTRIES[countryIndex];
   const [amount, setAmount] = useState<string>("2500");
   const [phoneLocal, setPhoneLocal] = useState<string>("");
   const [operator, setOperator] = useState<Operator>("orange_money");
-  const [otpCode, setOtpCode] = useState<string>("");
+  const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+  const otpRefs = useRef<Array<TextInput | null>>([null, null, null, null, null, null]);
 
   // ===== ÉTAT STAGE =====
   const [stage, setStage] = useState<Stage>("input");
@@ -96,12 +105,11 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     setStage("input");
     setAmount("2500");
     setPhoneLocal("");
-    setOtpCode("");
+    setOtpDigits(["", "", "", "", "", ""]);
     setSubmitError("");
     setPollError("");
     setDeposit(null);
     setOperator("orange_money");
-    setCountryIndex(0);
   }, []);
   const closeModal = useCallback(() => {
     reset();
@@ -127,7 +135,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
       setDeposit(initialDeposit);
       setOperator(initialDeposit.operator);
       setStage("waiting");
-      setOtpCode("");
+      setOtpDigits(["", "", "", "", "", ""]);
       setSubmitError("");
       setPollError("");
     }, 0);
@@ -135,20 +143,51 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   }, [visible, initialDeposit]);
 
   // ===== Handlers =====
-  const onChangeCountry = useCallback(() => {
-    setCountryIndex((idx) => (idx + 1) % COUNTRIES.length);
-    setPhoneLocal("");
+
+  // OTP cells : auto-focus sur la cellule suivante quand l'utilisateur saisit un chiffre.
+  // Si l'utilisateur efface (backspace) une cellule vide, on remonte le focus sur la
+  // cellule précédente. C'est ce comportement qui fluidifie la saisie sur mobile.
+  const onOtpChange = useCallback((index: number, value: string) => {
+    // On n'accepte qu'un seul chiffre par cellule. Si value est vide, c'est un backspace.
+    const digit = value.replace(/\D/g, "").slice(-1);
+    setOtpDigits((prev) => {
+      const next = [...prev];
+      next[index] = digit;
+      return next;
+    });
+    if (digit) {
+      // Avance : focus sur la cellule suivante si elle existe
+      const nextIndex = index + 1;
+      if (nextIndex < 6) otpRefs.current[nextIndex]?.focus();
+    }
   }, []);
 
+  const onOtpKeyPress = useCallback((index: number, key: string) => {
+    if (key === "Backspace") {
+      // Si la cellule courante est vide et qu'on a un index > 0, on recule le focus
+      // et on efface le chiffre précédent.
+      setOtpDigits((prev) => {
+        if (prev[index]) return prev; // la cellule a un chiffre, on le laisse (le backspace l'effacera)
+        if (index > 0) {
+          const next = [...prev];
+          next[index - 1] = "";
+          // Focus sur la cellule précédente (différé car setState asynchrone)
+          setTimeout(() => otpRefs.current[index - 1]?.focus(), 0);
+          return next;
+        }
+        return prev;
+      });
+    }
+  }, []);
+
+  // Lien tel: : on tente directement Linking.openURL sans pre-check canOpenURL.
+  // canOpenURL("tel:...") retourne false sur iOS sans LSApplicationQueriesSchemes déclaré,
+  // même quand le téléphone peut composer le numéro. On se contente donc d'un try/catch
+  // autour de openURL : si ça échoue vraiment, on remonte l'erreur.
   const onCallUSSD = useCallback(async () => {
     if (!ussdCode) return;
     const telUri = `tel:${encodeURIComponent(ussdCode)}`;
     try {
-      const supported = await Linking.canOpenURL(telUri).catch(() => true);
-      if (!supported) {
-        Alert.alert("App téléphone indisponible", "Impossible d'ouvrir l'application téléphone sur cet appareil.");
-        return;
-      }
       await Linking.openURL(telUri);
     } catch (cause) {
       Alert.alert("Erreur", cause instanceof Error ? cause.message : "Impossible d'ouvrir l'application téléphone.");
@@ -235,16 +274,17 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
             amount={amount}
             phoneLocal={phoneLocal}
             operator={operator}
-            otpCode={otpCode}
+            otpDigits={otpDigits}
+            otpRefs={otpRefs}
             ussdCode={ussdCode}
             submitError={submitError}
             submitting={requestMutation.isPending}
             canSubmit={canSubmit}
-            onChangeCountry={onChangeCountry}
             onChangeAmount={setAmount}
             onChangePhone={setPhoneLocal}
             onChangeOperator={setOperator}
-            onChangeOtp={setOtpCode}
+            onOtpChange={onOtpChange}
+            onOtpKeyPress={onOtpKeyPress}
             onCallUSSD={onCallUSSD}
             onSubmit={onSubmit}
           />
@@ -286,34 +326,33 @@ function InputStage(props: {
   amount: string;
   phoneLocal: string;
   operator: Operator;
-  otpCode: string;
+  otpDigits: string[];
+  otpRefs: React.MutableRefObject<Array<TextInput | null>>;
   ussdCode: string;
   submitError: string;
   submitting: boolean;
   canSubmit: boolean;
-  onChangeCountry: () => void;
   onChangeAmount: (value: string) => void;
   onChangePhone: (value: string) => void;
   onChangeOperator: (op: Operator) => void;
-  onChangeOtp: (value: string) => void;
+  onOtpChange: (index: number, value: string) => void;
+  onOtpKeyPress: (index: number, key: string) => void;
   onCallUSSD: () => void;
   onSubmit: () => void;
 }) {
-  const { theme, styles, country, amount, phoneLocal, operator, otpCode, ussdCode, submitError, submitting, canSubmit, onChangeCountry, onChangeAmount, onChangePhone, onChangeOperator, onChangeOtp, onCallUSSD, onSubmit } = props;
-  const otpValid = otpCode.length === 0 || /^\d{0,6}$/.test(otpCode);
+  const { theme, styles, country, amount, phoneLocal, operator, otpDigits, otpRefs, ussdCode, submitError, submitting, canSubmit, onChangeAmount, onChangePhone, onChangeOperator, onOtpChange, onOtpKeyPress, onCallUSSD, onSubmit } = props;
+  const focusFirstEmptyOtp = () => {
+    const firstEmpty = otpDigits.findIndex((d) => !d);
+    const target = firstEmpty === -1 ? 0 : firstEmpty;
+    otpRefs.current[target]?.focus();
+  };
+  useEffect(() => {
+    if (otpDigits.some((d) => d) || otpDigits.every((d) => !d)) focusFirstEmptyOtp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.label, { color: theme.muted }]}>PAYS</Text>
-          <Pressable onPress={onChangeCountry} style={({ pressed }) => [styles.countryPicker, { backgroundColor: theme.background, borderColor: theme.border }, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Changer de pays">
-            <Text style={styles.flag}>{countryFlagEmoji(country.id)}</Text>
-            <Text style={[styles.countryCode, { color: theme.foreground }]}>{country.dialCode}</Text>
-            <Text style={[styles.countryName, { color: theme.muted }]}>{country.name}</Text>
-            <MaterialIcons name="unfold-more" size={18} color={theme.muted} />
-          </Pressable>
-        </View>
-
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[styles.label, { color: theme.muted }]}>MONTANT</Text>
           <View style={styles.amountRow}>
@@ -338,11 +377,8 @@ function InputStage(props: {
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.label, { color: theme.muted }]}>NUMÉRO MOBILE MONEY</Text>
+          <Text style={[styles.label, { color: theme.muted }]}>NUMÉRO MOBILE MONEY · {country.dialCode}</Text>
           <View style={styles.phoneRow}>
-            <View style={[styles.dialCodeStatic, { backgroundColor: theme.background, borderColor: theme.border }]}>
-              <Text style={[styles.dialCodeText, { color: theme.foreground }]}>{country.dialCode}</Text>
-            </View>
             <TextInput
               value={phoneLocal}
               onChangeText={onChangePhone}
@@ -356,30 +392,14 @@ function InputStage(props: {
           <Text style={[styles.hint, { color: theme.muted }]}>{country.name} · {country.digits} chiffres attendus</Text>
         </View>
 
-        {/* OTP : un seul champ paste-friendly — l'utilisateur tape directement les 6 chiffres
-            reçus par SMS après avoir composé l'USSD. Pas de cellules manuelles. */}
-        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.label, { color: theme.muted }]}>CODE OTP REÇU PAR SMS</Text>
-          <TextInput
-            value={otpCode}
-            onChangeText={(value) => { if (/^\d{0,6}$/.test(value)) onChangeOtp(value); }}
-            keyboardType="number-pad"
-            maxLength={6}
-            placeholder="6 chiffres"
-            placeholderTextColor={theme.muted}
-            style={[styles.otpInput, { color: theme.foreground, backgroundColor: theme.background, borderColor: theme.border }, !otpValid && { borderColor: theme.error }]}
-            accessibilityLabel="Code OTP à 6 chiffres reçu par SMS"
-            returnKeyType="done"
-            autoComplete="one-time-code"
-            textContentType="oneTimeCode"
-          />
-          <Text style={[styles.hint, { color: theme.muted }]}>
-            Après composition de l&apos;USSD, votre opérateur envoie un code à 6 chiffres par SMS. Saisissez-le ici (optionnel — la confirmation vient de YengaPay).
-          </Text>
-        </View>
-
         {/* Lien USSD : titre = code USSD calculé live, tap = Linking.openURL("tel:...").
-            Style minimal : texte primary souligné, comme un lien hypertexte. */}
+            Placé ici au-dessus des cellules OTP comme demandé : l'utilisateur voit le code,
+            appelle, puis saisit l'OTP juste en dessous. Style minimal : texte primary
+            souligné, comme un lien hypertexte. */}
+        {/* Lien USSD : titre = code USSD calculé live, tap = Linking.openURL("tel:...").
+            Placé ici au-dessus des cellules OTP comme demandé : l'utilisateur voit le code,
+            appelle, puis saisit l'OTP juste en dessous. Style minimal : texte primary
+            souligné, comme un lien hypertexte. */}
         <View style={styles.ussdLinkWrap}>
           <Pressable
             onPress={onCallUSSD}
@@ -394,6 +414,35 @@ function InputStage(props: {
           </Pressable>
           <Text style={[styles.ussdLinkHint, { color: theme.muted }]}>
             Touchez pour ouvrir l&apos;app téléphone avec le code pré-rempli.
+          </Text>
+        </View>
+
+        {/* OTP : 6 cellules avec auto-focus sur la suivante quand l'utilisateur saisit
+            un chiffre. Backspace sur cellule vide → focus précédent + efface. */}
+        <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+          <Text style={[styles.label, { color: theme.muted }]}>CODE OTP REÇU PAR SMS</Text>
+          <View style={styles.otpRow}>
+            {otpDigits.map((digit, idx) => (
+              <TextInput
+                key={idx}
+                ref={(el) => { otpRefs.current[idx] = el; }}
+                value={digit}
+                onChangeText={(value) => onOtpChange(idx, value)}
+                onKeyPress={({ nativeEvent }) => onOtpKeyPress(idx, nativeEvent.key)}
+                keyboardType="number-pad"
+                maxLength={1}
+                selectTextOnFocus
+                style={[styles.otpCell, { color: theme.foreground, backgroundColor: theme.background, borderColor: theme.border }]}
+                accessibilityLabel={`Chiffre ${idx + 1} du code OTP`}
+                returnKeyType={idx === 5 ? "done" : "next"}
+                onSubmitEditing={() => { if (idx < 5) otpRefs.current[idx + 1]?.focus(); }}
+                autoComplete="one-time-code"
+                textContentType="oneTimeCode"
+              />
+            ))}
+          </View>
+          <Text style={[styles.hint, { color: theme.muted }]}>
+            Après composition de l'USSD, votre opérateur envoie un code à 6 chiffres par SMS. Saisissez-le ici (optionnel — la confirmation vient de YengaPay).
           </Text>
         </View>
 
@@ -541,10 +590,6 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
     body: { padding: 16, paddingBottom: 32, gap: 14 },
     card: { padding: 14, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, gap: 10 },
     label: { fontSize: 10.5, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
-    countryPicker: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth },
-    flag: { fontSize: 22 },
-    countryCode: { fontSize: 15, fontWeight: "700" },
-    countryName: { fontSize: 12, fontWeight: "500", flex: 1 },
     amountRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     amountInput: { flex: 1, fontSize: 22, fontWeight: "700", paddingHorizontal: 14, height: 46, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth },
     amountSuffix: { fontSize: 13, fontWeight: "600" },
@@ -557,16 +602,14 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
     operatorLogoText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
     operatorName: { fontSize: 13, fontWeight: "600" },
     operatorFees: { fontSize: 10.5 },
-    phoneRow: { flexDirection: "row", alignItems: "stretch", gap: 8 },
-    dialCodeStatic: { paddingHorizontal: 14, height: 46, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
-    dialCodeText: { fontSize: 14, fontWeight: "700" },
     phoneInput: { flex: 1, paddingHorizontal: 14, height: 46, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, fontSize: 16 },
     hint: { fontSize: 11, fontWeight: "500" },
     errorText: { padding: 12, borderRadius: 9, fontSize: 13, lineHeight: 18 },
     cta: { marginTop: 8, minHeight: 50 },
 
-    // OTP : un seul champ paste-friendly.
-    otpInput: { fontSize: 22, fontWeight: "700", letterSpacing: 6, paddingHorizontal: 14, height: 50, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth },
+    // OTP : 6 cellules avec auto-focus.
+    otpRow: { flexDirection: "row", justifyContent: "center", gap: 8 },
+    otpCell: { width: 42, height: 50, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, fontSize: 22, fontWeight: "700", textAlign: "center", paddingVertical: 0, paddingHorizontal: 0 },
 
     // Lien USSD : titre = code USSD calculé live, style lien simple.
     ussdLinkWrap: { alignItems: "center", gap: 4, paddingVertical: 6 },
