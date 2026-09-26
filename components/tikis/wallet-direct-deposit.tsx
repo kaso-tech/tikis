@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
-import { COUNTRIES, type CountrySpec } from "@/lib/registration-rules";
+import { COUNTRIES, countryFlagEmoji, formatLocalPhone, sanitizePhoneInput, type CountrySpec } from "@/lib/registration-rules";
 import { trpc } from "@/lib/trpc";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { buildUssdCode, operatorLabel, type YengapayOperatorCode } from "@/shared/yengapay-ussd";
@@ -377,14 +377,18 @@ function InputStage(props: {
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-          <Text style={[styles.label, { color: theme.muted }]}>NUMÉRO MOBILE MONEY · {country.dialCode}</Text>
+          <Text style={[styles.label, { color: theme.muted }]}>NUMÉRO MOBILE MONEY</Text>
           <View style={styles.phoneRow}>
+            <View style={[styles.dialCodeStatic, { backgroundColor: theme.background, borderColor: theme.border }]}>
+              <Text style={styles.flag}>{countryFlagEmoji(country.id)}</Text>
+              <Text style={[styles.dialCodeText, { color: theme.foreground }]}>{country.dialCode}</Text>
+            </View>
             <TextInput
-              value={phoneLocal}
-              onChangeText={onChangePhone}
+              value={formatLocalPhone(phoneLocal, country)}
+              onChangeText={(raw) => onChangePhone(sanitizePhoneInput(raw, country))}
               keyboardType="number-pad"
-              maxLength={country.digits}
-              placeholder={"0".repeat(country.digits)}
+              maxLength={country.digits + country.groups.length - 1}
+              placeholder={country.groups.map((g) => "0".repeat(g)).join(" ")}
               placeholderTextColor={theme.muted}
               style={[styles.phoneInput, { color: theme.foreground, backgroundColor: theme.background, borderColor: theme.border }]}
             />
@@ -392,10 +396,6 @@ function InputStage(props: {
           <Text style={[styles.hint, { color: theme.muted }]}>{country.name} · {country.digits} chiffres attendus</Text>
         </View>
 
-        {/* Lien USSD : titre = code USSD calculé live, tap = Linking.openURL("tel:...").
-            Placé ici au-dessus des cellules OTP comme demandé : l'utilisateur voit le code,
-            appelle, puis saisit l'OTP juste en dessous. Style minimal : texte primary
-            souligné, comme un lien hypertexte. */}
         {/* Lien USSD : titre = code USSD calculé live, tap = Linking.openURL("tel:...").
             Placé ici au-dessus des cellules OTP comme demandé : l'utilisateur voit le code,
             appelle, puis saisit l'OTP juste en dessous. Style minimal : texte primary
@@ -442,7 +442,7 @@ function InputStage(props: {
             ))}
           </View>
           <Text style={[styles.hint, { color: theme.muted }]}>
-            Après composition de l'USSD, votre opérateur envoie un code à 6 chiffres par SMS. Saisissez-le ici (optionnel — la confirmation vient de YengaPay).
+            Après composition de l&apos;USSD, votre opérateur envoie un code à 6 chiffres par SMS. Saisissez-le ici (optionnel — la confirmation vient de YengaPay).
           </Text>
         </View>
 
@@ -602,6 +602,10 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
     operatorLogoText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
     operatorName: { fontSize: 13, fontWeight: "600" },
     operatorFees: { fontSize: 10.5 },
+    phoneRow: { flexDirection: "row", alignItems: "stretch", gap: 8 },
+    dialCodeStatic: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, height: 46, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth },
+    flag: { fontSize: 18 },
+    dialCodeText: { fontSize: 14, fontWeight: "700" },
     phoneInput: { flex: 1, paddingHorizontal: 14, height: 46, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, fontSize: 16 },
     hint: { fontSize: 11, fontWeight: "500" },
     errorText: { padding: 12, borderRadius: 9, fontSize: 13, lineHeight: 18 },
