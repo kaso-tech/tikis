@@ -3,38 +3,14 @@ import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from "../../shared/const.js";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
-import { getTikisProfileByPhone } from "../db";
+import { getCachedTikisProfile, invalidateTikisProfileCache } from "./profile-cache";
 import { isSessionRevoked } from "../sessions";
+
+export { invalidateTikisProfileCache };
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
 });
-
-const PROFILE_CACHE_TTL_MS = 10_000;
-const PROFILE_CACHE_MAX_ENTRIES = 5_000;
-const profileCache = new Map<string, { profile: NonNullable<Awaited<ReturnType<typeof getTikisProfileByPhone>>>; expiresAt: number }>();
-
-async function getCachedTikisProfile(phone: string) {
-  const cached = profileCache.get(phone);
-  const now = Date.now();
-  if (cached && cached.expiresAt > now) return cached.profile;
-  const fresh = await getTikisProfileByPhone(phone);
-  if (!fresh) {
-    profileCache.delete(phone);
-    return undefined;
-  }
-  if (profileCache.size >= PROFILE_CACHE_MAX_ENTRIES) {
-    const firstKey = profileCache.keys().next().value;
-    if (firstKey) profileCache.delete(firstKey);
-  }
-  profileCache.set(phone, { profile: fresh, expiresAt: now + PROFILE_CACHE_TTL_MS });
-  return fresh;
-}
-
-export function invalidateTikisProfileCache(phone?: string) {
-  if (phone) profileCache.delete(phone);
-  else profileCache.clear();
-}
 
 export const router = t.router;
 export const mergeRouters = t.mergeRouters;

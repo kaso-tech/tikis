@@ -13,7 +13,8 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { sdk } from "./sdk";
 import * as db from "../db";
-import { expireOpenTikisDeliveries, finalizeExpiredAccountDeletions } from "../db";
+import { expireOpenTikisDeliveries } from "../db";
+import { runAccountDeletionJobs } from "../admin-deletions";
 import { expireLoyaltyGrants } from "../loyalty";
 import { publishDeliveryStatusBroadcast } from "../supabase-realtime";
 import { corsMiddleware, securityHeadersMiddleware, publicApiRateLimit } from "./security";
@@ -111,8 +112,8 @@ async function startServer() {
     try {
       const user = await sdk.authenticateRequest(req);
       if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
-      await finalizeExpiredAccountDeletions();
-      return res.json({ ok: true, taskUid: user.taskUid });
+      const result = await runAccountDeletionJobs();
+      return res.json({ ok: true, ...result, taskUid: user.taskUid });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Erreur inconnue";
       console.error("[scheduled:finalize-account-deletions]", error);

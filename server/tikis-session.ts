@@ -33,13 +33,28 @@ export async function createTikisProfileSession(phone: string) {
 }
 
 export async function verifyTikisProfileSession(token: string | undefined) {
+  return (await verifyTikisProfileSessionClaims(token))?.phone ?? null;
+}
+
+/** Numéro et date d'émission (secondes) d'un jeton valide ; `null` sinon. */
+export async function verifyTikisProfileSessionClaims(token: string | undefined) {
   if (!token || token.length > 4096) return null;
   try {
     const { payload } = await jwtVerify(token, signingKey(), { issuer: SESSION_ISSUER, audience: SESSION_AUDIENCE });
     if (payload.scope !== "tikis:profile" || typeof payload.sub !== "string" || !PHONE_PATTERN.test(payload.sub)) return null;
-    return payload.sub;
+    return { phone: payload.sub, issuedAt: typeof payload.iat === "number" ? payload.iat : 0 };
   } catch {
     return null;
   }
+}
+
+/**
+ * Déconnexion forcée : tout jeton émis avant `sessionsRevokedAt` (seconde de la décision) est refusé,
+ * qu'il ait été enregistré comme appareil ou non, natif ou web. Les jetons émis dans la même seconde
+ * que la décision restent valides : la reconnexion immédiate n'est jamais refusée.
+ */
+export function isRevokedByProfile(issuedAt: number, sessionsRevokedAt: Date | null | undefined) {
+  if (!sessionsRevokedAt) return false;
+  return issuedAt < Math.floor(sessionsRevokedAt.getTime() / 1000);
 }
 import { createHash } from "node:crypto";

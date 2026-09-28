@@ -24,8 +24,9 @@ import AccountPage from "./pages/AccountPage";
 import FinanceControlPage from "./pages/FinanceControlPage";
 import ApprovalsPage from "./pages/ApprovalsPage";
 import ReviewsPage from "./pages/ReviewsPage";
+import AccountDeletionsPage from "./pages/AccountDeletionsPage";
 
-type PageKey = "dashboard" | "map" | "reports" | "disputes" | "deliveries" | "users" | "kyc" | "referrals" | "finance" | "pricing" | "commission" | "countries" | "maintenance" | "settings" | "admins" | "auditLog" | "loyalty" | "loyaltyGrants" | "account" | "control" | "approvals" | "reviews";
+type PageKey = "dashboard" | "map" | "reports" | "disputes" | "deliveries" | "users" | "kyc" | "referrals" | "finance" | "pricing" | "commission" | "countries" | "maintenance" | "settings" | "admins" | "auditLog" | "loyalty" | "loyaltyGrants" | "account" | "control" | "approvals" | "reviews" | "deletions";
 type GroupKey = "ops" | "people" | "trust" | "finance" | "system";
 
 const NAV: { key: PageKey; label: string; href: string; icon: string; group: GroupKey; roles?: AdminRole[] }[] = [
@@ -38,6 +39,7 @@ const NAV: { key: PageKey; label: string; href: string; icon: string; group: Gro
   { key: "users", label: "Utilisateurs", href: "/admin/users", icon: "◉", group: "people" },
   { key: "kyc", label: "Validations KYC", href: "/admin/kyc", icon: "✓", group: "people" },
   { key: "referrals", label: "Parrainage", href: "/admin/referrals", icon: "◈", group: "people" },
+  { key: "deletions", label: "Suppressions de compte", href: "/admin/deletions", icon: "⌫", group: "people", roles: ["super_admin", "support", "finance"] },
   { key: "finance", label: "Finance", href: "/admin/finance", icon: "$", group: "finance", roles: ["super_admin", "finance"] },
   { key: "approvals", label: "Validations", href: "/admin/approvals", icon: "⇄", group: "finance", roles: ["super_admin", "finance"] },
   { key: "control", label: "Contrôle financier", href: "/admin/control", icon: "⊜", group: "finance", roles: ["super_admin", "finance"] },
@@ -192,6 +194,7 @@ function Shell() {
           {activePage === "reports" ? <ReportsPage /> : null}
           {activePage === "disputes" ? <DisputesPage /> : null}
           {activePage === "reviews" ? <ReviewsPage /> : null}
+          {activePage === "deletions" ? <AccountDeletionsPage /> : null}
           {activePage === "users" ? <UsersPage search={search} /> : null}
           {activePage === "kyc" ? <KycPage /> : null}
           {activePage === "referrals" ? <ReferralsPage /> : null}

@@ -145,11 +145,16 @@ describe.skipIf(!TEST_DB)("anomalies de paiement", () => {
   });
 
   it("un dépôt en attente depuis plus de 30 minutes est listé ; un dépôt récent ne l'est pas", async () => {
-    const stale = await pendingDeposit({ createdAt: new Date(Date.now() - 40 * 60_000) });
-    const fresh = await pendingDeposit({ createdAt: new Date(Date.now() - 5 * 60_000) });
-    const { stalePendingDeposits } = await control.adminPaymentAnomalies();
+    // Instant de référence tiré au hasard dans le passé : la base de test partagée accumule des dépôts en
+    // attente d'autres fichiers, et la liste n'en montre que les 100 plus anciens.
+    const now = new Date(Date.UTC(1990, 0, 1) + Math.floor(Math.random() * 3_000) * 86_400_000);
+    const stale = await pendingDeposit({ createdAt: new Date(now.getTime() - 40 * 60_000) });
+    const fresh = await pendingDeposit({ createdAt: new Date(now.getTime() - 5 * 60_000) });
+    const { stalePendingDeposits } = await control.adminPaymentAnomalies(now);
     expect(stalePendingDeposits.rows.some((row) => row.id === stale.id)).toBe(true);
     expect(stalePendingDeposits.rows.some((row) => row.id === fresh.id)).toBe(false);
+    const handle = (await db.getDb())!;
+    await handle.update(schema.tikisPaymentTransactions).set({ status: "expired" }).where(orm.inArray(schema.tikisPaymentTransactions.id, [stale.id, fresh.id]));
   });
 });
 

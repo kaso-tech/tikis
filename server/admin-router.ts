@@ -14,6 +14,8 @@ import { replayYengapayWebhookEvent } from "./yengapay-webhook";
 import * as db from "./db";
 import { publishDeliveryStatusBroadcast, syncDeliveryRealtimeMembers } from "./supabase-realtime";
 import * as disputes from "./admin-disputes";
+import * as userSupport from "./admin-users";
+import * as deletions from "./admin-deletions";
 
 /**
  * Détail d'une action, écrit après qu'elle a réussi. Ne fait jamais échouer la requête : l'action est faite,
@@ -269,6 +271,34 @@ export const tikisAdminRouter = router({
       await audit(ctx, "profile_role_changed", "profile", input.phone, { before, after: input.role });
       return result;
     }),
+    // Appareils connectés et déconnexion forcée (téléphone perdu, compte partagé, fraude).
+    devices: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ phone: z.string().min(4).max(20) })).query(({ input }) => userSupport.listUserDevices(input.phone)),
+    forceLogout: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ phone: z.string().min(4).max(20), reason: z.string().trim().min(3).max(300) })).mutation(async ({ ctx, input }) => {
+      const result = await userSupport.forceLogout(input.phone);
+      invalidateTikisProfileCache(input.phone);
+      await audit(ctx, "user_force_logout", "profile", input.phone, { reason: input.reason, revokedSessions: result.revokedSessions, removedPushTokens: result.removedPushTokens });
+      return result;
+    }),
+    revokeSession: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ phone: z.string().min(4).max(20), sessionId: z.string().min(1).max(40) })).mutation(async ({ ctx, input }) => {
+      const result = await userSupport.revokeUserSession(input.phone, input.sessionId);
+      await audit(ctx, "user_session_revoked", "profile", input.phone, { sessionId: input.sessionId, deviceName: result.deviceName });
+      return result;
+    }),
+    // Notes internes (jamais montrées à l'utilisateur) et historique des décisions de l'équipe sur ce compte.
+    notes: adminProcedure.use(requireTikisAdminRole("super_admin", "support", "finance")).input(z.object({ phone: z.string().min(4).max(20) })).query(({ input }) => userSupport.listProfileNotes(input.phone)),
+    addNote: adminProcedure.use(requireTikisAdminRole("super_admin", "support", "finance")).input(z.object({ phone: z.string().min(4).max(20), body: z.string().trim().min(2).max(userSupport.NOTE_MAX_LENGTH) })).mutation(async ({ ctx, input }) => {
+      const result = await userSupport.addProfileNote({ ...input, adminId: ctx.tikisAdmin.adminId, adminEmail: ctx.tikisAdmin.email });
+      await audit(ctx, "profile_note_added", "profile", input.phone, { noteId: result.id });
+      return result;
+    }),
+    history: adminProcedure.use(requireTikisAdminRole("super_admin", "support", "finance")).input(z.object({ phone: z.string().min(4).max(20) })).query(({ input }) => userSupport.profileHistory(input.phone)),
+    // Limites anti-abus : voir ce qui bloque l'utilisateur, et le débloquer.
+    rateLimits: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ phone: z.string().min(4).max(20) })).query(({ input }) => userSupport.listRateLimits(input.phone)),
+    clearRateLimits: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ phone: z.string().min(4).max(20), reason: z.string().trim().min(3).max(300) })).mutation(async ({ ctx, input }) => {
+      const result = await userSupport.clearRateLimits(input.phone);
+      await audit(ctx, "user_rate_limits_cleared", "profile", input.phone, { reason: input.reason, cleared: result.cleared });
+      return result;
+    }),
     reward: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string(), amount: z.number().int().positive(), reason: z.string().max(300), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       if (await approvals.requiresApproval(input.amount)) {
@@ -461,8 +491,28 @@ export const tikisAdminRouter = router({
     }),
   }),
 
+  // Suppressions de compte : délai de 30 jours, puis suppression définitive une fois l'argent et les courses réglés.
   accountDeletions: router({
-    list: adminProcedure.query(() => adminDb.adminListPendingDeletions()),
+    list: adminProcedure.use(requireTikisAdminRole("super_admin", "support", "finance")).query(() => deletions.listDeletionRequests()),
+    findByPhone: adminProcedure.use(requireTikisAdminRole("super_admin", "support", "finance")).input(z.object({ phone: z.string().min(4).max(20) })).query(({ input }) => deletions.findDeletedAccount(input.phone)),
+    payoutBalance: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string().min(4).max(20), payoutReference: z.string().trim().min(4).max(80), notes: z.string().trim().min(1).max(300), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+      const result = await deletions.payoutClosingBalance(input, { adminId: ctx.tikisAdmin.adminId, email: ctx.tikisAdmin.email });
+      if ("approvalId" in result) await audit(ctx, "approval_requested", "admin_approval", result.approvalId, { action: "withdrawal_settle", reason: "account_closure", phone: input.phone, amount: result.amount });
+      else await audit(ctx, "account_closure_payout", "profile", input.phone, { amount: result.amount, payoutReference: input.payoutReference, notes: input.notes });
+      return result;
+    }),
+    cancel: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ phone: z.string().min(4).max(20), reason: z.string().trim().min(3).max(300) })).mutation(async ({ ctx, input }) => {
+      const profile = await db.cancelProfileDeletion(input.phone);
+      invalidateTikisProfileCache(input.phone);
+      await audit(ctx, "account_deletion_cancelled", "profile", input.phone, { before: "deletion_requested", after: "active", reason: input.reason });
+      return { phone: profile.phone };
+    }),
+    finalize: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ phone: z.string().min(4).max(20) })).mutation(async ({ ctx, input }) => {
+      const result = await deletions.finalizeAccountDeletion(input.phone, { adminId: ctx.tikisAdmin.adminId });
+      // Le numéro n'existe plus dans l'historique : la trace pointe vers le pseudonyme, qui le retrouve 10 ans.
+      await audit(ctx, "account_deleted", "profile", result.pseudonym, { filesToErase: result.filesToErase, purgeAfter: result.purgeAfter });
+      return { pseudonym: result.pseudonym, purgeAfter: result.purgeAfter };
+    }),
   }),
 
   kyc: router({

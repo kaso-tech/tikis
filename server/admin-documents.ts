@@ -26,16 +26,20 @@ export const KYC_DOCUMENT_SIDES = { "id-front": "idFrontKey", "id-back": "idBack
 export type KycDocumentSide = keyof typeof KYC_DOCUMENT_SIDES;
 
 export type AdminDocumentRequest = { kind: "kyc"; submissionId: string; side: string } | { kind: "report"; reportId: string };
-export type AdminDocumentResult = { status: 200; body: Buffer; contentType: string } | { status: 401 | 403 | 404 | 502 | 503; message: string };
+export type AdminDocumentResult = { status: 200; body: Buffer; contentType: string } | { status: 401 | 403 | 404 | 410 | 502 | 503; message: string };
 
 type ReadObject = (key: string) => Promise<{ body: Buffer; contentType: string }>;
 
-async function documentKey(request: AdminDocumentRequest): Promise<string | null> {
+/** Pièce effacée à la suppression du compte : la vérification reste, les photos non. */
+const ERASED = Symbol("erased");
+
+async function documentKey(request: AdminDocumentRequest): Promise<string | typeof ERASED | null> {
   const db = await getDb();
   if (!db) return null;
   if (request.kind === "kyc") {
     if (!Object.hasOwn(KYC_DOCUMENT_SIDES, request.side)) return null;
     const submission = (await db.select().from(tikisKycSubmissions).where(eq(tikisKycSubmissions.id, request.submissionId)).limit(1))[0];
+    if (submission?.documentsErasedAt) return ERASED;
     return submission ? submission[KYC_DOCUMENT_SIDES[request.side as KycDocumentSide]] : null;
   }
   const report = (await db.select({ attachmentKey: tikisDeliveryReports.attachmentKey }).from(tikisDeliveryReports).where(eq(tikisDeliveryReports.id, request.reportId)).limit(1))[0];
@@ -49,6 +53,7 @@ export async function resolveAdminDocument(input: { sessionToken: string | undef
   if (admin.mustChangePassword) return { status: 403, message: "Choisissez votre mot de passe pour accéder à la console." };
   if (!(ADMIN_DOCUMENT_ROLES[input.request.kind] as readonly string[]).includes(admin.role)) return { status: 403, message: "Votre rôle d’administration ne donne pas accès aux pièces justificatives." };
   const key = await documentKey(input.request);
+  if (key === ERASED) return { status: 410, message: "Pièce effacée à la suppression du compte." };
   if (!key) return { status: 404, message: "Document introuvable." };
   let object: { body: Buffer; contentType: string };
   try {

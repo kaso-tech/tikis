@@ -1,7 +1,8 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
-import { verifyTikisProfileSession } from "../tikis-session";
+import { isRevokedByProfile, verifyTikisProfileSessionClaims } from "../tikis-session";
+import { getCachedTikisProfile } from "./profile-cache";
 import { ADMIN_CONSOLE_HEADER, ADMIN_SESSION_COOKIE, type AdminRole } from "../admin-auth";
 import { authenticateAdminSession } from "../admin-db";
 import { TIKIS_PROFILE_COOKIE } from "./cookies";
@@ -88,6 +89,15 @@ export function pickAdminSessionToken(opts: Pick<CreateExpressContextOptions, "r
   return requestCookies(opts as CreateExpressContextOptions)[ADMIN_SESSION_COOKIE];
 }
 
+/** Numéro du profil connecté, sauf si l'équipe Tikis a forcé la déconnexion de ses sessions depuis. */
+async function authenticateTikisProfile(sessionToken: string | undefined) {
+  const claims = await verifyTikisProfileSessionClaims(sessionToken);
+  if (!claims) return null;
+  const profile = await getCachedTikisProfile(claims.phone).catch(() => undefined);
+  if (profile && isRevokedByProfile(claims.issuedAt, profile.sessionsRevokedAt)) return null;
+  return claims.phone;
+}
+
 export async function createContext(opts: CreateExpressContextOptions): Promise<TrpcContext> {
   let user: User | null = null;
   const sessionToken = pickTikisSessionToken(opts);
@@ -105,7 +115,7 @@ export async function createContext(opts: CreateExpressContextOptions): Promise<
     req: opts.req,
     res: opts.res,
     user,
-    tikisProfilePhone: await verifyTikisProfileSession(sessionToken),
+    tikisProfilePhone: await authenticateTikisProfile(sessionToken),
     // Relit le compte à chaque requête : un admin suspendu ou rétrogradé perd ses droits tout de suite.
     tikisAdmin: await authenticateAdminSession(adminSessionToken),
   };

@@ -1,6 +1,6 @@
 import { isoCountry } from "../shared/iso-countries";
 import { createHash, randomUUID } from "crypto";
-import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNotNull, isNull, like, lt, lte, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, TikisDriverPreferences, tikisDriverPreferences, tikisFavoritePlaces, tikisKycSubmissions, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisPushTokens, tikisRateLimits, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, tikisYengapayWebhookEvents, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
@@ -140,19 +140,7 @@ export async function cancelProfileDeletion(phone: string) {
   return updated;
 }
 
-/** Vérification paresseuse (même principe que expireOpenTikisDeliveries) : finalise toute
- *  suppression dont le délai de 30 jours est écoulé. Anonymise les données personnelles plutôt
- *  que de supprimer la ligne, pour conserver l'intégrité référentielle de l'historique des livraisons. */
-export async function finalizeExpiredAccountDeletions(now = new Date()) {
-  const dbc = await getDb();
-  if (!dbc) return;
-  const due = await dbc.select({ phone: tikisProfiles.phone }).from(tikisProfiles).where(and(isNotNull(tikisProfiles.deletionScheduledAt), lte(tikisProfiles.deletionScheduledAt, now), isNull(tikisProfiles.deletedAt)));
-  for (const row of due) {
-    await dbc.update(tikisProfiles).set({
-      deletedAt: now, fullName: "Compte supprimé", email: null, photoKey: null, updatedAt: now,
-    }).where(eq(tikisProfiles.phone, row.phone));
-  }
-}
+// Suppression définitive des comptes arrivés à échéance : server/admin-deletions.ts (runAccountDeletionJobs).
 
 export async function getMaintenanceStatus() {
   const dbc = await getDb();
@@ -1212,8 +1200,9 @@ export async function cancelTikisWalletDirectDeposit(input: { profilePhone: stri
 type YengaPayTestPaymentView = { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled" | "expired"; providerReference: string; checkoutUrl?: string; mode: "test" | "sandbox" | "live"; createdAt: string; settledAt?: string };
 type YengaPayTestPaymentSettlement = { payment: YengaPayTestPaymentView; wallet: WalletSnapshot };
 
-function yengaPayTestPaymentToView(payment: { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled" | "expired"; provider: "ligdi_simulated" | "yengapay_test" | "yengapay_sandbox" | "yengapay_live" | "yengapay_direct_test" | "yengapay_direct_sandbox" | "yengapay_direct_live"; providerReference: string; checkoutUrl: string | null; createdAt: Date; settledAt: Date | null }): YengaPayTestPaymentView {
-  const mode = payment.provider.endsWith("_sandbox") ? "sandbox" : payment.provider.endsWith("_live") ? "live" : "test";
+function yengaPayTestPaymentToView(payment: { id: string; type: "deposit" | "withdrawal"; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled" | "expired"; provider: typeof tikisPaymentTransactions.$inferSelect.provider; providerReference: string; checkoutUrl: string | null; createdAt: Date; settledAt: Date | null }): YengaPayTestPaymentView {
+  // Un versement manuel (clôture de compte) est de l'argent réel, comme un retrait live.
+  const mode = payment.provider.endsWith("_sandbox") ? "sandbox" : payment.provider.endsWith("_live") || payment.provider === "manual_payout" ? "live" : "test";
   return { id: payment.id, type: payment.type, amount: payment.amount, status: payment.status, providerReference: payment.providerReference, mode, ...(payment.checkoutUrl ? { checkoutUrl: payment.checkoutUrl } : {}), createdAt: payment.createdAt.toISOString(), ...(payment.settledAt ? { settledAt: payment.settledAt.toISOString() } : {}) };
 }
 
@@ -1432,10 +1421,36 @@ export async function checkDistributedRateLimit(scope: string, identifier: strin
   await db.insert(tikisRateLimits).values({ rateLimitKey, count: 1 }).onDuplicateKeyUpdate({ set: { count: sql`${tikisRateLimits.count} + 1` } });
   const row = (await db.select({ count: tikisRateLimits.count }).from(tikisRateLimits).where(eq(tikisRateLimits.rateLimitKey, rateLimitKey)).limit(1))[0];
   if (Math.random() < 0.01) {
+    // Seulement les compteurs de cette limite : le nettoyage d'une limite à fenêtre courte (1 min pour les
+    // lieux) effaçait aussi les compteurs des limites à fenêtre longue (15 min pour les paiements).
     const staleBefore = new Date(Date.now() - windowMs * 4);
-    void db.delete(tikisRateLimits).where(lt(tikisRateLimits.updatedAt, staleBefore)).catch(() => {});
+    void db.delete(tikisRateLimits).where(and(like(tikisRateLimits.rateLimitKey, `${scope}:%`), lt(tikisRateLimits.updatedAt, staleBefore))).catch(() => {});
   }
   return (row?.count ?? 0) <= maxRequests;
+}
+
+export const PHONE_ATTEMPT_WINDOW_MS = 10 * 60_000;
+export const PHONE_ATTEMPT_MAX = 5;
+export const PHONE_ATTEMPT_BLOCK_MINUTES = 30;
+
+/**
+ * Tentatives d'authentification par numéro : au-delà de 5 en 10 minutes, le numéro est bloqué 30 minutes
+ * pour cette action. En base, partagé entre les instances et levable depuis la console (`clearRateLimitsForPhone`)
+ * — gardé en mémoire de processus, il ne protégeait qu'une instance et restait hors de portée du support.
+ * Le blocage est une ligne `phone-block:<action>:<numéro>` dont `count` porte la minute de fin (epoch).
+ */
+export async function checkPhoneAttemptLimit(scope: string, phone: string): Promise<{ allowed: true } | { allowed: false; retryInMinutes: number }> {
+  const db = await getDb();
+  if (!db) return { allowed: true };
+  const nowMinute = Math.floor(Date.now() / 60_000);
+  const blockKey = `phone-block:${scope}:${phone}`.slice(0, 191);
+  const block = (await db.select({ until: tikisRateLimits.count }).from(tikisRateLimits).where(eq(tikisRateLimits.rateLimitKey, blockKey)).limit(1))[0];
+  if (block && block.until > nowMinute) return { allowed: false, retryInMinutes: block.until - nowMinute };
+  if (Math.random() < 0.01) void db.delete(tikisRateLimits).where(and(like(tikisRateLimits.rateLimitKey, "phone-block:%"), lt(tikisRateLimits.count, nowMinute))).catch(() => {});
+  if (await checkDistributedRateLimit(`phone:${scope}`, phone, PHONE_ATTEMPT_WINDOW_MS, PHONE_ATTEMPT_MAX)) return { allowed: true };
+  const until = nowMinute + PHONE_ATTEMPT_BLOCK_MINUTES;
+  await db.insert(tikisRateLimits).values({ rateLimitKey: blockKey, count: until }).onDuplicateKeyUpdate({ set: { count: until } });
+  return { allowed: false, retryInMinutes: PHONE_ATTEMPT_BLOCK_MINUTES };
 }
 
 export async function applyForTikisDelivery(input: { id: string; deliveryId: string; driverPhone: string; confirmedCommission: number; offerPrice?: number }) {

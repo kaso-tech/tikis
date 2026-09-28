@@ -413,3 +413,34 @@ describe("lot C — litiges et avis", () => {
     expect(read("admin/src/pages/ApprovalsPage.tsx")).toContain('delivery_refund: "Dédommagement (litige)"');
   });
 });
+
+describe("lot D — utilisateurs", () => {
+  it("la déconnexion forcée vaut pour tout jeton, vérifiée à la création du contexte", () => {
+    const context = read("server/_core/context.ts");
+    expect(context).toContain("if (profile && isRevokedByProfile(claims.issuedAt, profile.sessionsRevokedAt)) return null;");
+    expect(read("server/tikis-session.ts")).toContain("return issuedAt < Math.floor(sessionsRevokedAt.getTime() / 1000);");
+  });
+
+  it("le blocage par numéro est en base, levable depuis la console ; le nettoyage reste dans sa limite", () => {
+    const routers = read("server/routers.ts");
+    expect(routers).not.toContain("perPhoneBuckets");
+    expect(routers).toContain("await db.checkPhoneAttemptLimit(scope, phone)");
+    expect(read("server/db.ts")).toContain("like(tikisRateLimits.rateLimitKey, `${scope}:%`)");
+  });
+
+  it("la suppression définitive passe par les blocages, efface les pièces et pseudonymise", () => {
+    const deletions = read("server/admin-deletions.ts");
+    expect(deletions).toContain("if (blockers.length > 0) throw new DeletionBlockedError(blockers);");
+    expect(deletions).toContain("documentsErasedAt: now");
+    expect(deletions).toContain("await pseudonymizePhone(tx, phone, pseudonym);");
+    expect(read("server/_core/index.ts")).toContain("await runAccountDeletionJobs()");
+    expect(read("server/db.ts")).not.toContain("export async function finalizeExpiredAccountDeletions");
+  });
+
+  it("la migration crée notes, correspondances et file d'effacement", () => {
+    const migration = read("drizzle/manual/0049_user_support_and_deletion.sql");
+    for (const fragment of ["`sessionsRevokedAt`", "CREATE TABLE IF NOT EXISTS `tikis_profile_notes`", "CREATE TABLE IF NOT EXISTS `tikis_deleted_accounts`", "CREATE TABLE IF NOT EXISTS `tikis_storage_erasures`", "`documentsErasedAt`", "'manual_payout'"]) {
+      expect(migration).toContain(fragment);
+    }
+  });
+});

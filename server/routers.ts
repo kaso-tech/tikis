@@ -105,30 +105,9 @@ async function assertCountryEnabled(countryCode: string) {
   }
 }
 
-type PerPhoneCounter = { count: number; windowStart: number; blockedUntil: number };
-const perPhoneBuckets = new Map<string, PerPhoneCounter>();
-const PER_PHONE_WINDOW_MS = 10 * 60_000;
-const PER_PHONE_MAX = 5;
-const PER_PHONE_BLOCK_MS = 30 * 60_000;
-
-function enforcePerPhoneRateLimit(scope: string, phone: string) {
-  const key = `${scope}:${phone}`;
-  const now = Date.now();
-  const entry = perPhoneBuckets.get(key);
-  if (entry?.blockedUntil && entry.blockedUntil > now) {
-    const minutes = Math.ceil((entry.blockedUntil - now) / 60_000);
-    throw new Error(`Trop de tentatives pour ce numéro. Réessayez dans ${minutes} minute(s).`);
-  }
-  if (!entry || now - entry.windowStart > PER_PHONE_WINDOW_MS) {
-    perPhoneBuckets.set(key, { count: 1, windowStart: now, blockedUntil: 0 });
-    return;
-  }
-  entry.count += 1;
-  if (entry.count > PER_PHONE_MAX) {
-    entry.blockedUntil = now + PER_PHONE_BLOCK_MS;
-    const minutes = Math.ceil(PER_PHONE_BLOCK_MS / 60_000);
-    throw new Error(`Trop de tentatives pour ce numéro. Réessayez dans ${minutes} minute(s).`);
-  }
+async function enforcePerPhoneRateLimit(scope: string, phone: string) {
+  const verdict = await db.checkPhoneAttemptLimit(scope, phone);
+  if (!verdict.allowed) throw new Error(`Trop de tentatives pour ce numéro. Réessayez dans ${verdict.retryInMinutes} minute(s).`);
 }
 
 /**
@@ -156,15 +135,6 @@ async function enforcePerIpRateLimit(req: { ip?: string; socket?: { remoteAddres
   if (!allowed) throw new Error("Trop de tentatives depuis cette connexion. Réessayez plus tard.");
 }
 
-const bucketCleanupTimer = setInterval(() => {
-  const now = Date.now();
-  for (const [key, entry] of perPhoneBuckets.entries()) {
-    if (now - entry.windowStart > PER_PHONE_WINDOW_MS * 2 && (!entry.blockedUntil || entry.blockedUntil < now)) {
-      perPhoneBuckets.delete(key);
-    }
-  }
-}, PER_PHONE_WINDOW_MS);
-(bucketCleanupTimer as unknown as { unref?: () => void }).unref?.();
 
 function toPublicProfile(profile: { phone: string; fullName: string; accountType: "sender" | "driver"; vehicles: string; photoKey?: string | null; email?: string | null; phoneVerified?: boolean; emailVerified?: boolean; referralCode?: string | null; status?: "active" | "suspended" | "banned"; statusReason?: string | null; country?: string | null; city?: string | null; deletionRequestedAt?: Date | null; deletionScheduledAt?: Date | null }) {
   let vehicles: ValidVehicle[] = [];
@@ -417,7 +387,7 @@ export const appRouter = router({
     /** Called after local OTP verification in the simulation flow. A production build must verify OTP server-side before this query. */
     lookup: publicProcedure.input(z.object({ phone: phoneSchema, otp: simulationOtpSchema })).mutation(async ({ input, ctx }) => {
       await enforcePerIpRateLimit(ctx.req);
-      enforcePerPhoneRateLimit("lookup", input.phone);
+      await enforcePerPhoneRateLimit("lookup", input.phone);
       const profile = await db.getTikisProfileByPhone(input.phone);
       if (profile) assertProfileNotBlocked(profile);
       if (!profile) return null;
@@ -427,7 +397,7 @@ export const appRouter = router({
     }),
     lookupSupabase: publicProcedure.input(z.object({ phone: phoneSchema, accessToken: supabaseAccessTokenSchema })).mutation(async ({ input, ctx }) => {
       await enforcePerIpRateLimit(ctx.req);
-      enforcePerPhoneRateLimit("lookupSupabase", input.phone);
+      await enforcePerPhoneRateLimit("lookupSupabase", input.phone);
       const supabaseUserId = await verifySupabasePhoneSession(input.phone, input.accessToken);
       const profile = await db.getTikisProfileByPhone(input.phone);
       if (!profile) return null;
@@ -439,7 +409,7 @@ export const appRouter = router({
     }),
     register: publicProcedure.input(registrationInputSchema).mutation(async ({ input, ctx }) => {
       await enforcePerIpRateLimit(ctx.req);
-      enforcePerPhoneRateLimit("register", input.phone);
+      await enforcePerPhoneRateLimit("register", input.phone);
       await assertCountryEnabled(input.countryCode);
       const referralCode = input.role === "driver" ? await generateUniqueReferralCode(input.fullName) : undefined;
       const profile = await db.createTikisProfile({
@@ -456,7 +426,7 @@ export const appRouter = router({
     }),
     registerSupabase: publicProcedure.input(profileFieldsSchema.extend({ accessToken: supabaseAccessTokenSchema }).superRefine(validateProfileRole)).mutation(async ({ input, ctx }) => {
       await enforcePerIpRateLimit(ctx.req);
-      enforcePerPhoneRateLimit("registerSupabase", input.phone);
+      await enforcePerPhoneRateLimit("registerSupabase", input.phone);
       await assertCountryEnabled(input.countryCode);
       const supabaseUserId = await verifySupabasePhoneSession(input.phone, input.accessToken);
       const referralCode = input.role === "driver" ? await generateUniqueReferralCode(input.fullName) : undefined;
@@ -472,7 +442,7 @@ export const appRouter = router({
       if (value.photoBase64 && !value.photoMime) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["photoMime"], message: "Type d’image requis." });
     })).mutation(async ({ input, ctx }) => {
       await enforcePerIpRateLimit(ctx.req);
-      enforcePerPhoneRateLimit("update", input.phone);
+      await enforcePerPhoneRateLimit("update", input.phone);
       let photoKey: string | null | undefined;
       if (input.photoBase64 && input.photoMime) {
         const bytes = Buffer.from(input.photoBase64, "base64");
@@ -531,7 +501,7 @@ export const appRouter = router({
       phone: phoneSchema,
     })).mutation(async ({ input, ctx }) => {
       await enforcePerIpRateLimit(ctx.req);
-      enforcePerPhoneRateLimit("requestContactOtp", input.phone);
+      await enforcePerPhoneRateLimit("requestContactOtp", input.phone);
       if (input.kind === "phone") {
         if (!/^\+?[0-9 ]{8,20}$/.test(input.value.trim())) throw new Error("Numéro de téléphone invalide.");
       } else {
@@ -547,7 +517,7 @@ export const appRouter = router({
       sessionOtp: simulationOtpSchema,
     })).mutation(async ({ input, ctx }) => {
       await enforcePerIpRateLimit(ctx.req);
-      enforcePerPhoneRateLimit("updateContact", input.phone);
+      await enforcePerPhoneRateLimit("updateContact", input.phone);
       if (input.otp !== input.sessionOtp) throw new Error("Code de confirmation invalide.");
       const current = await db.getTikisProfileByPhone(input.phone);
       if (!current) throw new Error("Profil introuvable.");

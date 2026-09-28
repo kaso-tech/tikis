@@ -38,6 +38,8 @@ export const tikisProfiles = mysqlTable("tikis_profiles", {
   deletionRequestedAt: timestamp("deletionRequestedAt"),
   deletionScheduledAt: timestamp("deletionScheduledAt"),
   deletedAt: timestamp("deletedAt"),
+  /** Déconnexion forcée par l'équipe : tout jeton de session émis avant cette date est refusé. */
+  sessionsRevokedAt: timestamp("sessionsRevokedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -212,7 +214,7 @@ export const tikisPaymentTransactions = mysqlTable("tikis_payment_transactions",
   id: varchar("id", { length: 40 }).primaryKey(),
   profilePhone: varchar("profilePhone", { length: 20 }).notNull(),
   type: mysqlEnum("type", ["deposit", "withdrawal"]).notNull(),
-  provider: mysqlEnum("provider", ["ligdi_simulated", "yengapay_test", "yengapay_sandbox", "yengapay_live", "yengapay_direct_test", "yengapay_direct_sandbox", "yengapay_direct_live"]).notNull().default("yengapay_test"),
+  provider: mysqlEnum("provider", ["ligdi_simulated", "yengapay_test", "yengapay_sandbox", "yengapay_live", "yengapay_direct_test", "yengapay_direct_sandbox", "yengapay_direct_live", "manual_payout"]).notNull().default("yengapay_test"),
   amount: int("amount").notNull(),
   status: mysqlEnum("status", ["pending", "succeeded", "failed", "cancelled", "expired"]).notNull().default("pending"),
   providerReference: varchar("providerReference", { length: 80 }).notNull().unique(),
@@ -436,6 +438,8 @@ export const tikisKycSubmissions = mysqlTable("tikis_kyc_submissions", {
   submittedAt: timestamp("submittedAt").defaultNow().notNull(),
   reviewedAt: timestamp("reviewedAt"),
   reviewedByAdminId: int("reviewedByAdminId"),
+  /** Photos effacées du stockage (suppression du compte) ; la décision de vérification reste. */
+  documentsErasedAt: timestamp("documentsErasedAt"),
 }, (table) => [
   index("tikis_kyc_submissions_driver_index").on(table.driverPhone, table.submittedAt),
   index("tikis_kyc_submissions_status_index").on(table.status),
@@ -611,3 +615,48 @@ export const tikisRateLimits = mysqlTable("tikis_rate_limits", {
 ]);
 
 export type TikisRateLimit = typeof tikisRateLimits.$inferSelect;
+
+/** Notes internes du support sur une fiche utilisateur. Jamais montrées à l'utilisateur. */
+export const tikisProfileNotes = mysqlTable("tikis_profile_notes", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  profilePhone: varchar("profilePhone", { length: 20 }).notNull(),
+  body: varchar("body", { length: 1000 }).notNull(),
+  adminId: int("adminId").notNull(),
+  adminEmail: varchar("adminEmail", { length: 180 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (table) => [
+  index("tikis_profile_notes_profile_index").on(table.profilePhone, table.createdAt),
+]);
+
+export type TikisProfileNote = typeof tikisProfileNotes.$inferSelect;
+
+/**
+ * Comptes supprimés : correspondance numéro ↔ pseudonyme, gardée 10 ans pour la comptabilité, puis
+ * effacée. Le numéro lui-même est remplacé par le pseudonyme dans toutes les autres tables.
+ */
+export const tikisDeletedAccounts = mysqlTable("tikis_deleted_accounts", {
+  pseudonym: varchar("pseudonym", { length: 20 }).primaryKey(),
+  phone: varchar("phone", { length: 20 }).notNull(),
+  accountType: mysqlEnum("accountType", ["sender", "driver"]).notNull(),
+  deletedAt: timestamp("deletedAt").defaultNow().notNull(),
+  purgeAfter: timestamp("purgeAfter").notNull(),
+  finalizedByAdminId: int("finalizedByAdminId"),
+}, (table) => [
+  index("tikis_deleted_accounts_phone_index").on(table.phone),
+  index("tikis_deleted_accounts_purge_index").on(table.purgeAfter),
+]);
+
+export type TikisDeletedAccount = typeof tikisDeletedAccounts.$inferSelect;
+
+/** Fichiers à effacer du stockage, traités en tâche de fond avec reprise. */
+export const tikisStorageErasures = mysqlTable("tikis_storage_erasures", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  storageKey: varchar("storageKey", { length: 512 }).notNull(),
+  reason: varchar("reason", { length: 80 }).notNull(),
+  attempts: int("attempts").notNull().default(0),
+  lastError: varchar("lastError", { length: 300 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  erasedAt: timestamp("erasedAt"),
+}, (table) => [
+  index("tikis_storage_erasures_pending_index").on(table.erasedAt, table.createdAt),
+]);

@@ -122,3 +122,21 @@ export async function storageReadObject(relKey: string): Promise<{ body: Buffer;
   if (!response.ok) throw new Error(`Storage read failed (${response.status})`);
   return { body: Buffer.from(await response.arrayBuffer()), contentType: response.headers.get("content-type") ?? "application/octet-stream" };
 }
+
+/**
+ * Efface le contenu d'un fichier privé en le réécrivant vide, à sa clé exacte : le stockage Forge n'expose
+ * pas de suppression. Si le compartiment conserve des versions, les versions antérieures restent à purger
+ * chez l'hébergeur.
+ */
+export async function storageErase(relKey: string): Promise<void> {
+  const { forgeUrl, forgeKey } = getForgeConfig();
+  const key = normalizeKey(relKey);
+  const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
+  presignUrl.searchParams.set("path", key);
+  const presignResp = await fetch(presignUrl, { headers: { Authorization: `Bearer ${forgeKey}` }, signal: AbortSignal.timeout(15_000) });
+  if (!presignResp.ok) throw new Error(`Storage presign failed (${presignResp.status})`);
+  const { url } = (await presignResp.json()) as { url: string };
+  if (!url) throw new Error("Forge returned empty presign URL");
+  const uploadResp = await fetch(url, { method: "PUT", headers: { "Content-Type": "application/octet-stream" }, body: new Blob([]), signal: AbortSignal.timeout(15_000) });
+  if (!uploadResp.ok) throw new Error(`Storage erase failed (${uploadResp.status})`);
+}

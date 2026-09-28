@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { afterEach } from "vitest";
 import type { TrpcContext } from "../server/_core/context";
 
-const dbMock = vi.hoisted(() => ({ getTikisProfileByPhone: vi.fn(), linkTikisProfileToSupabaseUser: vi.fn() }));
+// La limite de tentatives par numéro est en base (lot D) : ici, jamais atteinte.
+const dbMock = vi.hoisted(() => ({ getTikisProfileByPhone: vi.fn(), linkTikisProfileToSupabaseUser: vi.fn(), checkPhoneAttemptLimit: vi.fn(async () => ({ allowed: true as const })) }));
 vi.mock("../server/db", () => dbMock);
 // Mock partiel : seule la signature est remplacée. Remplacer tout le module effaçait aussi
 // `TIKIS_SESSION_TTL_SECONDS`, dont dépend la durée du cookie de session (server/_core/cookies.ts).

@@ -1038,11 +1038,6 @@ export async function adminSetMaintenance(input: { enabled: boolean; message?: s
 // Suppression de compte — vue administrateur
 // ————————————————————————————————————————————————————————————————————————
 
-export async function adminListPendingDeletions() {
-  const dbc = await getDb();
-  if (!dbc) return [];
-  return dbc.select({ phone: tikisProfiles.phone, fullName: tikisProfiles.fullName, accountType: tikisProfiles.accountType, deletionRequestedAt: tikisProfiles.deletionRequestedAt }).from(tikisProfiles).where(sql`${tikisProfiles.deletionRequestedAt} is not null and ${tikisProfiles.deletedAt} is null`).orderBy(desc(tikisProfiles.deletionRequestedAt));
-}
 
 // ————————————————————————————————————————————————————————————————————————
 // Vérification d'identité (KYC)

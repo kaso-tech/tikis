@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { trpc } from "../lib/trpc";
 import { downloadCsv, rowsToCsv } from "../lib/csv";
 import { SkeletonTable } from "../lib/skeleton";
+import { useAdminAuth } from "../lib/auth";
+import UserSupportPanel from "./UserSupportPanel";
 
 type Profile = { phone: string; fullName: string; accountType: "sender" | "driver"; email: string | null; phoneVerified: boolean; emailVerified: boolean; status?: "active" | "suspended" | "banned"; statusReason?: string | null };
 type Detail = {
@@ -21,6 +23,7 @@ function initials(name: string): string {
 }
 
 export default function UsersPage({ search: topSearch = "" }: { search?: string }) {
+  const { admin } = useAdminAuth();
   const [query, setQuery] = useState(topSearch);
   const [filter, setFilter] = useState<"all" | "sender" | "driver">("all");
   const [results, setResults] = useState<Profile[]>([]);
@@ -230,6 +233,8 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
             </div>
           </div>
         </div>
+        {admin ? <UserSupportPanel key={detail.profile.phone} phone={detail.profile.phone} role={admin.role} /> : null}
+
         <div className="card">
           <div className="card-head">
             <div>
