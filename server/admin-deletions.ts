@@ -19,12 +19,12 @@ import { and, count, desc, eq, getTableColumns, inArray, is, isNotNull, isNull, 
 import { MySqlTable, getTableConfig } from "drizzle-orm/mysql-core";
 import * as schema from "../drizzle/schema";
 import {
-  tikisAdminApprovals, tikisDeletedAccounts, tikisDeliveries, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDriverPreferences, tikisFavoritePlaces,
-  tikisKycSubmissions, tikisPaymentTransactions, tikisProfileNotes, tikisProfileSessions, tikisProfiles, tikisPushTokens, tikisRateLimits, tikisStorageErasures,
-  tikisWalletLedger, tikisWallets,
+  tikisseAdminApprovals, tikisseDeletedAccounts, tikisseDeliveries, tikisseDeliveryEvents, tikisseDeliveryLiveLocations, tikisseDriverPreferences, tikisseFavoritePlaces,
+  tikisseKycSubmissions, tikissePaymentTransactions, tikisseProfileNotes, tikisseProfileSessions, tikisseProfiles, tikissePushTokens, tikisseRateLimits, tikisseStorageErasures,
+  tikisseWalletLedger, tikisseWallets,
 } from "../drizzle/schema";
 import * as approvals from "./admin-approvals";
-import { invalidateTikisProfileCache } from "./_core/profile-cache";
+import { invalidateTikisseProfileCache } from "./_core/profile-cache";
 import * as db from "./db";
 import { storageErase } from "./storage";
 
@@ -49,10 +49,10 @@ export type DeletionBlocker = { code: "balance" | "held" | "delivery" | "payment
 /** Ce qui empêche encore de supprimer ce compte sans perdre d'argent ou laisser une course en plan. */
 export async function deletionBlockers(handle: Handle, phone: string): Promise<DeletionBlocker[]> {
   const [wallet, deliveries, payments, openApprovals] = await Promise.all([
-    handle.select().from(tikisWallets).where(eq(tikisWallets.profilePhone, phone)).limit(1),
-    handle.select({ count: count() }).from(tikisDeliveries).where(and(or(eq(tikisDeliveries.senderPhone, phone), eq(tikisDeliveries.driverPhone, phone)), inArray(tikisDeliveries.status, ["open", "pending_confirmation", "active"]))),
-    handle.select({ count: count() }).from(tikisPaymentTransactions).where(and(eq(tikisPaymentTransactions.profilePhone, phone), eq(tikisPaymentTransactions.status, "pending"))),
-    handle.select({ count: count() }).from(tikisAdminApprovals).where(and(eq(tikisAdminApprovals.targetPhone, phone), inArray(tikisAdminApprovals.status, ["pending", "approved"]))),
+    handle.select().from(tikisseWallets).where(eq(tikisseWallets.profilePhone, phone)).limit(1),
+    handle.select({ count: count() }).from(tikisseDeliveries).where(and(or(eq(tikisseDeliveries.senderPhone, phone), eq(tikisseDeliveries.driverPhone, phone)), inArray(tikisseDeliveries.status, ["open", "pending_confirmation", "active"]))),
+    handle.select({ count: count() }).from(tikissePaymentTransactions).where(and(eq(tikissePaymentTransactions.profilePhone, phone), eq(tikissePaymentTransactions.status, "pending"))),
+    handle.select({ count: count() }).from(tikisseAdminApprovals).where(and(eq(tikisseAdminApprovals.targetPhone, phone), inArray(tikisseAdminApprovals.status, ["pending", "approved"]))),
   ]);
   const blockers: DeletionBlocker[] = [];
   const available = wallet[0]?.availableBalance ?? 0;
@@ -77,9 +77,9 @@ export class DeletionBlockedError extends Error {
 /** Demandes en cours : dans le délai, à traiter (bloquées), ou prêtes à être finalisées. */
 export async function listDeletionRequests(now = new Date()) {
   const handle = await database();
-  const rows = await handle.select().from(tikisProfiles).where(and(isNotNull(tikisProfiles.deletionRequestedAt), isNull(tikisProfiles.deletedAt))).orderBy(tikisProfiles.deletionScheduledAt).limit(200);
+  const rows = await handle.select().from(tikisseProfiles).where(and(isNotNull(tikisseProfiles.deletionRequestedAt), isNull(tikisseProfiles.deletedAt))).orderBy(tikisseProfiles.deletionScheduledAt).limit(200);
   const requests = await Promise.all(rows.map(async (profile) => {
-    const [blockers, wallet] = await Promise.all([deletionBlockers(handle, profile.phone), handle.select().from(tikisWallets).where(eq(tikisWallets.profilePhone, profile.phone)).limit(1)]);
+    const [blockers, wallet] = await Promise.all([deletionBlockers(handle, profile.phone), handle.select().from(tikisseWallets).where(eq(tikisseWallets.profilePhone, profile.phone)).limit(1)]);
     const due = !profile.deletionScheduledAt || profile.deletionScheduledAt <= now;
     return {
       phone: profile.phone, fullName: profile.fullName, accountType: profile.accountType, status: profile.status,
@@ -88,20 +88,20 @@ export async function listDeletionRequests(now = new Date()) {
       state: blockers.length > 0 ? (due ? "blocked" as const : "grace_blocked" as const) : due ? "ready" as const : "grace" as const,
     };
   }));
-  const deleted = await handle.select({ pseudonym: tikisDeletedAccounts.pseudonym, accountType: tikisDeletedAccounts.accountType, deletedAt: tikisDeletedAccounts.deletedAt, purgeAfter: tikisDeletedAccounts.purgeAfter })
-    .from(tikisDeletedAccounts).orderBy(desc(tikisDeletedAccounts.deletedAt)).limit(20);
+  const deleted = await handle.select({ pseudonym: tikisseDeletedAccounts.pseudonym, accountType: tikisseDeletedAccounts.accountType, deletedAt: tikisseDeletedAccounts.deletedAt, purgeAfter: tikisseDeletedAccounts.purgeAfter })
+    .from(tikisseDeletedAccounts).orderBy(desc(tikisseDeletedAccounts.deletedAt)).limit(20);
   return { requests, recentlyDeleted: deleted };
 }
 
 /** Compte supprimé retrouvé par son ancien numéro, tant que la correspondance est conservée (10 ans). */
 export async function findDeletedAccount(phone: string) {
   const handle = await database();
-  return (await handle.select().from(tikisDeletedAccounts).where(eq(tikisDeletedAccounts.phone, phone)).orderBy(desc(tikisDeletedAccounts.deletedAt)))
+  return (await handle.select().from(tikisseDeletedAccounts).where(eq(tikisseDeletedAccounts.phone, phone)).orderBy(desc(tikisseDeletedAccounts.deletedAt)))
     .map((row) => ({ pseudonym: row.pseudonym, accountType: row.accountType, deletedAt: row.deletedAt, purgeAfter: row.purgeAfter }));
 }
 
 async function pendingDeletionProfile(handle: Handle, phone: string) {
-  const profile = (await handle.select().from(tikisProfiles).where(eq(tikisProfiles.phone, phone)).limit(1))[0];
+  const profile = (await handle.select().from(tikisseProfiles).where(eq(tikisseProfiles.phone, phone)).limit(1))[0];
   if (!profile) throw new Error("Profil introuvable.");
   if (profile.deletedAt) throw new Error("Ce compte est déjà supprimé.");
   if (!profile.deletionRequestedAt) throw new Error("Ce compte n’a pas demandé sa suppression.");
@@ -121,19 +121,19 @@ export async function payoutClosingBalance(input: { phone: string; payoutReferen
   const idempotencyKey = `closure-payout:${input.requestId}`;
   const payment = await handle.transaction(async (tx) => {
     await pendingDeletionProfile(tx, input.phone);
-    const existing = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.idempotencyKey, idempotencyKey)).limit(1))[0];
+    const existing = (await tx.select().from(tikissePaymentTransactions).where(eq(tikissePaymentTransactions.idempotencyKey, idempotencyKey)).limit(1))[0];
     if (existing) return existing;
-    const pending = (await tx.select({ id: tikisPaymentTransactions.id }).from(tikisPaymentTransactions).where(and(eq(tikisPaymentTransactions.profilePhone, input.phone), eq(tikisPaymentTransactions.status, "pending"))).limit(1))[0];
+    const pending = (await tx.select({ id: tikissePaymentTransactions.id }).from(tikissePaymentTransactions).where(and(eq(tikissePaymentTransactions.profilePhone, input.phone), eq(tikissePaymentTransactions.status, "pending"))).limit(1))[0];
     if (pending) throw new Error("Un paiement ou un versement est déjà en attente pour ce compte : traitez-le d’abord (Finance ou Validations).");
-    const wallet = (await tx.select().from(tikisWallets).where(eq(tikisWallets.profilePhone, input.phone)).limit(1).for("update"))[0];
+    const wallet = (await tx.select().from(tikisseWallets).where(eq(tikisseWallets.profilePhone, input.phone)).limit(1).for("update"))[0];
     if (wallet && wallet.heldBalance > 0) throw new Error("Des commissions sont encore réservées sur des candidatures : elles doivent être libérées avant de verser le solde.");
     const amount = wallet?.availableBalance ?? 0;
     if (amount <= 0) throw new Error("Aucun solde à verser.");
     const id = randomUUID();
     const row = { id, profilePhone: input.phone, type: "withdrawal" as const, provider: "manual_payout" as const, amount, status: "pending" as const, providerReference: `closure-${id}`, idempotencyKey };
-    await tx.insert(tikisPaymentTransactions).values(row);
-    await tx.insert(tikisWalletLedger).values({ id: randomUUID(), profilePhone: input.phone, deliveryId: null, operation: "withdrawal_request", amount, availableBefore: amount, availableAfter: amount, heldBefore: 0, heldAfter: 0, reason: "Versement du solde avant suppression du compte", idempotencyKey: `${id}:requested` });
-    return (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, id)).limit(1))[0]!;
+    await tx.insert(tikissePaymentTransactions).values(row);
+    await tx.insert(tikisseWalletLedger).values({ id: randomUUID(), profilePhone: input.phone, deliveryId: null, operation: "withdrawal_request", amount, availableBefore: amount, availableAfter: amount, heldBefore: 0, heldAfter: 0, reason: "Versement du solde avant suppression du compte", idempotencyKey: `${id}:requested` });
+    return (await tx.select().from(tikissePaymentTransactions).where(eq(tikissePaymentTransactions.id, id)).limit(1))[0]!;
   });
   if (payment.status !== "pending") return { approvalRequired: false as const, amount: payment.amount, paymentId: payment.id, status: payment.status };
   try {
@@ -146,8 +146,8 @@ export async function payoutClosingBalance(input: { phone: string; payoutReferen
   } catch (cause) {
     // Référence déjà utilisée, solde modifié entre-temps… : rien n'a été versé ni débité ; le versement
     // en attente est annulé pour ne pas bloquer une nouvelle tentative.
-    await handle.update(tikisPaymentTransactions).set({ status: "cancelled", settledAt: new Date(), adminNotes: "Versement de clôture non abouti" })
-      .where(and(eq(tikisPaymentTransactions.id, payment.id), eq(tikisPaymentTransactions.status, "pending")));
+    await handle.update(tikissePaymentTransactions).set({ status: "cancelled", settledAt: new Date(), adminNotes: "Versement de clôture non abouti" })
+      .where(and(eq(tikissePaymentTransactions.id, payment.id), eq(tikissePaymentTransactions.status, "pending")));
     throw cause;
   }
 }
@@ -157,16 +157,16 @@ export async function payoutClosingBalance(input: { phone: string; payoutReferen
 // ————————————————————————————————————————————————————————————————————————
 
 /** Tables où le numéro est gardé tel quel : la correspondance elle-même, et les comptes de la plateforme. */
-const PHONE_KEPT_IN = new Set(["tikis_deleted_accounts", "users"]);
+const PHONE_KEPT_IN = new Set(["tikisse_deleted_accounts", "users"]);
 const PHONE_COLUMN = (name: string) => /phone$/i.test(name) || name === "phoneE164";
 
 /** Colonnes de texte qui contiennent le numéro dans une clé ou un contenu (clés anti-doublon, demandes de validation). */
 const TEXT_EMBEDDING_PHONE = [
-  [tikisWalletLedger, tikisWalletLedger.idempotencyKey, "idempotencyKey"],
-  [tikisPaymentTransactions, tikisPaymentTransactions.idempotencyKey, "idempotencyKey"],
-  [tikisDeliveryEvents, tikisDeliveryEvents.idempotencyKey, "idempotencyKey"],
-  [tikisAdminApprovals, tikisAdminApprovals.targetRef, "targetRef"],
-  [tikisAdminApprovals, tikisAdminApprovals.payload, "payload"],
+  [tikisseWalletLedger, tikisseWalletLedger.idempotencyKey, "idempotencyKey"],
+  [tikissePaymentTransactions, tikissePaymentTransactions.idempotencyKey, "idempotencyKey"],
+  [tikisseDeliveryEvents, tikisseDeliveryEvents.idempotencyKey, "idempotencyKey"],
+  [tikisseAdminApprovals, tikisseAdminApprovals.targetRef, "targetRef"],
+  [tikisseAdminApprovals, tikisseAdminApprovals.payload, "payload"],
 ] as const;
 
 /** Remplace le numéro par le pseudonyme dans toutes les tables qui le portent. */
@@ -192,7 +192,7 @@ export async function finalizeAccountDeletion(phone: string, options: { adminId?
   const now = options.now ?? new Date();
   const handle = await database();
   const result = await handle.transaction(async (tx) => {
-    const profile = (await tx.select().from(tikisProfiles).where(eq(tikisProfiles.phone, phone)).limit(1).for("update"))[0];
+    const profile = (await tx.select().from(tikisseProfiles).where(eq(tikisseProfiles.phone, phone)).limit(1).for("update"))[0];
     if (!profile) throw new Error("Profil introuvable.");
     if (profile.deletedAt) throw new Error("Ce compte est déjà supprimé.");
     if (!profile.deletionRequestedAt) throw new Error("Ce compte n’a pas demandé sa suppression.");
@@ -204,49 +204,49 @@ export async function finalizeAccountDeletion(phone: string, options: { adminId?
 
     // Photos de la pièce d'identité et photo de profil : effacées du stockage en tâche de fond (avec reprise),
     // et dès maintenant inaccessibles depuis l'application et la console.
-    const submissions = await tx.select().from(tikisKycSubmissions).where(eq(tikisKycSubmissions.driverPhone, phone));
+    const submissions = await tx.select().from(tikisseKycSubmissions).where(eq(tikisseKycSubmissions.driverPhone, phone));
     const keys = [...submissions.flatMap((row) => [row.idFrontKey, row.idBackKey, row.selfieKey]), profile.photoKey].filter((key): key is string => !!key);
-    if (keys.length) await tx.insert(tikisStorageErasures).values(keys.map((storageKey) => ({ id: randomUUID(), storageKey, reason: "account_deletion" })));
-    if (submissions.length) await tx.update(tikisKycSubmissions).set({ idFrontKey: "", idBackKey: "", selfieKey: "", documentsErasedAt: now }).where(eq(tikisKycSubmissions.driverPhone, phone));
+    if (keys.length) await tx.insert(tikisseStorageErasures).values(keys.map((storageKey) => ({ id: randomUUID(), storageKey, reason: "account_deletion" })));
+    if (submissions.length) await tx.update(tikisseKycSubmissions).set({ idFrontKey: "", idBackKey: "", selfieKey: "", documentsErasedAt: now }).where(eq(tikisseKycSubmissions.driverPhone, phone));
 
     // Données personnelles sans valeur comptable : effacées.
-    await tx.delete(tikisPushTokens).where(eq(tikisPushTokens.phone, phone));
-    await tx.delete(tikisProfileSessions).where(eq(tikisProfileSessions.phone, phone));
-    await tx.delete(tikisDriverPreferences).where(eq(tikisDriverPreferences.profilePhone, phone));
-    await tx.delete(tikisFavoritePlaces).where(eq(tikisFavoritePlaces.profilePhone, phone));
-    await tx.delete(tikisDeliveryLiveLocations).where(eq(tikisDeliveryLiveLocations.driverPhone, phone));
-    await tx.delete(tikisProfileNotes).where(eq(tikisProfileNotes.profilePhone, phone));
-    await tx.delete(tikisRateLimits).where(or(like(tikisRateLimits.rateLimitKey, `%:${phone}:%`), like(tikisRateLimits.rateLimitKey, `%:${phone}`)));
-    await tx.update(tikisProfiles).set({
+    await tx.delete(tikissePushTokens).where(eq(tikissePushTokens.phone, phone));
+    await tx.delete(tikisseProfileSessions).where(eq(tikisseProfileSessions.phone, phone));
+    await tx.delete(tikisseDriverPreferences).where(eq(tikisseDriverPreferences.profilePhone, phone));
+    await tx.delete(tikisseFavoritePlaces).where(eq(tikisseFavoritePlaces.profilePhone, phone));
+    await tx.delete(tikisseDeliveryLiveLocations).where(eq(tikisseDeliveryLiveLocations.driverPhone, phone));
+    await tx.delete(tikisseProfileNotes).where(eq(tikisseProfileNotes.profilePhone, phone));
+    await tx.delete(tikisseRateLimits).where(or(like(tikisseRateLimits.rateLimitKey, `%:${phone}:%`), like(tikisseRateLimits.rateLimitKey, `%:${phone}`)));
+    await tx.update(tikisseProfiles).set({
       fullName: "Compte supprimé", email: null, emailVerified: false, photoKey: null, supabaseUserId: null, referralCode: null, city: null,
       statusReason: null, deletedAt: now, sessionsRevokedAt: now, updatedAt: now,
-    }).where(eq(tikisProfiles.phone, phone));
+    }).where(eq(tikisseProfiles.phone, phone));
 
     // Historique gardé 10 ans, sous pseudonyme ; le numéro est libéré.
     const pseudonym = `del-${randomBytes(8).toString("hex")}`;
     await pseudonymizePhone(tx, phone, pseudonym);
     const purgeAfter = new Date(now);
     purgeAfter.setFullYear(purgeAfter.getFullYear() + FINANCIAL_RETENTION_YEARS);
-    await tx.insert(tikisDeletedAccounts).values({ pseudonym, phone, accountType: profile.accountType, deletedAt: now, purgeAfter, finalizedByAdminId: options.adminId ?? null });
+    await tx.insert(tikisseDeletedAccounts).values({ pseudonym, phone, accountType: profile.accountType, deletedAt: now, purgeAfter, finalizedByAdminId: options.adminId ?? null });
     return { pseudonym, filesToErase: keys.length, purgeAfter };
   });
-  invalidateTikisProfileCache(phone);
+  invalidateTikisseProfileCache(phone);
   return result;
 }
 
 /** Efface du stockage les fichiers en attente. Un échec est retenté au passage suivant (10 essais au plus). */
 export async function processStorageErasures(limit = 50, erase: (key: string) => Promise<void> = storageErase) {
   const handle = await database();
-  const pending = await handle.select().from(tikisStorageErasures).where(and(isNull(tikisStorageErasures.erasedAt), lt(tikisStorageErasures.attempts, ERASURE_MAX_ATTEMPTS))).orderBy(tikisStorageErasures.createdAt).limit(limit);
+  const pending = await handle.select().from(tikisseStorageErasures).where(and(isNull(tikisseStorageErasures.erasedAt), lt(tikisseStorageErasures.attempts, ERASURE_MAX_ATTEMPTS))).orderBy(tikisseStorageErasures.createdAt).limit(limit);
   let erased = 0;
   for (const row of pending) {
     try {
       await erase(row.storageKey);
-      await handle.update(tikisStorageErasures).set({ erasedAt: new Date(), attempts: row.attempts + 1, lastError: null }).where(eq(tikisStorageErasures.id, row.id));
+      await handle.update(tikisseStorageErasures).set({ erasedAt: new Date(), attempts: row.attempts + 1, lastError: null }).where(eq(tikisseStorageErasures.id, row.id));
       erased += 1;
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
-      await handle.update(tikisStorageErasures).set({ attempts: row.attempts + 1, lastError: message.slice(0, 300) }).where(eq(tikisStorageErasures.id, row.id));
+      await handle.update(tikisseStorageErasures).set({ attempts: row.attempts + 1, lastError: message.slice(0, 300) }).where(eq(tikisseStorageErasures.id, row.id));
     }
   }
   return { erased, failed: pending.length - erased };
@@ -255,15 +255,15 @@ export async function processStorageErasures(limit = 50, erase: (key: string) =>
 /** Au bout de 10 ans, la correspondance numéro ↔ pseudonyme est effacée : l'historique n'est plus rattachable. */
 export async function purgeExpiredDeletedAccounts(now = new Date()) {
   const handle = await database();
-  const result = await handle.delete(tikisDeletedAccounts).where(lte(tikisDeletedAccounts.purgeAfter, now));
+  const result = await handle.delete(tikisseDeletedAccounts).where(lte(tikisseDeletedAccounts.purgeAfter, now));
   return { purged: (result as unknown as [{ affectedRows?: number }])[0]?.affectedRows ?? 0 };
 }
 
 /** Tâche planifiée : suppressions arrivées à échéance (sauf celles bloquées), effacement des fichiers, purge à 10 ans. */
 export async function runAccountDeletionJobs(now = new Date()) {
   const handle = await database();
-  const due = await handle.select({ phone: tikisProfiles.phone }).from(tikisProfiles)
-    .where(and(isNotNull(tikisProfiles.deletionScheduledAt), lte(tikisProfiles.deletionScheduledAt, now), isNull(tikisProfiles.deletedAt)));
+  const due = await handle.select({ phone: tikisseProfiles.phone }).from(tikisseProfiles)
+    .where(and(isNotNull(tikisseProfiles.deletionScheduledAt), lte(tikisseProfiles.deletionScheduledAt, now), isNull(tikisseProfiles.deletedAt)));
   let finalized = 0;
   let blocked = 0;
   for (const row of due) {

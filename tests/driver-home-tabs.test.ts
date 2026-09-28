@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const nativeSource = readFileSync(join(process.cwd(), "components/tikis/screens/home-screen.native.tsx"), "utf8");
-const webSource = readFileSync(join(process.cwd(), "components/tikis/screens/home-screen.web.tsx"), "utf8");
+const nativeSource = readFileSync(join(process.cwd(), "components/tikisse/screens/home-screen.native.tsx"), "utf8");
+const webSource = readFileSync(join(process.cwd(), "components/tikisse/screens/home-screen.web.tsx"), "utf8");
 
 describe("onglets de l’accueil livreur", () => {
   it.each([nativeSource, webSource])("déclare les quatre onglets dans l’ordre métier", (source) => {

@@ -3,16 +3,16 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import { TikisButton } from "@/components/tikis/ui";
+import { TikisseButton } from "@/components/tikisse/ui";
 import { usePushEnrollment } from "@/hooks/use-push-registration";
 import { getPushPermissionStatus, type PushPermissionOutcome } from "@/lib/push-notifications";
-import { useTikisStore } from "@/lib/tikis-store";
+import { useTikisseStore } from "@/lib/tikisse-store";
 import { useThemeColors } from "@/lib/use-theme-colors";
 
 export default function NotificationSettingsScreen() {
   const { colors: theme } = useThemeColors();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { role } = useTikisStore();
+  const { role } = useTikisseStore();
   const enablePush = usePushEnrollment();
   const [status, setStatus] = useState<"granted" | "denied" | "undetermined" | "unsupported">("undetermined");
   const [loading, setLoading] = useState(true);
@@ -41,10 +41,10 @@ export default function NotificationSettingsScreen() {
         setMessage("Les notifications push sont activées sur cet appareil.");
       } else if (outcome === "denied") {
         setStatus("denied");
-        setError("Les notifications sont bloquées. Autorisez Tikis dans les réglages du téléphone.");
+        setError("Les notifications sont bloquées. Autorisez Tikisse dans les réglages du téléphone.");
       } else if (outcome === "unsupported") {
         setStatus("unsupported");
-        setError("Les notifications push distantes nécessitent une version de développement Tikis. L’écran de notifications reste disponible dans l’application.");
+        setError("Les notifications push distantes nécessitent une version de développement Tikisse. L’écran de notifications reste disponible dans l’application.");
       } else {
         setError("Cet appareil n’a pas pu être enregistré. Vérifiez l’identifiant EAS et votre connexion, puis réessayez.");
       }
@@ -82,14 +82,14 @@ export default function NotificationSettingsScreen() {
             {loading ? <ActivityIndicator color={theme.primary} /> : null}
           </View>
           {status === "granted" ? null : (
-            <TikisButton label="Activer les notifications" icon="notifications-active" onPress={() => void enable()} loading={processing} disabled={loading || processing} style={styles.button} />
+            <TikisseButton label="Activer les notifications" icon="notifications-active" onPress={() => void enable()} loading={processing} disabled={loading || processing} style={styles.button} />
           )}
-          {status === "denied" ? <TikisButton label="Ouvrir les réglages du téléphone" icon="settings" variant="secondary" onPress={openSystemSettings} style={styles.button} /> : null}
+          {status === "denied" ? <TikisseButton label="Ouvrir les réglages du téléphone" icon="settings" variant="secondary" onPress={openSystemSettings} style={styles.button} /> : null}
         </View>
 
         <View style={styles.card}>
           <View style={styles.cardHeader}><MaterialIcons name="security" size={19} color={theme.primary} /><Text style={styles.cardTitle}>Vos données restent protégées</Text></View>
-          <Text style={styles.cardText}>Tikis enregistre uniquement l’identifiant technique de vos appareils autorisés. Il est supprimé automatiquement lorsqu’Apple, Google ou Expo le déclare invalide.</Text>
+          <Text style={styles.cardText}>Tikisse enregistre uniquement l’identifiant technique de vos appareils autorisés. Il est supprimé automatiquement lorsqu’Apple, Google ou Expo le déclare invalide.</Text>
         </View>
 
         {role === "driver" ? (

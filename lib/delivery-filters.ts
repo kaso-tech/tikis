@@ -1,4 +1,4 @@
-import type { Delivery, SelectableVehicleType } from "@/shared/tikis-domain";
+import type { Delivery, SelectableVehicleType } from "@/shared/tikisse-domain";
 
 export type DistanceLimit = "all" | 5 | 10 | 20 | 50;
 export type RewardMinimum = "all" | 2000 | 5000 | 10000;

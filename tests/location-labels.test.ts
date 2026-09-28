@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { displayLocation, locationSubtitle, locationTitle } from "../shared/tikis-domain";
+import { displayLocation, locationSubtitle, locationTitle } from "../shared/tikisse-domain";
 
-describe("libellés d’adresse Tikis", () => {
+describe("libellés d’adresse Tikisse", () => {
   /**
    * Ce cas attendait la rue au premier plan. La logique métier des lieux
    * (§7.1) place le quartier avant la rue : dans une liste, « Koulouba » se

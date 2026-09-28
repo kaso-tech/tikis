@@ -4,7 +4,7 @@ import type { AppRouter } from "../../../server/routers";
 
 // La session vit dans un cookie httpOnly posé par le serveur : aucun script de cette page ne peut la lire,
 // donc aucune faille XSS ne peut la voler. L'ancien jeton stocké ici n'est plus accepté ; on l'efface.
-const LEGACY_SESSION_KEY = "tikis_admin_session";
+const LEGACY_SESSION_KEY = "tikisse_admin_session";
 try {
   localStorage.removeItem(LEGACY_SESSION_KEY);
 } catch {
@@ -17,8 +17,8 @@ export const trpc = createTRPCClient<AppRouter>({
       url: "/api/trpc",
       transformer: superjson,
       // Le serveur n'accepte le cookie de session qu'accompagné de cet en-tête (protection CSRF).
-      headers: () => ({ "x-tikis-admin": "1" }),
-      // Nécessaire quand la console et l'API sont sur deux sous-domaines (admin.tikis.app → API).
+      headers: () => ({ "x-tikisse-admin": "1" }),
+      // Nécessaire quand la console et l'API sont sur deux sous-domaines (admin.tikisse.app → API).
       fetch: (url, options) => fetch(url, { ...options, credentials: "include" }),
     }),
   ],

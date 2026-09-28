@@ -9,7 +9,7 @@ afterEach(() => {
   resetGeographicCachesForTests();
 });
 
-describe("services géographiques backend Tikis", () => {
+describe("services géographiques backend Tikisse", () => {
   it("utilise Mapbox Search via le backend sans exposer le jeton au client", async () => {
     process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ suggestions: [{ mapbox_id: "dXJuOm1ieHBsYzpwbGFjZQ", name: "Maison du Peuple", full_address: "Ouagadougou", place_formatted: "Ouagadougou, Burkina Faso" }] })));
@@ -67,10 +67,10 @@ describe("services géographiques backend Tikis", () => {
 
   it("réutilise les mêmes suggestions récentes pour limiter les appels Mapbox", async () => {
     process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ suggestions: [{ mapbox_id: "cache-1", name: "Bureau Tikis" }] })));
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ suggestions: [{ mapbox_id: "cache-1", name: "Bureau Tikisse" }] })));
     global.fetch = fetchMock as typeof fetch;
-    await searchPlaces("Bureau Tikis", undefined, "BF");
-    await searchPlaces("Bureau Tikis", undefined, "BF");
+    await searchPlaces("Bureau Tikisse", undefined, "BF");
+    await searchPlaces("Bureau Tikisse", undefined, "BF");
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

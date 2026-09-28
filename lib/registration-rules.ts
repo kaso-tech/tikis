@@ -1,4 +1,4 @@
-import type { RegisteredProfile, UserRole, VehicleType } from "@/shared/tikis-domain";
+import type { RegisteredProfile, UserRole, VehicleType } from "@/shared/tikisse-domain";
 
 export type CountrySpec = {
   id: string;

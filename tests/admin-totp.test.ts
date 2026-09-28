@@ -11,8 +11,8 @@ import {
 
 const RFC_SECRET = Buffer.from("12345678901234567890", "ascii");
 const env = process.env as Record<string, string | undefined>;
-const savedKey = env.TIKIS_ADMIN_TOTP_KEY;
-afterEach(() => { if (savedKey === undefined) delete env.TIKIS_ADMIN_TOTP_KEY; else env.TIKIS_ADMIN_TOTP_KEY = savedKey; });
+const savedKey = env.TIKISSE_ADMIN_TOTP_KEY;
+afterEach(() => { if (savedKey === undefined) delete env.TIKISSE_ADMIN_TOTP_KEY; else env.TIKISSE_ADMIN_TOTP_KEY = savedKey; });
 
 describe("HOTP / TOTP — vecteurs des RFC", () => {
   it("RFC 4226 annexe D", () => {
@@ -70,7 +70,7 @@ describe("vérification d'un code saisi", () => {
 
 describe("secret chiffré au repos", () => {
   it("chiffre, déchiffre, et ne laisse jamais le secret lisible", () => {
-    env.TIKIS_ADMIN_TOTP_KEY = "cle-de-test-totp-0123456789abcdef-0123";
+    env.TIKISSE_ADMIN_TOTP_KEY = "cle-de-test-totp-0123456789abcdef-0123";
     const secret = generateTotpSecret();
     const stored = encryptTotpSecret(secret);
     expect(stored).not.toContain(secret);
@@ -79,15 +79,15 @@ describe("secret chiffré au repos", () => {
   });
 
   it("une autre clé ne déchiffre pas", () => {
-    env.TIKIS_ADMIN_TOTP_KEY = "cle-de-test-totp-0123456789abcdef-0123";
+    env.TIKISSE_ADMIN_TOTP_KEY = "cle-de-test-totp-0123456789abcdef-0123";
     const stored = encryptTotpSecret(generateTotpSecret());
-    env.TIKIS_ADMIN_TOTP_KEY = "une-autre-cle-totp-0123456789abcdef-99";
+    env.TIKISSE_ADMIN_TOTP_KEY = "une-autre-cle-totp-0123456789abcdef-99";
     expect(() => decryptTotpSecret(stored)).toThrow();
   });
 
   it("sans clé configurée, l'erreur dit quoi faire", () => {
-    delete env.TIKIS_ADMIN_TOTP_KEY;
-    expect(() => encryptTotpSecret("ABC")).toThrow(/TIKIS_ADMIN_TOTP_KEY/);
+    delete env.TIKISSE_ADMIN_TOTP_KEY;
+    expect(() => encryptTotpSecret("ABC")).toThrow(/TIKISSE_ADMIN_TOTP_KEY/);
   });
 });
 
@@ -107,7 +107,7 @@ describe("codes de secours et lien d'enrôlement", () => {
   });
 
   it("le lien otpauth porte l'émetteur, le compte et les paramètres standard", () => {
-    const uri = otpauthUri("admin@tikis.app", "JBSWY3DPEHPK3PXP");
-    expect(uri).toBe("otpauth://totp/Tikis%20Admin%3Aadmin%40tikis.app?secret=JBSWY3DPEHPK3PXP&issuer=Tikis+Admin&algorithm=SHA1&digits=6&period=30");
+    const uri = otpauthUri("admin@tikisse.app", "JBSWY3DPEHPK3PXP");
+    expect(uri).toBe("otpauth://totp/Tikisse%20Admin%3Aadmin%40tikisse.app?secret=JBSWY3DPEHPK3PXP&issuer=Tikisse+Admin&algorithm=SHA1&digits=6&period=30");
   });
 });

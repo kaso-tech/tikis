@@ -14,12 +14,12 @@ import "@/lib/_core/nativewind-pressable";
 // lib/background-location-task.ts pour pourquoi ce module existe.
 import "@/lib/background-location-task";
 import { ThemeProvider } from "@/lib/theme-provider";
-import { TikisDrawer } from "@/components/tikis/app-chrome";
-import { AppStatusGate } from "@/components/tikis/app-status-gate";
-import { DeliveryRealtimeProvider } from "@/components/tikis/delivery-realtime-provider";
-import { TikisNavigationProvider } from "@/lib/tikis-navigation";
-import { TikisLogoutProvider } from "@/lib/tikis-logout";
-import { TikisStoreProvider } from "@/lib/tikis-store";
+import { TikisseDrawer } from "@/components/tikisse/app-chrome";
+import { AppStatusGate } from "@/components/tikisse/app-status-gate";
+import { DeliveryRealtimeProvider } from "@/components/tikisse/delivery-realtime-provider";
+import { TikisseNavigationProvider } from "@/lib/tikisse-navigation";
+import { TikisseLogoutProvider } from "@/lib/tikisse-logout";
+import { TikisseStoreProvider } from "@/lib/tikisse-store";
 import {
   SafeAreaFrameContext,
   SafeAreaInsetsContext,
@@ -30,10 +30,10 @@ import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 
 import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
-import { TikisErrorBoundary } from "@/components/tikis/error-boundary";
-import { OfflineBanner } from "@/components/tikis/offline-banner";
-import { PushRegistrationHandler } from "@/components/tikis/push-registration-handler";
-import { PushNotificationRuntime } from "@/components/tikis/push-notification-runtime";
+import { TikisseErrorBoundary } from "@/components/tikisse/error-boundary";
+import { OfflineBanner } from "@/components/tikisse/offline-banner";
+import { PushRegistrationHandler } from "@/components/tikisse/push-registration-handler";
+import { PushNotificationRuntime } from "@/components/tikisse/push-notification-runtime";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -93,8 +93,8 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
-          <TikisLogoutProvider>
-            <TikisErrorBoundary>
+          <TikisseLogoutProvider>
+            <TikisseErrorBoundary>
               <OfflineBanner />
               <PushNotificationRuntime />
               <PushRegistrationHandler />
@@ -104,11 +104,11 @@ export default function RootLayout() {
                   <Stack.Screen name="(tabs)" />
                   <Stack.Screen name="oauth/callback" />
                 </Stack>
-                <TikisDrawer /></DeliveryRealtimeProvider>
+                <TikisseDrawer /></DeliveryRealtimeProvider>
               </AppStatusGate>
-            </TikisErrorBoundary>
+            </TikisseErrorBoundary>
             <StatusBar style="auto" />
-          </TikisLogoutProvider>
+          </TikisseLogoutProvider>
         </QueryClientProvider>
       </trpc.Provider>
     </GestureHandlerRootView>
@@ -122,7 +122,7 @@ export default function RootLayout() {
       <SafeAreaProvider initialMetrics={providerInitialMetrics}>
           <SafeAreaFrameContext.Provider value={frame}>
             <SafeAreaInsetsContext.Provider value={insets}>
-              <TikisStoreProvider><TikisNavigationProvider>{content}</TikisNavigationProvider></TikisStoreProvider>
+              <TikisseStoreProvider><TikisseNavigationProvider>{content}</TikisseNavigationProvider></TikisseStoreProvider>
             </SafeAreaInsetsContext.Provider>
           </SafeAreaFrameContext.Provider>
         </SafeAreaProvider>
@@ -132,7 +132,7 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <SafeAreaProvider initialMetrics={providerInitialMetrics}><TikisStoreProvider><TikisNavigationProvider>{content}</TikisNavigationProvider></TikisStoreProvider></SafeAreaProvider>
+      <SafeAreaProvider initialMetrics={providerInitialMetrics}><TikisseStoreProvider><TikisseNavigationProvider>{content}</TikisseNavigationProvider></TikisseStoreProvider></SafeAreaProvider>
     </ThemeProvider>
   );
 }

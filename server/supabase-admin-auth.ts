@@ -1,5 +1,5 @@
 /**
- * Établit une session Supabase Auth pour un profil Tikis authentifié par son propre système —
+ * Établit une session Supabase Auth pour un profil Tikisse authentifié par son propre système —
  * OTP de simulation compris — afin que les canaux Realtime privés (server/supabase-realtime.ts,
  * supabase/realtime_auth_phone_rls.sql) s'authentifient pour tout le monde, pas seulement les
  * profils passés par Supabase Phone Auth (profiles.lookupSupabase/registerSupabase).
@@ -17,7 +17,7 @@
  * l'utilisateur, EXPO_PUBLIC_SUPABASE_ANON_KEY (déjà publique) pour l'échange de session.
  *
  * Best-effort partout : un échec à n'importe quelle étape ne doit jamais bloquer la connexion
- * Tikis elle-même, qui ne dépend en rien de Supabase. Le client retombe sur le polling existant,
+ * Tikisse elle-même, qui ne dépend en rien de Supabase. Le client retombe sur le polling existant,
  * et retentera au prochain appel.
  */
 import { randomBytes } from "node:crypto";
@@ -73,7 +73,7 @@ export async function ensureSupabaseRealtimeSession(phone: string): Promise<Supa
   if (!config) return null;
   const { base, anonKey, serviceKey } = config;
   try {
-    const profile = await db.getTikisProfileByPhone(phone);
+    const profile = await db.getTikisseProfileByPhone(phone);
     if (!profile) return null;
 
     let userId = profile.supabaseUserId ?? null;
@@ -83,7 +83,7 @@ export async function ensureSupabaseRealtimeSession(phone: string): Promise<Supa
       // précédente restée incomplète, par exemple) : sans point d'accès admin pour le retrouver
       // par numéro, on abandonne proprement plutôt que de risquer un état incohérent.
       if (!userId) return null;
-      await db.linkTikisProfileToSupabaseUser(phone, userId);
+      await db.linkTikisseProfileToSupabaseUser(phone, userId);
     }
 
     const password = randomBytes(32).toString("hex");

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { canSubmitDeliveryReview, isValidReviewText, sanitizeReviewText } from "../lib/review-rules";
 
-describe("règles d’avis Tikis", () => {
+describe("règles d’avis Tikisse", () => {
   it("autorise une notation uniquement après une livraison terminée et une seule fois", () => {
     expect(canSubmitDeliveryReview("completed", false, 5)).toBe(true);
     expect(canSubmitDeliveryReview("active", false, 5)).toBe(false);

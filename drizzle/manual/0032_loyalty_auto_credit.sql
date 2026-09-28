@@ -3,6 +3,6 @@
 --
 -- Appliquer : mysql -u <user> -p <database> < drizzle/manual/0032_loyalty_auto_credit.sql
 
-ALTER TABLE `tikis_loyalty_programs`
+ALTER TABLE `tikisse_loyalty_programs`
   ADD COLUMN `autoCredit` boolean NOT NULL DEFAULT false AFTER `windowDays`,
   ADD COLUMN `autoCreditMaxAmount` int NOT NULL DEFAULT 0 AFTER `autoCredit`;

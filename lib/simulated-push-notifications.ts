@@ -2,7 +2,7 @@ import { Platform } from "react-native";
 import Constants from "expo-constants";
 import type { TrackingEvent } from "./gps-simulator";
 
-const TRACKING_CHANNEL = "tikis-delivery-tracking";
+const TRACKING_CHANNEL = "tikisse-delivery-tracking";
 let configured = false;
 const runsInExpoGo = Constants.appOwnership === "expo";
 let notificationHandlerConfigured = false;
@@ -31,7 +31,7 @@ export async function configureSimulatedPushNotifications() {
 
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync(TRACKING_CHANNEL, {
-      name: "Suivi de livraison Tikis",
+      name: "Suivi de livraison Tikisse",
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 180, 100, 180],
       lightColor: "#9A6201",

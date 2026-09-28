@@ -4,13 +4,13 @@ import { openBrowserAsync } from "expo-web-browser";
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { TikisButton } from "@/components/tikis/ui";
-import { WalletDirectDepositScreen } from "@/components/tikis/wallet-direct-deposit";
+import { TikisseButton } from "@/components/tikisse/ui";
+import { WalletDirectDepositScreen } from "@/components/tikisse/wallet-direct-deposit";
 import { offeredPriceError, parseOfferedPrice, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
-import { useTikisStore } from "@/lib/tikis-store";
+import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
 import { deliveryMetricsForDay } from "@/lib/wallet-metrics";
-import { availableWalletBalance, formatMoney, formatRelativeDate, type WalletOperation } from "@/shared/tikis-domain";
+import { availableWalletBalance, formatMoney, formatRelativeDate, type WalletOperation } from "@/shared/tikisse-domain";
 
 type Tone = "primary" | "success" | "warning" | "error" | "neutral";
 
@@ -38,7 +38,7 @@ const TONE_COLOR: Record<Tone, string> = {
 
 export default function WalletScreen() {
   const { colors: theme } = useThemeColors();
-  const { role, profile } = useTikisStore();
+  const { role, profile } = useTikisseStore();
   const utilities = trpc.useUtils();
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 12_000, refetchOnMount: "always", refetchOnWindowFocus: true });
   const wallet = walletQuery.data?.wallet;
@@ -54,7 +54,7 @@ export default function WalletScreen() {
   const [requestType, setRequestType] = useState<"deposit" | "withdrawal" | null>(null);
   const [amountInput, setAmountInput] = useState("");
   const [directModalVisible, setDirectModalVisible] = useState(false);
-  const [directResumeDeposit, setDirectResumeDeposit] = useState<import("@/components/tikis/wallet-direct-deposit").DirectDepositView | null>(null);
+  const [directResumeDeposit, setDirectResumeDeposit] = useState<import("@/components/tikisse/wallet-direct-deposit").DirectDepositView | null>(null);
   const [requestError, setRequestError] = useState("");
   const [paymentNotice, setPaymentNotice] = useState("");
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -180,7 +180,7 @@ export default function WalletScreen() {
             // paymentTransactionToDirectDeposit). Le modal ne lit que les champs qu'il a
             // déclarés, donc les champs supplémentaires du record (profilePhone, createdAt,
             // settledAt) sont ignorés sans risque.
-            onPress={() => { setDirectResumeDeposit(topPendingDirectDeposit as unknown as import("@/components/tikis/wallet-direct-deposit").DirectDepositView); setDirectModalVisible(true); }}
+            onPress={() => { setDirectResumeDeposit(topPendingDirectDeposit as unknown as import("@/components/tikisse/wallet-direct-deposit").DirectDepositView); setDirectModalVisible(true); }}
             style={({ pressed }) => [styles.pendingDirectCard, { backgroundColor: theme.surface, borderColor: theme.primary }, pressed && styles.pressed]}
             accessibilityRole="button"
             accessibilityLabel="Reprendre la confirmation d'un dépôt Mobile Money en attente"
@@ -218,7 +218,7 @@ export default function WalletScreen() {
             <View style={[styles.senderInfoIcon, { backgroundColor: theme.primary }]}><MaterialIcons name="handshake" size={16} color="#FFFFFF" /></View>
             <Text style={[styles.senderInfoText, { color: theme.foreground }]}>
               <Text style={[styles.senderInfoTextBold, { color: theme.foreground }]}>Paiement direct au livreur. </Text>
-              Le règlement de la course se fait à la remise. Les mouvements Tikis sont réservés aux règles de mise en relation.
+              Le règlement de la course se fait à la remise. Les mouvements Tikisse sont réservés aux règles de mise en relation.
             </Text>
           </View>
         )}
@@ -283,9 +283,9 @@ export default function WalletScreen() {
                 </View>
                 {requestError ? <Text style={styles.requestError}>{requestError}</Text> : <Text style={styles.modalHint}>{paymentNotice || (payment.mode === "test" ? "Aucun moyen de paiement réel n’est débité dans ce mode." : "Le statut est mis à jour automatiquement dès la confirmation YengaPay.")}</Text>}
                 {payment.mode === "test" && __DEV__ ? <View style={styles.modalActions}>
-                  <TikisButton label="Échouer" variant="secondary" disabled={requestLoading} onPress={() => void settlePayment("failed")} style={styles.modalAction} />
-                  <TikisButton label="Simuler réussite" icon="check-circle" loading={requestLoading} disabled={requestLoading} onPress={() => void settlePayment("succeeded")} style={styles.modalAction} />
-                </View> : payment.checkoutUrl ? <View style={styles.modalActions}><TikisButton label="Fermer" variant="secondary" disabled={requestLoading} onPress={() => setRequestType(null)} style={styles.modalAction} /><TikisButton label="Ouvrir YengaPay" icon="open-in-new" loading={checkoutLoading} disabled={requestLoading} onPress={() => void openCheckout()} style={styles.modalAction} /></View> : null}
+                  <TikisseButton label="Échouer" variant="secondary" disabled={requestLoading} onPress={() => void settlePayment("failed")} style={styles.modalAction} />
+                  <TikisseButton label="Simuler réussite" icon="check-circle" loading={requestLoading} disabled={requestLoading} onPress={() => void settlePayment("succeeded")} style={styles.modalAction} />
+                </View> : payment.checkoutUrl ? <View style={styles.modalActions}><TikisseButton label="Fermer" variant="secondary" disabled={requestLoading} onPress={() => setRequestType(null)} style={styles.modalAction} /><TikisseButton label="Ouvrir YengaPay" icon="open-in-new" loading={checkoutLoading} disabled={requestLoading} onPress={() => void openCheckout()} style={styles.modalAction} /></View> : null}
               </>
             ) : (
               <>
@@ -298,8 +298,8 @@ export default function WalletScreen() {
                 </View>
                 {requestError ? <Text style={styles.requestError}>{requestError}</Text> : <Text style={styles.modalHint}>Le montant et le statut de test seront enregistrés dans votre journal financier.</Text>}
                 <View style={styles.modalActions}>
-                  <TikisButton label="Annuler" variant="secondary" disabled={requestLoading} onPress={() => setRequestType(null)} style={styles.modalAction} />
-                  <TikisButton label="Initialiser" loading={requestLoading} disabled={requestLoading} onPress={() => void confirmRequest()} style={styles.modalAction} />
+                  <TikisseButton label="Annuler" variant="secondary" disabled={requestLoading} onPress={() => setRequestType(null)} style={styles.modalAction} />
+                  <TikisseButton label="Initialiser" loading={requestLoading} disabled={requestLoading} onPress={() => void confirmRequest()} style={styles.modalAction} />
                 </View>
               </>
             )}

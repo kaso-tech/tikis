@@ -1,2 +1,2 @@
-# tikis
-Repositoire Tikis (application de livraison)
+# tikisse
+Repositoire Tikisse (application de livraison)

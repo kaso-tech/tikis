@@ -1,6 +1,6 @@
 import { sql, type SQL } from "drizzle-orm";
 import { getDb } from "./db";
-import { tikisDailyMetrics } from "../drizzle/schema";
+import { tikisseDailyMetrics } from "../drizzle/schema";
 import { getLocalDateString } from "./_test-helpers/date-format";
 
 async function readMetricRow(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, query: SQL) {
@@ -8,7 +8,7 @@ async function readMetricRow(db: NonNullable<Awaited<ReturnType<typeof getDb>>>,
   return (result as unknown as Array<Record<string, unknown>>)[0] ?? {};
 }
 
-/** Calcule les métriques d'une journée et les upsert dans tikis_daily_metrics.
+/** Calcule les métriques d'une journée et les upsert dans tikisse_daily_metrics.
  *  Idempotent : peut être appelé plusieurs fois pour la même date.
  *  Renvoie les métriques calculées. */
 export async function computeDailyMetrics(date: string): Promise<{
@@ -32,17 +32,17 @@ export async function computeDailyMetrics(date: string): Promise<{
   const endOfDay = `${date} 23:59:59`;
 
   const [createdRow, completedRow, cancelledRow, gmvRow, commissionRow, newDriversRow, newSendersRow, activeDriversRow, activeSendersRow, bonusRow, reportsRow] = await Promise.all([
-    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikis_deliveries WHERE createdAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikis_deliveries WHERE status = 'completed' AND completedAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikis_deliveries WHERE status = 'cancelled' AND updatedAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COALESCE(SUM(COALESCE(offeredPrice, estimatedPrice)), 0) AS total FROM tikis_deliveries WHERE status = 'completed' AND completedAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COALESCE(SUM(amount), 0) AS total FROM tikis_wallet_ledger WHERE operation = 'compensation' AND createdAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikis_profiles WHERE accountType = 'driver' AND DATE(createdAt) = ${date}`),
-    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikis_profiles WHERE accountType = 'sender' AND DATE(createdAt) = ${date}`),
-    readMetricRow(db, sql`SELECT COUNT(DISTINCT driverPhone) AS count FROM tikis_deliveries WHERE status = 'completed' AND completedAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COUNT(DISTINCT senderPhone) AS count FROM tikis_deliveries WHERE createdAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COALESCE(SUM(amount), 0) AS total FROM tikis_wallet_ledger WHERE operation = 'bonus' AND createdAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikis_delivery_reports WHERE createdAt BETWEEN ${startOfDay} AND ${endOfDay}`),
+    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikisse_deliveries WHERE createdAt BETWEEN ${startOfDay} AND ${endOfDay}`),
+    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikisse_deliveries WHERE status = 'completed' AND completedAt BETWEEN ${startOfDay} AND ${endOfDay}`),
+    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikisse_deliveries WHERE status = 'cancelled' AND updatedAt BETWEEN ${startOfDay} AND ${endOfDay}`),
+    readMetricRow(db, sql`SELECT COALESCE(SUM(COALESCE(offeredPrice, estimatedPrice)), 0) AS total FROM tikisse_deliveries WHERE status = 'completed' AND completedAt BETWEEN ${startOfDay} AND ${endOfDay}`),
+    readMetricRow(db, sql`SELECT COALESCE(SUM(amount), 0) AS total FROM tikisse_wallet_ledger WHERE operation = 'compensation' AND createdAt BETWEEN ${startOfDay} AND ${endOfDay}`),
+    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikisse_profiles WHERE accountType = 'driver' AND DATE(createdAt) = ${date}`),
+    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikisse_profiles WHERE accountType = 'sender' AND DATE(createdAt) = ${date}`),
+    readMetricRow(db, sql`SELECT COUNT(DISTINCT driverPhone) AS count FROM tikisse_deliveries WHERE status = 'completed' AND completedAt BETWEEN ${startOfDay} AND ${endOfDay}`),
+    readMetricRow(db, sql`SELECT COUNT(DISTINCT senderPhone) AS count FROM tikisse_deliveries WHERE createdAt BETWEEN ${startOfDay} AND ${endOfDay}`),
+    readMetricRow(db, sql`SELECT COALESCE(SUM(amount), 0) AS total FROM tikisse_wallet_ledger WHERE operation = 'bonus' AND createdAt BETWEEN ${startOfDay} AND ${endOfDay}`),
+    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikisse_delivery_reports WHERE createdAt BETWEEN ${startOfDay} AND ${endOfDay}`),
   ]);
 
   const metrics = {
@@ -60,7 +60,7 @@ export async function computeDailyMetrics(date: string): Promise<{
     reportsOpened: Number(reportsRow.count ?? 0),
   };
 
-  await db.insert(tikisDailyMetrics).values(metrics).onDuplicateKeyUpdate({
+  await db.insert(tikisseDailyMetrics).values(metrics).onDuplicateKeyUpdate({
     set: {
       deliveriesCreated: metrics.deliveriesCreated,
       deliveriesCompleted: metrics.deliveriesCompleted,

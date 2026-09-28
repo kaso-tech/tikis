@@ -1,4 +1,4 @@
-import type { LocationLabel } from "@/shared/tikis-domain";
+import type { LocationLabel } from "@/shared/tikisse-domain";
 
 export const MAX_RECENT_PLACES = 3;
 const idFor = (place: LocationLabel) => `${place.latitude.toFixed(5)}:${place.longitude.toFixed(5)}`;

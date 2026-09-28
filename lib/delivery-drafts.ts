@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { LocationLabel } from "@/shared/tikis-domain";
+import type { LocationLabel } from "@/shared/tikisse-domain";
 
 export type DeliveryDraft = {
   id: string;
@@ -19,7 +19,7 @@ export type DeliveryDraft = {
   offeredPriceInput?: string;
 };
 
-const KEY_PREFIX = "tikis.delivery-drafts.";
+const KEY_PREFIX = "tikisse.delivery-drafts.";
 
 function keyFor(profilePhone: string) {
   return `${KEY_PREFIX}${profilePhone}`;

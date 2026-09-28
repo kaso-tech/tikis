@@ -76,7 +76,7 @@ describe("paiement direct YengaPay Sandbox", () => {
     expect(intent.ussdCode).toMatch(/#$/); // termine par #
     expect(intent.expiresAt).toEqual(expect.any(String));
     expect(new Date(intent.expiresAt).getTime()).toBeGreaterThan(Date.now());
-    // transactionId est un UUID Tikis interne
+    // transactionId est un UUID Tikisse interne
     expect(intent.transactionId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
   }, 25_000);
 

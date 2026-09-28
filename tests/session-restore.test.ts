@@ -1,14 +1,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { TIKIS_SESSION_TTL_SECONDS } from "../server/tikis-session";
-import { TIKIS_PROFILE_COOKIE_MAX_AGE_MS } from "../server/_core/cookies";
+import { TIKISSE_SESSION_TTL_SECONDS } from "../server/tikisse-session";
+import { TIKISSE_PROFILE_COOKIE_MAX_AGE_MS } from "../server/_core/cookies";
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
 const hook = read("hooks/use-session-restore.ts");
 const index = read("app/index.tsx");
-const store = read("lib/tikis-store.tsx");
+const store = read("lib/tikisse-store.tsx");
 
 // Le jeton vivait déjà trente jours et survivait à la fermeture de l'application, mais le profil
 // n'existait que dans l'état React : chaque relance repartait de `null` et réaffichait le parcours
@@ -30,14 +30,14 @@ describe("session rendue au démarrage", () => {
   });
 
   it("évite l'appel réseau en natif quand aucun jeton n'est stocké", () => {
-    expect(hook).toContain("getTikisSessionToken()");
+    expect(hook).toContain("getTikisseSessionToken()");
     expect(hook).toContain('Platform.OS !== "web"');
   });
 
   it("n'efface pas le jeton quand la restauration échoue", () => {
     // Une coupure réseau au lancement ne doit pas coûter sa session : seul le serveur décide, et
     // se reconnecter remplacera de toute façon un jeton périmé.
-    expect(hook).not.toContain("clearTikisSessionToken");
+    expect(hook).not.toContain("clearTikisseSessionToken");
   });
 
   it("le store reste la seule source du profil en mémoire, sans persistance parallèle", () => {
@@ -50,13 +50,13 @@ describe("session rendue au démarrage", () => {
 
 describe("durée de session", () => {
   it("le cookie web expire en même temps que le jeton qu'il transporte", () => {
-    expect(TIKIS_PROFILE_COOKIE_MAX_AGE_MS).toBe(TIKIS_SESSION_TTL_SECONDS * 1000);
+    expect(TIKISSE_PROFILE_COOKIE_MAX_AGE_MS).toBe(TIKISSE_SESSION_TTL_SECONDS * 1000);
   });
 
   it("la fenêtre des sessions listées couvre toute la durée de vie du jeton", () => {
     // Une session encore valide mais sortie de la liste ne serait plus révocable, alors que
     // l'appareil correspondant continuerait d'accéder au compte.
     const sessions = read("server/sessions.ts");
-    expect(sessions).toContain("ACTIVE_SESSION_WINDOW_DAYS = TIKIS_SESSION_TTL_SECONDS / (24 * 60 * 60)");
+    expect(sessions).toContain("ACTIVE_SESSION_WINDOW_DAYS = TIKISSE_SESSION_TTL_SECONDS / (24 * 60 * 60)");
   });
 });

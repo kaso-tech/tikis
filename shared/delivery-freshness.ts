@@ -1,5 +1,5 @@
 import { DELIVERY_EXPIRATION_MS, deliveryActivityTimestamp } from "./delivery-expiration";
-import type { DeliveryStatus } from "./tikis-domain";
+import type { DeliveryStatus } from "./tikisse-domain";
 
 export type DeliveryFreshness = {
   createdAt: string | Date | null | undefined;

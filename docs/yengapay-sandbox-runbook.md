@@ -19,12 +19,12 @@ Variables d'env attendues dans ton shell (déjà configurées selon Mavis) :
 | `YENGAPAY_PROJECT_ID` | `prj_...` |
 | `YENGAPAY_WEBHOOK_SECRET` | `whsec_...` |
 
-Repo Tikis sur origin/main, commit `909a2d9` minimum.
+Repo Tikisse sur origin/main, commit `909a2d9` minimum.
 
 ## Étape 1 — Sync avec main
 
 ```bash
-cd /workspace/tikis
+cd /workspace/tikisse
 git fetch origin
 git checkout main
 git pull --rebase origin main
@@ -53,7 +53,7 @@ Exit code `0` = OK, `1` = au moins un KO.
 
 Une fois `validate-yengapay-sandbox.sh` OK :
 
-**Terminal 1** (serveur Tikis) :
+**Terminal 1** (serveur Tikisse) :
 ```bash
 pnpm dev   # ou npm run dev
 # Attendre que Metro/Express soit prêt (HTTP 200 sur /api/health)

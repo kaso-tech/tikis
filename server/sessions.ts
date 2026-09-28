@@ -11,13 +11,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { tikisProfileSessions } from "../drizzle/schema";
+import { tikisseProfileSessions } from "../drizzle/schema";
 import { hashSessionToken, tokenLast4 } from "./_test-helpers/sessions-hash";
-import { TIKIS_SESSION_TTL_SECONDS } from "./tikis-session";
+import { TIKISSE_SESSION_TTL_SECONDS } from "./tikisse-session";
 
 /** Aligné sur la durée de vie du jeton : une session encore valide doit rester listée, sinon
  *  l'utilisateur ne peut plus révoquer un appareil qui, lui, continue d'accéder à son compte. */
-const ACTIVE_SESSION_WINDOW_DAYS = TIKIS_SESSION_TTL_SECONDS / (24 * 60 * 60);
+const ACTIVE_SESSION_WINDOW_DAYS = TIKISSE_SESSION_TTL_SECONDS / (24 * 60 * 60);
 
 export { hashSessionToken, tokenLast4 };
 
@@ -26,7 +26,7 @@ export function isMissingProfileSessionsSchema(error: unknown): boolean {
   const cause = candidate?.cause as { code?: unknown; message?: unknown } | undefined;
   const code = cause?.code ?? candidate?.code;
   const message = cause?.message ?? candidate?.message;
-  return code === "ER_NO_SUCH_TABLE" && typeof message === "string" && /tikis_profile_sessions/i.test(message);
+  return code === "ER_NO_SUCH_TABLE" && typeof message === "string" && /tikisse_profile_sessions/i.test(message);
 }
 
 export type Platform = "ios" | "android" | "web" | "unknown";
@@ -48,20 +48,20 @@ export async function recordSession(input: SessionInput) {
   const tokenHash = hashSessionToken(input.token);
   const last4 = tokenLast4(input.token);
   const now = new Date();
-  const existing = (await db.select().from(tikisProfileSessions).where(and(eq(tikisProfileSessions.phone, input.phone), eq(tikisProfileSessions.tokenHash, tokenHash))).limit(1))[0];
+  const existing = (await db.select().from(tikisseProfileSessions).where(and(eq(tikisseProfileSessions.phone, input.phone), eq(tikisseProfileSessions.tokenHash, tokenHash))).limit(1))[0];
   if (existing) {
-    await db.update(tikisProfileSessions).set({
+    await db.update(tikisseProfileSessions).set({
       lastSeenAt: now,
       deviceName: input.deviceName ?? existing.deviceName,
       platform: input.platform ?? existing.platform,
       appVersion: input.appVersion ?? existing.appVersion,
       ipAddress: input.ipAddress ?? existing.ipAddress,
       revokedAt: null,
-    }).where(eq(tikisProfileSessions.id, existing.id));
+    }).where(eq(tikisseProfileSessions.id, existing.id));
     return { id: existing.id, created: false };
   }
   const id = randomUUID();
-  await db.insert(tikisProfileSessions).values({
+  await db.insert(tikisseProfileSessions).values({
     id,
     phone: input.phone,
     tokenHash,
@@ -82,13 +82,13 @@ export async function listActiveSessions(input: { phone: string; currentTokenHas
   const cutoff = new Date(Date.now() - ACTIVE_SESSION_WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const rows = await db
     .select()
-    .from(tikisProfileSessions)
+    .from(tikisseProfileSessions)
     .where(and(
-      eq(tikisProfileSessions.phone, input.phone),
-      isNull(tikisProfileSessions.revokedAt),
-      gte(tikisProfileSessions.lastSeenAt, cutoff),
+      eq(tikisseProfileSessions.phone, input.phone),
+      isNull(tikisseProfileSessions.revokedAt),
+      gte(tikisseProfileSessions.lastSeenAt, cutoff),
     ))
-    .orderBy(desc(tikisProfileSessions.lastSeenAt))
+    .orderBy(desc(tikisseProfileSessions.lastSeenAt))
     .limit(20);
   return rows.map((row) => ({
     id: row.id,
@@ -108,11 +108,11 @@ export async function revokeSession(input: { phone: string; sessionId: string; c
   const db = await getDb();
   if (!db) throw new Error("Les sessions sont temporairement indisponibles.");
   return db.transaction(async (tx) => {
-    const session = (await tx.select().from(tikisProfileSessions).where(and(eq(tikisProfileSessions.id, input.sessionId), eq(tikisProfileSessions.phone, input.phone))).limit(1).for("update"))[0];
+    const session = (await tx.select().from(tikisseProfileSessions).where(and(eq(tikisseProfileSessions.id, input.sessionId), eq(tikisseProfileSessions.phone, input.phone))).limit(1).for("update"))[0];
     if (!session) throw new Error("Session introuvable.");
     if (session.tokenHash === input.currentTokenHash) throw new Error("Tu ne peux pas révoquer ta propre session depuis cette liste. Utilise 'Déconnecter' pour fermer la session actuelle.");
     if (session.revokedAt) return { id: session.id, alreadyRevoked: true };
-    await tx.update(tikisProfileSessions).set({ revokedAt: new Date() }).where(eq(tikisProfileSessions.id, session.id));
+    await tx.update(tikisseProfileSessions).set({ revokedAt: new Date() }).where(eq(tikisseProfileSessions.id, session.id));
     return { id: session.id, alreadyRevoked: false };
   });
 }
@@ -122,12 +122,12 @@ export async function revokeAllOtherSessions(input: { phone: string; currentToke
   const db = await getDb();
   if (!db) throw new Error("Les sessions sont temporairement indisponibles.");
   const result = await db
-    .update(tikisProfileSessions)
+    .update(tikisseProfileSessions)
     .set({ revokedAt: new Date() })
     .where(and(
-      eq(tikisProfileSessions.phone, input.phone),
-      isNull(tikisProfileSessions.revokedAt),
-      sql`${tikisProfileSessions.tokenHash} != ${input.currentTokenHash}`,
+      eq(tikisseProfileSessions.phone, input.phone),
+      isNull(tikisseProfileSessions.revokedAt),
+      sql`${tikisseProfileSessions.tokenHash} != ${input.currentTokenHash}`,
     ));
   return { revoked: (result as unknown as { affectedRows?: number }).affectedRows ?? 0 };
 }
@@ -140,7 +140,7 @@ export async function isSessionRevoked(input: { phone: string; token: string }):
   if (!db) return false;
   try {
     const tokenHash = hashSessionToken(input.token);
-    const row = (await db.select({ revokedAt: tikisProfileSessions.revokedAt }).from(tikisProfileSessions).where(and(eq(tikisProfileSessions.phone, input.phone), eq(tikisProfileSessions.tokenHash, tokenHash))).limit(1))[0];
+    const row = (await db.select({ revokedAt: tikisseProfileSessions.revokedAt }).from(tikisseProfileSessions).where(and(eq(tikisseProfileSessions.phone, input.phone), eq(tikisseProfileSessions.tokenHash, tokenHash))).limit(1))[0];
     return Boolean(row?.revokedAt);
   } catch (error) {
     if (isMissingProfileSessionsSchema(error)) return false;

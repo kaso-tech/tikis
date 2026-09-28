@@ -1,4 +1,4 @@
-import type { Delivery } from "./tikis-domain";
+import type { Delivery } from "./tikisse-domain";
 
 export type DriverHomeAction = "apply" | "withdraw" | "confirm" | "start" | "none";
 

@@ -14,10 +14,10 @@ export const users = mysqlTable("users", {
 });
 
 /**
- * Tikis phone-based profile. The phone number is unique and the account type
+ * Tikisse phone-based profile. The phone number is unique and the account type
  * is intentionally immutable after first registration.
  */
-export const tikisProfiles = mysqlTable("tikis_profiles", {
+export const tikisseProfiles = mysqlTable("tikisse_profiles", {
   id: int("id").autoincrement().primaryKey(),
   phone: varchar("phone", { length: 20 }).notNull().unique(),
   fullName: varchar("fullName", { length: 70 }).notNull(),
@@ -45,7 +45,7 @@ export const tikisProfiles = mysqlTable("tikis_profiles", {
 });
 
 /** Canonical GPS-first place cache. Coordinates remain the source of truth for all geographic calculations. */
-export const tikisPlaces = mysqlTable("tikis_places", {
+export const tikissePlaces = mysqlTable("tikisse_places", {
   id: int("id").autoincrement().primaryKey(),
   googlePlaceId: varchar("googlePlaceId", { length: 255 }).unique(),
   mapboxPlaceId: varchar("mapboxPlaceId", { length: 255 }).unique(),
@@ -67,21 +67,21 @@ export const tikisPlaces = mysqlTable("tikis_places", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => [
-  index("tikis_places_coordinate_key_index").on(table.coordinateKey),
-  index("tikis_places_coordinates_index").on(table.latitude, table.longitude),
+  index("tikisse_places_coordinate_key_index").on(table.coordinateKey),
+  index("tikisse_places_coordinates_index").on(table.latitude, table.longitude),
 ]);
 
 /** Sender-owned shortcuts to canonical places; natural labels make favourites recognisable in the form. */
-export const tikisFavoritePlaces = mysqlTable("tikis_favorite_places", {
+export const tikisseFavoritePlaces = mysqlTable("tikisse_favorite_places", {
   id: int("id").autoincrement().primaryKey(),
   profilePhone: varchar("profilePhone", { length: 20 }).notNull(),
   placeId: int("placeId").notNull(),
   label: varchar("label", { length: 80 }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, (table) => [uniqueIndex("tikis_favorite_places_profile_place_unique").on(table.profilePhone, table.placeId)]);
+}, (table) => [uniqueIndex("tikisse_favorite_places_profile_place_unique").on(table.profilePhone, table.placeId)]);
 
-/** Delivery records are owned by a phone-verified Tikis profile and reference canonical GPS places. */
-export const tikisDeliveries = mysqlTable("tikis_deliveries", {
+/** Delivery records are owned by a phone-verified Tikisse profile and reference canonical GPS places. */
+export const tikisseDeliveries = mysqlTable("tikisse_deliveries", {
   id: varchar("id", { length: 40 }).primaryKey(),
   senderPhone: varchar("senderPhone", { length: 20 }).notNull(),
   pickupPlaceId: int("pickupPlaceId").notNull(),
@@ -110,13 +110,13 @@ export const tikisDeliveries = mysqlTable("tikis_deliveries", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => [
-  index("tikis_deliveries_sender_status_index").on(table.senderPhone, table.status),
-  index("tikis_deliveries_driver_status_index").on(table.driverPhone, table.status),
-  index("tikis_deliveries_status_created_index").on(table.status, table.createdAt),
+  index("tikisse_deliveries_sender_status_index").on(table.senderPhone, table.status),
+  index("tikisse_deliveries_driver_status_index").on(table.driverPhone, table.status),
+  index("tikisse_deliveries_status_created_index").on(table.status, table.createdAt),
 ]);
 
 /** Latest foreground GPS position published by the driver assigned to an active delivery. */
-export const tikisDeliveryLiveLocations = mysqlTable("tikis_delivery_live_locations", {
+export const tikisseDeliveryLiveLocations = mysqlTable("tikisse_delivery_live_locations", {
   deliveryId: varchar("deliveryId", { length: 40 }).primaryKey(),
   driverPhone: varchar("driverPhone", { length: 20 }).notNull(),
   latitude: decimal("latitude", { precision: 10, scale: 7 }).notNull(),
@@ -124,10 +124,10 @@ export const tikisDeliveryLiveLocations = mysqlTable("tikis_delivery_live_locati
   heading: decimal("heading", { precision: 6, scale: 2 }).notNull().default("0"),
   recordedAt: timestamp("recordedAt").notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (table) => [index("tikis_delivery_live_locations_driver_index").on(table.driverPhone, table.updatedAt)]);
+}, (table) => [index("tikisse_delivery_live_locations_driver_index").on(table.driverPhone, table.updatedAt)]);
 
 /** A driver can have one candidacy per delivery. Historical status is retained, never deleted. */
-export const tikisDeliveryCandidates = mysqlTable("tikis_delivery_candidates", {
+export const tikisseDeliveryCandidates = mysqlTable("tikisse_delivery_candidates", {
   id: varchar("id", { length: 40 }).primaryKey(),
   deliveryId: varchar("deliveryId", { length: 40 }).notNull(),
   driverPhone: varchar("driverPhone", { length: 20 }).notNull(),
@@ -137,13 +137,13 @@ export const tikisDeliveryCandidates = mysqlTable("tikis_delivery_candidates", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => [
-  uniqueIndex("tikis_delivery_candidates_delivery_driver_unique").on(table.deliveryId, table.driverPhone),
-  index("tikis_delivery_candidates_delivery_status_index").on(table.deliveryId, table.status),
-  index("tikis_delivery_candidates_driver_status_index").on(table.driverPhone, table.status),
+  uniqueIndex("tikisse_delivery_candidates_delivery_driver_unique").on(table.deliveryId, table.driverPhone),
+  index("tikisse_delivery_candidates_delivery_status_index").on(table.deliveryId, table.status),
+  index("tikisse_delivery_candidates_driver_status_index").on(table.driverPhone, table.status),
 ]);
 
 /** Sender reviews are retained with the completed delivery and may be submitted once. */
-export const tikisDeliveryReviews = mysqlTable("tikis_delivery_reviews", {
+export const tikisseDeliveryReviews = mysqlTable("tikisse_delivery_reviews", {
   id: varchar("id", { length: 40 }).primaryKey(),
   deliveryId: varchar("deliveryId", { length: 40 }).notNull(),
   reviewerPhone: varchar("reviewerPhone", { length: 20 }).notNull(),
@@ -156,12 +156,12 @@ export const tikisDeliveryReviews = mysqlTable("tikis_delivery_reviews", {
   hiddenByAdminId: int("hiddenByAdminId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
-  uniqueIndex("tikis_delivery_reviews_delivery_reviewer_unique").on(table.deliveryId, table.reviewerPhone),
-  index("tikis_delivery_reviews_driver_index").on(table.driverPhone),
+  uniqueIndex("tikisse_delivery_reviews_delivery_reviewer_unique").on(table.deliveryId, table.reviewerPhone),
+  index("tikisse_delivery_reviews_driver_index").on(table.driverPhone),
 ]);
 
-/** One Wallet per Tikis profile. Amounts are stored in XOF minor units (whole FCFA). */
-export const tikisWallets = mysqlTable("tikis_wallets", {
+/** One Wallet per Tikisse profile. Amounts are stored in XOF minor units (whole FCFA). */
+export const tikisseWallets = mysqlTable("tikisse_wallets", {
   id: int("id").autoincrement().primaryKey(),
   profilePhone: varchar("profilePhone", { length: 20 }).notNull().unique(),
   availableBalance: int("availableBalance").notNull().default(0),
@@ -172,7 +172,7 @@ export const tikisWallets = mysqlTable("tikis_wallets", {
 });
 
 /** Singleton administration setting read by all commission calculations on the server. */
-export const tikisPlatformSettings = mysqlTable("tikis_platform_settings", {
+export const tikissePlatformSettings = mysqlTable("tikisse_platform_settings", {
   id: int("id").primaryKey(),
   commissionRate: decimal("commissionRate", { precision: 6, scale: 5 }).notNull().default("0.10000"),
   referralRewardAmount: int("referralRewardAmount").notNull().default(1000),
@@ -191,7 +191,7 @@ export const tikisPlatformSettings = mysqlTable("tikis_platform_settings", {
 });
 
 /** Immutable financial ledger. An idempotency key prevents duplicate movements under retries. */
-export const tikisWalletLedger = mysqlTable("tikis_wallet_ledger", {
+export const tikisseWalletLedger = mysqlTable("tikisse_wallet_ledger", {
   id: varchar("id", { length: 40 }).primaryKey(),
   profilePhone: varchar("profilePhone", { length: 20 }).notNull(),
   deliveryId: varchar("deliveryId", { length: 40 }),
@@ -205,12 +205,12 @@ export const tikisWalletLedger = mysqlTable("tikis_wallet_ledger", {
   idempotencyKey: varchar("idempotencyKey", { length: 100 }).notNull().unique(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
-  index("tikis_wallet_ledger_profile_created_index").on(table.profilePhone, table.createdAt),
-  index("tikis_wallet_ledger_delivery_index").on(table.deliveryId),
+  index("tikisse_wallet_ledger_profile_created_index").on(table.profilePhone, table.createdAt),
+  index("tikisse_wallet_ledger_delivery_index").on(table.deliveryId),
 ]);
 
 /** Payment request lifecycle; balance movements are written only once the provider outcome is confirmed. */
-export const tikisPaymentTransactions = mysqlTable("tikis_payment_transactions", {
+export const tikissePaymentTransactions = mysqlTable("tikisse_payment_transactions", {
   id: varchar("id", { length: 40 }).primaryKey(),
   profilePhone: varchar("profilePhone", { length: 20 }).notNull(),
   type: mysqlEnum("type", ["deposit", "withdrawal"]).notNull(),
@@ -236,13 +236,13 @@ export const tikisPaymentTransactions = mysqlTable("tikis_payment_transactions",
   providerReportedAmount: int("providerReportedAmount"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
-  index("tikis_payment_transactions_profile_created_index").on(table.profilePhone, table.createdAt),
-  index("tikis_payment_transactions_status_index").on(table.status, table.createdAt),
-  index("tikis_payment_transactions_operator_status_index").on(table.operatorCode, table.status, table.createdAt),
+  index("tikisse_payment_transactions_profile_created_index").on(table.profilePhone, table.createdAt),
+  index("tikisse_payment_transactions_status_index").on(table.status, table.createdAt),
+  index("tikisse_payment_transactions_operator_status_index").on(table.operatorCode, table.status, table.createdAt),
 ]);
 
 /** Durable, recipient-scoped activity stream used by the in-app and realtime notification layers. */
-export const tikisDeliveryEvents = mysqlTable("tikis_delivery_events", {
+export const tikisseDeliveryEvents = mysqlTable("tikisse_delivery_events", {
   id: varchar("id", { length: 40 }).primaryKey(),
   deliveryId: varchar("deliveryId", { length: 40 }).notNull(),
   eventType: varchar("eventType", { length: 48 }).notNull(),
@@ -257,12 +257,12 @@ export const tikisDeliveryEvents = mysqlTable("tikis_delivery_events", {
   readAt: timestamp("readAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
-  index("tikis_delivery_events_recipient_created_index").on(table.recipientPhone, table.createdAt),
-  index("tikis_delivery_events_delivery_created_index").on(table.deliveryId, table.createdAt),
+  index("tikisse_delivery_events_recipient_created_index").on(table.recipientPhone, table.createdAt),
+  index("tikisse_delivery_events_delivery_created_index").on(table.deliveryId, table.createdAt),
 ]);
 
 /** Signalements (CAS N°9) : envoyés par le Sender ou le Livreur à l'administration. */
-export const tikisDeliveryReports = mysqlTable("tikis_delivery_reports", {
+export const tikisseDeliveryReports = mysqlTable("tikisse_delivery_reports", {
   id: varchar("id", { length: 40 }).primaryKey(),
   deliveryId: varchar("deliveryId", { length: 40 }).notNull(),
   reporterPhone: varchar("reporterPhone", { length: 20 }).notNull(),
@@ -277,13 +277,13 @@ export const tikisDeliveryReports = mysqlTable("tikis_delivery_reports", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => [
-  index("tikis_delivery_reports_status_created_index").on(table.status, table.createdAt),
-  index("tikis_delivery_reports_delivery_index").on(table.deliveryId),
-  index("tikis_delivery_reports_reporter_index").on(table.reporterPhone),
+  index("tikisse_delivery_reports_status_created_index").on(table.status, table.createdAt),
+  index("tikisse_delivery_reports_delivery_index").on(table.deliveryId),
+  index("tikisse_delivery_reports_reporter_index").on(table.reporterPhone),
 ]);
 
-/** Comptes d'administration Tikis, totalement distincts de l'authentification des Senders/Livreurs. */
-export const tikisAdminUsers = mysqlTable("tikis_admin_users", {
+/** Comptes d'administration Tikisse, totalement distincts de l'authentification des Senders/Livreurs. */
+export const tikisseAdminUsers = mysqlTable("tikisse_admin_users", {
   id: int("id").autoincrement().primaryKey(),
   email: varchar("email", { length: 180 }).notNull().unique(),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
@@ -312,7 +312,7 @@ export const tikisAdminUsers = mysqlTable("tikis_admin_users", {
  * cookie httpOnly ; la base n'en garde que l'empreinte SHA-256. Une session se révoque à la déconnexion,
  * à la suspension du compte, ou expire au bout de 8 h.
  */
-export const tikisAdminSessions = mysqlTable("tikis_admin_sessions", {
+export const tikisseAdminSessions = mysqlTable("tikisse_admin_sessions", {
   id: varchar("id", { length: 40 }).primaryKey(),
   adminId: int("adminId").notNull(),
   tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
@@ -325,14 +325,14 @@ export const tikisAdminSessions = mysqlTable("tikis_admin_sessions", {
   /** `pending_totp` : mot de passe vérifié, code de double authentification attendu (5 min au plus). */
   stage: mysqlEnum("stage", ["pending_totp", "active"]).notNull().default("active"),
 }, (table) => [
-  index("tikis_admin_sessions_admin_index").on(table.adminId, table.revokedAt),
+  index("tikisse_admin_sessions_admin_index").on(table.adminId, table.revokedAt),
 ]);
 
 /**
  * Double validation : un bonus, une pénalité ou un retrait au-delà du seuil n'est pas exécuté par l'admin qui
  * le demande, mais mis en attente jusqu'à ce qu'un autre admin le valide (server/admin-approvals.ts).
  */
-export const tikisAdminApprovals = mysqlTable("tikis_admin_approvals", {
+export const tikisseAdminApprovals = mysqlTable("tikisse_admin_approvals", {
   id: varchar("id", { length: 40 }).primaryKey(),
   action: mysqlEnum("action", ["wallet_bonus", "wallet_penalty", "withdrawal_settle", "delivery_refund"]).notNull(),
   amount: int("amount").notNull(),
@@ -350,12 +350,12 @@ export const tikisAdminApprovals = mysqlTable("tikis_admin_approvals", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   decidedAt: timestamp("decidedAt"),
 }, (table) => [
-  index("tikis_admin_approvals_status_index").on(table.status, table.createdAt),
-  index("tikis_admin_approvals_target_index").on(table.targetRef, table.status),
+  index("tikisse_admin_approvals_status_index").on(table.status, table.createdAt),
+  index("tikisse_admin_approvals_target_index").on(table.targetRef, table.status),
 ]);
 
 /** Journal d'audit immuable de toute action d'administration (CAS N°10 — décisions tracées). */
-export const tikisAdminAuditLog = mysqlTable("tikis_admin_audit_log", {
+export const tikisseAdminAuditLog = mysqlTable("tikisse_admin_audit_log", {
   id: varchar("id", { length: 40 }).primaryKey(),
   adminId: int("adminId").notNull(),
   adminEmail: varchar("adminEmail", { length: 180 }).notNull(),
@@ -366,20 +366,20 @@ export const tikisAdminAuditLog = mysqlTable("tikis_admin_audit_log", {
   ipAddress: varchar("ipAddress", { length: 64 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
-  index("tikis_admin_audit_log_target_index").on(table.targetType, table.targetId),
-  index("tikis_admin_audit_log_admin_created_index").on(table.adminId, table.createdAt),
+  index("tikisse_admin_audit_log_target_index").on(table.targetType, table.targetId),
+  index("tikisse_admin_audit_log_admin_created_index").on(table.adminId, table.createdAt),
 ]);
 
-export type TikisDeliveryReport = typeof tikisDeliveryReports.$inferSelect;
-export type TikisAdminUser = typeof tikisAdminUsers.$inferSelect;
-export type TikisAdminSession = typeof tikisAdminSessions.$inferSelect;
-export type TikisAdminApproval = typeof tikisAdminApprovals.$inferSelect;
-export type TikisAdminAuditLog = typeof tikisAdminAuditLog.$inferSelect;
+export type TikisseDeliveryReport = typeof tikisseDeliveryReports.$inferSelect;
+export type TikisseAdminUser = typeof tikisseAdminUsers.$inferSelect;
+export type TikisseAdminSession = typeof tikisseAdminSessions.$inferSelect;
+export type TikisseAdminApproval = typeof tikisseAdminApprovals.$inferSelect;
+export type TikisseAdminAuditLog = typeof tikisseAdminAuditLog.$inferSelect;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 /** Parrainage : un enregistrement par filleul, créé à l'inscription si un code de parrain est fourni. */
-export const tikisReferrals = mysqlTable("tikis_referrals", {
+export const tikisseReferrals = mysqlTable("tikisse_referrals", {
   id: varchar("id", { length: 40 }).primaryKey(),
   referrerPhone: varchar("referrerPhone", { length: 20 }).notNull(),
   refereePhone: varchar("refereePhone", { length: 20 }).notNull().unique(),
@@ -392,12 +392,12 @@ export const tikisReferrals = mysqlTable("tikis_referrals", {
   rewardedByAdminId: int("rewardedByAdminId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
-  index("tikis_referrals_referrer_index").on(table.referrerPhone, table.createdAt),
-  index("tikis_referrals_status_index").on(table.status),
+  index("tikisse_referrals_referrer_index").on(table.referrerPhone, table.createdAt),
+  index("tikisse_referrals_status_index").on(table.status),
 ]);
 
 /** Pays actifs sur la plateforme (inscription, format de téléphone, filtrage géographique). */
-export const tikisSupportedCountries = mysqlTable("tikis_supported_countries", {
+export const tikisseSupportedCountries = mysqlTable("tikisse_supported_countries", {
   id: varchar("id", { length: 2 }).primaryKey(), // code ISO, ex. "BF"
   name: varchar("name", { length: 80 }).notNull(),
   dialCode: varchar("dialCode", { length: 6 }).notNull(),
@@ -410,24 +410,24 @@ export const tikisSupportedCountries = mysqlTable("tikis_supported_countries", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
-export type TikisProfile = typeof tikisProfiles.$inferSelect;
-export type InsertTikisProfile = typeof tikisProfiles.$inferInsert;
-export type TikisPlace = typeof tikisPlaces.$inferSelect;
-export type InsertTikisPlace = typeof tikisPlaces.$inferInsert;
-export type TikisFavoritePlace = typeof tikisFavoritePlaces.$inferSelect;
-export type TikisDelivery = typeof tikisDeliveries.$inferSelect;
-export type InsertTikisDelivery = typeof tikisDeliveries.$inferInsert;
-export type TikisDeliveryLiveLocation = typeof tikisDeliveryLiveLocations.$inferSelect;
-export type TikisDeliveryCandidate = typeof tikisDeliveryCandidates.$inferSelect;
-export type TikisDeliveryReview = typeof tikisDeliveryReviews.$inferSelect;
-export type TikisWallet = typeof tikisWallets.$inferSelect;
-export type TikisPlatformSettings = typeof tikisPlatformSettings.$inferSelect;
-export type TikisWalletLedger = typeof tikisWalletLedger.$inferSelect;
-export type TikisPaymentTransaction = typeof tikisPaymentTransactions.$inferSelect;
-export type TikisDeliveryEvent = typeof tikisDeliveryEvents.$inferSelect;
-export type TikisReferral = typeof tikisReferrals.$inferSelect;
+export type TikisseProfile = typeof tikisseProfiles.$inferSelect;
+export type InsertTikisseProfile = typeof tikisseProfiles.$inferInsert;
+export type TikissePlace = typeof tikissePlaces.$inferSelect;
+export type InsertTikissePlace = typeof tikissePlaces.$inferInsert;
+export type TikisseFavoritePlace = typeof tikisseFavoritePlaces.$inferSelect;
+export type TikisseDelivery = typeof tikisseDeliveries.$inferSelect;
+export type InsertTikisseDelivery = typeof tikisseDeliveries.$inferInsert;
+export type TikisseDeliveryLiveLocation = typeof tikisseDeliveryLiveLocations.$inferSelect;
+export type TikisseDeliveryCandidate = typeof tikisseDeliveryCandidates.$inferSelect;
+export type TikisseDeliveryReview = typeof tikisseDeliveryReviews.$inferSelect;
+export type TikisseWallet = typeof tikisseWallets.$inferSelect;
+export type TikissePlatformSettings = typeof tikissePlatformSettings.$inferSelect;
+export type TikisseWalletLedger = typeof tikisseWalletLedger.$inferSelect;
+export type TikissePaymentTransaction = typeof tikissePaymentTransactions.$inferSelect;
+export type TikisseDeliveryEvent = typeof tikisseDeliveryEvents.$inferSelect;
+export type TikisseReferral = typeof tikisseReferrals.$inferSelect;
 /** Vérification d'identité (KYC) des livreurs : documents envoyés, examinés par l'administration. */
-export const tikisKycSubmissions = mysqlTable("tikis_kyc_submissions", {
+export const tikisseKycSubmissions = mysqlTable("tikisse_kyc_submissions", {
   id: varchar("id", { length: 40 }).primaryKey(),
   driverPhone: varchar("driverPhone", { length: 20 }).notNull(),
   idFrontKey: varchar("idFrontKey", { length: 255 }).notNull(),
@@ -441,16 +441,16 @@ export const tikisKycSubmissions = mysqlTable("tikis_kyc_submissions", {
   /** Photos effacées du stockage (suppression du compte) ; la décision de vérification reste. */
   documentsErasedAt: timestamp("documentsErasedAt"),
 }, (table) => [
-  index("tikis_kyc_submissions_driver_index").on(table.driverPhone, table.submittedAt),
-  index("tikis_kyc_submissions_status_index").on(table.status),
+  index("tikisse_kyc_submissions_driver_index").on(table.driverPhone, table.submittedAt),
+  index("tikisse_kyc_submissions_status_index").on(table.status),
 ]);
 
-export type TikisSupportedCountry = typeof tikisSupportedCountries.$inferSelect;
-export type TikisKycSubmission = typeof tikisKycSubmissions.$inferSelect;
+export type TikisseSupportedCountry = typeof tikisseSupportedCountries.$inferSelect;
+export type TikisseKycSubmission = typeof tikisseKycSubmissions.$inferSelect;
 
 /** Événements webhook YengaPay : log immutable des callbacks reçus.
  *  Idempotence garantie par la contrainte unique sur (provider, providerEventId). */
-export const tikisYengapayWebhookEvents = mysqlTable("tikis_yengapay_webhook_events", {
+export const tikisseYengapayWebhookEvents = mysqlTable("tikisse_yengapay_webhook_events", {
   id: varchar("id", { length: 40 }).primaryKey(),
   provider: mysqlEnum("provider", ["yengapay_sandbox", "yengapay_live", "yengapay_direct_sandbox", "yengapay_direct_live"]).notNull().default("yengapay_live"),
   providerEventId: varchar("providerEventId", { length: 120 }).notNull(),
@@ -463,16 +463,16 @@ export const tikisYengapayWebhookEvents = mysqlTable("tikis_yengapay_webhook_eve
   failureReason: varchar("failureReason", { length: 500 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
-  uniqueIndex("tikis_yengapay_webhook_events_provider_event_unique").on(table.provider, table.providerEventId),
-  index("tikis_yengapay_webhook_events_status_index").on(table.status, table.createdAt),
-  index("tikis_yengapay_webhook_events_payment_index").on(table.paymentTransactionId),
+  uniqueIndex("tikisse_yengapay_webhook_events_provider_event_unique").on(table.provider, table.providerEventId),
+  index("tikisse_yengapay_webhook_events_status_index").on(table.status, table.createdAt),
+  index("tikisse_yengapay_webhook_events_payment_index").on(table.paymentTransactionId),
 ]);
 
-export type TikisYengapayWebhookEvent = typeof tikisYengapayWebhookEvents.$inferSelect;
+export type TikisseYengapayWebhookEvent = typeof tikisseYengapayWebhookEvents.$inferSelect;
 
 /** Push tokens Expo pour les notifications device-to-device.
  *  Un profil peut avoir plusieurs tokens (plusieurs devices ou plusieurs installs). */
-export const tikisPushTokens = mysqlTable("tikis_push_tokens", {
+export const tikissePushTokens = mysqlTable("tikisse_push_tokens", {
   id: varchar("id", { length: 40 }).primaryKey(),
   phone: varchar("phone", { length: 20 }).notNull(),
   token: varchar("token", { length: 200 }).notNull(),
@@ -482,17 +482,17 @@ export const tikisPushTokens = mysqlTable("tikis_push_tokens", {
   lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
-  uniqueIndex("tikis_push_tokens_phone_token_unique").on(table.phone, table.token),
-  index("tikis_push_tokens_phone_index").on(table.phone),
-  index("tikis_push_tokens_last_seen_index").on(table.lastSeenAt),
+  uniqueIndex("tikisse_push_tokens_phone_token_unique").on(table.phone, table.token),
+  index("tikisse_push_tokens_phone_index").on(table.phone),
+  index("tikisse_push_tokens_last_seen_index").on(table.lastSeenAt),
 ]);
 
-export type TikisPushToken = typeof tikisPushTokens.$inferSelect;
+export type TikissePushToken = typeof tikissePushTokens.$inferSelect;
 
 /** Périmètre de travail d'un livreur : quelles courses lui sont affichées, et pour lesquelles il
  *  reçoit une alerte push. Absence de ligne = réglages par défaut (cf. shared/driver-perimeter.ts) :
  *  alertes push désactivées, périmètre limité à la ville du profil. */
-export const tikisDriverPreferences = mysqlTable("tikis_driver_preferences", {
+export const tikisseDriverPreferences = mysqlTable("tikisse_driver_preferences", {
   profilePhone: varchar("profilePhone", { length: 20 }).primaryKey(),
   /** Opt-in explicite aux alertes push de nouvelles courses. Les notifications transactionnelles
    *  (candidature retenue, mission confirmée, course annulée…) ne sont jamais concernées. */
@@ -509,10 +509,10 @@ export const tikisDriverPreferences = mysqlTable("tikis_driver_preferences", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
-export type TikisDriverPreferences = typeof tikisDriverPreferences.$inferSelect;
+export type TikisseDriverPreferences = typeof tikisseDriverPreferences.$inferSelect;
 
 /** Programme de fidélité : règles métier (seuil livraisons, montant bonus, palier). */
-export const tikisLoyaltyPrograms = mysqlTable("tikis_loyalty_programs", {
+export const tikisseLoyaltyPrograms = mysqlTable("tikisse_loyalty_programs", {
   id: varchar("id", { length: 40 }).primaryKey(),
   name: varchar("name", { length: 80 }).notNull(),
   description: varchar("description", { length: 300 }),
@@ -532,11 +532,11 @@ export const tikisLoyaltyPrograms = mysqlTable("tikis_loyalty_programs", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => [
-  index("tikis_loyalty_programs_role_index").on(table.role, table.enabled),
+  index("tikisse_loyalty_programs_role_index").on(table.role, table.enabled),
 ]);
 
 /** Octroi de bonus lié à un programme. Idempotent via (programId, deliveryId). */
-export const tikisLoyaltyGrants = mysqlTable("tikis_loyalty_grants", {
+export const tikisseLoyaltyGrants = mysqlTable("tikisse_loyalty_grants", {
   id: varchar("id", { length: 40 }).primaryKey(),
   programId: varchar("programId", { length: 40 }).notNull(),
   profilePhone: varchar("profilePhone", { length: 20 }).notNull(),
@@ -549,19 +549,19 @@ export const tikisLoyaltyGrants = mysqlTable("tikis_loyalty_grants", {
   expiresAt: timestamp("expiresAt"),
   cancelledReason: varchar("cancelledReason", { length: 300 }),
 }, (table) => [
-  uniqueIndex("tikis_loyalty_grants_program_delivery_unique").on(table.programId, table.deliveryId),
-  index("tikis_loyalty_grants_profile_index").on(table.profilePhone, table.grantedAt),
-  index("tikis_loyalty_grants_status_index").on(table.status),
-  index("tikis_loyalty_grants_expires_index").on(table.expiresAt),
+  uniqueIndex("tikisse_loyalty_grants_program_delivery_unique").on(table.programId, table.deliveryId),
+  index("tikisse_loyalty_grants_profile_index").on(table.profilePhone, table.grantedAt),
+  index("tikisse_loyalty_grants_status_index").on(table.status),
+  index("tikisse_loyalty_grants_expires_index").on(table.expiresAt),
 ]);
 
-export type TikisLoyaltyProgram = typeof tikisLoyaltyPrograms.$inferSelect;
-export type TikisLoyaltyGrant = typeof tikisLoyaltyGrants.$inferSelect;
+export type TikisseLoyaltyProgram = typeof tikisseLoyaltyPrograms.$inferSelect;
+export type TikisseLoyaltyGrant = typeof tikisseLoyaltyGrants.$inferSelect;
 
 /** Sessions actives multi-device : permet la révocation granulaire.
  *  Le token JWT complet n'est jamais stocké (security) : on garde son hash SHA-256
  *  et les 4 derniers caractères pour affichage. */
-export const tikisProfileSessions = mysqlTable("tikis_profile_sessions", {
+export const tikisseProfileSessions = mysqlTable("tikisse_profile_sessions", {
   id: varchar("id", { length: 40 }).primaryKey(),
   phone: varchar("phone", { length: 20 }).notNull(),
   tokenHash: varchar("tokenHash", { length: 64 }).notNull(),
@@ -574,22 +574,22 @@ export const tikisProfileSessions = mysqlTable("tikis_profile_sessions", {
   lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
   revokedAt: timestamp("revokedAt"),
 }, (table) => [
-  index("tikis_profile_sessions_phone_index").on(table.phone, table.lastSeenAt),
-  uniqueIndex("tikis_profile_sessions_phone_token_unique").on(table.phone, table.tokenHash),
+  index("tikisse_profile_sessions_phone_index").on(table.phone, table.lastSeenAt),
+  uniqueIndex("tikisse_profile_sessions_phone_token_unique").on(table.phone, table.tokenHash),
 ]);
 
-export type TikisProfileSession = typeof tikisProfileSessions.$inferSelect;
+export type TikisseProfileSession = typeof tikisseProfileSessions.$inferSelect;
 
 /** Métriques business quotidiennes — alimentées par le cron /api/scheduled/compute-daily-metrics.
  *  Permet au DashboardPage d'afficher des tendances (GMV semaine dernière, etc.) sans
- *  ré-agréger toute la table tikis_deliveries. */
-export const tikisDailyMetrics = mysqlTable("tikis_daily_metrics", {
+ *  ré-agréger toute la table tikisse_deliveries. */
+export const tikisseDailyMetrics = mysqlTable("tikisse_daily_metrics", {
   date: varchar("date", { length: 10 }).primaryKey(), // "YYYY-MM-DD"
   deliveriesCreated: int("deliveriesCreated").notNull().default(0),
   deliveriesCompleted: int("deliveriesCompleted").notNull().default(0),
   deliveriesCancelled: int("deliveriesCancelled").notNull().default(0),
   gmvTotal: int("gmvTotal").notNull().default(0), // montant total facturé (FCFA)
-  commissionTotal: int("commissionTotal").notNull().default(0), // commission Tikis
+  commissionTotal: int("commissionTotal").notNull().default(0), // commission Tikisse
   newDrivers: int("newDrivers").notNull().default(0),
   newSenders: int("newSenders").notNull().default(0),
   activeDrivers: int("activeDrivers").notNull().default(0),
@@ -598,26 +598,26 @@ export const tikisDailyMetrics = mysqlTable("tikis_daily_metrics", {
   reportsOpened: int("reportsOpened").notNull().default(0),
   computedAt: timestamp("computedAt").defaultNow().notNull(),
 }, (table) => [
-  index("tikis_daily_metrics_date_index").on(table.date),
+  index("tikisse_daily_metrics_date_index").on(table.date),
 ]);
 
-export type TikisDailyMetric = typeof tikisDailyMetrics.$inferSelect;
+export type TikisseDailyMetric = typeof tikisseDailyMetrics.$inferSelect;
 
 /** Rate-limit distribué (partagé entre toutes les instances du serveur, contrairement à un compteur en
  *  mémoire de processus) : fenêtre fixe identifiée par `rateLimitKey` = "<portée>:<identifiant>:<fenêtre>"
  *  (ex. "geo:+22670000000:29234561"), incrémentée atomiquement via ON DUPLICATE KEY UPDATE. */
-export const tikisRateLimits = mysqlTable("tikis_rate_limits", {
+export const tikisseRateLimits = mysqlTable("tikisse_rate_limits", {
   rateLimitKey: varchar("rateLimitKey", { length: 191 }).primaryKey(),
   count: int("count").notNull().default(0),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (table) => [
-  index("tikis_rate_limits_updated_at_index").on(table.updatedAt),
+  index("tikisse_rate_limits_updated_at_index").on(table.updatedAt),
 ]);
 
-export type TikisRateLimit = typeof tikisRateLimits.$inferSelect;
+export type TikisseRateLimit = typeof tikisseRateLimits.$inferSelect;
 
 /** Notes internes du support sur une fiche utilisateur. Jamais montrées à l'utilisateur. */
-export const tikisProfileNotes = mysqlTable("tikis_profile_notes", {
+export const tikisseProfileNotes = mysqlTable("tikisse_profile_notes", {
   id: varchar("id", { length: 40 }).primaryKey(),
   profilePhone: varchar("profilePhone", { length: 20 }).notNull(),
   body: varchar("body", { length: 1000 }).notNull(),
@@ -625,16 +625,16 @@ export const tikisProfileNotes = mysqlTable("tikis_profile_notes", {
   adminEmail: varchar("adminEmail", { length: 180 }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
-  index("tikis_profile_notes_profile_index").on(table.profilePhone, table.createdAt),
+  index("tikisse_profile_notes_profile_index").on(table.profilePhone, table.createdAt),
 ]);
 
-export type TikisProfileNote = typeof tikisProfileNotes.$inferSelect;
+export type TikisseProfileNote = typeof tikisseProfileNotes.$inferSelect;
 
 /**
  * Comptes supprimés : correspondance numéro ↔ pseudonyme, gardée 10 ans pour la comptabilité, puis
  * effacée. Le numéro lui-même est remplacé par le pseudonyme dans toutes les autres tables.
  */
-export const tikisDeletedAccounts = mysqlTable("tikis_deleted_accounts", {
+export const tikisseDeletedAccounts = mysqlTable("tikisse_deleted_accounts", {
   pseudonym: varchar("pseudonym", { length: 20 }).primaryKey(),
   phone: varchar("phone", { length: 20 }).notNull(),
   accountType: mysqlEnum("accountType", ["sender", "driver"]).notNull(),
@@ -642,14 +642,14 @@ export const tikisDeletedAccounts = mysqlTable("tikis_deleted_accounts", {
   purgeAfter: timestamp("purgeAfter").notNull(),
   finalizedByAdminId: int("finalizedByAdminId"),
 }, (table) => [
-  index("tikis_deleted_accounts_phone_index").on(table.phone),
-  index("tikis_deleted_accounts_purge_index").on(table.purgeAfter),
+  index("tikisse_deleted_accounts_phone_index").on(table.phone),
+  index("tikisse_deleted_accounts_purge_index").on(table.purgeAfter),
 ]);
 
-export type TikisDeletedAccount = typeof tikisDeletedAccounts.$inferSelect;
+export type TikisseDeletedAccount = typeof tikisseDeletedAccounts.$inferSelect;
 
 /** Fichiers à effacer du stockage, traités en tâche de fond avec reprise. */
-export const tikisStorageErasures = mysqlTable("tikis_storage_erasures", {
+export const tikisseStorageErasures = mysqlTable("tikisse_storage_erasures", {
   id: varchar("id", { length: 40 }).primaryKey(),
   storageKey: varchar("storageKey", { length: 512 }).notNull(),
   reason: varchar("reason", { length: 80 }).notNull(),
@@ -658,5 +658,5 @@ export const tikisStorageErasures = mysqlTable("tikis_storage_erasures", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   erasedAt: timestamp("erasedAt"),
 }, (table) => [
-  index("tikis_storage_erasures_pending_index").on(table.erasedAt, table.createdAt),
+  index("tikisse_storage_erasures_pending_index").on(table.erasedAt, table.createdAt),
 ]);

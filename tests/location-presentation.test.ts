@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatDeliveryDetailPlace, formatFavoritePlace, formatListRoute, formatListRouteParts, formatNavigationTarget, normalizeLocation } from "../lib/geo-rules";
-import type { LocationLabel } from "../shared/tikis-domain";
+import type { LocationLabel } from "../shared/tikisse-domain";
 
 const place = (overrides: Partial<LocationLabel>): LocationLabel => ({
   name: "Point sélectionné",
@@ -11,7 +11,7 @@ const place = (overrides: Partial<LocationLabel>): LocationLabel => ({
   ...overrides,
 });
 
-describe("présentation métier des lieux Tikis", () => {
+describe("présentation métier des lieux Tikisse", () => {
   it("A — affiche deux POI locaux lorsqu’ils sont dans la même ville", () => {
     expect(formatListRoute(place({ name: "Maison du Peuple", district: "Koulouba", city: "Ouagadougou" }), place({ name: "Stade du 4 Août", district: "Gounghin", city: "Ouagadougou" }))).toBe("Maison du Peuple → Stade du 4 Août");
   });
@@ -42,12 +42,12 @@ describe("présentation métier des lieux Tikis", () => {
   });
 
   it("H — conserve l’adresse complète pour la navigation", () => {
-    const location = place({ name: "Agence Tikis", district: "Koulouba", city: "Ouagadougou", formattedAddress: "12 Avenue Kwame Nkrumah, Koulouba, Ouagadougou, Burkina Faso" });
+    const location = place({ name: "Agence Tikisse", district: "Koulouba", city: "Ouagadougou", formattedAddress: "12 Avenue Kwame Nkrumah, Koulouba, Ouagadougou, Burkina Faso" });
     expect(formatNavigationTarget(location)).toBe(location.formattedAddress);
   });
 
   it("I — conserve la provenance et la précision du lieu résolu", () => {
-    const normalized = normalizeLocation(place({ name: "Agence Tikis", city: "Ouagadougou", provider: "mapbox", source: "retrieve", featureType: "poi", precision: "exact" }));
+    const normalized = normalizeLocation(place({ name: "Agence Tikisse", city: "Ouagadougou", provider: "mapbox", source: "retrieve", featureType: "poi", precision: "exact" }));
     expect(normalized).toMatchObject({ provider: "mapbox", source: "retrieve", featureType: "poi", precision: "exact" });
   });
 

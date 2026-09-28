@@ -1,1 +1,1 @@
-ALTER TABLE `tikis_deliveries` ADD `accruedCommission` int;
+ALTER TABLE `tikisse_deliveries` ADD `accruedCommission` int;

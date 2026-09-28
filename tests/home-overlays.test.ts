@@ -5,10 +5,10 @@ import { describe, expect, it } from "vitest";
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
 const homes = {
-  natif: read("components/tikis/screens/home-screen.native.tsx"),
-  web: read("components/tikis/screens/home-screen.web.tsx"),
+  natif: read("components/tikisse/screens/home-screen.native.tsx"),
+  web: read("components/tikisse/screens/home-screen.web.tsx"),
 };
-const sheet = read("components/tikis/candidates-sheet.tsx");
+const sheet = read("components/tikisse/candidates-sheet.tsx");
 
 /**
  * La feuille des candidatures passait *sous* la feuille d'accueil sur Android :

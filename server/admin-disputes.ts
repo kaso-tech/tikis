@@ -10,7 +10,7 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 import { and, count, desc, eq, isNotNull, like, lte, ne, or } from "drizzle-orm";
-import { tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryReviews, tikisProfiles } from "../drizzle/schema";
+import { tikisseDeliveries, tikisseDeliveryCandidates, tikisseDeliveryReviews, tikisseProfiles } from "../drizzle/schema";
 import * as db from "./db";
 
 export const DISPUTE_REFUND_MAX = 1_000_000;
@@ -23,10 +23,10 @@ async function database() {
 
 /** Les profils qui ont pris part à la livraison : expéditeur, livreur actuel ou précédent, candidats. */
 async function assertParticipant(tx: any, deliveryId: string, phone: string) {
-  const delivery = (await tx.select().from(tikisDeliveries).where(eq(tikisDeliveries.id, deliveryId)).limit(1).for("update"))[0];
+  const delivery = (await tx.select().from(tikisseDeliveries).where(eq(tikisseDeliveries.id, deliveryId)).limit(1).for("update"))[0];
   if (!delivery) throw new Error("Livraison introuvable.");
   if ([delivery.senderPhone, delivery.driverPhone, delivery.previousDriverPhone].includes(phone)) return delivery;
-  const candidate = (await tx.select({ id: tikisDeliveryCandidates.id }).from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, deliveryId), eq(tikisDeliveryCandidates.driverPhone, phone))).limit(1))[0];
+  const candidate = (await tx.select({ id: tikisseDeliveryCandidates.id }).from(tikisseDeliveryCandidates).where(and(eq(tikisseDeliveryCandidates.deliveryId, deliveryId), eq(tikisseDeliveryCandidates.driverPhone, phone))).limit(1))[0];
   if (!candidate) throw new Error("Ce profil n’a pas pris part à cette livraison.");
   return delivery;
 }
@@ -57,7 +57,7 @@ export async function adminDisputeRefund(input: DisputeRefundInput) {
     // dédommage jamais deux fois. Condensée : les clés du journal sont limitées à 100 caractères.
     const key = `dispute-refund:${createHash("sha256").update(`${input.deliveryId}:${input.phone}:${input.requestId}`).digest("hex")}`;
     await db.applyWalletMovement(tx, { profilePhone: input.phone, deliveryId: input.deliveryId, operation: "refund", amount: input.amount, availableDelta: input.amount, heldDelta: 0, reason: `Dédommagement après litige : ${reason}`, idempotencyKey: key });
-    await db.appendDeliveryEvent(tx, { deliveryId: input.deliveryId, eventType: "admin_dispute_refund", recipientPhone: input.phone, title: "Dédommagement reçu", body: `L’équipe Tikis vous a crédité ${input.amount.toLocaleString("fr-FR")} FCFA : ${reason}.`, tone: "success", idempotencyKey: key });
+    await db.appendDeliveryEvent(tx, { deliveryId: input.deliveryId, eventType: "admin_dispute_refund", recipientPhone: input.phone, title: "Dédommagement reçu", body: `L’équipe Tikisse vous a crédité ${input.amount.toLocaleString("fr-FR")} FCFA : ${reason}.`, tone: "success", idempotencyKey: key });
     return { phone: input.phone, amount: input.amount };
   });
 }
@@ -76,7 +76,7 @@ export async function adminRefundDriverCommission(input: { deliveryId: string; d
     if (amount <= 0) throw new Error("Aucune commission à rendre : elle n’a pas été prélevée, ou a déjà été remboursée.");
     const key = `commission-refund:${randomUUID()}`;
     await db.applyWalletMovement(tx, { profilePhone: input.driverPhone, deliveryId: input.deliveryId, operation: "compensation", amount, availableDelta: amount, heldDelta: 0, reason: `Commission remboursée après litige : ${reason}`, idempotencyKey: key });
-    await db.appendDeliveryEvent(tx, { deliveryId: input.deliveryId, eventType: "admin_commission_refund", recipientPhone: input.driverPhone, title: "Commission remboursée", body: `L’équipe Tikis vous a remboursé la commission de ${amount.toLocaleString("fr-FR")} FCFA de cette livraison : ${reason}.`, tone: "success", idempotencyKey: key });
+    await db.appendDeliveryEvent(tx, { deliveryId: input.deliveryId, eventType: "admin_commission_refund", recipientPhone: input.driverPhone, title: "Commission remboursée", body: `L’équipe Tikisse vous a remboursé la commission de ${amount.toLocaleString("fr-FR")} FCFA de cette livraison : ${reason}.`, tone: "success", idempotencyKey: key });
     return { driverPhone: input.driverPhone, amount };
   });
 }
@@ -84,7 +84,7 @@ export async function adminRefundDriverCommission(input: { deliveryId: string; d
 /** Commission encore remboursable par livreur, pour l'affichage du litige. */
 export async function refundableCommissions(deliveryId: string) {
   const handle = await database();
-  const candidates = await handle.select({ driverPhone: tikisDeliveryCandidates.driverPhone }).from(tikisDeliveryCandidates).where(eq(tikisDeliveryCandidates.deliveryId, deliveryId));
+  const candidates = await handle.select({ driverPhone: tikisseDeliveryCandidates.driverPhone }).from(tikisseDeliveryCandidates).where(eq(tikisseDeliveryCandidates.deliveryId, deliveryId));
   const phones = Array.from(new Set(candidates.map((row) => row.driverPhone)));
   const amounts = await Promise.all(phones.map(async (driverPhone) => ({ driverPhone, amount: await db.netCommissionPaid(handle, deliveryId, driverPhone) })));
   return amounts.filter((row) => row.amount > 0);
@@ -101,16 +101,16 @@ export async function adminListReviews(input: { filter?: ReviewFilter; query?: s
   const handle = await database();
   const query = input.query?.replace(/[^0-9+]/g, "");
   const where = and(
-    input.filter === "hidden" ? isNotNull(tikisDeliveryReviews.hiddenAt) : undefined,
-    input.filter === "low" ? lte(tikisDeliveryReviews.rating, 2) : undefined,
-    input.filter === "commented" ? and(isNotNull(tikisDeliveryReviews.comment), ne(tikisDeliveryReviews.comment, "")) : undefined,
-    query && query.length >= 4 ? or(like(tikisDeliveryReviews.driverPhone, `%${query}%`), like(tikisDeliveryReviews.reviewerPhone, `%${query}%`)) : undefined,
+    input.filter === "hidden" ? isNotNull(tikisseDeliveryReviews.hiddenAt) : undefined,
+    input.filter === "low" ? lte(tikisseDeliveryReviews.rating, 2) : undefined,
+    input.filter === "commented" ? and(isNotNull(tikisseDeliveryReviews.comment), ne(tikisseDeliveryReviews.comment, "")) : undefined,
+    query && query.length >= 4 ? or(like(tikisseDeliveryReviews.driverPhone, `%${query}%`), like(tikisseDeliveryReviews.reviewerPhone, `%${query}%`)) : undefined,
   );
   const [rows, total] = await Promise.all([
-    handle.select({ review: tikisDeliveryReviews, driverName: tikisProfiles.fullName }).from(tikisDeliveryReviews)
-      .leftJoin(tikisProfiles, eq(tikisProfiles.phone, tikisDeliveryReviews.driverPhone))
-      .where(where).orderBy(desc(tikisDeliveryReviews.createdAt)).limit(Math.min(input.limit ?? 50, 200)).offset(Math.max(input.offset ?? 0, 0)),
-    handle.select({ count: count() }).from(tikisDeliveryReviews).where(where),
+    handle.select({ review: tikisseDeliveryReviews, driverName: tikisseProfiles.fullName }).from(tikisseDeliveryReviews)
+      .leftJoin(tikisseProfiles, eq(tikisseProfiles.phone, tikisseDeliveryReviews.driverPhone))
+      .where(where).orderBy(desc(tikisseDeliveryReviews.createdAt)).limit(Math.min(input.limit ?? 50, 200)).offset(Math.max(input.offset ?? 0, 0)),
+    handle.select({ count: count() }).from(tikisseDeliveryReviews).where(where),
   ]);
   return { rows: rows.map((row) => ({ ...row.review, driverName: row.driverName })), total: Number(total[0]?.count ?? 0) };
 }
@@ -118,14 +118,14 @@ export async function adminListReviews(input: { filter?: ReviewFilter; query?: s
 /** Masquer un avis (injurieux, hors sujet, frauduleux) : il ne s'affiche plus et ne compte plus dans la note. */
 export async function adminSetReviewHidden(input: { reviewId: string; hidden: boolean; reason?: string; adminId: number }) {
   const handle = await database();
-  const review = (await handle.select().from(tikisDeliveryReviews).where(eq(tikisDeliveryReviews.id, input.reviewId)).limit(1))[0];
+  const review = (await handle.select().from(tikisseDeliveryReviews).where(eq(tikisseDeliveryReviews.id, input.reviewId)).limit(1))[0];
   if (!review) throw new Error("Avis introuvable.");
   if (input.hidden) {
     const reason = input.reason?.trim();
     if (!reason) throw new Error("Indiquez pourquoi cet avis est masqué.");
-    await handle.update(tikisDeliveryReviews).set({ hiddenAt: new Date(), hiddenReason: reason.slice(0, 300), hiddenByAdminId: input.adminId }).where(eq(tikisDeliveryReviews.id, input.reviewId));
+    await handle.update(tikisseDeliveryReviews).set({ hiddenAt: new Date(), hiddenReason: reason.slice(0, 300), hiddenByAdminId: input.adminId }).where(eq(tikisseDeliveryReviews.id, input.reviewId));
   } else {
-    await handle.update(tikisDeliveryReviews).set({ hiddenAt: null, hiddenReason: null, hiddenByAdminId: null }).where(and(eq(tikisDeliveryReviews.id, input.reviewId), isNotNull(tikisDeliveryReviews.hiddenAt)));
+    await handle.update(tikisseDeliveryReviews).set({ hiddenAt: null, hiddenReason: null, hiddenByAdminId: null }).where(and(eq(tikisseDeliveryReviews.id, input.reviewId), isNotNull(tikisseDeliveryReviews.hiddenAt)));
   }
   return { before: review.hiddenAt ? "hidden" : "visible", after: input.hidden ? "hidden" : "visible", driverPhone: review.driverPhone, rating: review.rating };
 }

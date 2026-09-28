@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { compactRouteLabel, estimateDeliveryPrice, geodesicDistanceKm, normalizeLocation, provisionalRoute, sanitizePlaceText, validateDeliveryMeasurement } from "../lib/geo-rules";
 
-describe("règles géographiques et estimation Tikis", () => {
+describe("règles géographiques et estimation Tikisse", () => {
   const pickup = { name: "Maison du Peuple", district: "Koulouba", city: "Ouagadougou", latitude: 12.3714, longitude: -1.5197 };
   const dropoff = { name: "Stade du 4 Août", district: "Gounghin", city: "Ouagadougou", latitude: 12.3588, longitude: -1.5352 };
 

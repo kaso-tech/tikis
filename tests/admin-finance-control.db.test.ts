@@ -2,14 +2,14 @@
  * Lot A — contrôle financier de la console, exécuté contre une vraie base MySQL/MariaDB.
  *
  *   DATABASE_URL=<url> npx drizzle-kit push --force
- *   TIKIS_TEST_DATABASE_URL=<url> npx vitest run tests/admin-finance-control.db.test.ts
+ *   TIKISSE_TEST_DATABASE_URL=<url> npx vitest run tests/admin-finance-control.db.test.ts
  *
  * Jamais une base de production : chaque test crée ses propres profils, transactions et mouvements.
  */
 import { createHmac, randomUUID } from "node:crypto";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
-const TEST_DB = process.env.TIKIS_TEST_DATABASE_URL;
+const TEST_DB = process.env.TIKISSE_TEST_DATABASE_URL;
 if (TEST_DB) process.env.DATABASE_URL = TEST_DB;
 
 const SECRET = "whsec_lot_a_test_only";
@@ -58,7 +58,7 @@ async function pendingDeposit(options: { phone?: string; amount?: number; provid
   const handle = (await db.getDb())!;
   const id = randomUUID();
   const providerReference = options.providerReference ?? `pi_lot_a_${id}`;
-  await handle.insert(schema.tikisPaymentTransactions).values({
+  await handle.insert(schema.tikissePaymentTransactions).values({
     id, profilePhone: options.phone ?? newPhone(), type: "deposit", provider: "yengapay_sandbox", amount: options.amount ?? 5000, status: "pending",
     providerReference, checkoutUrl: null, idempotencyKey: `lot-a:${id}`, ...(options.createdAt ? { createdAt: options.createdAt } : {}),
   });
@@ -66,12 +66,12 @@ async function pendingDeposit(options: { phone?: string; amount?: number; provid
 }
 
 async function available(phone: string) {
-  return (await db.getTikisWalletSnapshot(phone)).total;
+  return (await db.getTikisseWalletSnapshot(phone)).total;
 }
 
 async function eventByReference(providerReference: string) {
   const handle = (await db.getDb())!;
-  const rows = await handle.select().from(schema.tikisYengapayWebhookEvents).where(orm.like(schema.tikisYengapayWebhookEvents.payload, `%${providerReference}%`));
+  const rows = await handle.select().from(schema.tikisseYengapayWebhookEvents).where(orm.like(schema.tikisseYengapayWebhookEvents.payload, `%${providerReference}%`));
   return rows;
 }
 
@@ -154,7 +154,7 @@ describe.skipIf(!TEST_DB)("anomalies de paiement", () => {
     expect(stalePendingDeposits.rows.some((row) => row.id === stale.id)).toBe(true);
     expect(stalePendingDeposits.rows.some((row) => row.id === fresh.id)).toBe(false);
     const handle = (await db.getDb())!;
-    await handle.update(schema.tikisPaymentTransactions).set({ status: "expired" }).where(orm.inArray(schema.tikisPaymentTransactions.id, [stale.id, fresh.id]));
+    await handle.update(schema.tikissePaymentTransactions).set({ status: "expired" }).where(orm.inArray(schema.tikissePaymentTransactions.id, [stale.id, fresh.id]));
   });
 });
 
@@ -169,7 +169,7 @@ describe.skipIf(!TEST_DB)("contrôle des Wallets", () => {
     expect((await control.adminWalletCheck()).discrepancies.some((row) => row.profilePhone === phone)).toBe(false);
 
     // Correction « à la main » en base : 1 000 FCFA apparaissent sans aucun mouvement.
-    await handle.update(schema.tikisWallets).set({ availableBalance: 5700 }).where(orm.eq(schema.tikisWallets.profilePhone, phone));
+    await handle.update(schema.tikisseWallets).set({ availableBalance: 5700 }).where(orm.eq(schema.tikisseWallets.profilePhone, phone));
     const flagged = (await control.adminWalletCheck()).discrepancies.find((row) => row.profilePhone === phone);
     expect(flagged).toMatchObject({ availableBalance: 5700, ledgerAvailable: 4700, heldBalance: 300, ledgerHeld: 300 });
   });
@@ -205,14 +205,14 @@ describe.skipIf(!TEST_DB)("export comptable mensuel", () => {
       await db.applyWalletMovement(tx, { profilePhone: phone, operation: "compensation", amount: 300, availableDelta: 300, heldDelta: 0, reason: "Commission rendue (test)", idempotencyKey: keys[2]! });
       await db.applyWalletMovement(tx, { profilePhone: phone, operation: "bonus", amount: 500, availableDelta: 500, heldDelta: 0, reason: "Bonus (test)", idempotencyKey: keys[3]! });
     });
-    await handle.update(schema.tikisWalletLedger).set({ createdAt: inMonth }).where(orm.inArray(schema.tikisWalletLedger.idempotencyKey, keys));
+    await handle.update(schema.tikisseWalletLedger).set({ createdAt: inMonth }).where(orm.inArray(schema.tikisseWalletLedger.idempotencyKey, keys));
     // Un mouvement à minuit pile le 1er du mois suivant n'appartient pas au mois.
     await handle.transaction(async (tx) => {
       await db.applyWalletMovement(tx, { profilePhone: phone, operation: "bonus", amount: 999, availableDelta: 999, heldDelta: 0, reason: "Bonus mois suivant (test)", idempotencyKey: `${phone}:next` });
     });
-    await handle.update(schema.tikisWalletLedger).set({ createdAt: control.monthRange(month).end }).where(orm.eq(schema.tikisWalletLedger.idempotencyKey, `${phone}:next`));
+    await handle.update(schema.tikisseWalletLedger).set({ createdAt: control.monthRange(month).end }).where(orm.eq(schema.tikisseWalletLedger.idempotencyKey, `${phone}:next`));
     const deposit = randomUUID();
-    await handle.insert(schema.tikisPaymentTransactions).values({ id: deposit, profilePhone: phone, type: "deposit", provider: "yengapay_sandbox", amount: 10_000, status: "succeeded", providerReference: `pi_lot_a_acc_${deposit}`, checkoutUrl: null, idempotencyKey: `lot-a:${deposit}`, settledAt: inMonth });
+    await handle.insert(schema.tikissePaymentTransactions).values({ id: deposit, profilePhone: phone, type: "deposit", provider: "yengapay_sandbox", amount: 10_000, status: "succeeded", providerReference: `pi_lot_a_acc_${deposit}`, checkoutUrl: null, idempotencyKey: `lot-a:${deposit}`, settledAt: inMonth });
 
     const statement = await control.adminAccountingMonth(month);
 
@@ -236,12 +236,12 @@ describe.skipIf(!TEST_DB)("accès au contrôle financier", () => {
   it("réservé à super-admin et finance : le support est refusé", async () => {
     const adminDb = await import("../server/admin-db");
     const adminAuth = await import("../server/admin-auth");
-    const { tikisAdminRouter } = await import("../server/admin-router");
+    const { tikisseAdminRouter } = await import("../server/admin-router");
     const { createContext } = await import("../server/_core/context");
-    const support = (await adminDb.createAdminUser({ email: `lot-a-${randomUUID()}@tikis.test`, passwordHash: await adminAuth.hashAdminPassword("mot-de-passe-lot-a"), fullName: "Support", role: "support" }))!;
+    const support = (await adminDb.createAdminUser({ email: `lot-a-${randomUUID()}@tikisse.test`, passwordHash: await adminAuth.hashAdminPassword("mot-de-passe-lot-a"), fullName: "Support", role: "support" }))!;
     const { token } = await adminDb.createAdminSession({ adminId: support.id });
-    const req = { headers: { "x-tikis-admin": "1", cookie: `tikis_admin_session=${token}` }, ip: "203.0.113.90", secure: true, socket: {} } as never;
-    const api = tikisAdminRouter.createCaller(await createContext({ req, res: { cookie: () => {}, clearCookie: () => {} } as never, info: {} as never }));
+    const req = { headers: { "x-tikisse-admin": "1", cookie: `tikisse_admin_session=${token}` }, ip: "203.0.113.90", secure: true, socket: {} } as never;
+    const api = tikisseAdminRouter.createCaller(await createContext({ req, res: { cookie: () => {}, clearCookie: () => {} } as never, info: {} as never }));
     await expect(api.finance.control.anomalies()).rejects.toThrow(/rôle/);
     await expect(api.finance.control.accounting({ month: "2019-06" })).rejects.toThrow(/rôle/);
   });

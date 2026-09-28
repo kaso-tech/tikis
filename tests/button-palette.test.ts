@@ -2,10 +2,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const buttonSource = readFileSync(join(process.cwd(), "components/tikis/ui.tsx"), "utf8");
-const authSource = readFileSync(join(process.cwd(), "components/tikis/auth-flow.tsx"), "utf8");
-const nativeHomeSource = readFileSync(join(process.cwd(), "components/tikis/screens/home-screen.native.tsx"), "utf8");
-const webHomeSource = readFileSync(join(process.cwd(), "components/tikis/screens/home-screen.web.tsx"), "utf8");
+const buttonSource = readFileSync(join(process.cwd(), "components/tikisse/ui.tsx"), "utf8");
+const authSource = readFileSync(join(process.cwd(), "components/tikisse/auth-flow.tsx"), "utf8");
+const nativeHomeSource = readFileSync(join(process.cwd(), "components/tikisse/screens/home-screen.native.tsx"), "utf8");
+const webHomeSource = readFileSync(join(process.cwd(), "components/tikisse/screens/home-screen.web.tsx"), "utf8");
 const deliverySource = readFileSync(join(process.cwd(), "app/delivery/[id].tsx"), "utf8");
 
 describe("palette des boutons", () => {
@@ -25,7 +25,7 @@ describe("palette des boutons", () => {
     expect(buttonSource).not.toContain("authStyle");
     expect(authSource).not.toContain("authStyle");
     // Un bouton par écran du parcours : accueil, numéro, code, rôle, engins, nom.
-    expect((authSource.match(/<TikisButton /g) ?? []).length).toBe(6);
+    expect((authSource.match(/<TikisseButton /g) ?? []).length).toBe(6);
   });
 
   it("les actions écrites en toutes lettres se lisent en neutre, pas en orange pâle", () => {

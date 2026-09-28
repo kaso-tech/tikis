@@ -1,1 +1,1 @@
-export { HomeScreen as default } from "@/components/tikis/screens/home-screen";
+export { HomeScreen as default } from "@/components/tikisse/screens/home-screen";

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { readCachedRoute, writeCachedRoute } from "@/lib/route-cache";
 import { isUsablePoint, pointKey, routeGeometryKey, shouldRefreshApproach, type ApproachAnchor, type Point } from "@/lib/route-refresh";
 import { trpc } from "@/lib/trpc";
-import type { LocationLabel } from "@/shared/tikis-domain";
+import type { LocationLabel } from "@/shared/tikisse-domain";
 
 /** Reprises après échec, et attente avant chacune. Trois essais espacés
  *  couvrent une coupure réseau passagère ou un pic de latence sans transformer

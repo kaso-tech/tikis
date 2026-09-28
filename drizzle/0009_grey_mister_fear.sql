@@ -1,4 +1,4 @@
-CREATE TABLE `tikis_delivery_events` (
+CREATE TABLE `tikisse_delivery_events` (
 	`id` varchar(40) NOT NULL,
 	`deliveryId` varchar(40) NOT NULL,
 	`eventType` varchar(48) NOT NULL,
@@ -11,10 +11,10 @@ CREATE TABLE `tikis_delivery_events` (
 	`metadata` text,
 	`readAt` timestamp,
 	`createdAt` timestamp NOT NULL DEFAULT (now()),
-	CONSTRAINT `tikis_delivery_events_id` PRIMARY KEY(`id`)
+	CONSTRAINT `tikisse_delivery_events_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `tikis_wallet_ledger` (
+CREATE TABLE `tikisse_wallet_ledger` (
 	`id` varchar(40) NOT NULL,
 	`profilePhone` varchar(20) NOT NULL,
 	`deliveryId` varchar(40),
@@ -27,11 +27,11 @@ CREATE TABLE `tikis_wallet_ledger` (
 	`reason` varchar(255) NOT NULL,
 	`idempotencyKey` varchar(100) NOT NULL,
 	`createdAt` timestamp NOT NULL DEFAULT (now()),
-	CONSTRAINT `tikis_wallet_ledger_id` PRIMARY KEY(`id`),
-	CONSTRAINT `tikis_wallet_ledger_idempotencyKey_unique` UNIQUE(`idempotencyKey`)
+	CONSTRAINT `tikisse_wallet_ledger_id` PRIMARY KEY(`id`),
+	CONSTRAINT `tikisse_wallet_ledger_idempotencyKey_unique` UNIQUE(`idempotencyKey`)
 );
 --> statement-breakpoint
-CREATE TABLE `tikis_wallets` (
+CREATE TABLE `tikisse_wallets` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`profilePhone` varchar(20) NOT NULL,
 	`availableBalance` int NOT NULL DEFAULT 0,
@@ -39,11 +39,11 @@ CREATE TABLE `tikis_wallets` (
 	`currency` varchar(3) NOT NULL DEFAULT 'XOF',
 	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
 	`createdAt` timestamp NOT NULL DEFAULT (now()),
-	CONSTRAINT `tikis_wallets_id` PRIMARY KEY(`id`),
-	CONSTRAINT `tikis_wallets_profilePhone_unique` UNIQUE(`profilePhone`)
+	CONSTRAINT `tikisse_wallets_id` PRIMARY KEY(`id`),
+	CONSTRAINT `tikisse_wallets_profilePhone_unique` UNIQUE(`profilePhone`)
 );
 --> statement-breakpoint
-CREATE INDEX `tikis_delivery_events_recipient_created_index` ON `tikis_delivery_events` (`recipientPhone`,`createdAt`);--> statement-breakpoint
-CREATE INDEX `tikis_delivery_events_delivery_created_index` ON `tikis_delivery_events` (`deliveryId`,`createdAt`);--> statement-breakpoint
-CREATE INDEX `tikis_wallet_ledger_profile_created_index` ON `tikis_wallet_ledger` (`profilePhone`,`createdAt`);--> statement-breakpoint
-CREATE INDEX `tikis_wallet_ledger_delivery_index` ON `tikis_wallet_ledger` (`deliveryId`);
+CREATE INDEX `tikisse_delivery_events_recipient_created_index` ON `tikisse_delivery_events` (`recipientPhone`,`createdAt`);--> statement-breakpoint
+CREATE INDEX `tikisse_delivery_events_delivery_created_index` ON `tikisse_delivery_events` (`deliveryId`,`createdAt`);--> statement-breakpoint
+CREATE INDEX `tikisse_wallet_ledger_profile_created_index` ON `tikisse_wallet_ledger` (`profilePhone`,`createdAt`);--> statement-breakpoint
+CREATE INDEX `tikisse_wallet_ledger_delivery_index` ON `tikisse_wallet_ledger` (`deliveryId`);

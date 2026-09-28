@@ -2,14 +2,14 @@
  * Lot B — gouvernance de la console, exécuté contre une vraie base MySQL/MariaDB, par le vrai routeur.
  *
  *   DATABASE_URL=<url> npx drizzle-kit push --force
- *   TIKIS_TEST_DATABASE_URL=<url> npx vitest run tests/admin-governance.db.test.ts
+ *   TIKISSE_TEST_DATABASE_URL=<url> npx vitest run tests/admin-governance.db.test.ts
  */
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-const TEST_DB = process.env.TIKIS_TEST_DATABASE_URL;
+const TEST_DB = process.env.TIKISSE_TEST_DATABASE_URL;
 if (TEST_DB) process.env.DATABASE_URL = TEST_DB;
-process.env.TIKIS_ADMIN_TOTP_KEY ??= "cle-totp-de-test-uniquement-0123456789abcdef";
+process.env.TIKISSE_ADMIN_TOTP_KEY ??= "cle-totp-de-test-uniquement-0123456789abcdef";
 
 type Role = "super_admin" | "support" | "finance" | "viewer" | "kyc_reviewer";
 let db: typeof import("../server/db");
@@ -40,20 +40,20 @@ const newPhone = () => `+22673${String(Math.floor(Math.random() * 1e6)).padStart
 const PASSWORD = "mot-de-passe-lot-b";
 
 async function newAdmin(role: Role, password = PASSWORD) {
-  const email = `lot-b-${randomUUID()}@tikis.test`;
+  const email = `lot-b-${randomUUID()}@tikisse.test`;
   return (await adminDb.createAdminUser({ email, passwordHash: await adminAuth.hashAdminPassword(password), fullName: "Lot B", role }))!;
 }
 
 /** Appelle le vrai routeur admin, avec la session donnée ; capture le cookie posé à la connexion. */
 async function caller(token?: string) {
-  const { tikisAdminRouter } = await import("../server/admin-router");
+  const { tikisseAdminRouter } = await import("../server/admin-router");
   const { createContext } = await import("../server/_core/context");
   const cookies: string[] = [];
-  const headers: Record<string, string> = { "x-tikis-admin": "1" };
-  if (token) headers.cookie = `tikis_admin_session=${token}`;
+  const headers: Record<string, string> = { "x-tikisse-admin": "1" };
+  if (token) headers.cookie = `tikisse_admin_session=${token}`;
   const req = { headers, ip: `198.51.100.${Math.floor(Math.random() * 250)}`, secure: true, socket: {} } as never;
   const res = { cookie: (_name: string, value: string) => { cookies.push(value); }, clearCookie: () => {} } as never;
-  return { api: tikisAdminRouter.createCaller(await createContext({ req, res, info: {} as never })), cookies };
+  return { api: tikisseAdminRouter.createCaller(await createContext({ req, res, info: {} as never })), cookies };
 }
 
 async function session(role: Role) {
@@ -63,7 +63,7 @@ async function session(role: Role) {
 }
 
 async function wallet(phone: string) {
-  return (await db.getTikisWalletSnapshot(phone)).total;
+  return (await db.getTikisseWalletSnapshot(phone)).total;
 }
 
 async function fund(phone: string, amount: number) {
@@ -84,7 +84,7 @@ describe.skipIf(!TEST_DB)("rôles restreints", () => {
 
   it("KYC seul : les vérifications d'identité, rien d'autre", async () => {
     const { api } = await session("kyc_reviewer");
-    const { id } = await db.createKycSubmission({ driverPhone: newPhone(), idFrontKey: "tikis-kyc/x/f.jpg", idBackKey: "tikis-kyc/x/b.jpg", selfieKey: "tikis-kyc/x/s.jpg" });
+    const { id } = await db.createKycSubmission({ driverPhone: newPhone(), idFrontKey: "tikisse-kyc/x/f.jpg", idBackKey: "tikisse-kyc/x/b.jpg", selfieKey: "tikisse-kyc/x/s.jpg" });
     await expect(api.kyc.list({ status: "submitted" })).resolves.toBeTruthy();
     await expect(api.kyc.review({ submissionId: id, decision: "approved" })).resolves.toMatchObject({ status: "approved" });
     await expect(api.dashboard.metrics({ periodDays: 7 })).rejects.toThrow(/rôle/);
@@ -94,7 +94,7 @@ describe.skipIf(!TEST_DB)("rôles restreints", () => {
   it("KYC seul : voit les pièces d'identité, pas les photos de signalement", async () => {
     const documents = await import("../server/admin-documents");
     const { token } = await session("kyc_reviewer");
-    const { id } = await db.createKycSubmission({ driverPhone: newPhone(), idFrontKey: "tikis-kyc/x/f.jpg", idBackKey: "tikis-kyc/x/b.jpg", selfieKey: "tikis-kyc/x/s.jpg" });
+    const { id } = await db.createKycSubmission({ driverPhone: newPhone(), idFrontKey: "tikisse-kyc/x/f.jpg", idBackKey: "tikisse-kyc/x/b.jpg", selfieKey: "tikisse-kyc/x/s.jpg" });
     const read = async () => ({ body: Buffer.from([1]), contentType: "image/jpeg" });
     expect(await documents.resolveAdminDocument({ sessionToken: token, request: { kind: "kyc", submissionId: id, side: "selfie" } }, read)).toMatchObject({ status: 200 });
     expect(await documents.resolveAdminDocument({ sessionToken: token, request: { kind: "report", reportId: randomUUID() } }, read)).toMatchObject({ status: 403 });
@@ -104,7 +104,7 @@ describe.skipIf(!TEST_DB)("rôles restreints", () => {
 describe.skipIf(!TEST_DB)("comptes admin gérés depuis la console", () => {
   it("un compte créé reçoit un mot de passe provisoire, qu'il doit changer avant tout accès", async () => {
     const { api } = await session("super_admin");
-    const email = `lot-b-new-${randomUUID()}@tikis.test`;
+    const email = `lot-b-new-${randomUUID()}@tikisse.test`;
     const created = await api.admins.create({ email, fullName: "Nouvel admin", role: "support" });
     expect(created.temporaryPassword).toMatch(/^[a-z2-9]{4}(-[a-z2-9]{4}){3}$/);
 
@@ -122,7 +122,7 @@ describe.skipIf(!TEST_DB)("comptes admin gérés depuis la console", () => {
 
   it("le mot de passe provisoire n'est pas recopié dans le journal", async () => {
     const { api, admin } = await session("super_admin");
-    const created = await api.admins.create({ email: `lot-b-log-${randomUUID()}@tikis.test`, fullName: "Journal", role: "viewer" });
+    const created = await api.admins.create({ email: `lot-b-log-${randomUUID()}@tikisse.test`, fullName: "Journal", role: "viewer" });
     const log = await adminDb.listAdminAuditLog({ adminEmail: admin.email, includeRequests: true, limit: 50 });
     expect(JSON.stringify(log.rows)).not.toContain(created.temporaryPassword);
   });
@@ -142,16 +142,16 @@ describe.skipIf(!TEST_DB)("comptes admin gérés depuis la console", () => {
 
   it("changer de rôle : jamais le sien, jamais le dernier super-admin", async () => {
     const handle = (await db.getDb())!;
-    await handle.update(schema.tikisAdminUsers).set({ active: false }).where(orm.eq(schema.tikisAdminUsers.role, "super_admin"));
+    await handle.update(schema.tikisseAdminUsers).set({ active: false }).where(orm.eq(schema.tikisseAdminUsers.role, "super_admin"));
     const boss = await session("super_admin");
     await expect(boss.api.admins.changeRole({ adminId: boss.admin.id, role: "viewer" })).rejects.toThrow(/propre rôle/);
     const other = await session("super_admin");
     // Deux super-admins actifs : l'un peut rétrograder l'autre, mais plus le dernier.
     await expect(boss.api.admins.changeRole({ adminId: other.admin.id, role: "finance" })).resolves.toEqual({ before: "super_admin", after: "finance" });
     const lastOne = await newAdmin("super_admin");
-    await handle.update(schema.tikisAdminUsers).set({ active: false }).where(orm.eq(schema.tikisAdminUsers.id, boss.admin.id));
+    await handle.update(schema.tikisseAdminUsers).set({ active: false }).where(orm.eq(schema.tikisseAdminUsers.id, boss.admin.id));
     const reviewer = await session("super_admin");
-    await handle.update(schema.tikisAdminUsers).set({ active: false }).where(orm.eq(schema.tikisAdminUsers.id, reviewer.admin.id));
+    await handle.update(schema.tikisseAdminUsers).set({ active: false }).where(orm.eq(schema.tikisseAdminUsers.id, reviewer.admin.id));
     // `reviewer` est suspendu : sa session ne vaut plus. On vérifie la règle directement.
     const accounts = await import("../server/admin-accounts");
     await expect(accounts.changeAdminRole({ actorAdminId: reviewer.admin.id, adminId: lastOne.id, role: "support" })).rejects.toThrow(/dernier super-admin/);
@@ -247,7 +247,7 @@ describe.skipIf(!TEST_DB)("double validation au-delà du seuil", () => {
     await fund(phone, 500_000);
     const handle = (await db.getDb())!;
     const paymentId = randomUUID();
-    await handle.insert(schema.tikisPaymentTransactions).values({ id: paymentId, profilePhone: phone, type: "withdrawal", provider: "yengapay_test", amount: 250_000, status: "pending", providerReference: `wd_lot_b_${paymentId}`, checkoutUrl: null, idempotencyKey: `lot-b:${paymentId}` });
+    await handle.insert(schema.tikissePaymentTransactions).values({ id: paymentId, profilePhone: phone, type: "withdrawal", provider: "yengapay_test", amount: 250_000, status: "pending", providerReference: `wd_lot_b_${paymentId}`, checkoutUrl: null, idempotencyKey: `lot-b:${paymentId}` });
     const payoutReference = `OM-LOTB-${paymentId.slice(0, 8)}`;
     const request = await requester.api.finance.settleTransaction({ paymentId, outcome: "succeeded", payoutReference, notes: "Versé par Orange Money" }) as { approvalId: string };
     expect(request).toMatchObject({ approvalRequired: true });

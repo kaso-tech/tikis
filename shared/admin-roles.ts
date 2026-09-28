@@ -2,7 +2,7 @@
  * Rôles de la console d'administration et ce que chacun peut faire.
  *
  * Les rôles complets (super_admin, support, finance) sont encadrés procédure par procédure
- * (`requireTikisAdminRole` dans server/admin-router.ts). Les deux rôles restreints sont encadrés ici, une
+ * (`requireTikisseAdminRole` dans server/admin-router.ts). Les deux rôles restreints sont encadrés ici, une
  * fois pour toutes, dans le middleware commun (server/_core/trpc.ts) : une procédure ajoutée plus tard leur
  * reste fermée par défaut, sans qu'il faille penser à les exclure.
  *

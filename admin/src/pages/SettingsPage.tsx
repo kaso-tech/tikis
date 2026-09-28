@@ -36,7 +36,7 @@ export default function SettingsPage() {
       <div className="page-head">
         <div>
           <h1 className="page-title">Paramètres plateforme</h1>
-          <p className="page-sub">Configuration globale Tikis · réservée aux super-administrateurs</p>
+          <p className="page-sub">Configuration globale Tikisse · réservée aux super-administrateurs</p>
         </div>
       </div>
 

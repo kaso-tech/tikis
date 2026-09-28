@@ -16,11 +16,11 @@ describe("jeton de session administrateur", () => {
     await expect(verifyAdminPasswordOrDecoy("n'importe quoi", undefined)).resolves.toBe(false);
   });
 
-  const checkBootstrapPassword = process.env.TIKIS_ADMIN_BOOTSTRAP_PASSWORD ? it : it.skip;
+  const checkBootstrapPassword = process.env.TIKISSE_ADMIN_BOOTSTRAP_PASSWORD ? it : it.skip;
 
   checkBootstrapPassword("valide le mot de passe de bootstrap sans le révéler", async () => {
     const { hashAdminPassword, verifyAdminPassword } = await import("../server/admin-auth");
-    const password = process.env.TIKIS_ADMIN_BOOTSTRAP_PASSWORD ?? "";
+    const password = process.env.TIKISSE_ADMIN_BOOTSTRAP_PASSWORD ?? "";
 
     expect(password.length).toBeGreaterThanOrEqual(12);
     const hash = await hashAdminPassword(password);

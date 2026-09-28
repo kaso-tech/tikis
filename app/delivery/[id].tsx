@@ -4,18 +4,18 @@ import { type ComponentProps, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { CandidatesSheet } from "@/components/tikis/candidates-sheet";
-import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
+import { CandidatesSheet } from "@/components/tikisse/candidates-sheet";
+import { DeliveryRouteMap } from "@/components/tikisse/delivery-route-map";
 import { useApproachRoute, useRouteCoordinates } from "@/hooks/use-route-coordinates";
 import { useDriverLocation } from "@/hooks/use-driver-location";
-import { FinancialConfirmationModal } from "@/components/tikis/financial-modal";
-import { RATING_STAR_COLOR, SectionHeading, TikisButton } from "@/components/tikis/ui";
+import { FinancialConfirmationModal } from "@/components/tikisse/financial-modal";
+import { RATING_STAR_COLOR, SectionHeading, TikisseButton } from "@/components/tikisse/ui";
 import { haptic } from "@/lib/haptics";
 import { deliveryRemainingMs, formatDeliveryCountdown } from "@/lib/delivery-countdown";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
-import { useTikisStore } from "@/lib/tikis-store";
+import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
-import { deliveryStatusMeta, formatMoney, formatRelativeDate, isPickupPending } from "@/shared/tikis-domain";
+import { deliveryStatusMeta, formatMoney, formatRelativeDate, isPickupPending } from "@/shared/tikisse-domain";
 
 type FinancialAction = "apply" | "withdraw" | "confirm" | "complete" | null;
 type SenderAction = "disable" | "reactivate" | "cancel" | "unselect" | null;
@@ -33,7 +33,7 @@ function DetailRow({ icon, label, value }: { icon: ComponentProps<typeof Materia
 export default function DeliveryDetailScreen() {
   const { colors: theme } = useThemeColors();
   const params = useLocalSearchParams<{ id: string }>();
-  const { role, profile } = useTikisStore();
+  const { role, profile } = useTikisseStore();
   const utilities = trpc.useUtils();
   const walletQuery = trpc.wallet.snapshot.useQuery(undefined, { enabled: Boolean(profile?.phone) });
   const deliveryQuery = trpc.deliveries.get.useQuery({ id: params.id ?? "00000000-0000-4000-8000-000000000000" }, { enabled: Boolean(params.id && profile?.phone) });
@@ -116,7 +116,7 @@ export default function DeliveryDetailScreen() {
   }
 
   if (!delivery) {
-    return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.notFound}><Text style={styles.notFoundTitle}>Livraison introuvable</Text><TikisButton label="Retour à l’accueil" onPress={() => router.replace("/(tabs)" as any)} /></View></SafeAreaView>;
+    return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.notFound}><Text style={styles.notFoundTitle}>Livraison introuvable</Text><TikisseButton label="Retour à l’accueil" onPress={() => router.replace("/(tabs)" as any)} /></View></SafeAreaView>;
   }
 
   const status = deliveryStatusMeta[delivery.status];
@@ -150,7 +150,7 @@ export default function DeliveryDetailScreen() {
       if (action === "apply") {
         if (!actionConfig?.amount) throw new Error("La commission doit être chargée puis confirmée avant la candidature.");
         // Le serveur calcule la commission sur `offerPrice` quand une contre-offre est fournie (server/db.ts,
-        // applyForTikisDelivery) : il faut recalculer sur ce même montant ici, sinon le contrôle de
+        // applyForTikisseDelivery) : il faut recalculer sur ce même montant ici, sinon le contrôle de
         // correspondance côté serveur rejette systématiquement toute candidature avec contre-offre.
         const confirmedCommission = counterOffer?.amount ? Math.round(counterOffer.amount * (walletQuery.data?.commissionRate ?? 0)) : actionConfig.amount;
         const result = await applyMutation.mutateAsync({ deliveryId, confirmedCommission, ...(counterOffer?.amount ? { offerPrice: counterOffer.amount } : {}) });
@@ -359,9 +359,9 @@ export default function DeliveryDetailScreen() {
 
         {role === "sender" ? (
           <View style={styles.senderActions}>
-            {canEdit ? <TikisButton compact label="Modifier" icon="edit" variant="secondary" onPress={() => router.push({ pathname: "/create-delivery", params: { deliveryId } } as any)} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
-            {canReactivate ? <TikisButton compact label="Activer" icon="play-circle" onPress={() => setSenderAction("reactivate")} loading={senderProcessing && senderAction === "reactivate"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
-            {canDisable ? <TikisButton compact label="Désactiver" icon="pause-circle" variant="secondary" onPress={() => setSenderAction("disable")} loading={senderProcessing && senderAction === "disable"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
+            {canEdit ? <TikisseButton compact label="Modifier" icon="edit" variant="secondary" onPress={() => router.push({ pathname: "/create-delivery", params: { deliveryId } } as any)} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
+            {canReactivate ? <TikisseButton compact label="Activer" icon="play-circle" onPress={() => setSenderAction("reactivate")} loading={senderProcessing && senderAction === "reactivate"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
+            {canDisable ? <TikisseButton compact label="Désactiver" icon="pause-circle" variant="secondary" onPress={() => setSenderAction("disable")} loading={senderProcessing && senderAction === "disable"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
             {canCancel ? (
               <Pressable
                 onPress={() => setSenderAction("cancel")}
@@ -374,7 +374,7 @@ export default function DeliveryDetailScreen() {
                 <Text style={[styles.cancelButtonText, senderProcessing && styles.cancelButtonTextDisabled]} numberOfLines={1}>Annuler</Text>
               </Pressable>
             ) : null}
-            {canUnselect ? <TikisButton compact label="Annuler le choix du livreur" icon="undo" variant="secondary" onPress={() => setSenderAction("unselect")} loading={senderProcessing && senderAction === "unselect"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
+            {canUnselect ? <TikisseButton compact label="Annuler le choix du livreur" icon="undo" variant="secondary" onPress={() => setSenderAction("unselect")} loading={senderProcessing && senderAction === "unselect"} disabled={senderProcessing} style={styles.senderActionBtn} /> : null}
           </View>
         ) : null}
 
@@ -384,7 +384,7 @@ export default function DeliveryDetailScreen() {
         {isCompleted && role === "sender" ? review ? (
           <View style={styles.reviewDone}><MaterialIcons name="star" size={20} color={RATING_STAR_COLOR} /><View style={styles.reviewDoneInfo}><Text style={styles.reviewDoneTitle}>Avis envoyé · {review.rating}/5</Text><Text style={styles.reviewDoneText}>{review.comment || "Votre évaluation est enregistrée dans votre historique."}</Text></View></View>
         ) : (
-          <TikisButton label="Noter le livreur" variant="ghost" icon="star-outline" onPress={() => router.push(`/review/${deliveryId}` as any)} style={styles.rateButton} />
+          <TikisseButton label="Noter le livreur" variant="ghost" icon="star-outline" onPress={() => router.push(`/review/${deliveryId}` as any)} style={styles.rateButton} />
         ) : null}
       </ScrollView>
 
@@ -413,13 +413,13 @@ function TimelineLine({ done }: { done: boolean }) {
 function DeliveryActionConfirmationModal({ visible, title, description, confirmLabel, tone, loading, onCancel, onConfirm }: { visible: boolean; title: string; description: string; confirmLabel: string; tone: "success" | "warning" | "danger"; loading: boolean; onCancel: () => void; onConfirm: () => void }) {
   const color = tone === "danger" ? "#A43740" : tone === "warning" ? "#A65300" : "#176C52";
   const background = tone === "danger" ? "#FFFFFF" : tone === "warning" ? "#FFFFFF" : "#E3E3E3";
-  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}><View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={onCancel} /><View style={styles.actionSheet}><View style={styles.actionHandle} /><View style={[styles.actionIcon, { backgroundColor: background }]}><MaterialIcons name={tone === "danger" ? "warning-amber" : tone === "warning" ? "pause-circle" : "play-circle"} size={24} color={color} /></View><Text style={styles.actionTitle}>{title}</Text><Text style={styles.actionDescription}>{description}</Text><TikisButton label={confirmLabel} variant={tone === "danger" ? "danger" : tone === "warning" ? "secondary" : "primary"} onPress={onConfirm} loading={loading} style={styles.actionConfirm} /><TikisButton label="Conserver la livraison" variant="ghost" onPress={onCancel} disabled={loading} style={styles.actionCancel} /></View></View></Modal>;
+  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}><View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={onCancel} /><View style={styles.actionSheet}><View style={styles.actionHandle} /><View style={[styles.actionIcon, { backgroundColor: background }]}><MaterialIcons name={tone === "danger" ? "warning-amber" : tone === "warning" ? "pause-circle" : "play-circle"} size={24} color={color} /></View><Text style={styles.actionTitle}>{title}</Text><Text style={styles.actionDescription}>{description}</Text><TikisseButton label={confirmLabel} variant={tone === "danger" ? "danger" : tone === "warning" ? "secondary" : "primary"} onPress={onConfirm} loading={loading} style={styles.actionConfirm} /><TikisseButton label="Conserver la livraison" variant="ghost" onPress={onCancel} disabled={loading} style={styles.actionCancel} /></View></View></Modal>;
 }
 
 function DriverActions({ deliveryStatus, ownCandidateStatus, loading, onApply, onWithdraw, onConfirm, onComplete }: { deliveryStatus: string; ownCandidateStatus?: string; loading: boolean; onApply: () => void; onWithdraw: () => void; onConfirm: () => void; onComplete: () => void }) {
-  if (deliveryStatus === "open") return <View style={styles.driverAction}>{ownCandidateStatus === "applied" ? <TikisButton label="Se retirer" variant="ghost" icon="undo" onPress={onWithdraw} loading={loading} disabled={loading} /> : <TikisButton label="Se proposer" icon="add-circle" onPress={onApply} loading={loading} disabled={loading} />}<Text style={styles.driverHint}>{ownCandidateStatus === "applied" ? "Votre candidature est enregistrée. Vous pouvez la retirer tant que vous n’êtes pas sélectionné." : "Postulez au prix client ou proposez votre prix via la modale de confirmation."}</Text></View>;
-  if (deliveryStatus === "pending_confirmation" && ownCandidateStatus === "selected") return <View style={styles.driverAction}><TikisButton label="Confirmer la course" icon="check-circle" onPress={onConfirm} loading={loading} disabled={loading} /><Text style={styles.driverHint}>Après confirmation, vos coordonnées seront partagées avec l’expéditeur.</Text></View>;
-  if (deliveryStatus === "active" && ownCandidateStatus === "confirmed") return <View style={styles.driverAction}><TikisButton label="Marquer comme terminée" icon="task-alt" onPress={onComplete} loading={loading} disabled={loading} /><Text style={styles.driverHint}>À utiliser après remise et paiement direct avec l’expéditeur.</Text></View>;
+  if (deliveryStatus === "open") return <View style={styles.driverAction}>{ownCandidateStatus === "applied" ? <TikisseButton label="Se retirer" variant="ghost" icon="undo" onPress={onWithdraw} loading={loading} disabled={loading} /> : <TikisseButton label="Se proposer" icon="add-circle" onPress={onApply} loading={loading} disabled={loading} />}<Text style={styles.driverHint}>{ownCandidateStatus === "applied" ? "Votre candidature est enregistrée. Vous pouvez la retirer tant que vous n’êtes pas sélectionné." : "Postulez au prix client ou proposez votre prix via la modale de confirmation."}</Text></View>;
+  if (deliveryStatus === "pending_confirmation" && ownCandidateStatus === "selected") return <View style={styles.driverAction}><TikisseButton label="Confirmer la course" icon="check-circle" onPress={onConfirm} loading={loading} disabled={loading} /><Text style={styles.driverHint}>Après confirmation, vos coordonnées seront partagées avec l’expéditeur.</Text></View>;
+  if (deliveryStatus === "active" && ownCandidateStatus === "confirmed") return <View style={styles.driverAction}><TikisseButton label="Marquer comme terminée" icon="task-alt" onPress={onComplete} loading={loading} disabled={loading} /><Text style={styles.driverHint}>À utiliser après remise et paiement direct avec l’expéditeur.</Text></View>;
   return null;
 }
 

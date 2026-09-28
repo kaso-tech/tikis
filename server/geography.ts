@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { geodesicDistanceKm, normalizeLocation, sanitizePlaceText } from "../lib/geo-rules";
 import { COUNTRIES } from "../lib/registration-rules";
 import { countryNameMatches, isoCountry } from "../shared/iso-countries";
-import type { LocationLabel, PlaceSuggestion } from "../shared/tikis-domain";
+import type { LocationLabel, PlaceSuggestion } from "../shared/tikisse-domain";
 import * as db from "./db";
 import { recordGeographicMetric } from "./geography-observability";
 
@@ -46,7 +46,7 @@ const CACHE_LIMIT = 200;
 const MAPBOX_TIMEOUT_MS = 8_000;
 const OSM_TIMEOUT_MS = 6_000;
 const OSM_MINIMUM_INTERVAL_MS = 1_000;
-const OSM_SEARCH_URL = process.env.TIKIS_OSM_SEARCH_URL || "https://nominatim.openstreetmap.org/search";
+const OSM_SEARCH_URL = process.env.TIKISSE_OSM_SEARCH_URL || process.env.TIKIS_OSM_SEARCH_URL || "https://nominatim.openstreetmap.org/search";
 let nextOpenStreetMapRequestAt = 0;
 
 function readCache<T>(cache: Map<string, CacheEntry<T>>, key: string) {
@@ -101,8 +101,8 @@ function placePersistenceInput(place: LocationLabel) {
 
 async function rememberResolvedPlace(place: LocationLabel) {
   try {
-    const persisted = await db.saveTikisPlace(placePersistenceInput(place));
-    return db.tikisPlaceToLocation(persisted);
+    const persisted = await db.saveTikissePlace(placePersistenceInput(place));
+    return db.tikissePlaceToLocation(persisted);
   } catch {
     // Le cache améliore les performances mais ne doit jamais empêcher une sélection géographique valide.
     return place;
@@ -257,7 +257,7 @@ async function searchOpenStreetMapPlaces(query: string, countryCode?: string) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), OSM_TIMEOUT_MS);
   try {
-    const response = await fetch(url, { headers: { "User-Agent": "Tikis development place search/1.0", "Accept-Language": "fr" }, signal: controller.signal });
+    const response = await fetch(url, { headers: { "User-Agent": "Tikisse development place search/1.0", "Accept-Language": "fr" }, signal: controller.signal });
     if (!response.ok) return [];
     const payload = await response.json() as unknown;
     return Array.isArray(payload) ? payload.map((item) => openStreetMapLocation(item as OpenStreetMapPlace)).filter((item): item is LocationLabel => Boolean(item)) : [];
@@ -281,7 +281,7 @@ async function reverseOpenStreetMapLocation(latitude: number, longitude: number,
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), OSM_TIMEOUT_MS);
   try {
-    const response = await fetch(url, { headers: { "User-Agent": "Tikis development place search/1.0", "Accept-Language": "fr" }, signal: controller.signal });
+    const response = await fetch(url, { headers: { "User-Agent": "Tikisse development place search/1.0", "Accept-Language": "fr" }, signal: controller.signal });
     if (!response.ok) return null;
     const item = await response.json() as OpenStreetMapPlace;
     const place = openStreetMapLocation({ ...item, lat: String(latitude), lon: String(longitude) }, "reverse");
@@ -428,8 +428,8 @@ export async function searchPlaces(query: string, bias?: { latitude: number; lon
 export async function resolveMapboxPlace(mapboxId: string, sessionToken?: string, countryCode?: string) {
   const safeId = mapboxId.trim();
   if (!safeId || safeId.length > 255) throw new Error("Identifiant Mapbox invalide.");
-  const cached = await db.getTikisPlaceByMapboxId(safeId);
-  if (cached) { recordGeographicMetric("resolve", "cache_hit"); return ensureCountry(db.tikisPlaceToLocation(cached), countryCode); }
+  const cached = await db.getTikissePlaceByMapboxId(safeId);
+  if (cached) { recordGeographicMetric("resolve", "cache_hit"); return ensureCountry(db.tikissePlaceToLocation(cached), countryCode); }
   const startedAt = Date.now();
   const url = new URL(`https://api.mapbox.com/search/searchbox/v1/retrieve/${encodeURIComponent(safeId)}`);
   url.searchParams.set("session_token", sessionToken?.trim() || randomUUID());
@@ -444,8 +444,8 @@ export async function resolveMapboxPlace(mapboxId: string, sessionToken?: string
 }
 
 export async function reverseGeocodeLocation(latitude: number, longitude: number, countryCode?: string) {
-  const cached = await db.getTikisPlaceByCoordinate(latitude, longitude);
-  if (cached) { recordGeographicMetric("reverse", "cache_hit"); return { ...ensureCountry(db.tikisPlaceToLocation(cached), countryCode), source: "reverse" as const }; }
+  const cached = await db.getTikissePlaceByCoordinate(latitude, longitude);
+  if (cached) { recordGeographicMetric("reverse", "cache_hit"); return { ...ensureCountry(db.tikissePlaceToLocation(cached), countryCode), source: "reverse" as const }; }
   const startedAt = Date.now();
   let mapboxPlace: LocationLabel | null = null;
   let mapboxErrorCause: unknown = null;

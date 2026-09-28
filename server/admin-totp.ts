@@ -5,7 +5,7 @@
  * Aucune dépendance externe pour le calcul : c'est une trentaine de lignes de crypto native, vérifiées
  * contre les vecteurs de test de la RFC (tests/admin-totp.test.ts).
  *
- * Le secret partagé n'est jamais stocké en clair : il est chiffré (AES-256-GCM) avec TIKIS_ADMIN_TOTP_KEY,
+ * Le secret partagé n'est jamais stocké en clair : il est chiffré (AES-256-GCM) avec TIKISSE_ADMIN_TOTP_KEY,
  * une clé qui ne vit que dans l'environnement du serveur. Une copie de la base (sauvegarde, export) ne
  * suffit donc pas à générer des codes. Les codes de secours ne sont gardés qu'en empreinte SHA-256.
  */
@@ -16,7 +16,7 @@ export const TOTP_STEP_SECONDS = 30;
 export const TOTP_DIGITS = 6;
 /** Tolérance d'un pas de chaque côté : un téléphone décalé de ±30 s fonctionne encore. */
 export const TOTP_WINDOW = 1;
-export const TOTP_ISSUER = "Tikis Admin";
+export const TOTP_ISSUER = "Tikisse Admin";
 export const RECOVERY_CODE_COUNT = 10;
 
 const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -113,9 +113,9 @@ export async function otpauthQrSvg(uri: string) {
 // ————————————————————————————————————————————————————————————————————————
 
 function totpKey(): Buffer {
-  const value = process.env.TIKIS_ADMIN_TOTP_KEY;
+  const value = process.env.TIKISSE_ADMIN_TOTP_KEY ?? process.env.TIKIS_ADMIN_TOTP_KEY;
   if (!value || value.length < 32) {
-    throw new Error("La double authentification n’est pas configurée sur ce serveur : définissez TIKIS_ADMIN_TOTP_KEY (32 caractères ou plus, aléatoire, distinct des autres secrets).");
+    throw new Error("La double authentification n’est pas configurée sur ce serveur : définissez TIKISSE_ADMIN_TOTP_KEY (32 caractères ou plus, aléatoire, distinct des autres secrets).");
   }
   return createHash("sha256").update(value, "utf8").digest();
 }

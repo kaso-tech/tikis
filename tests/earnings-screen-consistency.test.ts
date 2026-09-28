@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { computeDriverEarningsTrend } from "../server/analytics";
-import { netDriverEarning } from "../shared/tikis-domain";
+import { netDriverEarning } from "../shared/tikisse-domain";
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 

@@ -1,8 +1,8 @@
-# Logique métier — Gestion des lieux Tikis
+# Logique métier — Gestion des lieux Tikisse
 
 ## 1. Principe fondamental
 
-Dans Tikis, un lieu est une entité géographique identifiable par ses coordonnées GPS.
+Dans Tikisse, un lieu est une entité géographique identifiable par ses coordonnées GPS.
 
 Les coordonnées GPS constituent la source de vérité technique du lieu.
 
@@ -19,7 +19,7 @@ Une information d'affichage ne doit jamais remplacer les coordonnées GPS pour l
 
 ## 2. Modèle métier d'un lieu
 
-Chaque lieu Tikis possède deux catégories d'informations.
+Chaque lieu Tikisse possède deux catégories d'informations.
 
 ### 2.1. Données techniques
 
@@ -59,7 +59,7 @@ Ces informations peuvent provenir de différentes sources :
 
 1. Google Places ;
 2. Reverse Geocoding ;
-3. données déjà enregistrées dans Tikis ;
+3. données déjà enregistrées dans Tikisse ;
 4. informations saisies ou sélectionnées par l'utilisateur.
 
 Le système doit privilégier les données les plus précises et les plus fiables disponibles.
@@ -68,9 +68,9 @@ Le système doit privilégier les données les plus précises et les plus fiable
 
 ## 3. Un lieu doit être réutilisable
 
-Lorsqu'un même lieu est utilisé plusieurs fois dans Tikis, le système doit réutiliser ses informations existantes plutôt que recommencer inutilement les recherches géographiques.
+Lorsqu'un même lieu est utilisé plusieurs fois dans Tikisse, le système doit réutiliser ses informations existantes plutôt que recommencer inutilement les recherches géographiques.
 
-**Exemple :** si Tikis connaît déjà « Maison du Peuple, Ouagadougou » et que l'utilisateur sélectionne à nouveau ce lieu, Tikis doit réutiliser les informations disponibles lorsque cela est possible.
+**Exemple :** si Tikisse connaît déjà « Maison du Peuple, Ouagadougou » et que l'utilisateur sélectionne à nouveau ce lieu, Tikisse doit réutiliser les informations disponibles lorsque cela est possible.
 
 L'objectif est d'éviter :
 
@@ -83,7 +83,7 @@ L'objectif est d'éviter :
 
 ## 4. Sélection d'un lieu
 
-Lorsqu'un utilisateur sélectionne un lieu sur une carte, dans une recherche ou parmi ses favoris, Tikis doit considérer cette action comme une sélection de lieu géographique.
+Lorsqu'un utilisateur sélectionne un lieu sur une carte, dans une recherche ou parmi ses favoris, Tikisse doit considérer cette action comme une sélection de lieu géographique.
 
 La sélection doit fournir au système toutes les informations disponibles sur le lieu :
 
@@ -100,7 +100,7 @@ La sélection d'un marker ne doit déclencher aucune action métier secondaire. 
 
 ## 5. Classification du lieu
 
-Après sélection ou récupération d'un lieu, Tikis doit déterminer les informations géographiques disponibles.
+Après sélection ou récupération d'un lieu, Tikisse doit déterminer les informations géographiques disponibles.
 
 Le système doit notamment déterminer :
 
@@ -119,7 +119,7 @@ Cette classification permet ensuite de déterminer automatiquement le libellé a
 
 Un même lieu peut être affiché différemment selon le contexte. Par exemple, une adresse complète peut être inutile dans une liste de livraisons mais nécessaire dans la page de détail.
 
-Tikis doit donc adapter le niveau d'information au contexte. Il existe quatre principaux contextes métier :
+Tikisse doit donc adapter le niveau d'information au contexte. Il existe quatre principaux contextes métier :
 
 ### 6.1. Liste de livraisons
 **Objectif :** comprendre immédiatement le trajet. Le libellé doit être court.
@@ -137,11 +137,11 @@ Tikis doit donc adapter le niveau d'information au contexte. Il existe quatre pr
 
 ## 7. Règle métier principale des listes de livraison
 
-Pour une livraison, Tikis compare les villes du point de collecte et du point de destination.
+Pour une livraison, Tikisse compare les villes du point de collecte et du point de destination.
 
 ### 7.1. Même ville
 
-Lorsque les deux lieux appartiennent à la même ville, Tikis doit privilégier la compréhension locale.
+Lorsque les deux lieux appartiennent à la même ville, Tikisse doit privilégier la compréhension locale.
 
 Ordre de préférence :
 
@@ -163,7 +163,7 @@ Le système doit toujours privilégier l'information la plus utile et la plus co
 
 ## 8. Villes différentes
 
-Lorsque le point de collecte et le point de destination sont situés dans des villes différentes, Tikis doit simplifier fortement l'affichage.
+Lorsque le point de collecte et le point de destination sont situés dans des villes différentes, Tikisse doit simplifier fortement l'affichage.
 
 Le format principal devient : **« Ville → Ville »**
 
@@ -179,7 +179,7 @@ Dans ce contexte, les quartiers et rues ne doivent pas être affichés dans la c
 
 ## 9. Gestion des lieux situés hors agglomération
 
-Si un lieu ne possède pas de quartier identifiable, Tikis ne doit pas considérer cela comme une erreur. Le système doit descendre automatiquement dans la hiérarchie disponible.
+Si un lieu ne possède pas de quartier identifiable, Tikisse ne doit pas considérer cela comme une erreur. Le système doit descendre automatiquement dans la hiérarchie disponible.
 
 **Exemple :** lieu avec latitude + longitude, ville = Koudougou, quartier = absent, place_name = absent → résultat : « Koudougou ».
 
@@ -224,7 +224,7 @@ Le système ne doit pas afficher systématiquement l'adresse complète lorsqu'un
 
 ## 12. Fallback universel
 
-Lorsqu'un lieu ne possède pas toutes les informations nécessaires, Tikis doit construire automatiquement le meilleur libellé possible.
+Lorsqu'un lieu ne possède pas toutes les informations nécessaires, Tikisse doit construire automatiquement le meilleur libellé possible.
 
 Hiérarchie :
 
@@ -280,12 +280,12 @@ Google Places et le Reverse Geocoding sont des sources d'enrichissement des lieu
 
 Lorsqu'un lieu est sélectionné :
 
-1. Tikis récupère les coordonnées GPS ;
-2. Tikis utilise les données disponibles du lieu ;
-3. Tikis complète les informations manquantes si nécessaire ;
-4. Tikis normalise les informations ;
-5. Tikis conserve le résultat réutilisable ;
-6. Tikis construit les libellés nécessaires selon le contexte.
+1. Tikisse récupère les coordonnées GPS ;
+2. Tikisse utilise les données disponibles du lieu ;
+3. Tikisse complète les informations manquantes si nécessaire ;
+4. Tikisse normalise les informations ;
+5. Tikisse conserve le résultat réutilisable ;
+6. Tikisse construit les libellés nécessaires selon le contexte.
 
 Si les informations nécessaires sont déjà disponibles, aucun nouvel appel externe ne doit être effectué inutilement.
 
@@ -295,7 +295,7 @@ Si les informations nécessaires sont déjà disponibles, aucun nouvel appel ext
 
 Les informations géographiques doivent être réutilisées lorsqu'elles sont déjà connues.
 
-Avant d'effectuer une nouvelle recherche, Tikis doit vérifier si les données nécessaires sont déjà disponibles.
+Avant d'effectuer une nouvelle recherche, Tikisse doit vérifier si les données nécessaires sont déjà disponibles.
 
 Le système doit notamment éviter de répéter inutilement :
 
@@ -334,7 +334,7 @@ Les coordonnées GPS restent la référence pour :
 
 Le même lieu doit être représenté de manière cohérente dans toute l'application.
 
-Par exemple, si Tikis identifie « Maison du Peuple, Ouagadougou », la liste, le détail, les favoris et la sélection de lieu doivent tous utiliser les mêmes données de base.
+Par exemple, si Tikisse identifie « Maison du Peuple, Ouagadougou », la liste, le détail, les favoris et la sélection de lieu doivent tous utiliser les mêmes données de base.
 
 Seul le niveau de détail affiché peut changer selon le contexte.
 
@@ -393,7 +393,7 @@ Le système doit fonctionner correctement dans les situations suivantes :
 
 ## 22. Résultat métier attendu
 
-Le système de gestion des lieux Tikis doit fonctionner selon le principe suivant :
+Le système de gestion des lieux Tikisse doit fonctionner selon le principe suivant :
 
 > GPS → Identification du lieu → Enrichissement → Normalisation → Classification → Formatage contextuel → Affichage
 
@@ -408,7 +408,7 @@ L'utilisateur ne doit jamais avoir à comprendre la structure technique des donn
 
 ## 23. Règle d'or
 
-> **Tikis doit stocker et calculer avec des données géographiques précises, mais communiquer avec l'utilisateur avec des informations géographiques simples et naturelles.**
+> **Tikisse doit stocker et calculer avec des données géographiques précises, mais communiquer avec l'utilisateur avec des informations géographiques simples et naturelles.**
 
 **Technique :** `12.3714, -1.5197` — Google Place ID — `formatted_address`
 **Utilisateur :** « Maison du Peuple / Ouagadougou »

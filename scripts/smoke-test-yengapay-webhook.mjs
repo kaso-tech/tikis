@@ -4,7 +4,7 @@
  * un payload signé avec un secret HMAC connu, et qu'il rejette une signature invalide.
  *
  * Usage :
- *   # Depuis la racine du repo Tikis, serveur lancé en local sur le port 3000 :
+ *   # Depuis la racine du repo Tikisse, serveur lancé en local sur le port 3000 :
  *   YENGAPAY_WEBHOOK_SECRET=test-secret node scripts/smoke-test-yengapay-webhook.mjs
  *   YENGAPAY_WEBHOOK_SECRET=test-secret \
  *     BASE_URL=http://localhost:3000 \
@@ -15,7 +15,7 @@
  *   - Code de sortie 0 si OK, 1 si KO.
  *
  * Pré-requis :
- *   - Serveur Tikis lancé en local (mode `test` accepté, le handler renverra 503 — c'est
+ *   - Serveur Tikisse lancé en local (mode `test` accepté, le handler renverra 503 — c'est
  *     attendu : on valide ici uniquement la couche signature/parse, pas le settlement).
  *   - Variable d'env YENGAPAY_WEBHOOK_SECRET alignée avec celle utilisée par le serveur.
  */

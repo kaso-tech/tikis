@@ -101,7 +101,7 @@ export default function MaintenancePage() {
                 createdAt: new Date(entry.createdAt).toISOString(),
                 metadata: entry.metadata ?? "",
               })));
-              downloadCsv(`tikis-maintenance-history-${new Date().toISOString().slice(0, 10)}`, csv);
+              downloadCsv(`tikisse-maintenance-history-${new Date().toISOString().slice(0, 10)}`, csv);
             }}
           >
             Exporter l’historique
@@ -123,7 +123,7 @@ export default function MaintenancePage() {
           {!canEdit ? <div style={{ fontSize: 13, color: "var(--muted)" }}>Réservé aux super-administrateurs.</div> : (
             <>
               <label className="field-label">Message affiché aux utilisateurs (optionnel)</label>
-              <textarea className="input" rows={3} placeholder="Ex. Tikis est en maintenance pour une amélioration du service. Merci de votre patience, nous serons de retour très vite." value={message} onChange={(e) => setMessage(e.target.value)} style={{ marginBottom: 14 }} />
+              <textarea className="input" rows={3} placeholder="Ex. Tikisse est en maintenance pour une amélioration du service. Merci de votre patience, nous serons de retour très vite." value={message} onChange={(e) => setMessage(e.target.value)} style={{ marginBottom: 14 }} />
               <div style={{ display: "flex", gap: 8 }}>
                 {!enabled ? (
                   <button className="btn btn-danger" disabled={saving} onClick={() => void apply(true)}>{saving ? "…" : "Activer la maintenance"}</button>
@@ -147,7 +147,7 @@ export default function MaintenancePage() {
               <div className="phone-status"><span>9:41</span><span>•••</span></div>
               <div className="phone-screen">
                 <div className="phone-icon">🛠</div>
-                <div className="phone-title">Tikis en maintenance</div>
+                <div className="phone-title">Tikisse en maintenance</div>
                 <div className="phone-text">{message.trim() || "L’application est momentanément indisponible. L’équipe technique travaille pour la rétablir très bientôt."}</div>
                 <div className="phone-foot">Merci de votre patience.</div>
               </div>

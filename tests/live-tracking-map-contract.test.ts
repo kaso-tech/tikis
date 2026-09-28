@@ -2,9 +2,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const nativeHome = readFileSync(join(process.cwd(), "components/tikis/screens/home-screen.native.tsx"), "utf8");
-const webHome = readFileSync(join(process.cwd(), "components/tikis/screens/home-screen.web.tsx"), "utf8");
-const homeResolver = readFileSync(join(process.cwd(), "components/tikis/screens/home-screen.tsx"), "utf8");
+const nativeHome = readFileSync(join(process.cwd(), "components/tikisse/screens/home-screen.native.tsx"), "utf8");
+const webHome = readFileSync(join(process.cwd(), "components/tikisse/screens/home-screen.web.tsx"), "utf8");
+const homeResolver = readFileSync(join(process.cwd(), "components/tikisse/screens/home-screen.tsx"), "utf8");
 
 describe("contrat de suivi cartographique", () => {
   it("charge la carte native sur iOS et Android plutôt que la variante web", () => {

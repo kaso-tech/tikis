@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { autoCompletionTimestamp, DELIVERY_EXPIRATION_MS } from "../shared/delivery-expiration";
 import { deliveryMetricsForDay } from "../lib/wallet-metrics";
-import type { FinancialRecord } from "../shared/tikis-domain";
+import type { FinancialRecord } from "../shared/tikisse-domain";
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 const at = (iso: string) => new Date(iso).getTime();
@@ -64,7 +64,7 @@ describe("une course clôturée automatiquement est datée de son échéance", (
 
 describe("l'écran Gains n'estime plus l'avenir", () => {
   it("ni le calcul, ni la carte, ni l'API ne produisent d'estimation des jours à venir", () => {
-    for (const fichier of ["server/analytics.ts", "components/tikis/driver-earnings-trend.tsx", "server/_test-helpers/driver-earnings-projection.ts"]) {
+    for (const fichier of ["server/analytics.ts", "components/tikisse/driver-earnings-trend.tsx", "server/_test-helpers/driver-earnings-projection.ts"]) {
       const source = read(fichier);
       expect(source).not.toContain("projection30Days");
       expect(source).not.toContain("PROCHAINS JOURS");

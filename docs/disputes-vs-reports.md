@@ -2,11 +2,11 @@
 
 ## État actuel
 
-**Une seule table** : `tikis_delivery_reports` (alias "signalements").
+**Une seule table** : `tikisse_delivery_reports` (alias "signalements").
 
-Historique : une table `tikis_disputes` (alias "litiges") avait été évoquée pour un
+Historique : une table `tikisse_disputes` (alias "litiges") avait été évoquée pour un
 workflow de médiation plus poussé (échange contradictoire, score de confiance, etc.).
-**Elle n'a jamais été implémentée** : tout passe par `tikis_delivery_reports`.
+**Elle n'a jamais été implémentée** : tout passe par `tikisse_delivery_reports`.
 
 ## Pourquoi pas deux tables ?
 
@@ -20,7 +20,7 @@ aujourd'hui car :
   via `disputes.timeline` qui agrège toutes les sources.
 - Une seule table = un seul set de statuts, plus simple à auditer.
 
-## Quand recréer `tikis_disputes` ?
+## Quand recréer `tikisse_disputes` ?
 
 Si l'un de ces seuils est franchi :
 
@@ -33,16 +33,16 @@ Si l'un de ces seuils est franchi :
 
 ## Migration future
 
-Si on recrée `tikis_disputes`, la migration sera non destructive :
+Si on recrée `tikisse_disputes`, la migration sera non destructive :
 ```sql
-CREATE TABLE tikis_disputes (
+CREATE TABLE tikisse_disputes (
   id varchar(40) PRIMARY KEY,
-  reportId varchar(40) NOT NULL,  -- FK vers tikis_delivery_reports.id
+  reportId varchar(40) NOT NULL,  -- FK vers tikisse_delivery_reports.id
   deliveryId varchar(40) NOT NULL,
   -- colonnes spécifiques au workflow contradictoire
   ...
 );
-ALTER TABLE tikis_disputes ADD CONSTRAINT fk_dispute_report
-  FOREIGN KEY (reportId) REFERENCES tikis_delivery_reports(id);
+ALTER TABLE tikisse_disputes ADD CONSTRAINT fk_dispute_report
+  FOREIGN KEY (reportId) REFERENCES tikisse_delivery_reports(id);
 ```
 

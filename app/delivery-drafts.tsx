@@ -3,16 +3,16 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { TikisButton } from "@/components/tikis/ui";
+import { TikisseButton } from "@/components/tikisse/ui";
 import { deleteDeliveryDraft, listDeliveryDrafts, type DeliveryDraft } from "@/lib/delivery-drafts";
 import { locationTitle } from "@/lib/geo-rules";
 import { haptic } from "@/lib/haptics";
-import { useTikisStore } from "@/lib/tikis-store";
+import { useTikisseStore } from "@/lib/tikisse-store";
 import { useThemeColors } from "@/lib/use-theme-colors";
 
 export default function DeliveryDraftsScreen() {
   const router = useRouter();
-  const { profile } = useTikisStore();
+  const { profile } = useTikisseStore();
   const { colors: theme } = useThemeColors();
   const [drafts, setDrafts] = useState<DeliveryDraft[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,7 +87,7 @@ export default function DeliveryDraftsScreen() {
           </View>
           <Text style={[styles.emptyTitle, { color: theme.foreground }]}>Aucun brouillon</Text>
           <Text style={[styles.emptyText, { color: theme.muted }]}>Vos livraisons non publiées sont sauvegardées ici automatiquement depuis la page de création.</Text>
-          <TikisButton label="Créer une livraison" icon="add" onPress={() => router.push("/create-delivery" as any)} style={styles.emptyCta} />
+          <TikisseButton label="Créer une livraison" icon="add" onPress={() => router.push("/create-delivery" as any)} style={styles.emptyCta} />
         </View>
       ) : (
         <FlatList

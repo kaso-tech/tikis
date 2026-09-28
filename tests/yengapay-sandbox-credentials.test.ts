@@ -20,7 +20,7 @@ describe("identifiants du projet YengaPay Sandbox", () => {
     const organizationId = configured("YENGAPAY_ORG_ID");
     const projectId = configured("YENGAPAY_PROJECT_ID");
     const baseUrl = (process.env.YENGAPAY_BASE_URL ?? SANDBOX_BASE_URL).replace(/\/$/, "");
-    const sentinelIntentId = "tikis-sandbox-health-check-does-not-exist";
+    const sentinelIntentId = "tikisse-sandbox-health-check-does-not-exist";
     const response = await fetch(`${baseUrl}/groups/${encodeURIComponent(organizationId)}/payment-intent/project/${encodeURIComponent(projectId)}/intent/${sentinelIntentId}`, {
       headers: { "x-api-key": apiKey },
       signal: AbortSignal.timeout(15_000),

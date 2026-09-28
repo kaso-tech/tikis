@@ -2,7 +2,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Alert, Platform } from "react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { KycCapture, KycDocumentKind } from "@/components/tikis/kyc-uploader";
+import type { KycCapture, KycDocumentKind } from "@/components/tikisse/kyc-uploader";
 import { trpc } from "@/lib/trpc";
 
 export type KycStatus = "not_started" | "in_progress" | "submitted" | "approved" | "rejected";

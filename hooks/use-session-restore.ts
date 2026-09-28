@@ -1,9 +1,9 @@
 /**
  * Rend la session au démarrage, au lieu de la redemander.
  *
- * Le jeton de session vit un an (server/tikis-session.ts) et survit à la fermeture de
+ * Le jeton de session vit un an (server/tikisse-session.ts) et survit à la fermeture de
  * l'application — stockage sécurisé de l'OS en natif, cookie httpOnly sur le web. Mais le profil,
- * lui, vivait uniquement dans l'état React de `TikisStoreProvider` : à chaque relance, et à chaque
+ * lui, vivait uniquement dans l'état React de `TikisseStoreProvider` : à chaque relance, et à chaque
  * rechargement d'Expo Go, il repartait à `null`, l'écran d'accueil montrait le parcours
  * d'authentification, et il fallait ressaisir son numéro alors que le jeton posé sur l'appareil
  * était toujours valide. Personne ne se reconnecte à WhatsApp à chaque ouverture.
@@ -17,8 +17,8 @@
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
 import { Platform } from "react-native";
-import { getTikisSessionToken } from "@/lib/tikis-session";
-import { useTikisStore } from "@/lib/tikis-store";
+import { getTikisseSessionToken } from "@/lib/tikisse-session";
+import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
 
 export type SessionRestoreState =
@@ -30,7 +30,7 @@ export type SessionRestoreState =
   | "absent";
 
 export function useSessionRestore(): SessionRestoreState {
-  const { profile, signInProfile } = useTikisStore();
+  const { profile, signInProfile } = useTikisseStore();
   const utilities = trpc.useUtils();
   // Un profil déjà en mémoire (retour sur l'accueil après une déconnexion, par exemple) n'a rien à
   // restaurer : on ne veut ni l'appel réseau, ni l'écran d'attente.
@@ -50,7 +50,7 @@ export function useSessionRestore(): SessionRestoreState {
       try {
         // En natif, l'absence de jeton tranche sans réseau. Sur le web, le cookie est httpOnly donc
         // illisible d'ici : seul l'appel peut répondre, et il part avec `credentials: "include"`.
-        if (Platform.OS !== "web" && !(await getTikisSessionToken())) {
+        if (Platform.OS !== "web" && !(await getTikisseSessionToken())) {
           if (active) setState("absent");
           return;
         }

@@ -1,5 +1,5 @@
 import type { CookieOptions, Request, Response } from "express";
-import { TIKIS_SESSION_TTL_SECONDS } from "../tikis-session";
+import { TIKISSE_SESSION_TTL_SECONDS } from "../tikisse-session";
 import { ADMIN_SESSION_COOKIE } from "../admin-auth";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
@@ -16,7 +16,7 @@ function isIpAddress(host: string) {
  * This allows cookies set by 3000-xxx to be read by 8081-xxx
  *
  * Réservé aux environnements de prévisualisation, dont les sous-domaines
- * changent à chaque session. En production, `TIKIS_COOKIE_DOMAIN` (plus bas)
+ * changent à chaque session. En production, `TIKISSE_COOKIE_DOMAIN` (plus bas)
  * fixe la valeur au lieu de la dériver de l'en-tête `Host` de la requête : le
  * dériver dynamiquement revenait à laisser quiconque contrôle cet en-tête
  * choisir le domaine sur lequel le cookie de session s'applique.
@@ -44,12 +44,12 @@ function getParentDomain(hostname: string): string | undefined {
 export function getSessionCookieOptions(
   req: Request,
 ): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
-  // En production, TIKIS_COOKIE_DOMAIN fixe le domaine explicitement (ex. ".tikis.app") plutôt
+  // En production, TIKISSE_COOKIE_DOMAIN fixe le domaine explicitement (ex. ".tikisse.app") plutôt
   // que de le recalculer depuis l'en-tête Host de chaque requête — un en-tête que le client
   // choisit. Sans cette variable (environnements de prévisualisation, développement local), le
   // calcul dynamique historique reste le seul moyen de partager le cookie entre sous-domaines
   // éphémères.
-  const fixedDomain = process.env.TIKIS_COOKIE_DOMAIN?.trim();
+  const fixedDomain = process.env.TIKISSE_COOKIE_DOMAIN?.trim() || process.env.TIKIS_COOKIE_DOMAIN?.trim();
   const domain = fixedDomain || getParentDomain(req.hostname);
 
   return {
@@ -67,19 +67,24 @@ export function getSessionCookieOptions(
   };
 }
 
-export const TIKIS_PROFILE_COOKIE = "tikis-profile-session";
+export const TIKISSE_PROFILE_COOKIE = "tikisse-profile-session";
+// Renommage Tikis → Tikisse : nom du cookie posé avant le renommage. Un navigateur déjà connecté le porte
+// encore ; server/_core/context.ts le relit en secours pour ne pas déconnecter le web au déploiement. Il
+// disparaît de lui-même (le cookie expire, ou est remplacé par TIKISSE_PROFILE_COOKIE à la prochaine
+// connexion) : rien à retirer explicitement plus tard.
+export const LEGACY_TIKIS_PROFILE_COOKIE = "tikis-profile-session";
 // Dérivé de la durée de vie du jeton lui-même : un cookie qui expire avant le JWT qu'il transporte
 // déconnecterait le web plus tôt que le natif, sans raison.
-export const TIKIS_PROFILE_COOKIE_MAX_AGE_MS = TIKIS_SESSION_TTL_SECONDS * 1000;
+export const TIKISSE_PROFILE_COOKIE_MAX_AGE_MS = TIKISSE_SESSION_TTL_SECONDS * 1000;
 
-export function setTikisProfileCookie(res: Pick<Response, "cookie" | "clearCookie">, req: Request, token: string) {
+export function setTikisseProfileCookie(res: Pick<Response, "cookie" | "clearCookie">, req: Request, token: string) {
   if (!res || typeof (res as { cookie?: unknown }).cookie !== "function") return;
-  res.cookie(TIKIS_PROFILE_COOKIE, token, { ...getSessionCookieOptions(req), maxAge: TIKIS_PROFILE_COOKIE_MAX_AGE_MS });
+  res.cookie(TIKISSE_PROFILE_COOKIE, token, { ...getSessionCookieOptions(req), maxAge: TIKISSE_PROFILE_COOKIE_MAX_AGE_MS });
 }
 
-export function clearTikisProfileCookie(res: Pick<Response, "cookie" | "clearCookie">, req: Request) {
+export function clearTikisseProfileCookie(res: Pick<Response, "cookie" | "clearCookie">, req: Request) {
   if (!res || typeof (res as { cookie?: unknown }).cookie !== "function") return;
-  res.clearCookie(TIKIS_PROFILE_COOKIE, getSessionCookieOptions(req));
+  res.clearCookie(TIKISSE_PROFILE_COOKIE, getSessionCookieOptions(req));
 }
 
 /**

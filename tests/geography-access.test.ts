@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "../server/_core/context";
 
-// Le middleware d'authentification (`requireTikisProfile`) et le rate-limit géographique
+// Le middleware d'authentification (`requireTikisseProfile`) et le rate-limit géographique
 // (`enforceGeographyRateLimit`) appellent tous deux `server/db` avant que `geography.search`
 // ne soit atteint. Sans ce mock, le second test touchait une vraie connexion base de
 // données — absente de cet environnement de test — et échouait sur « Le service des
@@ -9,7 +9,7 @@ import type { TrpcContext } from "../server/_core/context";
 // réellement. La dérivation du pays elle-même (`sessionCountryCode`) est pure : rien dans
 // ce test n'a jamais eu besoin d'infrastructure réelle.
 const dbMock = vi.hoisted(() => ({
-  getTikisProfileByPhone: vi.fn(),
+  getTikisseProfileByPhone: vi.fn(),
   checkDistributedRateLimit: vi.fn(),
 }));
 
@@ -23,7 +23,7 @@ const originalFetch = global.fetch;
 function contextFor(phone: string | null): TrpcContext {
   return {
     user: null,
-    tikisProfilePhone: phone,
+    tikisseProfilePhone: phone,
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { clearCookie: () => undefined } as unknown as TrpcContext["res"],
   };
@@ -35,14 +35,14 @@ afterEach(() => {
   resetGeographicCachesForTests();
 });
 
-describe("accès géographique Tikis", () => {
-  it("refuse toute recherche sans session Tikis signée", async () => {
+describe("accès géographique Tikisse", () => {
+  it("refuse toute recherche sans session Tikisse signée", async () => {
     const caller = appRouter.createCaller(contextFor(null));
     await expect(caller.geography.search({ query: "Ouagadougou" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
   it("impose le pays déduit du profil même si le client en transmet un autre", async () => {
-    dbMock.getTikisProfileByPhone.mockResolvedValue({ phone: "+22677777777", accountType: "sender", status: "active", deletedAt: null });
+    dbMock.getTikisseProfileByPhone.mockResolvedValue({ phone: "+22677777777", accountType: "sender", status: "active", deletedAt: null });
     dbMock.checkDistributedRateLimit.mockResolvedValue(true);
     process.env.MAPBOX_SECRET_ACCESS_TOKEN = "backend-test-token";
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ suggestions: [] })));

@@ -13,7 +13,7 @@ const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
  * appels qui coûtent quelque chose, et chacun corrige une dépense qui était bien réelle.
  */
 describe("appels Mapbox facturés", () => {
-  const picker = read("components/tikis/yango-address-picker.tsx");
+  const picker = read("components/tikisse/yango-address-picker.tsx");
 
   it("le sélecteur d'adresse ne lance plus deux recherches par requête saisie", () => {
     // Un second minuteur partait en parallèle du debounce et élargissait systématiquement, ce qui

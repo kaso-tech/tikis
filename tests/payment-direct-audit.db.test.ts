@@ -3,17 +3,17 @@
  *
  * Ces tests appellent les fonctions qui créditent réellement les Wallets — règlement, webhook —, sans
  * rien simuler de la base : ce sont elles qu'un défaut ferait payer en argent. Ils ne tournent que si
- * TIKIS_TEST_DATABASE_URL désigne une base jetable dont le schéma a été poussé :
+ * TIKISSE_TEST_DATABASE_URL désigne une base jetable dont le schéma a été poussé :
  *
  *   DATABASE_URL=<url> npx drizzle-kit push --force
- *   TIKIS_TEST_DATABASE_URL=<url> npx vitest run tests/payment-direct-audit.db.test.ts
+ *   TIKISSE_TEST_DATABASE_URL=<url> npx vitest run tests/payment-direct-audit.db.test.ts
  *
  * Jamais une base de production : chaque test crée ses propres profils et transactions.
  */
 import { createHmac, randomUUID } from "node:crypto";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
-const TEST_DB = process.env.TIKIS_TEST_DATABASE_URL;
+const TEST_DB = process.env.TIKISSE_TEST_DATABASE_URL;
 if (TEST_DB) process.env.DATABASE_URL = TEST_DB;
 
 const SECRET = "whsec_audit_test_only";
@@ -55,7 +55,7 @@ beforeAll(async () => {
 const newPhone = () => `+22670${String(Math.floor(Math.random() * 1e6)).padStart(6, "0")}`;
 
 async function balance(phone: string) {
-  return (await db.getTikisWalletSnapshot(phone)).total;
+  return (await db.getTikisseWalletSnapshot(phone)).total;
 }
 
 /** Une transaction en attente, telle que la créent les parcours checkout ou paiement direct. */
@@ -63,7 +63,7 @@ async function pendingPayment(phone: string, provider: "yengapay_test" | "yengap
   const handle = (await db.getDb())!;
   const id = randomUUID();
   const providerReference = `pi_audit_${id}`;
-  await handle.insert(schema.tikisPaymentTransactions).values({
+  await handle.insert(schema.tikissePaymentTransactions).values({
     id, profilePhone: phone, type: "deposit", provider, amount, status: "pending", providerReference,
     checkoutUrl: null, idempotencyKey: `audit:${id}`,
     ...(provider.startsWith("yengapay_direct_") ? { phoneE164: phone, operatorCode: "orange_money", countryCode: "BF", ussdCode: "*144#", expiresAt: new Date(Date.now() + 15 * 60_000) } : {}),
@@ -130,7 +130,7 @@ describe.skipIf(!TEST_DB)("paiement direct — un paiement confirmé par YengaPa
     useRemoteMode();
     const phone = newPhone();
     const payment = await pendingPayment(phone, "yengapay_direct_sandbox", 3000);
-    await db.cancelTikisWalletDirectDeposit({ profilePhone: phone, transactionId: payment.id, status: "cancelled" });
+    await db.cancelTikisseWalletDirectDeposit({ profilePhone: phone, transactionId: payment.id, status: "cancelled" });
     await db.settleYengapayLivePayment({ providerReference: payment.providerReference, outcome: "succeeded" });
     expect(await balance(phone)).toBe(3000);
   });
@@ -139,7 +139,7 @@ describe.skipIf(!TEST_DB)("paiement direct — un paiement confirmé par YengaPa
     useRemoteMode();
     const phone = newPhone();
     const payment = await pendingPayment(phone, "yengapay_direct_sandbox", 4000);
-    await db.cancelTikisWalletDirectDeposit({ profilePhone: phone, transactionId: payment.id, status: "expired" });
+    await db.cancelTikisseWalletDirectDeposit({ profilePhone: phone, transactionId: payment.id, status: "expired" });
     await db.settleYengapayLivePayment({ providerReference: payment.providerReference, outcome: "succeeded" });
     expect(await balance(phone)).toBe(4000);
   });
@@ -148,8 +148,8 @@ describe.skipIf(!TEST_DB)("paiement direct — un paiement confirmé par YengaPa
     useRemoteMode();
     const phone = newPhone();
     const payment = await pendingPayment(phone, "yengapay_direct_sandbox", 4500);
-    await db.cancelTikisWalletDirectDeposit({ profilePhone: phone, transactionId: payment.id, status: "expired" });
-    await db.settleTikisWalletDepositRequest({ profilePhone: phone, transactionId: payment.id });
+    await db.cancelTikisseWalletDirectDeposit({ profilePhone: phone, transactionId: payment.id, status: "expired" });
+    await db.settleTikisseWalletDepositRequest({ profilePhone: phone, transactionId: payment.id });
     expect(await balance(phone)).toBe(4500);
   });
 
@@ -158,7 +158,7 @@ describe.skipIf(!TEST_DB)("paiement direct — un paiement confirmé par YengaPa
     const phone = newPhone();
     const payment = await pendingPayment(phone, "yengapay_direct_sandbox", 6000);
     await db.settleYengapayLivePayment({ providerReference: payment.providerReference, outcome: "succeeded" });
-    await db.settleTikisWalletDepositRequest({ profilePhone: phone, transactionId: payment.id });
+    await db.settleTikisseWalletDepositRequest({ profilePhone: phone, transactionId: payment.id });
     await db.settleYengapayLivePayment({ providerReference: payment.providerReference, outcome: "succeeded" });
     expect(await balance(phone)).toBe(6000);
   });
@@ -169,7 +169,7 @@ describe.skipIf(!TEST_DB)("paiement direct — un paiement confirmé par YengaPa
     const payment = await pendingPayment(phone, "yengapay_direct_sandbox", 1500);
     await db.settleYengapayLivePayment({ providerReference: payment.providerReference, outcome: "succeeded" });
     await db.settleYengapayLivePayment({ providerReference: payment.providerReference, outcome: "failed" });
-    await db.cancelTikisWalletDirectDeposit({ profilePhone: phone, transactionId: payment.id, status: "cancelled" });
+    await db.cancelTikisseWalletDirectDeposit({ profilePhone: phone, transactionId: payment.id, status: "cancelled" });
     expect(await balance(phone)).toBe(1500);
   });
 });
@@ -200,7 +200,7 @@ describe.skipIf(!TEST_DB)("paiement direct — le webhook ne perd aucun événem
     expect(first.status).toBe(202);
 
     const handle = (await db.getDb())!;
-    await handle.insert(schema.tikisPaymentTransactions).values({
+    await handle.insert(schema.tikissePaymentTransactions).values({
       id: randomUUID(), profilePhone: phone, type: "deposit", provider: "yengapay_direct_sandbox", amount: 9000, status: "pending",
       providerReference, checkoutUrl: null, idempotencyKey: `audit:${providerReference}`,
       phoneE164: phone, operatorCode: "orange_money", countryCode: "BF", ussdCode: "*144#", expiresAt: new Date(Date.now() + 60_000),
@@ -221,7 +221,7 @@ describe.skipIf(!TEST_DB)("paiement direct — le webhook ne perd aucun événem
     expect((await processYengapayWebhook(event)).status).toBe(202);
 
     const handle = (await db.getDb())!;
-    await handle.insert(schema.tikisPaymentTransactions).values({
+    await handle.insert(schema.tikissePaymentTransactions).values({
       id: randomUUID(), profilePhone: phone, type: "deposit", provider: "yengapay_sandbox", amount: 11_000, status: "pending",
       providerReference, checkoutUrl: "https://checkout.example/pay", idempotencyKey: `audit:${providerReference}`,
     });
@@ -261,7 +261,7 @@ describe.skipIf(!TEST_DB)("paiement direct — le suivi côté app", () => {
     const payment = await pendingPayment(phone, "yengapay_direct_sandbox", amount);
     const handle = (await db.getDb())!;
     const { eq } = await import("drizzle-orm");
-    await handle.update(schema.tikisPaymentTransactions).set({ expiresAt: new Date(Date.now() - 60_000) }).where(eq(schema.tikisPaymentTransactions.id, payment.id));
+    await handle.update(schema.tikissePaymentTransactions).set({ expiresAt: new Date(Date.now() - 60_000) }).where(eq(schema.tikissePaymentTransactions.id, payment.id));
     return payment;
   }
   const intentResponse = (body: Record<string, unknown>) => { global.fetch = (async () => new Response(JSON.stringify(body), { status: 200 })) as typeof fetch; };

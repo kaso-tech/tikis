@@ -12,7 +12,7 @@
  *
  * Fonction pure : le routeur lui passe les enregistrements, elle ne touche pas à la base.
  */
-import type { FinancialRecord } from "../shared/tikis-domain";
+import type { FinancialRecord } from "../shared/tikisse-domain";
 import { computeTrendPct as trendPct } from "./_test-helpers/driver-earnings-projection";
 
 export type DriverEarningsTrend = {

@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { isDeliveryCompletedWithinLast24Hours, type Delivery } from "../shared/tikis-domain";
+import { isDeliveryCompletedWithinLast24Hours, type Delivery } from "../shared/tikisse-domain";
 
-const nativeSource = readFileSync(join(process.cwd(), "components/tikis/screens/home-screen.native.tsx"), "utf8");
-const webSource = readFileSync(join(process.cwd(), "components/tikis/screens/home-screen.web.tsx"), "utf8");
+const nativeSource = readFileSync(join(process.cwd(), "components/tikisse/screens/home-screen.native.tsx"), "utf8");
+const webSource = readFileSync(join(process.cwd(), "components/tikisse/screens/home-screen.web.tsx"), "utf8");
 
 function completedDelivery(completedAt: string): Pick<Delivery, "status" | "completedAt"> {
   return { status: "completed", completedAt };

@@ -123,7 +123,7 @@ export default function KycPage() {
               status: STATUS_LABEL[row.submission.status] ?? row.submission.status,
               rejectionReason: row.submission.rejectionReason ?? "",
             })));
-            downloadCsv(`tikis-kyc-${statusFilter}-${new Date().toISOString().slice(0, 10)}`, csv);
+            downloadCsv(`tikisse-kyc-${statusFilter}-${new Date().toISOString().slice(0, 10)}`, csv);
           }}
         >
           Exporter CSV

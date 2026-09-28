@@ -13,7 +13,7 @@
  */
 import type { Express, Request, Response } from "express";
 import { eq } from "drizzle-orm";
-import { tikisDeliveryReports, tikisKycSubmissions } from "../drizzle/schema";
+import { tikisseDeliveryReports, tikisseKycSubmissions } from "../drizzle/schema";
 import { adminSessionCookieValue } from "./_core/context";
 import { clientIp } from "./_core/security";
 import { authenticateAdminSession, writeAdminAuditLog } from "./admin-db";
@@ -38,11 +38,11 @@ async function documentKey(request: AdminDocumentRequest): Promise<string | type
   if (!db) return null;
   if (request.kind === "kyc") {
     if (!Object.hasOwn(KYC_DOCUMENT_SIDES, request.side)) return null;
-    const submission = (await db.select().from(tikisKycSubmissions).where(eq(tikisKycSubmissions.id, request.submissionId)).limit(1))[0];
+    const submission = (await db.select().from(tikisseKycSubmissions).where(eq(tikisseKycSubmissions.id, request.submissionId)).limit(1))[0];
     if (submission?.documentsErasedAt) return ERASED;
     return submission ? submission[KYC_DOCUMENT_SIDES[request.side as KycDocumentSide]] : null;
   }
-  const report = (await db.select({ attachmentKey: tikisDeliveryReports.attachmentKey }).from(tikisDeliveryReports).where(eq(tikisDeliveryReports.id, request.reportId)).limit(1))[0];
+  const report = (await db.select({ attachmentKey: tikisseDeliveryReports.attachmentKey }).from(tikisseDeliveryReports).where(eq(tikisseDeliveryReports.id, request.reportId)).limit(1))[0];
   return report?.attachmentKey ?? null;
 }
 

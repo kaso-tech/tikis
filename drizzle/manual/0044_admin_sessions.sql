@@ -5,11 +5,11 @@
 -- base n'en conserve que l'empreinte SHA-256, jamais le jeton lui-même. Se déconnecter, ou suspendre le
 -- compte, révoque la session côté serveur.
 --
--- Après déploiement, chaque admin doit se reconnecter une fois. TIKIS_ADMIN_SESSION_SECRET n'est plus lu.
+-- Après déploiement, chaque admin doit se reconnecter une fois. TIKISSE_ADMIN_SESSION_SECRET n'est plus lu.
 --
 -- Idempotente. Appliquer directement :
 --   mysql -u <user> -p <database> < drizzle/manual/0044_admin_sessions.sql
-CREATE TABLE IF NOT EXISTS `tikis_admin_sessions` (
+CREATE TABLE IF NOT EXISTS `tikisse_admin_sessions` (
   `id` varchar(40) NOT NULL,
   `adminId` int NOT NULL,
   `tokenHash` varchar(64) NOT NULL,
@@ -20,6 +20,6 @@ CREATE TABLE IF NOT EXISTS `tikis_admin_sessions` (
   `expiresAt` timestamp NOT NULL,
   `revokedAt` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `tikis_admin_sessions_tokenHash_unique` (`tokenHash`),
-  KEY `tikis_admin_sessions_admin_index` (`adminId`, `revokedAt`)
+  UNIQUE KEY `tikisse_admin_sessions_tokenHash_unique` (`tokenHash`),
+  KEY `tikisse_admin_sessions_admin_index` (`adminId`, `revokedAt`)
 );

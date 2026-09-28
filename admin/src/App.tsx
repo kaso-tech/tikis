@@ -97,8 +97,8 @@ function Shell() {
       const custom = event as CustomEvent<{ page: PageKey }>;
       if (custom.detail?.page) setPage(custom.detail.page);
     }
-    window.addEventListener("tikis:navigate", onNavigate as EventListener);
-    return () => window.removeEventListener("tikis:navigate", onNavigate as EventListener);
+    window.addEventListener("tikisse:navigate", onNavigate as EventListener);
+    return () => window.removeEventListener("tikisse:navigate", onNavigate as EventListener);
   }, []);
   if (!admin) return null;
 
@@ -126,7 +126,7 @@ function Shell() {
         <div className="sidebar-brand">
           <div className="sidebar-brand-mark">T</div>
           <div className="sidebar-brand-text">
-            <div className="sidebar-brand-title">Tikis Admin</div>
+            <div className="sidebar-brand-title">Tikisse Admin</div>
             <div className="sidebar-brand-sub">Console opérateur</div>
           </div>
         </div>

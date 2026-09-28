@@ -6,10 +6,10 @@
 --
 -- Idempotente (IF NOT EXISTS). Appliquer directement :
 --   mysql -u <user> -p <database> < drizzle/manual/0043_withdrawal_payout_reference.sql
-ALTER TABLE `tikis_payment_transactions`
+ALTER TABLE `tikisse_payment_transactions`
   ADD COLUMN IF NOT EXISTS `payoutReference` varchar(80) DEFAULT NULL AFTER `settledAt`,
   ADD COLUMN IF NOT EXISTS `adminNotes` varchar(300) DEFAULT NULL AFTER `payoutReference`,
   ADD COLUMN IF NOT EXISTS `settledByAdminId` int DEFAULT NULL AFTER `adminNotes`;
 
-CREATE UNIQUE INDEX IF NOT EXISTS `tikis_payment_transactions_payoutReference_unique`
-  ON `tikis_payment_transactions` (`payoutReference`);
+CREATE UNIQUE INDEX IF NOT EXISTS `tikisse_payment_transactions_payoutReference_unique`
+  ON `tikisse_payment_transactions` (`payoutReference`);

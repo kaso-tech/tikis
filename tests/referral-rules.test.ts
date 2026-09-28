@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { REFERRAL_REWARD_AMOUNT, canClaimReferralReward, referralStatusFor } from "../lib/referral-rules";
 
-describe("règles de parrainage Tikis", () => {
+describe("règles de parrainage Tikisse", () => {
   it("rend la récompense éligible après la première course terminée du filleul", () => {
     expect(referralStatusFor(0)).toBe("invited");
     expect(referralStatusFor(1)).toBe("qualified");

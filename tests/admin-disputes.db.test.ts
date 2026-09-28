@@ -1,7 +1,7 @@
 /**
  * Lot C — litiges et avis, exécuté contre une vraie base MySQL/MariaDB, par le vrai routeur admin.
  *
- *   TIKIS_TEST_DATABASE_URL=<url> npx vitest run tests/admin-disputes.db.test.ts
+ *   TIKISSE_TEST_DATABASE_URL=<url> npx vitest run tests/admin-disputes.db.test.ts
  *
  * (schéma : drizzle/manual/0048_disputes_and_reviews.sql)
  *
@@ -11,9 +11,9 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-const TEST_DB = process.env.TIKIS_TEST_DATABASE_URL;
+const TEST_DB = process.env.TIKISSE_TEST_DATABASE_URL;
 if (TEST_DB) process.env.DATABASE_URL = TEST_DB;
-process.env.TIKIS_ADMIN_TOTP_KEY ??= "cle-totp-de-test-uniquement-0123456789abcdef";
+process.env.TIKISSE_ADMIN_TOTP_KEY ??= "cle-totp-de-test-uniquement-0123456789abcdef";
 
 type Role = "super_admin" | "support" | "finance" | "viewer" | "kyc_reviewer";
 let db: typeof import("../server/db");
@@ -43,29 +43,29 @@ afterAll(async () => {
 const newPhone = () => `+22674${String(Math.floor(Math.random() * 1e6)).padStart(6, "0")}`;
 
 async function session(role: Role) {
-  const admin = (await adminDb.createAdminUser({ email: `lot-c-${randomUUID()}@tikis.test`, passwordHash: await adminAuth.hashAdminPassword("mot-de-passe-lot-c"), fullName: "Lot C", role }))!;
+  const admin = (await adminDb.createAdminUser({ email: `lot-c-${randomUUID()}@tikisse.test`, passwordHash: await adminAuth.hashAdminPassword("mot-de-passe-lot-c"), fullName: "Lot C", role }))!;
   const { token } = await adminDb.createAdminSession({ adminId: admin.id });
-  const { tikisAdminRouter } = await import("../server/admin-router");
+  const { tikisseAdminRouter } = await import("../server/admin-router");
   const { createContext } = await import("../server/_core/context");
-  const req = { headers: { "x-tikis-admin": "1", cookie: `tikis_admin_session=${token}` }, ip: "198.51.100.7", secure: true, socket: {} } as never;
+  const req = { headers: { "x-tikisse-admin": "1", cookie: `tikisse_admin_session=${token}` }, ip: "198.51.100.7", secure: true, socket: {} } as never;
   const res = { cookie: () => {}, clearCookie: () => {} } as never;
-  return { admin, api: tikisAdminRouter.createCaller(await createContext({ req, res, info: {} as never })) };
+  return { admin, api: tikisseAdminRouter.createCaller(await createContext({ req, res, info: {} as never })) };
 }
 
 async function wallet(phone: string) {
   const handle = (await db.getDb())!;
-  const row = (await handle.select().from(schema.tikisWallets).where(orm.eq(schema.tikisWallets.profilePhone, phone)).limit(1))[0];
+  const row = (await handle.select().from(schema.tikisseWallets).where(orm.eq(schema.tikisseWallets.profilePhone, phone)).limit(1))[0];
   return { available: row?.availableBalance ?? 0, held: row?.heldBalance ?? 0 };
 }
 
 async function deliveryRow(deliveryId: string) {
   const handle = (await db.getDb())!;
-  return (await handle.select().from(schema.tikisDeliveries).where(orm.eq(schema.tikisDeliveries.id, deliveryId)).limit(1))[0]!;
+  return (await handle.select().from(schema.tikisseDeliveries).where(orm.eq(schema.tikisseDeliveries.id, deliveryId)).limit(1))[0]!;
 }
 
 async function candidateRow(deliveryId: string, driverPhone: string) {
   const handle = (await db.getDb())!;
-  return (await handle.select().from(schema.tikisDeliveryCandidates).where(orm.and(orm.eq(schema.tikisDeliveryCandidates.deliveryId, deliveryId), orm.eq(schema.tikisDeliveryCandidates.driverPhone, driverPhone))).limit(1))[0]!;
+  return (await handle.select().from(schema.tikisseDeliveryCandidates).where(orm.and(orm.eq(schema.tikisseDeliveryCandidates.deliveryId, deliveryId), orm.eq(schema.tikisseDeliveryCandidates.driverPhone, driverPhone))).limit(1))[0]!;
 }
 
 /** Livraison avec un livreur engagé au stade donné, et les mouvements de Wallet des parcours réels. */
@@ -79,23 +79,23 @@ async function engagedDelivery(stage: "applied" | "selected" | "confirmed", comm
     await db.applyWalletMovement(tx, { profilePhone: driverPhone, operation: "credit", amount: 5000, availableDelta: 5000, heldDelta: 0, reason: "Solde de départ (test)", idempotencyKey: `${candidateId}:seed` });
     await db.applyWalletMovement(tx, { profilePhone: driverPhone, deliveryId, operation: "block", amount: commission, availableDelta: -commission, heldDelta: commission, reason: "Commission temporairement bloquée pour candidature", idempotencyKey: `${candidateId}:block` });
     if (stage === "confirmed") {
-      await db.applyWalletMovement(tx, { profilePhone: driverPhone, deliveryId, operation: "commission_debit", amount: commission, availableDelta: 0, heldDelta: -commission, reason: "Commission Tikis prélevée après confirmation de disponibilité", idempotencyKey: `${deliveryId}:commission-debit:${candidateId}` });
+      await db.applyWalletMovement(tx, { profilePhone: driverPhone, deliveryId, operation: "commission_debit", amount: commission, availableDelta: 0, heldDelta: -commission, reason: "Commission Tikisse prélevée après confirmation de disponibilité", idempotencyKey: `${deliveryId}:commission-debit:${candidateId}` });
     }
   });
-  await handle.insert(schema.tikisDeliveries).values({
+  await handle.insert(schema.tikisseDeliveries).values({
     id: deliveryId, senderPhone, pickupPlaceId: 1, dropoffPlaceId: 2, title: "Litige lot C", details: "",
     deliveryType: "Plis", distanceKm: "3.00", estimatedPrice: 3000, vehicleTypes: "Moto",
     status: stage === "applied" ? "open" : stage === "selected" ? "pending_confirmation" : "active",
     driverPhone: stage === "applied" ? null : driverPhone,
     accruedCommission: stage === "applied" ? null : commission,
   });
-  await handle.insert(schema.tikisDeliveryCandidates).values({ id: candidateId, deliveryId, driverPhone, status: stage, commissionBlocked: commission });
+  await handle.insert(schema.tikisseDeliveryCandidates).values({ id: candidateId, deliveryId, driverPhone, status: stage, commissionBlocked: commission });
   return { deliveryId, driverPhone, senderPhone, commission };
 }
 
 async function events(deliveryId: string, eventType: string) {
   const handle = (await db.getDb())!;
-  return handle.select().from(schema.tikisDeliveryEvents).where(orm.and(orm.eq(schema.tikisDeliveryEvents.deliveryId, deliveryId), orm.eq(schema.tikisDeliveryEvents.eventType, eventType)));
+  return handle.select().from(schema.tikisseDeliveryEvents).where(orm.and(orm.eq(schema.tikisseDeliveryEvents.deliveryId, deliveryId), orm.eq(schema.tikisseDeliveryEvents.eventType, eventType)));
 }
 
 describe.skipIf(!TEST_DB)("dédommagement après litige", () => {
@@ -189,7 +189,7 @@ describe.skipIf(!TEST_DB)("clôture par l'administration", () => {
     const active = await engagedDelivery("confirmed");
     await expect(api.disputes.complete({ deliveryId: active.deliveryId, reason: "Colis remis, oubli de clôture" })).resolves.toMatchObject({ status: "completed" });
     expect((await deliveryRow(active.deliveryId)).status).toBe("completed");
-    expect((await events(active.deliveryId, "delivery_completed"))[0]?.body).toMatch(/Clôturée par l’équipe Tikis/);
+    expect((await events(active.deliveryId, "delivery_completed"))[0]?.body).toMatch(/Clôturée par l’équipe Tikisse/);
     await expect(api.disputes.complete({ deliveryId: active.deliveryId, reason: "Encore" })).rejects.toThrow(/Seule une livraison en cours/);
     const pending = await engagedDelivery("selected");
     await expect(api.disputes.complete({ deliveryId: pending.deliveryId, reason: "Essai" })).rejects.toThrow(/Seule une livraison en cours/);
@@ -200,7 +200,7 @@ describe.skipIf(!TEST_DB)("modération des avis", () => {
   async function review(driverPhone: string, rating: number, comment: string | null) {
     const handle = (await db.getDb())!;
     const id = randomUUID();
-    await handle.insert(schema.tikisDeliveryReviews).values({ id, deliveryId: randomUUID(), reviewerPhone: newPhone(), driverPhone, rating, comment });
+    await handle.insert(schema.tikisseDeliveryReviews).values({ id, deliveryId: randomUUID(), reviewerPhone: newPhone(), driverPhone, rating, comment });
     return id;
   }
 
@@ -209,18 +209,18 @@ describe.skipIf(!TEST_DB)("modération des avis", () => {
     const driverPhone = newPhone();
     await review(driverPhone, 5, "Parfait");
     const insult = await review(driverPhone, 1, "Propos injurieux");
-    expect(await db.getTikisDriverStats(driverPhone)).toMatchObject({ rating: 3, reviewsCount: 2 });
+    expect(await db.getTikisseDriverStats(driverPhone)).toMatchObject({ rating: 3, reviewsCount: 2 });
 
     await expect(api.reviews.setHidden({ reviewId: insult, hidden: true })).rejects.toThrow(/pourquoi/);
     await api.reviews.setHidden({ reviewId: insult, hidden: true, reason: "Injurieux" });
-    expect(await db.getTikisDriverStats(driverPhone)).toMatchObject({ rating: 5, reviewsCount: 1 });
-    expect(await db.listTikisDeliveryReviewsForProfile(driverPhone, "driver")).toHaveLength(1);
+    expect(await db.getTikisseDriverStats(driverPhone)).toMatchObject({ rating: 5, reviewsCount: 1 });
+    expect(await db.listTikisseDeliveryReviewsForProfile(driverPhone, "driver")).toHaveLength(1);
     const hidden = await api.reviews.list({ filter: "hidden", query: driverPhone });
     expect(hidden.rows.map((row) => row.id)).toEqual([insult]);
     expect(hidden.rows[0]).toMatchObject({ hiddenReason: "Injurieux" });
 
     await api.reviews.setHidden({ reviewId: insult, hidden: false });
-    expect(await db.getTikisDriverStats(driverPhone)).toMatchObject({ rating: 3, reviewsCount: 2 });
+    expect(await db.getTikisseDriverStats(driverPhone)).toMatchObject({ rating: 3, reviewsCount: 2 });
   });
 
   it("filtre les avis négatifs et commentés", async () => {

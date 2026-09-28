@@ -69,7 +69,7 @@ export default function LoyaltyGrantsPage() {
         </div>
         <div className="page-actions">
           <button type="button" className="btn" onClick={() => {
-            const event = new CustomEvent("tikis:navigate", { detail: { page: "loyalty" } });
+            const event = new CustomEvent("tikisse:navigate", { detail: { page: "loyalty" } });
             window.dispatchEvent(event);
           }}>← Programmes</button>
         </div>

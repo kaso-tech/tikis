@@ -1,4 +1,4 @@
-CREATE TABLE `tikis_deliveries` (
+CREATE TABLE `tikisse_deliveries` (
 	`id` varchar(40) NOT NULL,
 	`senderPhone` varchar(20) NOT NULL,
 	`pickupPlaceId` int NOT NULL,
@@ -25,10 +25,10 @@ CREATE TABLE `tikis_deliveries` (
 	`cancelledAt` timestamp,
 	`createdAt` timestamp NOT NULL DEFAULT (now()),
 	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
-	CONSTRAINT `tikis_deliveries_id` PRIMARY KEY(`id`)
+	CONSTRAINT `tikisse_deliveries_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `tikis_delivery_candidates` (
+CREATE TABLE `tikisse_delivery_candidates` (
 	`id` varchar(40) NOT NULL,
 	`deliveryId` varchar(40) NOT NULL,
 	`driverPhone` varchar(20) NOT NULL,
@@ -37,12 +37,12 @@ CREATE TABLE `tikis_delivery_candidates` (
 	`commissionBlocked` int NOT NULL DEFAULT 0,
 	`createdAt` timestamp NOT NULL DEFAULT (now()),
 	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
-	CONSTRAINT `tikis_delivery_candidates_id` PRIMARY KEY(`id`),
-	CONSTRAINT `tikis_delivery_candidates_delivery_driver_unique` UNIQUE(`deliveryId`,`driverPhone`)
+	CONSTRAINT `tikisse_delivery_candidates_id` PRIMARY KEY(`id`),
+	CONSTRAINT `tikisse_delivery_candidates_delivery_driver_unique` UNIQUE(`deliveryId`,`driverPhone`)
 );
 --> statement-breakpoint
-CREATE INDEX `tikis_deliveries_sender_status_index` ON `tikis_deliveries` (`senderPhone`,`status`);--> statement-breakpoint
-CREATE INDEX `tikis_deliveries_driver_status_index` ON `tikis_deliveries` (`driverPhone`,`status`);--> statement-breakpoint
-CREATE INDEX `tikis_deliveries_status_created_index` ON `tikis_deliveries` (`status`,`createdAt`);--> statement-breakpoint
-CREATE INDEX `tikis_delivery_candidates_delivery_status_index` ON `tikis_delivery_candidates` (`deliveryId`,`status`);--> statement-breakpoint
-CREATE INDEX `tikis_delivery_candidates_driver_status_index` ON `tikis_delivery_candidates` (`driverPhone`,`status`);
+CREATE INDEX `tikisse_deliveries_sender_status_index` ON `tikisse_deliveries` (`senderPhone`,`status`);--> statement-breakpoint
+CREATE INDEX `tikisse_deliveries_driver_status_index` ON `tikisse_deliveries` (`driverPhone`,`status`);--> statement-breakpoint
+CREATE INDEX `tikisse_deliveries_status_created_index` ON `tikisse_deliveries` (`status`,`createdAt`);--> statement-breakpoint
+CREATE INDEX `tikisse_delivery_candidates_delivery_status_index` ON `tikisse_delivery_candidates` (`deliveryId`,`status`);--> statement-breakpoint
+CREATE INDEX `tikisse_delivery_candidates_driver_status_index` ON `tikisse_delivery_candidates` (`driverPhone`,`status`);

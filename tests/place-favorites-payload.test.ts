@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { toPlacePayload } from "../lib/place-favorites";
-import type { LocationLabel } from "../shared/tikis-domain";
+import type { LocationLabel } from "../shared/tikisse-domain";
 
 const communityPoi: LocationLabel = {
   name: "Maison du Peuple",

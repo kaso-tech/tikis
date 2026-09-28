@@ -26,7 +26,7 @@ describe("compatibilité expo-router / react-navigation (SDK 56+)", () => {
   });
 
   it("expo-router expose son propre useFocusEffect, celui à utiliser à la place de @react-navigation/native", () => {
-    const trackedMarker = readFileSync("components/tikis/tracked-marker.tsx", "utf8");
+    const trackedMarker = readFileSync("components/tikisse/tracked-marker.tsx", "utf8");
     expect(trackedMarker).toContain('import { useFocusEffect } from "expo-router"');
   });
 });

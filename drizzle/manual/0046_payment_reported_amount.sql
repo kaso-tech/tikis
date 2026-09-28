@@ -6,5 +6,5 @@
 --
 -- Idempotente. Appliquer directement :
 --   mysql -u <user> -p <database> < drizzle/manual/0046_payment_reported_amount.sql
-ALTER TABLE `tikis_payment_transactions`
+ALTER TABLE `tikisse_payment_transactions`
   ADD COLUMN IF NOT EXISTS `providerReportedAmount` int DEFAULT NULL AFTER `settledByAdminId`;

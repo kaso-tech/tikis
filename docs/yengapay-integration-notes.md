@@ -10,7 +10,7 @@ Endpoint officiel retenu pour les dépôts : création d’intention Checkout `P
 
 Le webhook reçu sur une URL HTTPS vérifie `x-webhook-hash` contre le corps JSON brut. Le payload Checkout fournit notamment `paymentIntentId`, `reference`, `transId`, `paymentAmount` et `paymentStatus` (`DONE` ou `FAILED`). Le montant minimal affiché par la documentation est de 100 FCFA. Le client ouvre uniquement `checkoutPageUrlWithPaymentToken`, sans recevoir de clé API ; le webhook est la source de vérité métier et doit être idempotent par `transId` ou `paymentIntentId`.
 
-L’intégration Tikis doit créer les intentions côté serveur, ne jamais exposer la clé API au mobile, ne créditer le Wallet qu’après confirmation serveur authentifiée, et traiter les webhooks de manière idempotente.
+L’intégration Tikisse doit créer les intentions côté serveur, ne jamais exposer la clé API au mobile, ne créditer le Wallet qu’après confirmation serveur authentifiée, et traiter les webhooks de manière idempotente.
 
 ## Paiement direct Mobile Money
 
@@ -26,10 +26,10 @@ Le contrat Sandbox vérifié le 26 septembre 2026 est :
    `POST /direct-payment/send-otp` avec `paymentIntentId`, `operatorCode`, `countryCode`
    et `customerMSISDN`. Le client saisit ensuite l’OTP reçu par SMS.
 4. Pour `ORANGE` (`flow: ONE_STEP`), afficher le `ussdCode` renvoyé par YengaPay afin que
-   le client génère son OTP. Le client saisit ensuite cet OTP dans Tikis.
+   le client génère son OTP. Le client saisit ensuite cet OTP dans Tikisse.
 5. `POST /direct-payment/pay` reçoit `paymentIntentId`, `operatorCode`, `countryCode`,
    `customerMSISDN` et `otp`. Une réponse `status: DONE` confirme le paiement.
-6. Le mobile reste dans Tikis pendant tout le parcours. Le serveur crédite le Wallet une
+6. Le mobile reste dans Tikisse pendant tout le parcours. Le serveur crédite le Wallet une
    seule fois après `DONE` ou après un webhook signé `payment.succeeded`.
 
 Le statut peut aussi être relu avec l’endpoint d’intention existant pendant le polling.

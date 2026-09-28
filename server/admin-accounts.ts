@@ -7,7 +7,7 @@
  */
 import { randomBytes } from "node:crypto";
 import { and, desc, eq, gt, isNull, ne } from "drizzle-orm";
-import { tikisAdminSessions, tikisAdminUsers } from "../drizzle/schema";
+import { tikisseAdminSessions, tikisseAdminUsers } from "../drizzle/schema";
 import { ADMIN_ROLES, type AdminRole } from "../shared/admin-roles";
 import { hashAdminPassword, verifyAdminPassword } from "./admin-auth";
 import { consumeSecondFactor, getAdminByEmail, revokeAllAdminSessions } from "./admin-db";
@@ -35,8 +35,8 @@ async function database() {
 }
 
 async function assertAnotherActiveSuperAdmin(tx: any, excludedAdminId: number) {
-  const others = await tx.select({ id: tikisAdminUsers.id }).from(tikisAdminUsers)
-    .where(and(eq(tikisAdminUsers.role, "super_admin"), eq(tikisAdminUsers.active, true), ne(tikisAdminUsers.id, excludedAdminId))).for("update");
+  const others = await tx.select({ id: tikisseAdminUsers.id }).from(tikisseAdminUsers)
+    .where(and(eq(tikisseAdminUsers.role, "super_admin"), eq(tikisseAdminUsers.active, true), ne(tikisseAdminUsers.id, excludedAdminId))).for("update");
   if (others.length === 0) throw new Error("Impossible : ce compte est le dernier super-admin actif.");
 }
 
@@ -46,7 +46,7 @@ export async function createAdminAccount(input: { email: string; fullName: strin
   if (await getAdminByEmail(email)) throw new Error("Un compte admin existe déjà pour cet email.");
   const temporaryPassword = temporaryAdminPassword();
   const db = await database();
-  await db.insert(tikisAdminUsers).values({ email, fullName: input.fullName.trim(), role: input.role, passwordHash: await hashAdminPassword(temporaryPassword), mustChangePassword: true });
+  await db.insert(tikisseAdminUsers).values({ email, fullName: input.fullName.trim(), role: input.role, passwordHash: await hashAdminPassword(temporaryPassword), mustChangePassword: true });
   const created = await getAdminByEmail(email);
   return { adminId: created!.id, email, temporaryPassword };
 }
@@ -61,10 +61,10 @@ export async function changeAdminRole(input: { actorAdminId: number; adminId: nu
   if (input.actorAdminId === input.adminId) throw new Error("Vous ne pouvez pas changer votre propre rôle.");
   const db = await database();
   return db.transaction(async (tx) => {
-    const target = (await tx.select().from(tikisAdminUsers).where(eq(tikisAdminUsers.id, input.adminId)).limit(1).for("update"))[0];
+    const target = (await tx.select().from(tikisseAdminUsers).where(eq(tikisseAdminUsers.id, input.adminId)).limit(1).for("update"))[0];
     if (!target) throw new Error("Compte admin introuvable.");
     if (target.role === "super_admin" && input.role !== "super_admin" && target.active) await assertAnotherActiveSuperAdmin(tx, target.id);
-    await tx.update(tikisAdminUsers).set({ role: input.role }).where(eq(tikisAdminUsers.id, input.adminId));
+    await tx.update(tikisseAdminUsers).set({ role: input.role }).where(eq(tikisseAdminUsers.id, input.adminId));
     return { before: target.role, after: input.role };
   });
 }
@@ -76,9 +76,9 @@ export async function resetAdminPassword(input: { actorAdminId: number; adminId:
   const temporaryPassword = temporaryAdminPassword();
   const passwordHash = await hashAdminPassword(temporaryPassword);
   await db.transaction(async (tx) => {
-    const target = (await tx.select({ id: tikisAdminUsers.id }).from(tikisAdminUsers).where(eq(tikisAdminUsers.id, input.adminId)).limit(1).for("update"))[0];
+    const target = (await tx.select({ id: tikisseAdminUsers.id }).from(tikisseAdminUsers).where(eq(tikisseAdminUsers.id, input.adminId)).limit(1).for("update"))[0];
     if (!target) throw new Error("Compte admin introuvable.");
-    await tx.update(tikisAdminUsers).set({ passwordHash, mustChangePassword: true }).where(eq(tikisAdminUsers.id, input.adminId));
+    await tx.update(tikisseAdminUsers).set({ passwordHash, mustChangePassword: true }).where(eq(tikisseAdminUsers.id, input.adminId));
     await revokeAllAdminSessions(input.adminId, tx);
   });
   return { temporaryPassword };
@@ -92,15 +92,15 @@ export async function changeOwnAdminPassword(input: { adminId: number; sessionId
   if (input.newPassword.length < ADMIN_PASSWORD_MIN_LENGTH) throw new Error(`Le mot de passe doit contenir au moins ${ADMIN_PASSWORD_MIN_LENGTH} caractères.`);
   if (input.newPassword === input.currentPassword) throw new Error("Le nouveau mot de passe doit être différent de l’actuel.");
   const db = await database();
-  const account = (await db.select().from(tikisAdminUsers).where(eq(tikisAdminUsers.id, input.adminId)).limit(1))[0];
+  const account = (await db.select().from(tikisseAdminUsers).where(eq(tikisseAdminUsers.id, input.adminId)).limit(1))[0];
   if (!account) throw new Error("Compte admin introuvable.");
   if (!(await verifyAdminPassword(input.currentPassword, account.passwordHash))) throw new Error("Mot de passe actuel incorrect.");
   const passwordHash = await hashAdminPassword(input.newPassword);
   await db.transaction(async (tx) => {
-    await tx.update(tikisAdminUsers).set({ passwordHash, mustChangePassword: false }).where(eq(tikisAdminUsers.id, input.adminId));
-    await tx.update(tikisAdminSessions).set({ revokedAt: new Date() }).where(and(
-      eq(tikisAdminSessions.adminId, input.adminId), isNull(tikisAdminSessions.revokedAt),
-      ...(input.sessionId ? [ne(tikisAdminSessions.id, input.sessionId)] : []),
+    await tx.update(tikisseAdminUsers).set({ passwordHash, mustChangePassword: false }).where(eq(tikisseAdminUsers.id, input.adminId));
+    await tx.update(tikisseAdminSessions).set({ revokedAt: new Date() }).where(and(
+      eq(tikisseAdminSessions.adminId, input.adminId), isNull(tikisseAdminSessions.revokedAt),
+      ...(input.sessionId ? [ne(tikisseAdminSessions.id, input.sessionId)] : []),
     ));
   });
 }
@@ -109,19 +109,19 @@ export async function changeOwnAdminPassword(input: { adminId: number; sessionId
 export async function listAdminSessions(adminId: number) {
   const db = await database();
   return db.select({
-    id: tikisAdminSessions.id, ipAddress: tikisAdminSessions.ipAddress, userAgent: tikisAdminSessions.userAgent,
-    createdAt: tikisAdminSessions.createdAt, lastSeenAt: tikisAdminSessions.lastSeenAt, expiresAt: tikisAdminSessions.expiresAt,
-  }).from(tikisAdminSessions)
-    .where(and(eq(tikisAdminSessions.adminId, adminId), eq(tikisAdminSessions.stage, "active"), isNull(tikisAdminSessions.revokedAt), gt(tikisAdminSessions.expiresAt, new Date())))
-    .orderBy(desc(tikisAdminSessions.lastSeenAt));
+    id: tikisseAdminSessions.id, ipAddress: tikisseAdminSessions.ipAddress, userAgent: tikisseAdminSessions.userAgent,
+    createdAt: tikisseAdminSessions.createdAt, lastSeenAt: tikisseAdminSessions.lastSeenAt, expiresAt: tikisseAdminSessions.expiresAt,
+  }).from(tikisseAdminSessions)
+    .where(and(eq(tikisseAdminSessions.adminId, adminId), eq(tikisseAdminSessions.stage, "active"), isNull(tikisseAdminSessions.revokedAt), gt(tikisseAdminSessions.expiresAt, new Date())))
+    .orderBy(desc(tikisseAdminSessions.lastSeenAt));
 }
 
 /** Ferme une session. `ownerAdminId` limite la révocation aux sessions de ce compte (révocation de ses propres sessions). */
 export async function revokeAdminSessionById(input: { sessionId: string; ownerAdminId?: number }) {
   const db = await database();
-  const session = (await db.select({ id: tikisAdminSessions.id, adminId: tikisAdminSessions.adminId }).from(tikisAdminSessions).where(eq(tikisAdminSessions.id, input.sessionId)).limit(1))[0];
+  const session = (await db.select({ id: tikisseAdminSessions.id, adminId: tikisseAdminSessions.adminId }).from(tikisseAdminSessions).where(eq(tikisseAdminSessions.id, input.sessionId)).limit(1))[0];
   if (!session || (input.ownerAdminId !== undefined && session.adminId !== input.ownerAdminId)) throw new Error("Session introuvable.");
-  await db.update(tikisAdminSessions).set({ revokedAt: new Date() }).where(and(eq(tikisAdminSessions.id, input.sessionId), isNull(tikisAdminSessions.revokedAt)));
+  await db.update(tikisseAdminSessions).set({ revokedAt: new Date() }).where(and(eq(tikisseAdminSessions.id, input.sessionId), isNull(tikisseAdminSessions.revokedAt)));
   return { adminId: session.adminId };
 }
 
@@ -135,7 +135,7 @@ export async function regenerateRecoveryCodes(input: { adminId: number; code: st
     const factor = await consumeSecondFactor(tx, input.adminId, input.code);
     if (!factor) throw new Error("Code invalide.");
     const recoveryCodes = generateRecoveryCodes();
-    await tx.update(tikisAdminUsers).set({ totpRecoveryCodes: JSON.stringify(recoveryCodes.map(hashRecoveryCode)) }).where(eq(tikisAdminUsers.id, input.adminId));
+    await tx.update(tikisseAdminUsers).set({ totpRecoveryCodes: JSON.stringify(recoveryCodes.map(hashRecoveryCode)) }).where(eq(tikisseAdminUsers.id, input.adminId));
     return { recoveryCodes };
   });
 }

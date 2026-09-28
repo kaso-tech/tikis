@@ -3,11 +3,11 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useThemeColors } from "@/lib/use-theme-colors";
-import { useTikisStore } from "@/lib/tikis-store";
+import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
 import { deliveryMetricsForDay, isDeliveryEarning } from "@/lib/wallet-metrics";
-import { formatMoney, formatRelativeDate, type FinancialRecord } from "@/shared/tikis-domain";
-import { DriverEarningsTrend } from "@/components/tikis/driver-earnings-trend";
+import { formatMoney, formatRelativeDate, type FinancialRecord } from "@/shared/tikisse-domain";
+import { DriverEarningsTrend } from "@/components/tikisse/driver-earnings-trend";
 
 type Period = "day" | "week" | "month";
 type FlowFilter = "earnings" | "bonus" | "all";
@@ -63,7 +63,7 @@ function periodStart(period: Period, now: Date): Date {
 
 export default function EarningsScreen() {
   const { colors: theme } = useThemeColors();
-  const { profile } = useTikisStore();
+  const { profile } = useTikisseStore();
   const [period, setPeriod] = useState<Period>("day");
   const [flow, setFlow] = useState<FlowFilter>("earnings");
   // Capturé une fois à l'ouverture de l'écran plutôt qu'appelé pendant le rendu (deux fois, dans le
@@ -321,7 +321,7 @@ export default function EarningsScreen() {
 
         <View style={styles.disclaimer}>
           <MaterialIcons name="verified-user" size={14} color={theme.muted} />
-          <Text style={[styles.disclaimerText, { color: theme.muted }]}>Les montants affichés sont vos gains de course, commission Tikis déduite. Ils ne sont pas versés sur votre Wallet : l’expéditeur vous paie directement.</Text>
+          <Text style={[styles.disclaimerText, { color: theme.muted }]}>Les montants affichés sont vos gains de course, commission Tikisse déduite. Ils ne sont pas versés sur votre Wallet : l’expéditeur vous paie directement.</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

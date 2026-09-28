@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { approximateCoordinate, concealPlaceForDriver } from "../server/_test-helpers/delivery-visibility";
 import { formatDeliveryDetailPlace, formatListRouteParts, geodesicDistanceKm } from "../lib/geo-rules";
-import type { LocationLabel } from "../shared/tikis-domain";
+import type { LocationLabel } from "../shared/tikisse-domain";
 
 const karpala: LocationLabel = {
   name: "Villa 32, chez Awa",

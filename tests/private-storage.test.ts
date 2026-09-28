@@ -11,20 +11,24 @@ import { isPrivateStorageKey } from "../server/storage";
 
 describe("isPrivateStorageKey", () => {
   it.each([
+    "tikisse-kyc/22670123456/1700000000000-id-front_ab12cd34.jpg",
+    "tikisse-reports/22670123456/1700000000000-x.png",
+    "/tikisse-kyc/a.jpg",
+    "//tikisse-kyc/a.jpg",
+    "./tikisse-kyc/a.jpg",
+    "tikisse-profiles/../tikisse-kyc/a.jpg",
+    "TIKISSE-KYC/a.jpg",
+    "tikisse-kyc",
+    "tikisse-kyc\\a.jpg",
+    // Renommage Tikis → Tikisse : les fichiers déposés avant le déploiement restent sous l'ancien préfixe
+    // (jamais renommés dans le stockage lui-même) et doivent rester protégés indéfiniment.
     "tikis-kyc/22670123456/1700000000000-id-front_ab12cd34.jpg",
     "tikis-reports/22670123456/1700000000000-x.png",
-    "/tikis-kyc/a.jpg",
-    "//tikis-kyc/a.jpg",
-    "./tikis-kyc/a.jpg",
-    "tikis-profiles/../tikis-kyc/a.jpg",
-    "TIKIS-KYC/a.jpg",
-    "tikis-kyc",
-    "tikis-kyc\\a.jpg",
   ])("refuse %s", (key) => {
     expect(isPrivateStorageKey(key)).toBe(true);
   });
 
-  it.each(["tikis-profiles/22670123456/avatar_ab12cd34.jpg", "generated/1700000000000.png", "tikis-kycx/a.jpg"])("laisse passer %s", (key) => {
+  it.each(["tikisse-profiles/22670123456/avatar_ab12cd34.jpg", "generated/1700000000000.png", "tikisse-kycx/a.jpg"])("laisse passer %s", (key) => {
     expect(isPrivateStorageKey(key)).toBe(false);
   });
 });
@@ -43,10 +47,10 @@ describe("proxy public /manus-storage", () => {
   afterAll(() => close());
 
   it.each([
-    "/manus-storage/tikis-kyc/22670123456/1700000000000-selfie_ab12cd34.jpg",
-    "/manus-storage//tikis-kyc/a.jpg",
-    "/manus-storage/tikis-kyc%2Fa.jpg",
-    "/manus-storage/tikis-reports/22670123456/a.png",
+    "/manus-storage/tikisse-kyc/22670123456/1700000000000-selfie_ab12cd34.jpg",
+    "/manus-storage//tikisse-kyc/a.jpg",
+    "/manus-storage/tikisse-kyc%2Fa.jpg",
+    "/manus-storage/tikisse-reports/22670123456/a.png",
   ])("répond 404 pour %s, sans jamais interroger le stockage", async (path) => {
     const response = await fetch(`${base}${path}`, { redirect: "manual" });
     expect(response.status).toBe(404);

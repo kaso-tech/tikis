@@ -7,7 +7,7 @@ const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 const config = read("app.config.ts");
 const packageJson = read("package.json");
 const task = read("lib/background-location-task.ts");
-const provider = read("components/tikis/delivery-realtime-provider.tsx");
+const provider = read("components/tikisse/delivery-realtime-provider.tsx");
 const layout = read("app/_layout.tsx");
 
 describe("le suivi de position du livreur survit à l'arrière-plan", () => {

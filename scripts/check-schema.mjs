@@ -125,9 +125,9 @@ if (process.env.DATABASE_URL) {
     } else {
       logOk(`Toutes les ${tablesInSchema.size} tables sont présentes en base.`);
     }
-    const orphanInDb = [...tablesInDb].filter((t) => t.startsWith("tikis_") && !tablesInSchema.has(t));
+    const orphanInDb = [...tablesInDb].filter((t) => t.startsWith("tikisse_") && !tablesInSchema.has(t));
     if (orphanInDb.length > 0) {
-      console.warn(`\n  ℹ Tables 'tikis_*' en base mais pas dans schema.ts :`);
+      console.warn(`\n  ℹ Tables 'tikisse_*' en base mais pas dans schema.ts :`);
       for (const t of orphanInDb) console.warn(`      • ${t}`);
     }
     await conn.end();

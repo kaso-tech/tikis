@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { COUNTRIES, createRegisteredProfile, detectCountry, findCountryForPhone, findSimulatedAccount, formatLocalPhone, generateDriverReferralCode, isValidInternationalPhone, normalizedInternationalPhone, sanitizeFullName, validateFullName } from "../lib/registration-rules";
 
-describe("règles d’inscription internationale Tikis", () => {
+describe("règles d’inscription internationale Tikisse", () => {
   const burkina = COUNTRIES.find((country) => country.id === "BF")!;
   const ivoryCoast = COUNTRIES.find((country) => country.id === "CI")!;
 

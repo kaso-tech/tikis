@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const source = readFileSync(join(process.cwd(), "components/tikis/auth-flow.tsx"), "utf8");
+const source = readFileSync(join(process.cwd(), "components/tikisse/auth-flow.tsx"), "utf8");
 
 describe("erreurs de vérification du profil existant", () => {
   it("distingue les indisponibilités de profils, de session et de vérification Supabase", () => {

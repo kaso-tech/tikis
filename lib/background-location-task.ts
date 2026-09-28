@@ -27,12 +27,12 @@ import { createTRPCClient, httpLink, TRPCClientError } from "@trpc/client";
 import superjson from "superjson";
 import type { AppRouter } from "@/server/routers";
 import { getApiBaseUrl } from "@/constants/oauth";
-import { getTikisSessionToken } from "@/lib/tikis-session";
+import { getTikisseSessionToken } from "@/lib/tikisse-session";
 import { safeHeading } from "@/lib/background-location-rules";
 import { LIVE_POSITION_GPS_JUMP_ERR_MSG, LIVE_POSITION_OUT_OF_ZONE_ERR_MSG } from "@/shared/const";
 
-export const BACKGROUND_DRIVER_LOCATION_TASK = "tikis-driver-background-location";
-const ACTIVE_DELIVERY_STORAGE_KEY = "tikis:background-tracking:active-delivery-id";
+export const BACKGROUND_DRIVER_LOCATION_TASK = "tikisse-driver-background-location";
+const ACTIVE_DELIVERY_STORAGE_KEY = "tikisse:background-tracking:active-delivery-id";
 
 /**
  * Les deux environnements où ce suivi n'existe pas, et où l'appeler ne produit que du bruit.
@@ -58,7 +58,7 @@ function createBackgroundClient(sessionToken: string) {
       httpLink({
         url: `${getApiBaseUrl()}/api/trpc`,
         transformer: superjson,
-        headers: () => ({ "x-tikis-session": sessionToken }),
+        headers: () => ({ "x-tikisse-session": sessionToken }),
       }),
     ],
   });
@@ -77,7 +77,7 @@ if (BACKGROUND_TRACKING_SUPPORTED) {
       // mais un dernier réveil peut arriver juste après — rien à publier dans ce cas.
       const deliveryId = await AsyncStorage.getItem(ACTIVE_DELIVERY_STORAGE_KEY);
       if (!deliveryId) return;
-      const sessionToken = await getTikisSessionToken();
+      const sessionToken = await getTikisseSessionToken();
       if (!sessionToken) return;
       await createBackgroundClient(sessionToken).deliveries.updateLivePosition.mutate({
         deliveryId,
@@ -131,7 +131,7 @@ export async function startBackgroundDriverTracking(deliveryId: string): Promise
       showsBackgroundLocationIndicator: true,
       foregroundService: {
         notificationTitle: "Course en cours",
-        notificationBody: "Tikis partage votre position avec l'expéditeur tant que la course est active.",
+        notificationBody: "Tikisse partage votre position avec l'expéditeur tant que la course est active.",
         killServiceOnDestroy: true,
       },
     });

@@ -4,9 +4,9 @@ import { useMemo } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useTikisStore } from "@/lib/tikis-store";
+import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
-import { formatRelativeDate, type InAppNotification } from "@/shared/tikis-domain";
+import { formatRelativeDate, type InAppNotification } from "@/shared/tikisse-domain";
 
 const ICON_BY_TONE: Record<InAppNotification["tone"], { icon: React.ComponentProps<typeof MaterialIcons>["name"]; bgClass: "primary" | "success" | "warning" }> = {
   info: { icon: "notifications", bgClass: "primary" },
@@ -41,7 +41,7 @@ function timeShort(date: Date) {
 export default function NotificationsScreen() {
   const { colors: theme } = useThemeColors();
   const router = useRouter();
-  const { profile, role } = useTikisStore();
+  const { profile, role } = useTikisseStore();
   const notificationsQuery = trpc.notifications.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 60_000 });
   const markAllReadMutation = trpc.notifications.markRead.useMutation({ onSuccess: () => void notificationsQuery.refetch() });
   const markOneReadMutation = trpc.notifications.markOneRead.useMutation({ onSuccess: () => void notificationsQuery.refetch() });

@@ -3,17 +3,17 @@
  *
  * Même principe que tests/payment-direct-audit.db.test.ts : ces tests appellent les fonctions qui
  * touchent réellement aux Wallets et aux sessions admin, sans rien simuler de la base. Ils ne tournent
- * que si TIKIS_TEST_DATABASE_URL désigne une base jetable dont le schéma a été poussé :
+ * que si TIKISSE_TEST_DATABASE_URL désigne une base jetable dont le schéma a été poussé :
  *
  *   DATABASE_URL=<url> npx drizzle-kit push --force
- *   TIKIS_TEST_DATABASE_URL=<url> npx vitest run tests/admin-console-audit.db.test.ts
+ *   TIKISSE_TEST_DATABASE_URL=<url> npx vitest run tests/admin-console-audit.db.test.ts
  */
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-const TEST_DB = process.env.TIKIS_TEST_DATABASE_URL;
+const TEST_DB = process.env.TIKISSE_TEST_DATABASE_URL;
 if (TEST_DB) process.env.DATABASE_URL = TEST_DB;
-process.env.TIKIS_ADMIN_TOTP_KEY ??= "cle-totp-de-test-uniquement-0123456789abcdef";
+process.env.TIKISSE_ADMIN_TOTP_KEY ??= "cle-totp-de-test-uniquement-0123456789abcdef";
 
 type Db = typeof import("../server/db");
 let db: Db;
@@ -34,7 +34,7 @@ const newPhone = () => `+22671${String(Math.floor(Math.random() * 1e6)).padStart
 async function wallet(phone: string) {
   const handle = (await db.getDb())!;
   const { eq } = await import("drizzle-orm");
-  const row = (await handle.select().from(schema.tikisWallets).where(eq(schema.tikisWallets.profilePhone, phone)).limit(1))[0];
+  const row = (await handle.select().from(schema.tikisseWallets).where(eq(schema.tikisseWallets.profilePhone, phone)).limit(1))[0];
   return { available: row?.availableBalance ?? 0, held: row?.heldBalance ?? 0 };
 }
 
@@ -52,17 +52,17 @@ async function engagedDelivery(stage: "applied" | "selected" | "confirmed", comm
     await db.applyWalletMovement(tx, { profilePhone: driverPhone, operation: "credit", amount: 5000, availableDelta: 5000, heldDelta: 0, reason: "Solde de départ (test)", idempotencyKey: `${candidateId}:seed` });
     await db.applyWalletMovement(tx, { profilePhone: driverPhone, deliveryId, operation: "block", amount: commission, availableDelta: -commission, heldDelta: commission, reason: "Commission temporairement bloquée pour candidature", idempotencyKey: `${candidateId}:block` });
     if (stage === "confirmed") {
-      await db.applyWalletMovement(tx, { profilePhone: driverPhone, deliveryId, operation: "commission_debit", amount: commission, availableDelta: 0, heldDelta: -commission, reason: "Commission Tikis prélevée après confirmation de disponibilité", idempotencyKey: `${deliveryId}:commission-debit:${candidateId}` });
+      await db.applyWalletMovement(tx, { profilePhone: driverPhone, deliveryId, operation: "commission_debit", amount: commission, availableDelta: 0, heldDelta: -commission, reason: "Commission Tikisse prélevée après confirmation de disponibilité", idempotencyKey: `${deliveryId}:commission-debit:${candidateId}` });
     }
   });
-  await handle.insert(schema.tikisDeliveries).values({
+  await handle.insert(schema.tikisseDeliveries).values({
     id: deliveryId, senderPhone: newPhone(), pickupPlaceId: 1, dropoffPlaceId: 2, title: "Audit admin", details: "",
     deliveryType: "Plis", distanceKm: "3.00", estimatedPrice: 3000, vehicleTypes: "Moto",
     status: stage === "applied" ? "open" : stage === "selected" ? "pending_confirmation" : "active",
     driverPhone: stage === "applied" ? null : driverPhone,
     accruedCommission: stage === "applied" ? null : commission,
   });
-  await handle.insert(schema.tikisDeliveryCandidates).values({ id: candidateId, deliveryId, driverPhone, status: stage, commissionBlocked: commission });
+  await handle.insert(schema.tikisseDeliveryCandidates).values({ id: candidateId, deliveryId, driverPhone, status: stage, commissionBlocked: commission });
   return { deliveryId, driverPhone, commission };
 }
 
@@ -100,7 +100,7 @@ describe.skipIf(!TEST_DB)("annulation forcée par l'administration — aucun arg
 
 describe.skipIf(!TEST_DB)("session admin — l'état du compte fait foi, pas le jeton", () => {
   async function newAdmin(role: "super_admin" | "support" | "finance") {
-    const email = `audit-${randomUUID()}@tikis.test`;
+    const email = `audit-${randomUUID()}@tikisse.test`;
     const created = await adminDb.createAdminUser({ email, passwordHash: await adminAuth.hashAdminPassword("mot-de-passe-audit"), fullName: "Audit", role });
     return created!;
   }
@@ -120,7 +120,7 @@ describe.skipIf(!TEST_DB)("session admin — l'état du compte fait foi, pas le 
     const { token } = await adminDb.createAdminSession({ adminId: admin.id });
     const handle = (await db.getDb())!;
     const { eq } = await import("drizzle-orm");
-    await handle.update(schema.tikisAdminUsers).set({ role: "support" }).where(eq(schema.tikisAdminUsers.id, admin.id));
+    await handle.update(schema.tikisseAdminUsers).set({ role: "support" }).where(eq(schema.tikisseAdminUsers.id, admin.id));
 
     expect(await adminDb.authenticateAdminSession(token)).toMatchObject({ adminId: admin.id, role: "support" });
   });
@@ -130,7 +130,7 @@ describe.skipIf(!TEST_DB)("session admin — l'état du compte fait foi, pas le 
     const { token } = await adminDb.createAdminSession({ adminId: admin.id });
     const handle = (await db.getDb())!;
     const { eq } = await import("drizzle-orm");
-    await handle.delete(schema.tikisAdminUsers).where(eq(schema.tikisAdminUsers.id, admin.id));
+    await handle.delete(schema.tikisseAdminUsers).where(eq(schema.tikisseAdminUsers.id, admin.id));
 
     expect(await adminDb.authenticateAdminSession(token)).toBeNull();
   });
@@ -144,7 +144,7 @@ describe.skipIf(!TEST_DB)("session admin — l'état du compte fait foi, pas le 
     const handle = (await db.getDb())!;
     const { eq } = await import("drizzle-orm");
     // Isole ce test : un seul super-admin actif en base.
-    await handle.update(schema.tikisAdminUsers).set({ active: false }).where(eq(schema.tikisAdminUsers.role, "super_admin"));
+    await handle.update(schema.tikisseAdminUsers).set({ active: false }).where(eq(schema.tikisseAdminUsers.role, "super_admin"));
     const last = await newAdmin("super_admin");
     const other = await newAdmin("support");
     await expect(adminDb.setAdminUserActive({ actorAdminId: other.id, adminId: last.id, active: false })).rejects.toThrow(/dernier super-admin/);
@@ -177,7 +177,7 @@ describe.skipIf(!TEST_DB)("validation manuelle d'un dépôt — jamais sans preu
     const handle = (await db.getDb())!;
     const phone = newPhone();
     const id = randomUUID();
-    await handle.insert(schema.tikisPaymentTransactions).values({
+    await handle.insert(schema.tikissePaymentTransactions).values({
       id, profilePhone: phone, type: "deposit", provider, amount, status: "pending", providerReference: `pi_admin_${id}`,
       checkoutUrl: null, idempotencyKey: `admin-audit:${id}`,
       ...(provider === "yengapay_direct_live" ? { phoneE164: phone, operatorCode: "orange_money", countryCode: "BF", ussdCode: "*144#", expiresAt: new Date(Date.now() + 15 * 60_000) } : {}),
@@ -209,13 +209,13 @@ describe.skipIf(!TEST_DB)("validation manuelle d'un dépôt — jamais sans preu
 
 async function profile(phone: string, accountType: "sender" | "driver") {
   const handle = (await db.getDb())!;
-  await handle.insert(schema.tikisProfiles).values({ phone, fullName: "Profil audit", accountType, vehicles: accountType === "driver" ? "[\"Moto\"]" : "[]" });
+  await handle.insert(schema.tikisseProfiles).values({ phone, fullName: "Profil audit", accountType, vehicles: accountType === "driver" ? "[\"Moto\"]" : "[]" });
 }
 
 async function candidateStatus(deliveryId: string, driverPhone: string) {
   const handle = (await db.getDb())!;
   const { and, eq } = await import("drizzle-orm");
-  return (await handle.select().from(schema.tikisDeliveryCandidates).where(and(eq(schema.tikisDeliveryCandidates.deliveryId, deliveryId), eq(schema.tikisDeliveryCandidates.driverPhone, driverPhone))).limit(1))[0]?.status;
+  return (await handle.select().from(schema.tikisseDeliveryCandidates).where(and(eq(schema.tikisseDeliveryCandidates.deliveryId, deliveryId), eq(schema.tikisseDeliveryCandidates.driverPhone, driverPhone))).limit(1))[0]?.status;
 }
 
 describe.skipIf(!TEST_DB)("changement de rôle — jamais avec de l'argent ou des courses engagés", () => {
@@ -230,7 +230,7 @@ describe.skipIf(!TEST_DB)("changement de rôle — jamais avec de l'argent ou de
     const handle = (await db.getDb())!;
     const senderPhone = newPhone();
     await profile(senderPhone, "sender");
-    await handle.insert(schema.tikisDeliveries).values({
+    await handle.insert(schema.tikisseDeliveries).values({
       id: randomUUID(), senderPhone, pickupPlaceId: 1, dropoffPlaceId: 2, title: "Course ouverte", details: "",
       deliveryType: "Plis", distanceKm: "3.00", estimatedPrice: 3000, vehicleTypes: "Moto", status: "open",
     });
@@ -289,7 +289,7 @@ describe.skipIf(!TEST_DB)("suspension d'un livreur — ses candidatures sont ret
       await db.applyWalletMovement(tx, { profilePhone: driverPhone, deliveryId, operation: "block", amount: 300, availableDelta: -300, heldDelta: 300, reason: "Nouvelle candidature (test)", idempotencyKey: `${deliveryId}:${driverPhone}:reblock` });
     });
     await new Promise((resolve) => setTimeout(resolve, 1100)); // updatedAt a une précision d'une seconde
-    await handle.update(schema.tikisDeliveryCandidates).set({ status: "applied", updatedAt: new Date() }).where(and(eq(schema.tikisDeliveryCandidates.deliveryId, deliveryId), eq(schema.tikisDeliveryCandidates.driverPhone, driverPhone)));
+    await handle.update(schema.tikisseDeliveryCandidates).set({ status: "applied", updatedAt: new Date() }).where(and(eq(schema.tikisseDeliveryCandidates.deliveryId, deliveryId), eq(schema.tikisseDeliveryCandidates.driverPhone, driverPhone)));
 
     await adminDb.adminSetProfileStatus({ phone: driverPhone, status: "suspended", reason: "Audit", adminId: 1 });
     expect(await wallet(driverPhone)).toEqual({ available: 5000, held: 0 });
@@ -304,7 +304,7 @@ describe.skipIf(!TEST_DB)("validation manuelle d'un retrait — jamais sans preu
     await handle.transaction(async (tx) => {
       await db.applyWalletMovement(tx, { profilePhone: phone, operation: "credit", amount: 5000, availableDelta: 5000, heldDelta: 0, reason: "Solde de départ (test)", idempotencyKey: `${id}:seed` });
     });
-    await handle.insert(schema.tikisPaymentTransactions).values({
+    await handle.insert(schema.tikissePaymentTransactions).values({
       id, profilePhone: phone, type: "withdrawal", provider: "yengapay_test", amount, status: "pending", providerReference: `wd_admin_${id}`,
       checkoutUrl: null, idempotencyKey: `admin-audit-wd:${id}`,
     });
@@ -328,7 +328,7 @@ describe.skipIf(!TEST_DB)("validation manuelle d'un retrait — jamais sans preu
     expect(await wallet(phone)).toEqual({ available: 3000, held: 0 });
     const handle = (await db.getDb())!;
     const { eq } = await import("drizzle-orm");
-    const row = (await handle.select().from(schema.tikisPaymentTransactions).where(eq(schema.tikisPaymentTransactions.id, id)).limit(1))[0]!;
+    const row = (await handle.select().from(schema.tikissePaymentTransactions).where(eq(schema.tikissePaymentTransactions.id, id)).limit(1))[0]!;
     expect(row).toMatchObject({ status: "succeeded", payoutReference: `OM-${id.slice(0, 8)}`, adminNotes: "Versé par Orange Money", settledByAdminId: 42 });
   });
 
@@ -350,26 +350,26 @@ describe.skipIf(!TEST_DB)("validation manuelle d'un retrait — jamais sans preu
 
 describe.skipIf(!TEST_DB)("lot 2 — session admin révocable, en cookie", () => {
   async function newAdmin(role: "super_admin" | "support" | "finance" = "support", password = "mot-de-passe-audit") {
-    const email = `lot2-${randomUUID()}@tikis.test`;
+    const email = `lot2-${randomUUID()}@tikisse.test`;
     return (await adminDb.createAdminUser({ email, passwordHash: await adminAuth.hashAdminPassword(password), fullName: "Audit", role }))!;
   }
 
   /** Appelle le vrai routeur admin avec une requête Express minimale, et capture les cookies posés. */
   async function caller(options: { ip?: string; cookie?: string; consoleHeader?: boolean } = {}) {
-    const { tikisAdminRouter } = await import("../server/admin-router");
+    const { tikisseAdminRouter } = await import("../server/admin-router");
     const { createContext } = await import("../server/_core/context");
     const cookies: Array<{ name: string; value: string; options: Record<string, unknown> }> = [];
     const cleared: string[] = [];
     const headers: Record<string, string> = {};
     if (options.cookie) headers.cookie = options.cookie;
-    if (options.consoleHeader !== false) headers["x-tikis-admin"] = "1";
+    if (options.consoleHeader !== false) headers["x-tikisse-admin"] = "1";
     const req = { headers, ip: options.ip ?? "203.0.113.7", secure: true, socket: {} } as never;
     const res = {
       cookie: (name: string, value: string, cookieOptions: Record<string, unknown>) => { cookies.push({ name, value, options: cookieOptions }); },
       clearCookie: (name: string) => { cleared.push(name); },
     } as never;
     const ctx = await createContext({ req, res, info: {} as never });
-    return { api: tikisAdminRouter.createCaller(ctx), cookies, cleared };
+    return { api: tikisseAdminRouter.createCaller(ctx), cookies, cleared };
   }
 
   it("la connexion pose un cookie httpOnly strict et ne renvoie aucun jeton à la page", async () => {
@@ -378,26 +378,26 @@ describe.skipIf(!TEST_DB)("lot 2 — session admin révocable, en cookie", () =>
     const result = await api.auth.login({ email: admin.email, password: "mot-de-passe-audit" });
     expect(JSON.stringify(result)).not.toMatch(/token/i);
     expect(cookies).toHaveLength(1);
-    expect(cookies[0]).toMatchObject({ name: "tikis_admin_session", options: { httpOnly: true, sameSite: "strict", path: "/api", secure: true } });
+    expect(cookies[0]).toMatchObject({ name: "tikisse_admin_session", options: { httpOnly: true, sameSite: "strict", path: "/api", secure: true } });
     expect(cookies[0].options.domain).toBeUndefined();
   });
 
   it("le cookie authentifie avec l'en-tête de la console, et seulement avec lui", async () => {
     const admin = await newAdmin();
     const { token } = await adminDb.createAdminSession({ adminId: admin.id });
-    const withHeader = await caller({ cookie: `tikis_admin_session=${token}` });
+    const withHeader = await caller({ cookie: `tikisse_admin_session=${token}` });
     expect(await withHeader.api.auth.me()).toMatchObject({ adminId: admin.id });
     // Une requête forgée par un autre site porterait le cookie, jamais l'en-tête.
-    const forged = await caller({ cookie: `tikis_admin_session=${token}`, consoleHeader: false });
+    const forged = await caller({ cookie: `tikisse_admin_session=${token}`, consoleHeader: false });
     expect(await forged.api.auth.me()).toBeNull();
   });
 
   it("la déconnexion révoque la session côté serveur : le cookie copié ne vaut plus rien", async () => {
     const admin = await newAdmin();
     const { token } = await adminDb.createAdminSession({ adminId: admin.id });
-    const session = await caller({ cookie: `tikis_admin_session=${token}` });
+    const session = await caller({ cookie: `tikisse_admin_session=${token}` });
     await session.api.auth.logout();
-    expect(session.cleared).toContain("tikis_admin_session");
+    expect(session.cleared).toContain("tikisse_admin_session");
     expect(await adminDb.authenticateAdminSession(token)).toBeNull();
   });
 
@@ -406,7 +406,7 @@ describe.skipIf(!TEST_DB)("lot 2 — session admin révocable, en cookie", () =>
     const { token } = await adminDb.createAdminSession({ adminId: admin.id });
     const handle = (await db.getDb())!;
     const { eq } = await import("drizzle-orm");
-    await handle.update(schema.tikisAdminSessions).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.tikisAdminSessions.adminId, admin.id));
+    await handle.update(schema.tikisseAdminSessions).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.tikisseAdminSessions.adminId, admin.id));
     expect(await adminDb.authenticateAdminSession(token)).toBeNull();
   });
 
@@ -442,18 +442,18 @@ describe.skipIf(!TEST_DB)("lot 2 — session admin révocable, en cookie", () =>
     await adminDb.recordAdminLoginFailure(admin.email, ip);
     const handle = (await db.getDb())!;
     const { like } = await import("drizzle-orm");
-    const rows = await handle.select().from(schema.tikisRateLimits).where(like(schema.tikisRateLimits.rateLimitKey, `admin-login:%${admin.email}%`));
+    const rows = await handle.select().from(schema.tikisseRateLimits).where(like(schema.tikisseRateLimits.rateLimitKey, `admin-login:%${admin.email}%`));
     expect(rows.length).toBe(2);
   });
 
   it("un email inconnu donne la même erreur qu'un mauvais mot de passe", async () => {
-    await expect((await caller({ ip: "198.51.100.251" })).api.auth.login({ email: `inconnu-${randomUUID()}@tikis.test`, password: "peu importe" })).rejects.toThrow(/^Identifiants invalides\.$/);
+    await expect((await caller({ ip: "198.51.100.251" })).api.auth.login({ email: `inconnu-${randomUUID()}@tikisse.test`, password: "peu importe" })).rejects.toThrow(/^Identifiants invalides\.$/);
   });
 
   it("la carte en direct est refusée au rôle Finance", async () => {
     const admin = await newAdmin("finance");
     const { token } = await adminDb.createAdminSession({ adminId: admin.id });
-    const { api } = await caller({ cookie: `tikis_admin_session=${token}` });
+    const { api } = await caller({ cookie: `tikisse_admin_session=${token}` });
     await expect(api.deliveriesOps.liveLocations({ maxAgeSeconds: 120 })).rejects.toThrow(/rôle/);
   });
 });
@@ -462,20 +462,20 @@ describe.skipIf(!TEST_DB)("lot 3 — double authentification TOTP", () => {
   const PASSWORD = "mot-de-passe-lot3";
 
   async function newAdmin(role: "super_admin" | "support" | "finance" = "support") {
-    const email = `lot3-${randomUUID()}@tikis.test`;
+    const email = `lot3-${randomUUID()}@tikisse.test`;
     return (await adminDb.createAdminUser({ email, passwordHash: await adminAuth.hashAdminPassword(PASSWORD), fullName: "Audit", role }))!;
   }
 
   async function caller(cookie?: string) {
-    const { tikisAdminRouter } = await import("../server/admin-router");
+    const { tikisseAdminRouter } = await import("../server/admin-router");
     const { createContext } = await import("../server/_core/context");
     const cookies: Array<{ name: string; value: string }> = [];
-    const headers: Record<string, string> = { "x-tikis-admin": "1" };
-    if (cookie) headers.cookie = `tikis_admin_session=${cookie}`;
+    const headers: Record<string, string> = { "x-tikisse-admin": "1" };
+    if (cookie) headers.cookie = `tikisse_admin_session=${cookie}`;
     const req = { headers, ip: `203.0.113.${Math.floor(Math.random() * 250)}`, secure: true, socket: {} } as never;
     const res = { cookie: (name: string, value: string) => { cookies.push({ name, value }); }, clearCookie: () => {} } as never;
     const ctx = await createContext({ req, res, info: {} as never });
-    return { api: tikisAdminRouter.createCaller(ctx), cookies };
+    return { api: tikisseAdminRouter.createCaller(ctx), cookies };
   }
 
   /** Enrôle un compte comme le ferait la console ; renvoie le secret et les codes de secours. */
@@ -494,7 +494,7 @@ describe.skipIf(!TEST_DB)("lot 3 — double authentification TOTP", () => {
 
   async function setPolicy(required: boolean) {
     const handle = (await db.getDb())!;
-    await handle.insert(schema.tikisPlatformSettings).values({ id: 1, adminTotpRequired: required }).onDuplicateKeyUpdate({ set: { adminTotpRequired: required } });
+    await handle.insert(schema.tikissePlatformSettings).values({ id: 1, adminTotpRequired: required }).onDuplicateKeyUpdate({ set: { adminTotpRequired: required } });
   }
   afterAll(async () => { if (TEST_DB) await setPolicy(false); });
 
@@ -506,7 +506,7 @@ describe.skipIf(!TEST_DB)("lot 3 — double authentification TOTP", () => {
     expect(await api.auth.me()).toMatchObject({ adminId: admin.id, totpEnabled: true, mustEnrollTotp: false });
     const handle = (await db.getDb())!;
     const { eq } = await import("drizzle-orm");
-    const row = (await handle.select().from(schema.tikisAdminUsers).where(eq(schema.tikisAdminUsers.id, admin.id)).limit(1))[0]!;
+    const row = (await handle.select().from(schema.tikisseAdminUsers).where(eq(schema.tikisseAdminUsers.id, admin.id)).limit(1))[0]!;
     expect(row.totpSecret).not.toContain(secret);
     expect(row.totpRecoveryCodes).not.toContain(recoveryCodes[0]);
   });
@@ -584,7 +584,7 @@ describe.skipIf(!TEST_DB)("lot 3 — double authentification TOTP", () => {
   it("l'obligation ne peut pas être activée tant qu'un super-admin ou finance n'est pas enrôlé", async () => {
     const handle = (await db.getDb())!;
     const { inArray } = await import("drizzle-orm");
-    await handle.update(schema.tikisAdminUsers).set({ active: false }).where(inArray(schema.tikisAdminUsers.role, ["super_admin", "finance"]));
+    await handle.update(schema.tikisseAdminUsers).set({ active: false }).where(inArray(schema.tikisseAdminUsers.role, ["super_admin", "finance"]));
     const actor = await newAdmin("super_admin");
     const { token } = await enroll(actor.id);
     const laggard = await newAdmin("finance");
@@ -648,13 +648,13 @@ describe.skipIf(!TEST_DB)("lot 4 — pièces KYC et pièces jointes, réservées
   const fakeRead = async (key: string) => { reads.push(key); return { body: IMAGE, contentType: "image/jpeg" }; };
 
   async function sessionFor(role: "super_admin" | "support" | "finance") {
-    const admin = (await adminDb.createAdminUser({ email: `lot4-${randomUUID()}@tikis.test`, passwordHash: await adminAuth.hashAdminPassword("mot-de-passe-lot4"), fullName: "Audit", role }))!;
+    const admin = (await adminDb.createAdminUser({ email: `lot4-${randomUUID()}@tikisse.test`, passwordHash: await adminAuth.hashAdminPassword("mot-de-passe-lot4"), fullName: "Audit", role }))!;
     return { admin, token: (await adminDb.createAdminSession({ adminId: admin.id })).token };
   }
 
   async function submission() {
     const phone = newPhone();
-    const { id } = await db.createKycSubmission({ driverPhone: phone, idFrontKey: `tikis-kyc/${phone}/front.jpg`, idBackKey: `tikis-kyc/${phone}/back.jpg`, selfieKey: `tikis-kyc/${phone}/selfie.jpg` });
+    const { id } = await db.createKycSubmission({ driverPhone: phone, idFrontKey: `tikisse-kyc/${phone}/front.jpg`, idBackKey: `tikisse-kyc/${phone}/back.jpg`, selfieKey: `tikisse-kyc/${phone}/selfie.jpg` });
     return { id, phone };
   }
 
@@ -664,7 +664,7 @@ describe.skipIf(!TEST_DB)("lot 4 — pièces KYC et pièces jointes, réservées
     const { id, phone } = await submission();
     const result = await documents.resolveAdminDocument({ sessionToken: token, request: { kind: "kyc", submissionId: id, side: "selfie" } }, fakeRead);
     expect(result).toMatchObject({ status: 200, contentType: "image/jpeg" });
-    expect(reads.at(-1)).toBe(`tikis-kyc/${phone}/selfie.jpg`);
+    expect(reads.at(-1)).toBe(`tikisse-kyc/${phone}/selfie.jpg`);
     const log = await adminDb.listAdminAuditLog({ targetType: "kyc_submission", targetId: id });
     expect(log.rows[0]).toMatchObject({ adminId: admin.id, action: "kyc_document_viewed" });
   });
@@ -725,7 +725,7 @@ describe.skipIf(!TEST_DB)("lot 4 — pièces KYC et pièces jointes, réservées
       expect(anonymous.headers.get("cache-control")).toBe("no-store, private");
       // Avec session : la lecture réelle du stockage échoue ici (aucun stockage configuré en test) → 502,
       // preuve que l'authentification et la recherche en base sont passées.
-      const authed = await fetch(`http://127.0.0.1:${port}/api/admin/documents/kyc/${id}/selfie`, { headers: { cookie: `tikis_admin_session=${token}` } });
+      const authed = await fetch(`http://127.0.0.1:${port}/api/admin/documents/kyc/${id}/selfie`, { headers: { cookie: `tikisse_admin_session=${token}` } });
       expect(authed.status).toBe(502);
     } finally {
       server.close();
@@ -737,32 +737,32 @@ describe.skipIf(!TEST_DB)("lot 4 — pièces KYC et pièces jointes, réservées
     const { token } = await sessionFor("support");
     const handle = (await db.getDb())!;
     const reportId = randomUUID();
-    await handle.insert(schema.tikisDeliveryReports).values({ id: reportId, deliveryId: randomUUID(), reporterPhone: newPhone(), reporterRole: "sender", reason: "damaged", description: "Colis abîmé", attachmentKey: "tikis-reports/x/photo.png" });
+    await handle.insert(schema.tikisseDeliveryReports).values({ id: reportId, deliveryId: randomUUID(), reporterPhone: newPhone(), reporterRole: "sender", reason: "damaged", description: "Colis abîmé", attachmentKey: "tikisse-reports/x/photo.png" });
     expect(await documents.resolveAdminDocument({ sessionToken: token, request: { kind: "report", reportId } }, fakeRead)).toMatchObject({ status: 200 });
-    expect(reads.at(-1)).toBe("tikis-reports/x/photo.png");
+    expect(reads.at(-1)).toBe("tikisse-reports/x/photo.png");
   });
 });
 
 describe.skipIf(!TEST_DB)("lot 5 — traçabilité et pilotage", () => {
   async function adminCaller(role: "super_admin" | "support" | "finance" = "super_admin") {
-    const admin = (await adminDb.createAdminUser({ email: `lot5-${randomUUID()}@tikis.test`, passwordHash: await adminAuth.hashAdminPassword("mot-de-passe-lot5"), fullName: "Audit", role }))!;
+    const admin = (await adminDb.createAdminUser({ email: `lot5-${randomUUID()}@tikisse.test`, passwordHash: await adminAuth.hashAdminPassword("mot-de-passe-lot5"), fullName: "Audit", role }))!;
     const { token } = await adminDb.createAdminSession({ adminId: admin.id });
-    const { tikisAdminRouter } = await import("../server/admin-router");
+    const { tikisseAdminRouter } = await import("../server/admin-router");
     const { createContext } = await import("../server/_core/context");
-    const req = { headers: { "x-tikis-admin": "1", cookie: `tikis_admin_session=${token}` }, ip: "203.0.113.50", secure: true, socket: {} } as never;
+    const req = { headers: { "x-tikisse-admin": "1", cookie: `tikisse_admin_session=${token}` }, ip: "203.0.113.50", secure: true, socket: {} } as never;
     const res = { cookie: () => {}, clearCookie: () => {} } as never;
-    return { admin, api: tikisAdminRouter.createCaller(await createContext({ req, res, info: {} as never })) };
+    return { admin, api: tikisseAdminRouter.createCaller(await createContext({ req, res, info: {} as never })) };
   }
 
   async function auditRows(adminId: number) {
     const handle = (await db.getDb())!;
     const { desc, eq } = await import("drizzle-orm");
-    return handle.select().from(schema.tikisAdminAuditLog).where(eq(schema.tikisAdminAuditLog.adminId, adminId)).orderBy(desc(schema.tikisAdminAuditLog.createdAt));
+    return handle.select().from(schema.tikisseAdminAuditLog).where(eq(schema.tikisseAdminAuditLog.adminId, adminId)).orderBy(desc(schema.tikisseAdminAuditLog.createdAt));
   }
 
   it("chaque modification laisse la demande, puis le détail avec la valeur avant et après", async () => {
     const { admin, api } = await adminCaller();
-    const before = await db.getTikisCommissionRate();
+    const before = await db.getTikisseCommissionRate();
     const next = before === 0.1 ? 0.12 : 0.1;
     try {
       await api.commission.update({ rate: next });
@@ -777,16 +777,16 @@ describe.skipIf(!TEST_DB)("lot 5 — traçabilité et pilotage", () => {
 
   it("si le journal est indisponible, la modification est refusée et n'a pas lieu", async () => {
     const { api } = await adminCaller();
-    const before = await db.getTikisCommissionRate();
+    const before = await db.getTikisseCommissionRate();
     const handle = (await db.getDb())!;
     const { sql } = await import("drizzle-orm");
-    await handle.execute(sql`RENAME TABLE tikis_admin_audit_log TO tikis_admin_audit_log_offline`);
+    await handle.execute(sql`RENAME TABLE tikisse_admin_audit_log TO tikisse_admin_audit_log_offline`);
     try {
       await expect(api.commission.update({ rate: before === 0.1 ? 0.15 : 0.1 })).rejects.toThrow(/journal d’audit est indisponible/);
     } finally {
-      await handle.execute(sql`RENAME TABLE tikis_admin_audit_log_offline TO tikis_admin_audit_log`);
+      await handle.execute(sql`RENAME TABLE tikisse_admin_audit_log_offline TO tikisse_admin_audit_log`);
     }
-    expect(await db.getTikisCommissionRate()).toBe(before);
+    expect(await db.getTikisseCommissionRate()).toBe(before);
   });
 
   it("aucun code ni mot de passe n'est recopié dans le journal", async () => {
@@ -809,7 +809,7 @@ describe.skipIf(!TEST_DB)("lot 5 — traçabilité et pilotage", () => {
 
   it("KYC : un dossier ne se tranche qu'une fois", async () => {
     const { api } = await adminCaller("support");
-    const { id } = await db.createKycSubmission({ driverPhone: newPhone(), idFrontKey: "tikis-kyc/x/f.jpg", idBackKey: "tikis-kyc/x/b.jpg", selfieKey: "tikis-kyc/x/s.jpg" });
+    const { id } = await db.createKycSubmission({ driverPhone: newPhone(), idFrontKey: "tikisse-kyc/x/f.jpg", idBackKey: "tikisse-kyc/x/b.jpg", selfieKey: "tikisse-kyc/x/s.jpg" });
     await api.kyc.review({ submissionId: id, decision: "approved" });
     // Avant correction : accepté, le dossier approuvé devenait refusé sans que le livreur le sache.
     await expect(api.kyc.review({ submissionId: id, decision: "rejected", rejectionReason: "Flou" })).rejects.toThrow(/déjà été approuvé/);
@@ -821,7 +821,7 @@ describe.skipIf(!TEST_DB)("lot 5 — traçabilité et pilotage", () => {
     const { and, eq } = await import("drizzle-orm");
     const reporterPhone = newPhone();
     const { id } = await adminDb.createDeliveryReport({ deliveryId: randomUUID(), reporterPhone, reporterRole: "sender", reason: "late", description: "Très en retard" });
-    const decisions = async () => handle.select().from(schema.tikisDeliveryEvents).where(and(eq(schema.tikisDeliveryEvents.recipientPhone, reporterPhone), eq(schema.tikisDeliveryEvents.eventType, "report_decision")));
+    const decisions = async () => handle.select().from(schema.tikisseDeliveryEvents).where(and(eq(schema.tikisseDeliveryEvents.recipientPhone, reporterPhone), eq(schema.tikisseDeliveryEvents.eventType, "report_decision")));
 
     await api.reports.resolve({ reportId: id, status: "resolved", resolutionNotes: "Livreur averti (interne)", replyToReporter: "Le livreur a été averti." });
     let events = await decisions();
@@ -842,7 +842,7 @@ describe.skipIf(!TEST_DB)("lot 5 — traçabilité et pilotage", () => {
     const before = (await adminDb.adminDashboardMetrics(30))!;
     const driverPhone = newPhone();
     // Publiée il y a 40 jours, terminée hier : elle compte dans les 30 derniers jours.
-    await handle.insert(schema.tikisDeliveries).values({
+    await handle.insert(schema.tikisseDeliveries).values({
       id: randomUUID(), senderPhone: newPhone(), pickupPlaceId: 1, dropoffPlaceId: 2, title: "Ancienne course", details: "",
       deliveryType: "Plis", distanceKm: "3.00", estimatedPrice: 3000, vehicleTypes: "Moto", status: "completed", driverPhone,
       createdAt: new Date(Date.now() - 40 * 86_400_000), completedAt: new Date(Date.now() - 86_400_000),
@@ -868,7 +868,7 @@ describe.skipIf(!TEST_DB)("lot 5 — traçabilité et pilotage", () => {
     for (const status of ["succeeded", "expired", "failed"] as const) {
       const id = randomUUID();
       ids.push(id);
-      await handle.insert(schema.tikisPaymentTransactions).values({ id, profilePhone: phone, type: "deposit", provider: "yengapay_live", amount: 1000, status, providerReference: `pi_lot5_${id}`, checkoutUrl: null, idempotencyKey: `lot5:${id}` });
+      await handle.insert(schema.tikissePaymentTransactions).values({ id, profilePhone: phone, type: "deposit", provider: "yengapay_live", amount: 1000, status, providerReference: `pi_lot5_${id}`, checkoutUrl: null, idempotencyKey: `lot5:${id}` });
     }
     const local = phone.replace("+226", "");
     expect((await api.finance.transactions({ query: local })).total).toBe(3);

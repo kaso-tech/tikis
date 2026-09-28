@@ -170,7 +170,7 @@ function getOrCreateWalletChannelEntry(supabaseUserId: string): WalletChannelEnt
 
 /** S'abonne aux mouvements du Wallet d'un profil (pas son contenu, juste le signal — le solde reste
  *  à relire via wallet.snapshot). `supabaseUserId` : celui de la session Supabase active, jamais le
- *  numéro Tikis — c'est ce qu'authentifie realtime_wallet_rls.sql. Retourne une fonction de
+ *  numéro Tikisse — c'est ce qu'authentifie realtime_wallet_rls.sql. Retourne une fonction de
  *  désabonnement à appeler au démontage. */
 export function subscribeToWalletChannel(supabaseUserId: string, onChange: () => void): () => void {
   const entry = getOrCreateWalletChannelEntry(supabaseUserId);

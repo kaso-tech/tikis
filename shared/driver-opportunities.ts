@@ -17,7 +17,7 @@
  * du serveur passait tel quel. Deux livreurs voyaient donc deux listes.
  */
 
-import type { Delivery } from "./tikis-domain";
+import type { Delivery } from "./tikisse-domain";
 
 type Sortable = Pick<Delivery, "status" | "ownCandidateStatus" | "offeredPrice" | "estimatedPrice" | "createdAt">;
 

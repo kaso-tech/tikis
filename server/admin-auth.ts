@@ -4,18 +4,21 @@ import { promisify } from "node:util";
 const scrypt = promisify(scryptCallback);
 
 export const ADMIN_SESSION_TTL_SECONDS = 8 * 60 * 60; // 8h : une console d'admin garde une session courte, contrairement à l'app mobile.
-export const ADMIN_SESSION_COOKIE = "tikis_admin_session";
+export const ADMIN_SESSION_COOKIE = "tikisse_admin_session";
+// Renommage Tikis → Tikisse : nom du cookie avant le renommage, relu en secours (server/_core/context.ts)
+// pour qu'un admin déjà connecté n'ait pas à se reconnecter au déploiement.
+export const LEGACY_ADMIN_SESSION_COOKIE = "tikis_admin_session";
 /**
  * En-tête que la console envoie avec chaque requête. Le cookie seul ne suffit pas à authentifier : un site
  * tiers peut faire envoyer un cookie par le navigateur, pas ajouter un en-tête personnalisé sans une
  * pré-vérification CORS que seules les origines autorisées passent (défense CSRF en plus de SameSite).
  */
-export const ADMIN_CONSOLE_HEADER = "x-tikis-admin";
+export const ADMIN_CONSOLE_HEADER = "x-tikisse-admin";
 
 /**
- * Authentification admin totalement séparée de celle des Senders/Livreurs (server/tikis-session.ts).
+ * Authentification admin totalement séparée de celle des Senders/Livreurs (server/tikisse-session.ts).
  * Aucune route de simulation ici : mot de passe hashé (scrypt, natif Node, aucune dépendance
- * supplémentaire à installer) + session opaque stockée en base (server/admin-db.ts, tikis_admin_sessions).
+ * supplémentaire à installer) + session opaque stockée en base (server/admin-db.ts, tikisse_admin_sessions).
  */
 
 /** Jeton de session : 256 bits aléatoires. Seul le navigateur le détient ; la base garde son empreinte. */

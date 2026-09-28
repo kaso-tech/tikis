@@ -1,4 +1,4 @@
-import type { LocationLabel } from "@/shared/tikis-domain";
+import type { LocationLabel } from "@/shared/tikisse-domain";
 
 export type StoredFavoritePlace = {
   id: number | string;

@@ -47,7 +47,7 @@ describe("une erreur de YengaPay ne remonte jamais brute jusqu'à l'écran", () 
 
 describe("le paiement Mobile Money est limité par profil", () => {
   const routers = readFileSync(join(process.cwd(), "server/routers.ts"), "utf8");
-  const procedure = (name: string) => routers.slice(routers.indexOf(`    ${name}: tikisProtectedProcedure`), routers.indexOf("}),", routers.indexOf(`    ${name}: tikisProtectedProcedure`)));
+  const procedure = (name: string) => routers.slice(routers.indexOf(`    ${name}: tikisseProtectedProcedure`), routers.indexOf("}),", routers.indexOf(`    ${name}: tikisseProtectedProcedure`)));
 
   it.each([
     ["requestDirectDeposit", "request"],

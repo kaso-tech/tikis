@@ -1,4 +1,4 @@
-import { SIMULATION_OTP } from "../shared/tikis-domain";
+import { SIMULATION_OTP } from "../shared/tikisse-domain";
 
 export const OTP_LENGTH = 6;
 export const OTP_MAX_ATTEMPTS = 5;

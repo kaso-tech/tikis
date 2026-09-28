@@ -1,8 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { LocationLabel } from "@/shared/tikis-domain";
+import type { LocationLabel } from "@/shared/tikisse-domain";
 import { MAX_RECENT_PLACES, mergeRecentPlaces } from "@/lib/recent-places-rules";
 
-const keyFor = (profilePhone: string) => `tikis:recent-places:${profilePhone}`;
+const keyFor = (profilePhone: string) => `tikisse:recent-places:${profilePhone}`;
 
 function isPlace(value: unknown): value is LocationLabel {
   if (!value || typeof value !== "object") return false;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatRelativeDate } from "../shared/tikis-domain";
+import { formatRelativeDate } from "../shared/tikisse-domain";
 
 describe("formatRelativeDate", () => {
   const now = new Date("2026-09-26T18:00:00.000Z").getTime();

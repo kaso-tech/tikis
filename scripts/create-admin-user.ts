@@ -1,5 +1,5 @@
 /**
- * Crée ou met à jour un compte d'administration Tikis.
+ * Crée ou met à jour un compte d'administration Tikisse.
  *
  * Usage :
  *   node --import tsx scripts/create-admin-user.ts vous@kasotech.com "mot de passe" "Votre nom" super_admin

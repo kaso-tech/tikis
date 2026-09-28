@@ -191,15 +191,15 @@ export async function createYengapayPaymentIntent(input: CreateCheckoutInput): P
   }
   if (input.type !== "deposit") throw new Error("Les retraits YengaPay ne sont pas activés : un projet Payout/Cash-Out est requis.");
 
-  const reference = `TIKIS-${input.paymentTransactionId}`;
+  const reference = `TIKISSE-${input.paymentTransactionId}`;
   const data = await callYengapay<Record<string, unknown>>(config, `/payment-intent/${encodeURIComponent(config.projectId!)}`, {
     method: "POST",
     body: JSON.stringify({
       paymentAmount: input.amount,
       reference,
       customerNumber: input.phone,
-      articles: [{ title: "Rechargement Wallet Tikis", description: input.description ?? "Dépôt sécurisé pour le Wallet Tikis", price: input.amount }],
-      additionalInfos: { tikisPaymentTransactionId: input.paymentTransactionId, purpose: "wallet_deposit" },
+      articles: [{ title: "Rechargement Wallet Tikisse", description: input.description ?? "Dépôt sécurisé pour le Wallet Tikisse", price: input.amount }],
+      additionalInfos: { tikissePaymentTransactionId: input.paymentTransactionId, purpose: "wallet_deposit" },
     }),
   });
   const providerReference = asNonEmptyString(data.paymentIntentId) ?? asNonEmptyString(data.id) ?? asNonEmptyString(data.reference);

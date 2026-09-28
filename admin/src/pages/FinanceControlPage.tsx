@@ -141,7 +141,7 @@ export default function FinanceControlPage() {
       { key: "availableBefore", label: "Disponible avant" }, { key: "availableAfter", label: "Disponible après" }, { key: "heldBefore", label: "Bloqué avant" }, { key: "heldAfter", label: "Bloqué après" },
       { key: "deliveryId", label: "Livraison" }, { key: "reason", label: "Motif" }, { key: "id", label: "Identifiant du mouvement" },
     ], statement.rows);
-    downloadCsv(`tikis-grand-livre-${statement.month}.csv`, csv);
+    downloadCsv(`tikisse-grand-livre-${statement.month}.csv`, csv);
   }
 
   const webhookPages = Math.max(1, Math.ceil(webhooks.total / PAGE_SIZE));

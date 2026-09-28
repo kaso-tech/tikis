@@ -104,7 +104,7 @@ export default function LoyaltyPage() {
         <div className="page-actions">
           {canEdit ? <button type="button" className="btn btn-primary" onClick={startCreate}>Nouveau programme</button> : null}
           <button type="button" className="btn" onClick={() => {
-            const event = new CustomEvent("tikis:navigate", { detail: { page: "loyaltyGrants" } });
+            const event = new CustomEvent("tikisse:navigate", { detail: { page: "loyaltyGrants" } });
             window.dispatchEvent(event);
           }}>Octrois en attente</button>
         </div>

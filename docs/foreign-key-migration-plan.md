@@ -3,7 +3,7 @@
 ## Constat (audit D4)
 
 `drizzle/schema.ts` ne déclare **aucune** foreign key. Toutes les relations entre
-tables (senderPhone → tikis_profiles.phone, deliveryId → tikis_deliveries.id, etc.)
+tables (senderPhone → tikisse_profiles.phone, deliveryId → tikisse_deliveries.id, etc.)
 sont gérées par la logique métier (helpers TypeScript + transactions).
 
 ## Pourquoi ce choix
@@ -19,11 +19,11 @@ sont gérées par la logique métier (helpers TypeScript + transactions).
 ## Risques acceptés
 
 - **Orphelins** : si une logique métier oublie de valider la relation avant
-  un INSERT, on peut avoir des lignes incohérentes (ex : `tikis_deliveries`
-  avec un `senderPhone` qui n'existe pas dans `tikis_profiles`).
+  un INSERT, on peut avoir des lignes incohérentes (ex : `tikisse_deliveries`
+  avec un `senderPhone` qui n'existe pas dans `tikisse_profiles`).
 - **Cascade-delete manuel** : suppression d'un profil = il faut supprimer
   manuellement ses courses, son wallet, ses reviews, etc. C'est géré dans
-  `db.deleteTikisProfile()` mais doit rester cohérent.
+  `db.deleteTikisseProfile()` mais doit rester cohérent.
 
 ## Comment on s'en protège
 
@@ -31,35 +31,35 @@ sont gérées par la logique métier (helpers TypeScript + transactions).
    orphelins en base** si `DATABASE_URL` est défini. À lancer :
    - Avant chaque release (`pnpm release` → `db:audit-fk`)
    - En cron mensuel (cleanup des orphelins)
-2. **Logique métier** : tous les helpers (`getTikisDeliveryById` + `getTikisProfileByPhone`,
-   `getTikisWallet`, etc.) valident l'existence avant d'écrire.
-3. **Cache LRU** : `requireTikisProfile` cache le profil 10s (lot 1), ce qui
+2. **Logique métier** : tous les helpers (`getTikisseDeliveryById` + `getTikisseProfileByPhone`,
+   `getTikisseWallet`, etc.) valident l'existence avant d'écrire.
+3. **Cache LRU** : `requireTikisseProfile` cache le profil 10s (lot 1), ce qui
    détecte rapidement les références cassées.
 
 ## Plan d'ajout progressif (si besoin futur)
 
 Si la dette technique devient ingérable, voici l'ordre d'ajout recommandé :
 
-1. **`tikis_delivery_reviews.deliveryId` → `tikis_deliveries.id`** (lecture seule,
+1. **`tikisse_delivery_reviews.deliveryId` → `tikisse_deliveries.id`** (lecture seule,
    on n'insère presque jamais, risque faible)
-2. **`tikis_delivery_events.deliveryId` → `tikis_deliveries.id`** (audit, jamais
+2. **`tikisse_delivery_events.deliveryId` → `tikisse_deliveries.id`** (audit, jamais
    supprimé)
-3. **`tikis_wallet_ledger.profilePhone` → `tikis_profiles.phone`** (sécurité
+3. **`tikisse_wallet_ledger.profilePhone` → `tikisse_profiles.phone`** (sécurité
    financière,FK + ON DELETE RESTRICT)
 
 Pour ajouter une FK en Drizzle :
 
 ```ts
 }, (table) => [
-  foreignKey({ columns: [table.deliveryId], foreignColumns: [tikisDeliveries.id], name: "fk_review_delivery" }).onDelete("restrict"),
+  foreignKey({ columns: [table.deliveryId], foreignColumns: [tikisseDeliveries.id], name: "fk_review_delivery" }).onDelete("restrict"),
 ]);
 ```
 
 Puis migration manuelle `003X_add_fk_review_delivery.sql` :
 
 ```sql
-ALTER TABLE `tikis_delivery_reviews`
-  ADD CONSTRAINT `fk_review_delivery` FOREIGN KEY (`deliveryId`) REFERENCES `tikis_deliveries` (`id`) ON DELETE RESTRICT;
+ALTER TABLE `tikisse_delivery_reviews`
+  ADD CONSTRAINT `fk_review_delivery` FOREIGN KEY (`deliveryId`) REFERENCES `tikisse_deliveries` (`id`) ON DELETE RESTRICT;
 ```
 
 ## Verdict

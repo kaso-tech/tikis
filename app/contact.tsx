@@ -3,10 +3,10 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { TikisButton } from "@/components/tikis/ui";
+import { TikisseButton } from "@/components/tikisse/ui";
 import { haptic } from "@/lib/haptics";
 import { useThemeColors } from "@/lib/use-theme-colors";
-import { sanitizeDeliveryText, isAllowedDeliveryText } from "@/lib/tikis-engine";
+import { sanitizeDeliveryText, isAllowedDeliveryText } from "@/lib/tikisse-engine";
 
 type ContactReason = "general" | "account" | "delivery" | "payment" | "report" | "other";
 
@@ -19,7 +19,7 @@ const REASONS: { value: ContactReason; label: string; helper: string }[] = [
   { value: "other", label: "Autre", helper: "Précisez votre demande." },
 ];
 
-const CONTACT_EMAIL = "support@tikis.app";
+const CONTACT_EMAIL = "support@tikisse.app";
 const CONTACT_PHONE = "+226 25 00 00 00";
 
 export default function ContactScreen() {
@@ -104,7 +104,7 @@ export default function ContactScreen() {
               <MaterialIcons name="check-circle" size={28} color={theme.success} />
               <Text style={[styles.successTitle, { color: theme.foreground }]}>Message prêt à envoyer</Text>
               <Text style={[styles.successText, { color: theme.muted }]}>Votre application de messagerie a été ouverte avec le message pré-rempli. Si elle ne s’est pas lancée, écrivez-nous directement à {CONTACT_EMAIL}.</Text>
-              <TikisButton label="Envoyer un autre message" variant="secondary" onPress={() => { setSuccess(false); setSubject(""); setMessage(""); }} />
+              <TikisseButton label="Envoyer un autre message" variant="secondary" onPress={() => { setSuccess(false); setSubject(""); setMessage(""); }} />
             </View>
           ) : (
             <>
@@ -134,7 +134,7 @@ export default function ContactScreen() {
 
               {error ? <Text style={styles.error}>{error}</Text> : null}
 
-              <TikisButton label="Envoyer" icon="send" onPress={() => void send()} loading={sending} loadingLabel="Préparation…" disabled={!canSend} />
+              <TikisseButton label="Envoyer" icon="send" onPress={() => void send()} loading={sending} loadingLabel="Préparation…" disabled={!canSend} />
             </>
           )}
         </ScrollView>

@@ -5,22 +5,22 @@ import { useMemo, useState } from "react";
 import { Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { TikisButton } from "@/components/tikis/ui";
-import { ContactSection } from "@/components/tikis/contact-section";
-import { LoyaltyProgress } from "@/components/tikis/loyalty-progress";
+import { TikisseButton } from "@/components/tikisse/ui";
+import { ContactSection } from "@/components/tikisse/contact-section";
+import { LoyaltyProgress } from "@/components/tikisse/loyalty-progress";
 import { haptic } from "@/lib/haptics";
-import { useTikisLogout } from "@/lib/tikis-logout";
+import { useTikisseLogout } from "@/lib/tikisse-logout";
 import { countryFlagEmoji, sanitizeFullName, validateFullName } from "@/lib/registration-rules";
 import { getApiBaseUrl } from "@/constants/oauth";
-import { useTikisStore } from "@/lib/tikis-store";
+import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
 import { describePerimeter } from "@/shared/driver-perimeter";
 import { profileVerification } from "@/lib/profile-verification";
 
 export default function ProfileScreen() {
   const { colors: theme, isDark } = useThemeColors();
-  const { role, profile, updateProfile } = useTikisStore();
-  const { openLogoutConfirmation } = useTikisLogout();
+  const { role, profile, updateProfile } = useTikisseStore();
+  const { openLogoutConfirmation } = useTikisseLogout();
   const updateMutation = trpc.profiles.update.useMutation();
   const updateVehiclesMutation = trpc.profiles.updateVehicles.useMutation({
     onSuccess: (saved) => {
@@ -463,7 +463,7 @@ export default function ProfileScreen() {
               Vous aurez 30 jours pour changer d’avis. Pendant ce délai, votre compte sera bloqué et vous pourrez annuler la suppression à tout moment. Passé ce délai, vos données personnelles seront définitivement supprimées.
             </Text>
             {deleteError ? <Text style={styles.error}>{deleteError}</Text> : null}
-            <TikisButton label="Confirmer la suppression" icon="delete-forever" variant="danger" onPress={() => void confirmAccountDeletion()} loading={requestDeletionMutation.isPending} style={styles.saveButton} />
+            <TikisseButton label="Confirmer la suppression" icon="delete-forever" variant="danger" onPress={() => void confirmAccountDeletion()} loading={requestDeletionMutation.isPending} style={styles.saveButton} />
             <Pressable onPress={() => setDeleteConfirmOpen(false)} disabled={requestDeletionMutation.isPending} style={({ pressed }) => [styles.photoPicker, pressed && styles.pressed]}>
               <Text style={[styles.photoPickerText, { color: theme.muted }]}>Annuler</Text>
             </Pressable>
@@ -498,7 +498,7 @@ export default function ProfileScreen() {
               style={[styles.input, error ? styles.inputError : null, isDark && { backgroundColor: theme.background, color: theme.foreground, borderColor: theme.border }]}
             />
             {error ? <Text style={styles.error}>{error}</Text> : null}
-            <TikisButton label="Enregistrer les modifications" icon="save" onPress={() => void saveProfile()} loading={updateMutation.isPending} style={styles.saveButton} />
+            <TikisseButton label="Enregistrer les modifications" icon="save" onPress={() => void saveProfile()} loading={updateMutation.isPending} style={styles.saveButton} />
           </View>
         </KeyboardAvoidingView>
       </Modal>

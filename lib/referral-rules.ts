@@ -1,4 +1,4 @@
-import type { ReferralStatus } from "@/shared/tikis-domain";
+import type { ReferralStatus } from "@/shared/tikisse-domain";
 
 export const REFERRAL_REWARD_AMOUNT = 1000;
 

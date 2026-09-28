@@ -4,12 +4,12 @@ import { describe, expect, it } from "vitest";
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
-const markers = read("components/tikis/map-markers.tsx");
+const markers = read("components/tikisse/map-markers.tsx");
 const surfaces = {
-  "accueil (natif)": read("components/tikis/screens/home-screen.native.tsx"),
-  "accueil (web)": read("components/tikis/screens/home-screen.web.tsx"),
-  "fiche et suivi (natif)": read("components/tikis/delivery-route-map.native.tsx"),
-  "fiche et suivi (web)": read("components/tikis/delivery-route-map.web.tsx"),
+  "accueil (natif)": read("components/tikisse/screens/home-screen.native.tsx"),
+  "accueil (web)": read("components/tikisse/screens/home-screen.web.tsx"),
+  "fiche et suivi (natif)": read("components/tikisse/delivery-route-map.native.tsx"),
+  "fiche et suivi (web)": read("components/tikisse/delivery-route-map.web.tsx"),
 };
 
 describe("marqueurs de carte", () => {
@@ -36,7 +36,7 @@ describe("marqueurs de carte", () => {
   });
 
   it.each(Object.entries(surfaces))("%s emprunte les marqueurs partagés plutôt que les siens", (_name, source) => {
-    expect(source).toContain('from "@/components/tikis/map-markers"');
+    expect(source).toContain('from "@/components/tikisse/map-markers"');
     expect(source).toContain("<PickupMarker");
     expect(source).toContain("<DropoffMarker");
     expect(source).toContain("<DriverMarker");

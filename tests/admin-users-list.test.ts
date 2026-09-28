@@ -7,13 +7,13 @@ const adminDbMock = vi.hoisted(() => ({
 
 vi.mock("../server/admin-db", () => adminDbMock);
 
-import { tikisAdminRouter } from "../server/admin-router";
+import { tikisseAdminRouter } from "../server/admin-router";
 
 function createAdminContext(): TrpcContext {
   return {
     user: null,
-    tikisProfilePhone: null,
-    tikisAdmin: { adminId: 1, email: "admin@tikis.app", role: "super_admin" },
+    tikisseProfilePhone: null,
+    tikisseAdmin: { adminId: 1, email: "admin@tikisse.app", role: "super_admin" },
     req: { headers: {} } as TrpcContext["req"],
     res: {} as TrpcContext["res"],
   };
@@ -26,7 +26,7 @@ describe("liste des utilisateurs de la console", () => {
     const profiles = [{ phone: "+22670000000", fullName: "Aïcha Traoré", accountType: "sender", email: null }];
     adminDbMock.adminSearchProfiles.mockResolvedValue({ rows: profiles, total: profiles.length });
 
-    const caller = tikisAdminRouter.createCaller(createAdminContext());
+    const caller = tikisseAdminRouter.createCaller(createAdminContext());
     await expect(caller.users.search({})).resolves.toEqual({ rows: profiles, total: 1, limit: 25, offset: 0 });
     expect(adminDbMock.adminSearchProfiles).toHaveBeenCalledWith({ query: undefined, limit: 25, offset: 0 });
   });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { activeDriverDeliveryFilterCount, defaultDriverDeliveryFilters, filterAndSortDriverDeliveries } from "../lib/delivery-filters";
-import type { Delivery } from "../shared/tikis-domain";
+import type { Delivery } from "../shared/tikisse-domain";
 
 const deliveries: Delivery[] = [
   { id: "near", senderPhone: "+22670000001", senderName: "Awa", title: "Plis proche", type: "Plis", pickup: { name: "A", district: "Centre", city: "Ouagadougou", latitude: 12.37, longitude: -1.51 }, dropoff: { name: "B", district: "Centre", city: "Ouagadougou", latitude: 12.38, longitude: -1.52 }, distanceKm: 3, routeSource: "routes", estimatedPrice: 1800, offeredPrice: 3000, vehicleTypes: ["Vélo"], details: "Plis", status: "open", scheduledAt: "Dès maintenant", createdAt: "2026-08-26T10:00:00.000Z" },

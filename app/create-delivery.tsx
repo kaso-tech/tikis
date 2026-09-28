@@ -4,19 +4,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { YangoAddressPicker } from "@/components/tikis/yango-address-picker";
-import { TikisButton } from "@/components/tikis/ui";
-import { MapPreview } from "@/components/tikis/map-preview";
+import { YangoAddressPicker } from "@/components/tikisse/yango-address-picker";
+import { TikisseButton } from "@/components/tikisse/ui";
+import { MapPreview } from "@/components/tikisse/map-preview";
 import { publicationBlocker, suggestVehicle } from "@/lib/delivery-form";
 import { priceSuggestions } from "@/lib/price-suggestions";
 import { offeredPriceError, parseOfferedPrice, priceDifferencePercent, sanitizeOfferedPriceInput } from "@/lib/delivery-price";
 import { estimateDeliveryPrice, formatFavoritePlace, provisionalRoute, sanitizePlaceText, validateDeliveryMeasurement } from "@/lib/geo-rules";
 import { favoriteToLocation, toPlacePayload } from "@/lib/place-favorites";
-import { deliveryTextInputIssue, isAllowedDeliveryText, sanitizeDeliveryText } from "@/lib/tikis-engine";
-import { useTikisStore } from "@/lib/tikis-store";
+import { deliveryTextInputIssue, isAllowedDeliveryText, sanitizeDeliveryText } from "@/lib/tikisse-engine";
+import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
 import { haptic } from "@/lib/haptics";
-import { locationSubtitle, locationTitle, type DeliveryType, type LocationLabel, type SavedFavorite, type SelectableVehicleType } from "@/shared/tikis-domain";
+import { locationSubtitle, locationTitle, type DeliveryType, type LocationLabel, type SavedFavorite, type SelectableVehicleType } from "@/shared/tikisse-domain";
 import { getDeliveryDraft, saveDeliveryDraft } from "@/lib/delivery-drafts";
 
 const VEHICLES: SelectableVehicleType[] = ["Vélo", "Moto", "Tricycle", "Voiture"];
@@ -42,7 +42,7 @@ const detailsInputIssue = (value: string) => deliveryTextInputIssue(value, false
 export default function CreateDeliveryScreen() {
   const { deliveryId, draftId } = useLocalSearchParams<{ deliveryId?: string; draftId?: string }>();
   const { colors: theme } = useThemeColors();
-  const { profile } = useTikisStore();
+  const { profile } = useTikisseStore();
   const [title, setTitle] = useState("");
   const [details, setDetails] = useState("");
   const [deliveryType, setDeliveryType] = useState<DeliveryType>("Plis");
@@ -285,7 +285,7 @@ export default function CreateDeliveryScreen() {
       }
       const errorString = `${error?.toString?.() ?? ""} ${message}`.toLowerCase();
       if (errorString.includes("json parse") || errorString.includes("unexpected character") || errorString.includes("failed to fetch") || errorString.includes("network request failed")) {
-        message = "Le serveur Tikis ne répond pas. Vérifiez que le serveur dev est bien démarré (npm run dev:server) puis réessayez.";
+        message = "Le serveur Tikisse ne répond pas. Vérifiez que le serveur dev est bien démarré (npm run dev:server) puis réessayez.";
       }
       const reason = isEditing ? "Modification indisponible" : "Publication indisponible";
       setPublicationStage(`${reason} : ${message}`);
@@ -448,7 +448,7 @@ export default function CreateDeliveryScreen() {
             ) : (
             <View style={styles.offerCard}>
               <View style={styles.offerHead}>
-                <Text style={styles.offerHeadLabel}>Tikis estime cette course à</Text>
+                <Text style={styles.offerHeadLabel}>Tikisse estime cette course à</Text>
                 <Text style={styles.offerHeadValue}>{estimate ? `${estimate.toLocaleString("fr-FR")} F` : "—"}</Text>
               </View>
               <View style={styles.offerBody}>
@@ -513,7 +513,7 @@ export default function CreateDeliveryScreen() {
         </ScrollView>
 
         <View style={styles.footer}>
-          <TikisButton
+          <TikisseButton
             // Le libellé reprenait `publishedPrice`, qui retombe sur l'estimation :
             // le bouton annonçait un prix que l'expéditeur n'avait pas fixé.
             label={`${ctaLabel}${parsedOfferedPrice ? ` · ${parsedOfferedPrice.toLocaleString("fr-FR")} F` : ""}`}

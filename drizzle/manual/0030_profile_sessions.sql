@@ -4,7 +4,7 @@
 --
 -- Appliquer : mysql -u <user> -p <database> < drizzle/manual/0030_profile_sessions.sql
 
-CREATE TABLE IF NOT EXISTS `tikis_profile_sessions` (
+CREATE TABLE IF NOT EXISTS `tikisse_profile_sessions` (
   `id` varchar(40) NOT NULL PRIMARY KEY,
   `phone` varchar(20) NOT NULL,
   `tokenHash` varchar(64) NOT NULL,
@@ -16,6 +16,6 @@ CREATE TABLE IF NOT EXISTS `tikis_profile_sessions` (
   `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `lastSeenAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `revokedAt` timestamp NULL,
-  KEY `tikis_profile_sessions_phone_index` (`phone`, `lastSeenAt`),
-  UNIQUE KEY `tikis_profile_sessions_phone_token_unique` (`phone`, `tokenHash`)
+  KEY `tikisse_profile_sessions_phone_index` (`phone`, `lastSeenAt`),
+  UNIQUE KEY `tikisse_profile_sessions_phone_token_unique` (`phone`, `tokenHash`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

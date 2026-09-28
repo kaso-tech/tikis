@@ -65,14 +65,14 @@ describe("le livreur voit sa propre position sur l'accueil", () => {
   it("dès qu'elle est connue, et pas seulement une fois la course active", () => {
     // La ligne d'approche est tracée dès qu'une course attend sa collecte ; le marqueur n'apparaissait
     // qu'une fois la course active : la ligne partait d'un point que rien ne marquait.
-    const native = read("components/tikis/screens/home-screen.native.tsx");
+    const native = read("components/tikisse/screens/home-screen.native.tsx");
     expect(native).toContain('const showsDriverMarker = Boolean(driverPosition) && (role === "driver" || selectedDeliveryStatus === "active");');
     expect(native).toContain("{showsDriverMarker && driverPosition ? (");
     expect(native).not.toContain("hasDriver");
   });
 
   it("sur l'accueil web aussi, avec la même règle que l'accueil natif", () => {
-    const web = read("components/tikis/screens/home-screen.web.tsx");
+    const web = read("components/tikisse/screens/home-screen.web.tsx");
     expect(web).toContain('const showsApproach = role === "driver" ? isPickupPending(selected?.status) : selected?.status === "active";');
     expect(web).toContain("if (!pickup || !driverPosition || !showsApproach) return null;");
     expect(web).not.toContain("hasDriver");

@@ -6,12 +6,12 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:8082",
   "http://localhost:3000",
   "http://localhost:5173",
-  "https://admin.tikis.app",
-  "https://app.tikis.app",
+  "https://admin.tikisse.app",
+  "https://app.tikisse.app",
 ];
 
 function parseAllowedOrigins(): Set<string> {
-  const fromEnv = (process.env.TIKIS_ALLOWED_ORIGINS ?? "")
+  const fromEnv = (process.env.TIKISSE_ALLOWED_ORIGINS ?? process.env.TIKIS_ALLOWED_ORIGINS ?? "")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
@@ -32,9 +32,9 @@ export function corsMiddleware(req: Request, res: Response, next: NextFunction) 
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
   res.header(
     "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Tikis-Admin, X-Tikis-Session, X-Tikis-Profile-Session",
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-Tikisse-Admin, X-Tikisse-Session, X-Tikisse-Profile-Session",
   );
-  res.header("Access-Control-Expose-Headers", "X-Tikis-Request-Id");
+  res.header("Access-Control-Expose-Headers", "X-Tikisse-Request-Id");
   res.header("Access-Control-Max-Age", "600");
   if (req.method === "OPTIONS") {
     res.sendStatus(204);
@@ -90,7 +90,7 @@ export type RateLimitOptions = {
 /**
  * Limite de requêtes partagée entre toutes les instances du serveur.
  *
- * S'appuie sur `checkDistributedRateLimit` (table `tikis_rate_limits`), pas
+ * S'appuie sur `checkDistributedRateLimit` (table `tikisse_rate_limits`), pas
  * sur un compteur en mémoire de processus : ce dernier ne protège que
  * l'instance qui le détient, et un client réparti sur plusieurs connexions —
  * ou simplement plusieurs instances derrière le même équilibreur — pouvait y

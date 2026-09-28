@@ -1,9 +1,9 @@
 -- Table de métriques business quotidiennes.
 -- Alimentée par le cron /api/scheduled/compute-daily-metrics (1 fois/jour).
 --
--- Permet de voir les tendances GMV / commission sans ré-agréger tikis_deliveries.
+-- Permet de voir les tendances GMV / commission sans ré-agréger tikisse_deliveries.
 
-CREATE TABLE IF NOT EXISTS `tikis_daily_metrics` (
+CREATE TABLE IF NOT EXISTS `tikisse_daily_metrics` (
   `date` varchar(10) NOT NULL,
   `deliveriesCreated` int NOT NULL DEFAULT 0,
   `deliveriesCompleted` int NOT NULL DEFAULT 0,
@@ -18,5 +18,5 @@ CREATE TABLE IF NOT EXISTS `tikis_daily_metrics` (
   `reportsOpened` int NOT NULL DEFAULT 0,
   `computedAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`date`),
-  INDEX `tikis_daily_metrics_date_index` (`date`)
+  INDEX `tikisse_daily_metrics_date_index` (`date`)
 );

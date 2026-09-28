@@ -4,8 +4,8 @@
   "id": "cee7d849-aa8f-404a-998b-c45b9e2531f8",
   "prevId": "d27f10a5-29d2-46d0-8796-e911cee40a4d",
   "tables": {
-    "tikis_favorite_places": {
-      "name": "tikis_favorite_places",
+    "tikisse_favorite_places": {
+      "name": "tikisse_favorite_places",
       "columns": {
         "id": {
           "name": "id",
@@ -45,8 +45,8 @@
         }
       },
       "indexes": {
-        "tikis_favorite_places_profile_place_unique": {
-          "name": "tikis_favorite_places_profile_place_unique",
+        "tikisse_favorite_places_profile_place_unique": {
+          "name": "tikisse_favorite_places_profile_place_unique",
           "columns": [
             "profilePhone",
             "placeId"
@@ -56,8 +56,8 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "tikis_favorite_places_id": {
-          "name": "tikis_favorite_places_id",
+        "tikisse_favorite_places_id": {
+          "name": "tikisse_favorite_places_id",
           "columns": [
             "id"
           ]
@@ -66,8 +66,8 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
-    "tikis_places": {
-      "name": "tikis_places",
+    "tikisse_places": {
+      "name": "tikisse_places",
       "columns": {
         "id": {
           "name": "id",
@@ -220,8 +220,8 @@
         }
       },
       "indexes": {
-        "tikis_places_coordinate_key_index": {
-          "name": "tikis_places_coordinate_key_index",
+        "tikisse_places_coordinate_key_index": {
+          "name": "tikisse_places_coordinate_key_index",
           "columns": [
             "coordinateKey"
           ],
@@ -230,22 +230,22 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "tikis_places_id": {
-          "name": "tikis_places_id",
+        "tikisse_places_id": {
+          "name": "tikisse_places_id",
           "columns": [
             "id"
           ]
         }
       },
       "uniqueConstraints": {
-        "tikis_places_googlePlaceId_unique": {
-          "name": "tikis_places_googlePlaceId_unique",
+        "tikisse_places_googlePlaceId_unique": {
+          "name": "tikisse_places_googlePlaceId_unique",
           "columns": [
             "googlePlaceId"
           ]
         },
-        "tikis_places_mapboxPlaceId_unique": {
-          "name": "tikis_places_mapboxPlaceId_unique",
+        "tikisse_places_mapboxPlaceId_unique": {
+          "name": "tikisse_places_mapboxPlaceId_unique",
           "columns": [
             "mapboxPlaceId"
           ]
@@ -253,8 +253,8 @@
       },
       "checkConstraint": {}
     },
-    "tikis_profiles": {
-      "name": "tikis_profiles",
+    "tikisse_profiles": {
+      "name": "tikisse_profiles",
       "columns": {
         "id": {
           "name": "id",
@@ -326,22 +326,22 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "tikis_profiles_id": {
-          "name": "tikis_profiles_id",
+        "tikisse_profiles_id": {
+          "name": "tikisse_profiles_id",
           "columns": [
             "id"
           ]
         }
       },
       "uniqueConstraints": {
-        "tikis_profiles_phone_unique": {
-          "name": "tikis_profiles_phone_unique",
+        "tikisse_profiles_phone_unique": {
+          "name": "tikisse_profiles_phone_unique",
           "columns": [
             "phone"
           ]
         },
-        "tikis_profiles_referralCode_unique": {
-          "name": "tikis_profiles_referralCode_unique",
+        "tikisse_profiles_referralCode_unique": {
+          "name": "tikisse_profiles_referralCode_unique",
           "columns": [
             "referralCode"
           ]

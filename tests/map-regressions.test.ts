@@ -4,11 +4,11 @@ import { describe, expect, it } from "vitest";
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
-const home = read("components/tikis/screens/home-screen.native.tsx");
-const routeMap = read("components/tikis/delivery-route-map.native.tsx");
+const home = read("components/tikisse/screens/home-screen.native.tsx");
+const routeMap = read("components/tikisse/delivery-route-map.native.tsx");
 const detail = read("app/delivery/[id].tsx");
 const hooks = read("hooks/use-route-coordinates.ts");
-const sheet = read("components/tikis/candidates-sheet.tsx");
+const sheet = read("components/tikisse/candidates-sheet.tsx");
 
 const tracking = read("app/delivery/[id]/map.tsx");
 
@@ -38,7 +38,7 @@ describe("les calques de la carte ont une identité stable", () => {
 });
 
 describe("le marqueur de collecte survit à un aller-retour d'écran", () => {
-  const tracked = read("components/tikis/tracked-marker.tsx");
+  const tracked = read("components/tikisse/tracked-marker.tsx");
 
   it("chaque épingle et le livreur passent par TrackedMarker, pas Marker nu", () => {
     // `tracksViewChanges` vrai en continu coûte cher ; faux en continu laisse

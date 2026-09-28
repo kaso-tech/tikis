@@ -90,7 +90,7 @@ export default function DeliveriesPage() {
                 createdAt: typeof row.createdAt === "string" ? row.createdAt : new Date(row.createdAt).toISOString(),
               })),
             );
-            downloadCsv(`tikis-deliveries-${new Date().toISOString().slice(0, 10)}`, csv);
+            downloadCsv(`tikisse-deliveries-${new Date().toISOString().slice(0, 10)}`, csv);
           }} disabled={rows.length === 0}>Exporter CSV</button>
         </div>
       </div>

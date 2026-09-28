@@ -308,7 +308,7 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
                 statusReason: profile.statusReason ?? "",
               })),
             );
-            downloadCsv(`tikis-users-${new Date().toISOString().slice(0, 10)}`, csv);
+            downloadCsv(`tikisse-users-${new Date().toISOString().slice(0, 10)}`, csv);
           }} disabled={results.length === 0}>Exporter CSV</button>
         </div>
       </div>

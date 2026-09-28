@@ -11,7 +11,7 @@ const FAQ: FaqEntry[] = [
   {
     id: "kyc-1",
     category: "Vérification d’identité",
-    question: "Pourquoi Tikis vérifie-t-il l’identité des livreurs ?",
+    question: "Pourquoi Tikisse vérifie-t-il l’identité des livreurs ?",
     answer: "La vérification protège la communauté : elle limite les annonces frauduleuses, sécurise le paiement de la course et rassure les expéditeurs. Sans vérification, un livreur ne peut pas postuler aux livraisons.",
   },
   {
@@ -29,14 +29,14 @@ const FAQ: FaqEntry[] = [
   {
     id: "billing-1",
     category: "Livraisons & commissions",
-    question: "Comment est calculée la commission Tikis ?",
+    question: "Comment est calculée la commission Tikisse ?",
     answer: "La commission est un pourcentage du prix de la course, défini par l’administration. Elle est calculée dynamiquement à partir de la politique de commission et du prix proposé par l’expéditeur, sans montant figé dans l’application.",
   },
   {
     id: "billing-2",
     category: "Livraisons & commissions",
     question: "Que se passe-t-il si je remplace un livreur ?",
-    answer: "La commission du nouveau livreur est débitée puis rembourse intégralement l’ancien. Tikis ne perçoit jamais plus d’une commission par livraison.",
+    answer: "La commission du nouveau livreur est débitée puis rembourse intégralement l’ancien. Tikisse ne perçoit jamais plus d’une commission par livraison.",
   },
   {
     id: "billing-3",
@@ -48,13 +48,13 @@ const FAQ: FaqEntry[] = [
     id: "wallet-1",
     category: "Wallet",
     question: "Quand reçois-je le paiement d’une course ?",
-    answer: "Le règlement s’effectue directement entre l’expéditeur et le livreur, en espèces ou via Mobile Money, lors de la remise du colis. Tikis n’intervient pas dans ce transfert et ne prélève aucune part du prix.",
+    answer: "Le règlement s’effectue directement entre l’expéditeur et le livreur, en espèces ou via Mobile Money, lors de la remise du colis. Tikisse n’intervient pas dans ce transfert et ne prélève aucune part du prix.",
   },
   {
     id: "account-1",
     category: "Compte & rôles",
     question: "Puis-je changer de rôle après l’inscription ?",
-    answer: "Non. Le rôle choisi à l’inscription (expéditeur ou livreur) est définitif pour des raisons de cohérence métier. Vous pouvez quitter Tikis à tout moment depuis votre profil.",
+    answer: "Non. Le rôle choisi à l’inscription (expéditeur ou livreur) est définitif pour des raisons de cohérence métier. Vous pouvez quitter Tikisse à tout moment depuis votre profil.",
   },
   {
     id: "account-2",

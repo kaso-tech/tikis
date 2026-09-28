@@ -11,7 +11,7 @@ function reply(status: number, body: Record<string, unknown>): YengapayWebhookRe
   return { status, body };
 }
 
-type PaymentLookup = Awaited<ReturnType<typeof db.lookupTikisPaymentByProviderReference>>;
+type PaymentLookup = Awaited<ReturnType<typeof db.lookupTikissePaymentByProviderReference>>;
 
 /**
  * Applique un événement déjà authentifié et déjà enregistré (`recordedId`) : règlement, statut de
@@ -36,9 +36,9 @@ async function settleRecordedEvent(event: YengapayWebhookEvent, recordedId: stri
         void db.enqueuePushToPhone({
           phone,
           title: "Dépôt Mobile Money confirmé",
-          body: `${settled.payment.amount.toLocaleString("fr-FR")} FCFA crédités sur votre Wallet Tikis.`,
+          body: `${settled.payment.amount.toLocaleString("fr-FR")} FCFA crédités sur votre Wallet Tikisse.`,
           data: { kind: "wallet_direct_deposit_succeeded", transactionId: settled.payment.id },
-          channelId: "tikis-wallet",
+          channelId: "tikisse-wallet",
         }).catch((pushError) => {
           console.error("[webhook:yengapay] push failed", pushError);
         });
@@ -48,7 +48,7 @@ async function settleRecordedEvent(event: YengapayWebhookEvent, recordedId: stri
           title: "Dépôt Mobile Money échoué",
           body: "Le paiement n'a pas été confirmé par votre opérateur. Le solde de votre Wallet est inchangé.",
           data: { kind: "wallet_direct_deposit_failed", transactionId: settled.payment.id },
-          channelId: "tikis-wallet",
+          channelId: "tikisse-wallet",
         }).catch((pushError) => {
           console.error("[webhook:yengapay] push failed", pushError);
         });
@@ -77,7 +77,7 @@ export async function processYengapayWebhook({ rawBody, signature, headerEvent }
     // l'appel API n'ait commité la ligne), on retombe sur le provider par défaut du mode
     // courant et le settle échouera avec un message clair — le webhook réessayé plus tard
     // trouvera la transaction.
-    const preLookup = await db.lookupTikisPaymentByProviderReference(event.providerReference);
+    const preLookup = await db.lookupTikissePaymentByProviderReference(event.providerReference);
     const isDirect = preLookup?.provider.startsWith("yengapay_direct_") ?? false;
     const provider = isDirect
       ? (config.mode === "sandbox" ? "yengapay_direct_sandbox" : "yengapay_direct_live")
@@ -114,7 +114,7 @@ export async function replayYengapayWebhookEvent(eventId: string) {
   // Le type enregistré est déjà normalisé (« payment.succeeded », « withdrawal.failed »…) : le repasser
   // comme en-tête d'événement conserve la distinction dépôt / retrait de la réception d'origine.
   const event = parseYengapayWebhookEvent(recorded.payload, recorded.signature, recorded.eventType);
-  const preLookup = await db.lookupTikisPaymentByProviderReference(event.providerReference);
+  const preLookup = await db.lookupTikissePaymentByProviderReference(event.providerReference);
   const result = await settleRecordedEvent(event, recorded.id, preLookup);
   const after = await db.getYengapayWebhookEvent(eventId);
   return { status: after?.status ?? recorded.status, failureReason: after?.failureReason ?? null, reply: result.body };

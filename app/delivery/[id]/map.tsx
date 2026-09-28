@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Animated, Dimensions, Linking, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { DeliveryRouteMap } from "@/components/tikis/delivery-route-map";
+import { DeliveryRouteMap } from "@/components/tikisse/delivery-route-map";
 import { useApproachRoute, useRouteCoordinates } from "@/hooks/use-route-coordinates";
 import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
 import { useLiveDeliveryPosition } from "@/hooks/use-live-delivery-position";
@@ -31,9 +31,9 @@ import {
 } from "@/lib/live-tracking-format";
 import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
 import { createStyles } from "@/lib/create-styles";
-import { useTikisStore } from "@/lib/tikis-store";
+import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
-import { formatMoney } from "@/shared/tikis-domain";
+import { formatMoney } from "@/shared/tikisse-domain";
 
 type Coordinate = { latitude: number; longitude: number };
 const fallbackId = "00000000-0000-4000-8000-000000000000";
@@ -131,7 +131,7 @@ export default function DeliveryTrackingScreen() {
   const { colors: theme } = useThemeColors();
   const styles = useMemo(() => stylesFor(theme), [theme]);
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { profile, role } = useTikisStore();
+  const { profile, role } = useTikisseStore();
 
   const deliveryQuery = trpc.deliveries.get.useQuery(
     { id: id ?? fallbackId },
@@ -454,7 +454,7 @@ export default function DeliveryTrackingScreen() {
                       <Text style={[styles.driverMeta, { color: theme.muted }]} numberOfLines={1}>
                         {driverStats && driverStats.reviewsCount > 0
                           ? `★ ${driverStats.rating.toFixed(1).replace(".", ",")} · ${driverStats.completedDeliveries} course${driverStats.completedDeliveries > 1 ? "s" : ""}`
-                          : "Premières courses sur Tikis"}
+                          : "Premières courses sur Tikisse"}
                       </Text>
                     </View>
                     {delivery.driverPhone ? (
@@ -521,7 +521,7 @@ export default function DeliveryTrackingScreen() {
                       </View>
                     </View>
                     <Text style={[styles.paymentNote, { color: theme.muted }]}>
-                      Vous réglerez directement le livreur à la remise. Tikis ne prélève rien sur ce montant.
+                      Vous réglerez directement le livreur à la remise. Tikisse ne prélève rien sur ce montant.
                     </Text>
                   </>
                 ) : null}

@@ -7,18 +7,18 @@ const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 const routers = read("server/routers.ts");
 const db = read("server/db.ts");
 const realtime = read("server/supabase-realtime.ts");
-const provider = read("components/tikis/delivery-realtime-provider.tsx");
-const homeNative = read("components/tikis/screens/home-screen.native.tsx");
-const homeWeb = read("components/tikis/screens/home-screen.web.tsx");
-const appChrome = read("components/tikis/app-chrome.tsx");
+const provider = read("components/tikisse/delivery-realtime-provider.tsx");
+const homeNative = read("components/tikisse/screens/home-screen.native.tsx");
+const homeWeb = read("components/tikisse/screens/home-screen.web.tsx");
+const appChrome = read("components/tikisse/app-chrome.tsx");
 const notificationsScreen = read("app/notifications.tsx");
 
 describe("pont d'authentification Realtime — profil sans Supabase Phone Auth", () => {
   it("expose une procédure protégée qui établit la session Supabase du profil courant, jamais d'un numéro arbitraire", () => {
-    expect(routers).toContain("ensureRealtimeSession: tikisProtectedProcedure.mutation(async ({ ctx }) => {");
-    const slice = routers.slice(routers.indexOf("ensureRealtimeSession: tikisProtectedProcedure"));
+    expect(routers).toContain("ensureRealtimeSession: tikisseProtectedProcedure.mutation(async ({ ctx }) => {");
+    const slice = routers.slice(routers.indexOf("ensureRealtimeSession: tikisseProtectedProcedure"));
     const body = slice.slice(0, slice.indexOf("}),"));
-    expect(body).toContain("ensureSupabaseRealtimeSession(ctx.tikisProfilePhone)");
+    expect(body).toContain("ensureSupabaseRealtimeSession(ctx.tikisseProfilePhone)");
   });
 
   it("chaque mouvement de Wallet signale le changement sur le canal Realtime privé du profil", () => {

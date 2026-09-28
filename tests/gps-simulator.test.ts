@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { coordinateAtStep, remainingMinutes, routeProgress, SIMULATED_ROUTE, trackingEventAtStep } from "../lib/gps-simulator";
 
-describe("suivi GPS simulé Tikis", () => {
+describe("suivi GPS simulé Tikisse", () => {
   it("borne la progression entre le départ et l’arrivée", () => {
     expect(routeProgress(-2)).toBe(0);
     expect(routeProgress(SIMULATED_ROUTE.length - 1)).toBe(100);

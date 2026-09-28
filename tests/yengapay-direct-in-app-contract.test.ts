@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const mobile = readFileSync(join(process.cwd(), "components/tikis/wallet-direct-deposit.tsx"), "utf8");
+const mobile = readFileSync(join(process.cwd(), "components/tikisse/wallet-direct-deposit.tsx"), "utf8");
 const router = readFileSync(join(process.cwd(), "server/routers.ts"), "utf8");
 const direct = readFileSync(join(process.cwd(), "server/yengapay-direct.ts"), "utf8");
 const database = readFileSync(join(process.cwd(), "server/db.ts"), "utf8");
@@ -12,7 +12,7 @@ const createDirectSection = direct.slice(
   direct.indexOf("export async function getYengapayDirectDepositStatus"),
 );
 
-describe("paiement direct YengaPay dans Tikis", () => {
+describe("paiement direct YengaPay dans Tikisse", () => {
   it("ne quitte pas l’application pour saisir et confirmer l’OTP", () => {
     expect(mobile).not.toContain("expo-linking");
     expect(mobile).toContain("Linking.openURL");
@@ -49,12 +49,12 @@ describe("paiement direct YengaPay dans Tikis", () => {
   it("crée une intention idempotente sans inscrire de mouvement Wallet avant le statut fournisseur", () => {
     expect(createDirectSection).toContain("getDirectDepositByIdempotencyKey");
     expect(createDirectSection).toContain("idempotencyKey: input.idempotencyKey");
-    expect(createDirectSection).not.toContain("requestTikisWalletOperation");
+    expect(createDirectSection).not.toContain("requestTikisseWalletOperation");
     expect(createDirectSection).toContain('callDirect(config, "/init"');
     expect(createDirectSection).toContain('callDirect(config, "/send-otp"');
     expect(direct).toContain('callDirect(config, "/pay"');
     expect(router).toContain("payDirectDeposit");
-    expect(direct).toContain("settleTikisWalletDepositRequest");
+    expect(direct).toContain("settleTikisseWalletDepositRequest");
     expect(database).toContain("checkoutUrl: null");
   });
 
@@ -65,7 +65,7 @@ describe("paiement direct YengaPay dans Tikis", () => {
     // La simulation est refusée au niveau de la transaction elle-même, plus seulement du mode du serveur
     // (tests/payment-direct-audit.db.test.ts l'exerce contre une vraie base).
     expect(direct).toContain("assertSimulatedSettlementAllowed(`yengapay_direct_${stored.mode}`);");
-    expect(database).toContain("cancelTikisWalletDirectDeposit");
+    expect(database).toContain("cancelTikisseWalletDirectDeposit");
     expect(database).toContain('"expired"');
   });
 });

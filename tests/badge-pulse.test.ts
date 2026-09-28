@@ -3,8 +3,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const sources = [
-  readFileSync(join(process.cwd(), "components/tikis/screens/home-screen.native.tsx"), "utf8"),
-  readFileSync(join(process.cwd(), "components/tikis/screens/home-screen.web.tsx"), "utf8"),
+  readFileSync(join(process.cwd(), "components/tikisse/screens/home-screen.native.tsx"), "utf8"),
+  readFileSync(join(process.cwd(), "components/tikisse/screens/home-screen.web.tsx"), "utf8"),
 ];
 
 describe("pulsation des badges de statut", () => {

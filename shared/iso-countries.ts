@@ -1,5 +1,5 @@
 /**
- * Les codes ISO des pays que Tikis peut servir, et ce qu'ils désignent vraiment.
+ * Les codes ISO des pays que Tikisse peut servir, et ce qu'ils désignent vraiment.
  *
  * Un pays s'ajoute depuis la console d'administration, dans un formulaire où le
  * code ISO, le nom et l'indicatif se saisissent à la main, sans que rien ne
@@ -130,7 +130,7 @@ export function countryDraftIssue(draft: CountryDraft): string | null {
 
   if (!known) {
     if (byName) return `Le code ISO de « ${byName.name} » est ${byName.id}, pas ${code}.`;
-    return `Le code ISO ${code} n’est pas un pays desservi par Tikis. Vérifiez-le avant d’enregistrer.`;
+    return `Le code ISO ${code} n’est pas un pays desservi par Tikisse. Vérifiez-le avant d’enregistrer.`;
   }
 
   if (byName && byName.id !== code) {

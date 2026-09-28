@@ -63,7 +63,7 @@ describe("qui applique ce classement", () => {
   });
 
   it("l'accueil web s'y réfère au lieu de garder sa propre copie", () => {
-    const web = read("components/tikis/screens/home-screen.web.tsx");
+    const web = read("components/tikisse/screens/home-screen.web.tsx");
     expect(web).toContain("sortDriverOpportunities(deliveries.filter(matches))");
     expect(web).not.toContain("driverSortPriority");
   });

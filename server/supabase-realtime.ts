@@ -30,11 +30,11 @@ export async function syncDeliveryRealtimeMembers(deliveryId: string, members: D
   const base = url.replace(/\/$/, "");
   const headers = { apikey: secret, Authorization: `Bearer ${secret}`, "Content-Type": "application/json" };
   try {
-    const removed = await fetch(`${base}/rest/v1/tikis_delivery_channel_members?delivery_id=eq.${encodeURIComponent(safeId)}`, { method: "DELETE", headers, signal: AbortSignal.timeout(4_000) });
+    const removed = await fetch(`${base}/rest/v1/tikisse_delivery_channel_members?delivery_id=eq.${encodeURIComponent(safeId)}`, { method: "DELETE", headers, signal: AbortSignal.timeout(4_000) });
     if (!removed.ok) return false;
     const rows = members.filter((member) => /^[0-9a-fA-F-]{36}$/.test(member.userId)).map((member) => ({ delivery_id: safeId, user_id: member.userId, participant_role: member.role }));
     if (!rows.length) return true;
-    const response = await fetch(`${base}/rest/v1/tikis_delivery_channel_members`, { method: "POST", headers: { ...headers, Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(rows), signal: AbortSignal.timeout(4_000) });
+    const response = await fetch(`${base}/rest/v1/tikisse_delivery_channel_members`, { method: "POST", headers: { ...headers, Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(rows), signal: AbortSignal.timeout(4_000) });
     return response.ok;
   } catch { return false; }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mergeRecentPlaces } from "../lib/recent-places-rules";
-import type { LocationLabel } from "@/shared/tikis-domain";
+import type { LocationLabel } from "@/shared/tikisse-domain";
 
 function place(name: string, latitude: number, longitude: number): LocationLabel {
   return { name, district: "Centre", city: "Ouagadougou", latitude, longitude, provider: "mapbox", source: "retrieve", featureType: "poi", precision: "exact" };

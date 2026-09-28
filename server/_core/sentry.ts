@@ -5,7 +5,7 @@ function logServer(level: "info" | "warn" | "error", scope: string, message: str
 
 const SENTRY_DSN = process.env.SENTRY_DSN;
 const SENTRY_ENVIRONMENT = process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV ?? "development";
-const SENTRY_RELEASE = process.env.SENTRY_RELEASE ?? "tikis@unknown";
+const SENTRY_RELEASE = process.env.SENTRY_RELEASE ?? "tikisse@unknown";
 
 let initialized = false;
 let captureException: ((error: unknown, context?: Record<string, unknown>) => void) | null = null;

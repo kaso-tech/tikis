@@ -12,7 +12,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { sdk } from "./sdk";
 import * as db from "../db";
-import { expireOpenTikisDeliveries } from "../db";
+import { expireOpenTikisseDeliveries } from "../db";
 import { runAccountDeletionJobs } from "../admin-deletions";
 import { expireLoyaltyGrants } from "../loyalty";
 import { publishDeliveryStatusBroadcast } from "../supabase-realtime";
@@ -42,7 +42,7 @@ async function startServer() {
   app.use(corsMiddleware);
   app.use((req, res, next) => {
     const requestId = req.headers["x-request-id"] || randomUUID();
-    res.header("X-Tikis-Request-Id", String(requestId));
+    res.header("X-Tikisse-Request-Id", String(requestId));
     next();
   });
   app.use(publicApiRateLimit);
@@ -73,7 +73,7 @@ async function startServer() {
     try {
       const user = await sdk.authenticateRequest(req);
       if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
-      const result = await expireOpenTikisDeliveries();
+      const result = await expireOpenTikisseDeliveries();
       for (const deliveryId of result.completedDeliveryIds) {
         void publishDeliveryStatusBroadcast({ deliveryId, status: "completed", title: "Livraison finalisée automatiquement", body: "La course active a été clôturée après 24 heures.", occurredAt: new Date().toISOString() });
       }
@@ -144,7 +144,7 @@ async function startServer() {
     return res.status(result.status).json(result.body);
   });
 
-  // Console d'administration Tikis : SPA statique compilée séparément (voir admin/README.md),
+  // Console d'administration Tikisse : SPA statique compilée séparément (voir admin/README.md),
   // servie par ce même serveur ("même infra") mais sous son propre chemin, isolée du bundle mobile.
   const adminDistPath = path.resolve(process.cwd(), "admin/dist");
   if (fs.existsSync(adminDistPath)) {

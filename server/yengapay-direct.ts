@@ -165,10 +165,10 @@ export async function createYengapayDirectDeposit(input: YengapayDirectDepositRe
     return { transactionId, providerReference, ussdCode, amount: input.amount, phone: input.phone, operator: input.operator, countryCode: input.countryCode, expiresAt, status: "pending", mode: "test", requiresOtp: false, flow: "TEST" };
   }
 
-  const reference = `TIKIS-DIRECT-${transactionId}`;
+  const reference = `TIKISSE-DIRECT-${transactionId}`;
   const initData = await callDirect(config, "/init", {
     amount: input.amount,
-    articles: [{ title: "Rechargement Wallet Tikis", description: "Dépôt Mobile Money direct via YengaPay", price: input.amount }],
+    articles: [{ title: "Rechargement Wallet Tikisse", description: "Dépôt Mobile Money direct via YengaPay", price: input.amount }],
     reference,
   });
   const providerReference = asNonEmptyString(initData.paymentIntentId);
@@ -199,9 +199,9 @@ export async function payYengapayDirectDeposit(input: { profilePhone: string; tr
     otp: input.otp,
   });
   const status = remoteStatus(data.status ?? data.transactionStatus ?? data.paymentStatus);
-  if (status === "succeeded") await db.settleTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
-  else if (status === "failed") await db.refuseTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
-  else if (status === "cancelled" || status === "expired") await db.cancelTikisWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status });
+  if (status === "succeeded") await db.settleTikisseWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
+  else if (status === "failed") await db.refuseTikisseWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
+  else if (status === "cancelled" || status === "expired") await db.cancelTikisseWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status });
   const updated = await db.getDirectDepositIntent(input.transactionId, input.profilePhone);
   if (!updated) throw new Error("La transaction directe n'est plus disponible.");
   return viewFromStored(updated, config.mode);
@@ -227,7 +227,7 @@ export async function getYengapayDirectDepositStatus(input: { profilePhone: stri
   const stored = await db.getDirectDepositIntent(input.transactionId, input.profilePhone);
   if (!stored) throw new Error("Transaction de dépôt introuvable ou expirée.");
   const pastDeadline = stored.status === "pending" && new Date(stored.expiresAt).getTime() <= Date.now();
-  const expireLocally = async () => viewFromStored(await db.cancelTikisWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status: "expired" }), config.mode);
+  const expireLocally = async () => viewFromStored(await db.cancelTikisseWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status: "expired" }), config.mode);
   if (stored.status !== "pending") return viewFromStored(stored, config.mode);
   if (config.mode === "test") return pastDeadline ? expireLocally() : viewFromStored(stored, config.mode);
   // Passé le délai, on demande d'abord à YengaPay : le client a pu valider son code à la dernière
@@ -239,15 +239,15 @@ export async function getYengapayDirectDepositStatus(input: { profilePhone: stri
   // (« requête réussie »), un paiement jamais effectué aurait été crédité. À défaut, le webhook tranche.
   const status = remoteStatus(data.paymentStatus ?? data.transactionStatus);
   if (status === "pending" && pastDeadline) return expireLocally();
-  if (status === "succeeded") await db.settleTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
-  else if (status === "failed") await db.refuseTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
-  else if (status === "cancelled" || status === "expired") await db.cancelTikisWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status });
+  if (status === "succeeded") await db.settleTikisseWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
+  else if (status === "failed") await db.refuseTikisseWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
+  else if (status === "cancelled" || status === "expired") await db.cancelTikisseWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status });
   const updated = await db.getDirectDepositIntent(input.transactionId, input.profilePhone);
   return updated ? viewFromStored(updated, config.mode) : viewFromStored(stored, config.mode);
 }
 
 export async function cancelYengapayDirectDeposit(input: { profilePhone: string; transactionId: string }) {
-  const result = await db.cancelTikisWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status: "cancelled" });
+  const result = await db.cancelTikisseWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status: "cancelled" });
   return viewFromStored(result, readYengapayConfig().mode);
 }
 
@@ -256,7 +256,7 @@ export async function settleYengapayDirectDepositTest(input: { profilePhone: str
   if (!stored) throw new Error("Transaction de dépôt introuvable ou expirée.");
   // Le mode du serveur ne suffit pas : c'est la transaction qui doit être née en mode test.
   assertSimulatedSettlementAllowed(`yengapay_direct_${stored.mode}`);
-  if (input.outcome === "succeeded") await db.settleTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
-  else await db.refuseTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
+  if (input.outcome === "succeeded") await db.settleTikisseWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
+  else await db.refuseTikisseWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
   return getYengapayDirectDepositStatus({ profilePhone: input.profilePhone, transactionId: input.transactionId });
 }

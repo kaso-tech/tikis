@@ -9,7 +9,7 @@
  *  - export comptable d'un mois.
  */
 import { and, asc, count, desc, eq, gte, isNotNull, like, lt, ne, or, sql } from "drizzle-orm";
-import { tikisPaymentTransactions, tikisWalletLedger, tikisWallets, tikisYengapayWebhookEvents } from "../drizzle/schema";
+import { tikissePaymentTransactions, tikisseWalletLedger, tikisseWallets, tikisseYengapayWebhookEvents } from "../drizzle/schema";
 import { getDb } from "./db";
 
 /** Neutralise les jokers de LIKE : une recherche « 100% » cherche ce texte, pas « 100 suivi de n'importe quoi ». */
@@ -22,7 +22,7 @@ export type WebhookEventStatus = "received" | "processed" | "failed" | "ignored"
 /**
  * Webhooks YengaPay, les plus récents d'abord. `query` retrouve un événement par son identifiant interne,
  * par l'identifiant YengaPay de l'événement (enregistré sous la forme « identifiant:type »), par la
- * transaction Tikis liée, ou — à partir de 8 caractères — par toute référence présente dans le contenu
+ * transaction Tikisse liée, ou — à partir de 8 caractères — par toute référence présente dans le contenu
  * reçu (référence de paiement YengaPay notamment).
  */
 export async function adminListWebhookEvents(input: { status?: WebhookEventStatus; query?: string; limit?: number; offset?: number }) {
@@ -30,25 +30,25 @@ export async function adminListWebhookEvents(input: { status?: WebhookEventStatu
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   const query = input.query?.trim();
   const where = and(
-    input.status ? eq(tikisYengapayWebhookEvents.status, input.status) : undefined,
+    input.status ? eq(tikisseYengapayWebhookEvents.status, input.status) : undefined,
     query ? or(
-      eq(tikisYengapayWebhookEvents.id, query),
-      eq(tikisYengapayWebhookEvents.providerEventId, query),
-      like(tikisYengapayWebhookEvents.providerEventId, `${escapeLike(query)}:%`),
-      eq(tikisYengapayWebhookEvents.paymentTransactionId, query),
-      ...(query.length >= 8 ? [like(tikisYengapayWebhookEvents.payload, `%${escapeLike(query)}%`)] : []),
+      eq(tikisseYengapayWebhookEvents.id, query),
+      eq(tikisseYengapayWebhookEvents.providerEventId, query),
+      like(tikisseYengapayWebhookEvents.providerEventId, `${escapeLike(query)}:%`),
+      eq(tikisseYengapayWebhookEvents.paymentTransactionId, query),
+      ...(query.length >= 8 ? [like(tikisseYengapayWebhookEvents.payload, `%${escapeLike(query)}%`)] : []),
     ) : undefined,
   );
   const limit = Math.min(input.limit ?? 50, 200);
   const [rows, total] = await Promise.all([
     dbc.select({
-      id: tikisYengapayWebhookEvents.id, provider: tikisYengapayWebhookEvents.provider, providerEventId: tikisYengapayWebhookEvents.providerEventId,
-      eventType: tikisYengapayWebhookEvents.eventType, paymentTransactionId: tikisYengapayWebhookEvents.paymentTransactionId, status: tikisYengapayWebhookEvents.status,
-      failureReason: tikisYengapayWebhookEvents.failureReason, createdAt: tikisYengapayWebhookEvents.createdAt, processedAt: tikisYengapayWebhookEvents.processedAt,
+      id: tikisseYengapayWebhookEvents.id, provider: tikisseYengapayWebhookEvents.provider, providerEventId: tikisseYengapayWebhookEvents.providerEventId,
+      eventType: tikisseYengapayWebhookEvents.eventType, paymentTransactionId: tikisseYengapayWebhookEvents.paymentTransactionId, status: tikisseYengapayWebhookEvents.status,
+      failureReason: tikisseYengapayWebhookEvents.failureReason, createdAt: tikisseYengapayWebhookEvents.createdAt, processedAt: tikisseYengapayWebhookEvents.processedAt,
       // Aperçu seulement : le contenu complet peut être long, et il n'est utile qu'en cas d'enquête.
-      payloadPreview: sql<string>`left(${tikisYengapayWebhookEvents.payload}, 400)`,
-    }).from(tikisYengapayWebhookEvents).where(where).orderBy(desc(tikisYengapayWebhookEvents.createdAt)).limit(limit).offset(Math.max(input.offset ?? 0, 0)),
-    dbc.select({ count: count() }).from(tikisYengapayWebhookEvents).where(where),
+      payloadPreview: sql<string>`left(${tikisseYengapayWebhookEvents.payload}, 400)`,
+    }).from(tikisseYengapayWebhookEvents).where(where).orderBy(desc(tikisseYengapayWebhookEvents.createdAt)).limit(limit).offset(Math.max(input.offset ?? 0, 0)),
+    dbc.select({ count: count() }).from(tikisseYengapayWebhookEvents).where(where),
   ]);
   return { rows, total: Number(total[0]?.count ?? 0) };
 }
@@ -62,18 +62,18 @@ export async function adminPaymentAnomalies(now = new Date()) {
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   const staleBefore = new Date(now.getTime() - STALE_PENDING_DEPOSIT_MINUTES * 60_000);
   const stuckBefore = new Date(now.getTime() - STUCK_WEBHOOK_MINUTES * 60_000);
-  const stalePending = and(eq(tikisPaymentTransactions.type, "deposit"), eq(tikisPaymentTransactions.status, "pending"), lt(tikisPaymentTransactions.createdAt, staleBefore));
-  const mismatch = and(isNotNull(tikisPaymentTransactions.providerReportedAmount), ne(tikisPaymentTransactions.providerReportedAmount, tikisPaymentTransactions.amount));
+  const stalePending = and(eq(tikissePaymentTransactions.type, "deposit"), eq(tikissePaymentTransactions.status, "pending"), lt(tikissePaymentTransactions.createdAt, staleBefore));
+  const mismatch = and(isNotNull(tikissePaymentTransactions.providerReportedAmount), ne(tikissePaymentTransactions.providerReportedAmount, tikissePaymentTransactions.amount));
   const webhookProblem = or(
-    eq(tikisYengapayWebhookEvents.status, "failed"),
-    and(eq(tikisYengapayWebhookEvents.status, "received"), lt(tikisYengapayWebhookEvents.createdAt, stuckBefore)),
+    eq(tikisseYengapayWebhookEvents.status, "failed"),
+    and(eq(tikisseYengapayWebhookEvents.status, "received"), lt(tikisseYengapayWebhookEvents.createdAt, stuckBefore)),
   );
   const [pendingRows, pendingCount, mismatchRows, mismatchCount, webhookCount] = await Promise.all([
-    dbc.select().from(tikisPaymentTransactions).where(stalePending).orderBy(asc(tikisPaymentTransactions.createdAt)).limit(100),
-    dbc.select({ count: count() }).from(tikisPaymentTransactions).where(stalePending),
-    dbc.select().from(tikisPaymentTransactions).where(mismatch).orderBy(desc(tikisPaymentTransactions.settledAt)).limit(100),
-    dbc.select({ count: count() }).from(tikisPaymentTransactions).where(mismatch),
-    dbc.select({ count: count() }).from(tikisYengapayWebhookEvents).where(webhookProblem),
+    dbc.select().from(tikissePaymentTransactions).where(stalePending).orderBy(asc(tikissePaymentTransactions.createdAt)).limit(100),
+    dbc.select({ count: count() }).from(tikissePaymentTransactions).where(stalePending),
+    dbc.select().from(tikissePaymentTransactions).where(mismatch).orderBy(desc(tikissePaymentTransactions.settledAt)).limit(100),
+    dbc.select({ count: count() }).from(tikissePaymentTransactions).where(mismatch),
+    dbc.select({ count: count() }).from(tikisseYengapayWebhookEvents).where(webhookProblem),
   ]);
   return {
     stalePendingDeposits: { rows: pendingRows, total: Number(pendingCount[0]?.count ?? 0) },
@@ -93,21 +93,21 @@ export async function adminWalletCheck() {
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   const totals = (await dbc.select({
     wallets: count(),
-    available: sql<number>`coalesce(sum(${tikisWallets.availableBalance}), 0)`,
-    held: sql<number>`coalesce(sum(${tikisWallets.heldBalance}), 0)`,
-  }).from(tikisWallets))[0];
-  const ledgerAvailable = sql<number>`coalesce(sum(${tikisWalletLedger.availableAfter} - ${tikisWalletLedger.availableBefore}), 0)`;
-  const ledgerHeld = sql<number>`coalesce(sum(${tikisWalletLedger.heldAfter} - ${tikisWalletLedger.heldBefore}), 0)`;
+    available: sql<number>`coalesce(sum(${tikisseWallets.availableBalance}), 0)`,
+    held: sql<number>`coalesce(sum(${tikisseWallets.heldBalance}), 0)`,
+  }).from(tikisseWallets))[0];
+  const ledgerAvailable = sql<number>`coalesce(sum(${tikisseWalletLedger.availableAfter} - ${tikisseWalletLedger.availableBefore}), 0)`;
+  const ledgerHeld = sql<number>`coalesce(sum(${tikisseWalletLedger.heldAfter} - ${tikisseWalletLedger.heldBefore}), 0)`;
   const discrepancies = await dbc.select({
-    profilePhone: tikisWallets.profilePhone,
-    availableBalance: tikisWallets.availableBalance,
-    heldBalance: tikisWallets.heldBalance,
+    profilePhone: tikisseWallets.profilePhone,
+    availableBalance: tikisseWallets.availableBalance,
+    heldBalance: tikisseWallets.heldBalance,
     ledgerAvailable,
     ledgerHeld,
-  }).from(tikisWallets)
-    .leftJoin(tikisWalletLedger, eq(tikisWalletLedger.profilePhone, tikisWallets.profilePhone))
-    .groupBy(tikisWallets.profilePhone, tikisWallets.availableBalance, tikisWallets.heldBalance)
-    .having(sql`${tikisWallets.availableBalance} <> ${ledgerAvailable} or ${tikisWallets.heldBalance} <> ${ledgerHeld} or ${tikisWallets.availableBalance} < 0 or ${tikisWallets.heldBalance} < 0`)
+  }).from(tikisseWallets)
+    .leftJoin(tikisseWalletLedger, eq(tikisseWalletLedger.profilePhone, tikisseWallets.profilePhone))
+    .groupBy(tikisseWallets.profilePhone, tikisseWallets.availableBalance, tikisseWallets.heldBalance)
+    .having(sql`${tikisseWallets.availableBalance} <> ${ledgerAvailable} or ${tikisseWallets.heldBalance} <> ${ledgerHeld} or ${tikisseWallets.availableBalance} < 0 or ${tikisseWallets.heldBalance} < 0`)
     .limit(200);
   return {
     wallets: Number(totals?.wallets ?? 0),
@@ -137,18 +137,18 @@ export async function adminAccountingMonth(month: string) {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   const { start, end } = monthRange(month);
-  const inMonth = and(gte(tikisWalletLedger.createdAt, start), lt(tikisWalletLedger.createdAt, end));
-  const settledInMonth = and(eq(tikisPaymentTransactions.status, "succeeded"), gte(tikisPaymentTransactions.settledAt, start), lt(tikisPaymentTransactions.settledAt, end));
+  const inMonth = and(gte(tikisseWalletLedger.createdAt, start), lt(tikisseWalletLedger.createdAt, end));
+  const settledInMonth = and(eq(tikissePaymentTransactions.status, "succeeded"), gte(tikissePaymentTransactions.settledAt, start), lt(tikissePaymentTransactions.settledAt, end));
   const [operations, payments, rows] = await Promise.all([
-    dbc.select({ operation: tikisWalletLedger.operation, movements: count(), total: sql<number>`coalesce(sum(${tikisWalletLedger.amount}), 0)` })
-      .from(tikisWalletLedger).where(inMonth).groupBy(tikisWalletLedger.operation),
-    dbc.select({ type: tikisPaymentTransactions.type, transactions: count(), total: sql<number>`coalesce(sum(${tikisPaymentTransactions.amount}), 0)` })
-      .from(tikisPaymentTransactions).where(settledInMonth).groupBy(tikisPaymentTransactions.type),
+    dbc.select({ operation: tikisseWalletLedger.operation, movements: count(), total: sql<number>`coalesce(sum(${tikisseWalletLedger.amount}), 0)` })
+      .from(tikisseWalletLedger).where(inMonth).groupBy(tikisseWalletLedger.operation),
+    dbc.select({ type: tikissePaymentTransactions.type, transactions: count(), total: sql<number>`coalesce(sum(${tikissePaymentTransactions.amount}), 0)` })
+      .from(tikissePaymentTransactions).where(settledInMonth).groupBy(tikissePaymentTransactions.type),
     dbc.select({
-      createdAt: tikisWalletLedger.createdAt, profilePhone: tikisWalletLedger.profilePhone, operation: tikisWalletLedger.operation, amount: tikisWalletLedger.amount,
-      availableBefore: tikisWalletLedger.availableBefore, availableAfter: tikisWalletLedger.availableAfter, heldBefore: tikisWalletLedger.heldBefore, heldAfter: tikisWalletLedger.heldAfter,
-      deliveryId: tikisWalletLedger.deliveryId, reason: tikisWalletLedger.reason, id: tikisWalletLedger.id,
-    }).from(tikisWalletLedger).where(inMonth).orderBy(asc(tikisWalletLedger.createdAt), asc(tikisWalletLedger.id)).limit(ACCOUNTING_EXPORT_MAX_ROWS + 1),
+      createdAt: tikisseWalletLedger.createdAt, profilePhone: tikisseWalletLedger.profilePhone, operation: tikisseWalletLedger.operation, amount: tikisseWalletLedger.amount,
+      availableBefore: tikisseWalletLedger.availableBefore, availableAfter: tikisseWalletLedger.availableAfter, heldBefore: tikisseWalletLedger.heldBefore, heldAfter: tikisseWalletLedger.heldAfter,
+      deliveryId: tikisseWalletLedger.deliveryId, reason: tikisseWalletLedger.reason, id: tikisseWalletLedger.id,
+    }).from(tikisseWalletLedger).where(inMonth).orderBy(asc(tikisseWalletLedger.createdAt), asc(tikisseWalletLedger.id)).limit(ACCOUNTING_EXPORT_MAX_ROWS + 1),
   ]);
   const byOperation = Object.fromEntries(operations.map((row) => [row.operation, { movements: Number(row.movements), total: Number(row.total) }]));
   const byType = Object.fromEntries(payments.map((row) => [row.type, { transactions: Number(row.transactions), total: Number(row.total) }]));

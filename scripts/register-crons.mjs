@@ -5,7 +5,7 @@
  * Affiche la liste des crons à enregistrer via la console webdevtoken.v1.WebDevService.
  * Vérifie que chaque endpoint répond en HTTP 200 (optionnel via --ping).
  *
- * Crons Tikis :
+ * Crons Tikisse :
  *   - expire-deliveries         toutes les 10 minutes  (finalise les courses actives > 24h)
  *   - finalize-account-deletions 1 fois par jour        (supprime les comptes en attente > 30j)
  *   - expire-loyalty-grants      1 fois par jour        (annule les grants loyalty non crédités > 30j)
@@ -43,17 +43,17 @@ const CRONS = [
     name: "compute-daily-metrics",
     path: "/api/scheduled/compute-daily-metrics?days=7",
     schedule: "15 0 * * *",
-    description: "Calcule les métriques business des 7 derniers jours (GMV, commission, courses) et les upsert dans tikis_daily_metrics.",
+    description: "Calcule les métriques business des 7 derniers jours (GMV, commission, courses) et les upsert dans tikisse_daily_metrics.",
   },
 ];
 
 const args = new Set(process.argv.slice(2));
 const shouldPing = args.has("--ping");
-const baseUrl = process.env.TIKIS_API_URL ?? "http://localhost:3000";
+const baseUrl = process.env.TIKISSE_API_URL ?? "http://localhost:3000";
 
 function printInstructions() {
   console.log("╔════════════════════════════════════════════════════════════════╗");
-  console.log("║              Tikis — Cron registration helper                 ║");
+  console.log("║              Tikisse — Cron registration helper                 ║");
   console.log("╚════════════════════════════════════════════════════════════════╝\n");
   console.log("Les 3 crons suivants doivent être enregistrés dans la console webdevtoken :\n");
   for (const cron of CRONS) {

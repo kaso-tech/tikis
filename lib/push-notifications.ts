@@ -5,9 +5,9 @@ import { logger } from "@/lib/logger";
 type NotificationsModule = typeof import("expo-notifications");
 
 export const PUSH_CHANNELS = {
-  transactional: "tikis-transactional",
-  opportunities: "tikis-opportunities",
-  tracking: "tikis-delivery-tracking",
+  transactional: "tikisse-transactional",
+  opportunities: "tikisse-opportunities",
+  tracking: "tikisse-delivery-tracking",
 } as const;
 
 export type PushPermissionOutcome = "granted" | "denied" | "unsupported" | "registration-failed";
@@ -51,7 +51,7 @@ export async function configurePushNotifications(): Promise<NotificationsModule 
   if (Platform.OS === "android" && !channelsConfigured) {
     await Promise.all([
       Notifications.setNotificationChannelAsync(PUSH_CHANNELS.transactional, {
-        name: "Notifications Tikis",
+        name: "Notifications Tikisse",
         importance: Notifications.AndroidImportance.HIGH,
         sound: "default",
         vibrationPattern: [0, 180, 100, 180],

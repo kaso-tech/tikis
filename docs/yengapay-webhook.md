@@ -2,8 +2,8 @@
 
 ## Vue d'ensemble
 
-Le webhook YengaPay notifie Tikis quand l'état d'un paiement change côté PSP.
-Tikis utilise le **même endpoint** pour deux familles de paiements :
+Le webhook YengaPay notifie Tikisse quand l'état d'un paiement change côté PSP.
+Tikisse utilise le **même endpoint** pour deux familles de paiements :
 
 | Famille | Provider (transaction) | Flow client | USSD |
 |---|---|---|---|
@@ -11,7 +11,7 @@ Tikis utilise le **même endpoint** pour deux familles de paiements :
 | Direct Mobile Money | `yengapay_direct_sandbox` / `yengapay_direct_live` | Code USSD composé depuis l'app (`tel:` URI), OTP par SMS | oui |
 
 Les deux familles partagent le même PSP et donc le même webhook. La distinction
-se fait dans le handler Tikis via le `provider` déjà enregistré sur la transaction.
+se fait dans le handler Tikisse via le `provider` déjà enregistré sur la transaction.
 
 ## Endpoint
 
@@ -68,11 +68,11 @@ Status normalisés :
 
 | Event type YengaPay | eventType interne | Action |
 |---|---|---|
-| `payment.pending` | `payment.pending` | 202, pas de settle (statut déjà pending côté Tikis) |
+| `payment.pending` | `payment.pending` | 202, pas de settle (statut déjà pending côté Tikisse) |
 | `payment.succeeded` | `payment.succeeded` | `settleYengapayLivePayment` + push notif si paiement direct |
 | `payment.failed` | `payment.failed` | `settleYengapayLivePayment` (status=failed) + push notif si paiement direct |
 | `payment.cancelled` | `payment.cancelled` | `settleYengapayLivePayment` (status=cancelled) + push notif si paiement direct |
-| `withdrawal.*` | `withdrawal.succeeded` / `withdrawal.failed` | (hors scope MVP Tikis) |
+| `withdrawal.*` | `withdrawal.succeeded` / `withdrawal.failed` | (hors scope MVP Tikisse) |
 
 ## Idempotence
 
@@ -80,7 +80,7 @@ Status normalisés :
   `paymentIntentId`, commun à « en attente » et « réussi » d'un même paiement. La clé enregistrée est donc
   `providerEventId:eventType` (`webhookEventKey`, empreinte SHA-256 au-delà de 120 caractères) : un succès
   n'est jamais pris pour le doublon de l'attente qui l'a précédé.
-- Le handler loggue l'event dans `tikis_yengapay_webhook_events` (contrainte unique
+- Le handler loggue l'event dans `tikisse_yengapay_webhook_events` (contrainte unique
   `(provider, providerEventId)`), puis le clôt : `processed` après un settle réussi, `ignored` pour un
   `payment.pending`, `failed` (avec `failureReason`) quand le settle échoue.
 - Seul un event `processed` ou `ignored` est un doublon (`{ ok: true, duplicate: true }`, sans settle).
@@ -98,7 +98,7 @@ Status normalisés :
 Sur settle réussi d'un paiement direct (`yengapay_direct_*`), le handler envoie un push
 Expo au téléphone associé :
 
-- **Succès** : titre `"Dépôt Mobile Money confirmé"`, body `"<montant> FCFA crédités sur votre Wallet Tikis."`
+- **Succès** : titre `"Dépôt Mobile Money confirmé"`, body `"<montant> FCFA crédités sur votre Wallet Tikisse."`
 - **Échec** : titre `"Dépôt Mobile Money échoué"`, body `"Le paiement n'a pas été confirmé par votre opérateur. Le solde de votre Wallet est inchangé."`
 - **Cancelled** : idem échec.
 
@@ -111,7 +111,7 @@ En cas d'incident webhook persistant, l'admin peut forcer une réconciliation :
 
 ```ts
 // Console admin (TanStack Start)
-tikisAdminRouter.finance.reconcileYengapayPayment.mutate({ providerReference })
+tikisseAdminRouter.finance.reconcileYengapayPayment.mutate({ providerReference })
 ```
 
 Le handler :
@@ -162,4 +162,4 @@ Variables d'environnement :
 ## Sources
 
 - Documentation YengaPay Direct : https://docs.yengapay.com/docs/guides/integration-api-direct
-- Code : `server/yengapay.ts` (signature, parser, normalize), `server/_core/index.ts:151` (handler), `server/db.ts:settleYengapayLivePayment` (settlement), `server/db.ts:lookupTikisPaymentByProviderReference` (lookup pre-settle).
+- Code : `server/yengapay.ts` (signature, parser, normalize), `server/_core/index.ts:151` (handler), `server/db.ts:settleYengapayLivePayment` (settlement), `server/db.ts:lookupTikissePaymentByProviderReference` (lookup pre-settle).

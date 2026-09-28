@@ -1,5 +1,5 @@
 /**
- * Règles géographiques Tikis : normalisation des lieux, libellés d’affichage,
+ * Règles géographiques Tikisse : normalisation des lieux, libellés d’affichage,
  * distances et estimation de prix.
  *
  * Les libellés suivent docs/logique-metier-lieux.md. Cette logique est
@@ -9,7 +9,7 @@
  * d’affichage se fait dans ce fichier, et le document est mis à jour avec.
  */
 
-import type { DeliveryType, LocationLabel, LocationPresentation, SelectableVehicleType } from "@/shared/tikis-domain";
+import type { DeliveryType, LocationLabel, LocationPresentation, SelectableVehicleType } from "@/shared/tikisse-domain";
 
 const safeWhitespace = /\s+/g;
 const forbiddenPlaceChars = /[^\p{L}\p{N}\s,.'’\-()/]/gu;

@@ -44,8 +44,8 @@ describe("état de vérification d'un profil", () => {
 
 describe("la page de profil", () => {
   const source = readFileSync(join(process.cwd(), "app/(tabs)/profile.tsx"), "utf8");
-  const contact = readFileSync(join(process.cwd(), "components/tikis/contact-section.tsx"), "utf8");
-  const sessions = readFileSync(join(process.cwd(), "components/tikis/sessions-section.tsx"), "utf8");
+  const contact = readFileSync(join(process.cwd(), "components/tikisse/contact-section.tsx"), "utf8");
+  const sessions = readFileSync(join(process.cwd(), "components/tikisse/sessions-section.tsx"), "utf8");
 
   it("lit le dossier KYC au lieu d'écrire « vérifié » en dur", () => {
     expect(source).toContain("trpc.kyc.status.useQuery");

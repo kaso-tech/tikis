@@ -101,11 +101,14 @@ export async function storageGetSignedUrl(relKey: string): Promise<string> {
  * pièces d'identité et selfies KYC, pièces jointes des signalements. Ils ne sortent que par la route
  * admin authentifiée (server/admin-documents.ts), qui retrouve la clé en base au lieu de la lire dans l'URL.
  */
-export const PRIVATE_STORAGE_PREFIXES = ["tikis-kyc/", "tikis-reports/"] as const;
+// Renommage Tikis → Tikisse : les fichiers déjà déposés sous l'ancien préfixe (avant ce déploiement)
+// restent protégés indéfiniment — ils ne sont jamais renommés dans le stockage lui-même (voir la note de
+// migration). Les nouveaux dépôts utilisent le nouveau préfixe (server/routers.ts).
+export const PRIVATE_STORAGE_PREFIXES = ["tikisse-kyc/", "tikisse-reports/", "tikis-kyc/", "tikis-reports/"] as const;
 
 /**
  * Faut-il refuser cette clé au proxy public ? Normalise d'abord comme le ferait le stockage (barres initiales,
- * segments « . », barres doublées) : « //tikis-kyc/… » ou « ./tikis-kyc/… » ne doivent pas passer. Toute
+ * segments « . », barres doublées) : « //tikisse-kyc/… » ou « ./tikisse-kyc/… » ne doivent pas passer. Toute
  * remontée « .. » est refusée d'office.
  */
 export function isPrivateStorageKey(rawKey: string): boolean {

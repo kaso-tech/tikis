@@ -1,19 +1,19 @@
-import { getTikisProfileByPhone } from "../db";
+import { getTikisseProfileByPhone } from "../db";
 
 /**
  * Profils relus au plus toutes les 10 s par instance : une décision de l'administration (suspension,
  * bannissement, déconnexion forcée) prend effet en 10 s au plus, immédiatement sur l'instance qui l'a
- * prise (`invalidateTikisProfileCache`).
+ * prise (`invalidateTikisseProfileCache`).
  */
 const PROFILE_CACHE_TTL_MS = 10_000;
 const PROFILE_CACHE_MAX_ENTRIES = 5_000;
-const profileCache = new Map<string, { profile: NonNullable<Awaited<ReturnType<typeof getTikisProfileByPhone>>>; expiresAt: number }>();
+const profileCache = new Map<string, { profile: NonNullable<Awaited<ReturnType<typeof getTikisseProfileByPhone>>>; expiresAt: number }>();
 
-export async function getCachedTikisProfile(phone: string) {
+export async function getCachedTikisseProfile(phone: string) {
   const cached = profileCache.get(phone);
   const now = Date.now();
   if (cached && cached.expiresAt > now) return cached.profile;
-  const fresh = await getTikisProfileByPhone(phone);
+  const fresh = await getTikisseProfileByPhone(phone);
   if (!fresh) {
     profileCache.delete(phone);
     return undefined;
@@ -26,7 +26,7 @@ export async function getCachedTikisProfile(phone: string) {
   return fresh;
 }
 
-export function invalidateTikisProfileCache(phone?: string) {
+export function invalidateTikisseProfileCache(phone?: string) {
   if (phone) profileCache.delete(phone);
   else profileCache.clear();
 }

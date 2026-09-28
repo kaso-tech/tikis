@@ -21,8 +21,8 @@ describe("contrat Expo Go des notifications push", () => {
   });
 
   it("déclare des canaux séparés pour les alertes transactionnelles et les opportunités", () => {
-    expect(pushSource).toContain('transactional: "tikis-transactional"');
-    expect(pushSource).toContain('opportunities: "tikis-opportunities"');
-    expect(pushSource).toContain('tracking: "tikis-delivery-tracking"');
+    expect(pushSource).toContain('transactional: "tikisse-transactional"');
+    expect(pushSource).toContain('opportunities: "tikisse-opportunities"');
+    expect(pushSource).toContain('tracking: "tikisse-delivery-tracking"');
   });
 });

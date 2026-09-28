@@ -11,7 +11,7 @@
  * Un état est désormais un nom et un ton, la couleur restant au rendu.
  */
 
-import type { Delivery, DeliveryStatus } from "@/shared/tikis-domain";
+import type { Delivery, DeliveryStatus } from "@/shared/tikisse-domain";
 
 /** Le registre de couleur d'une carte, sans dire laquelle : c'est au rendu de choisir. */
 export type DeliveryCardTone = "open" | "assigned" | "active" | "done" | "idle";

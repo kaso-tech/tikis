@@ -30,17 +30,17 @@ describe("droits par rôle", () => {
   const router = read("server/admin-router.ts");
 
   it("trancher un signalement est réservé au support et aux super-admins", () => {
-    expect(router).toMatch(/resolve: adminProcedure\.use\(requireTikisAdminRole\("super_admin", "support"\)\)/);
+    expect(router).toMatch(/resolve: adminProcedure\.use\(requireTikisseAdminRole\("super_admin", "support"\)\)/);
   });
 
   it("la suspension d'un admin passe l'auteur de l'action au serveur", () => {
-    expect(router).toContain("setAdminUserActive({ actorAdminId: ctx.tikisAdmin.adminId, adminId: input.adminId, active: input.active })");
+    expect(router).toContain("setAdminUserActive({ actorAdminId: ctx.tikisseAdmin.adminId, adminId: input.adminId, active: input.active })");
   });
 
   it("la session admin est relue en base à chaque requête", () => {
     const context = read("server/_core/context.ts");
-    expect(context).toContain("tikisAdmin: await authenticateAdminSession(adminSessionToken)");
-    expect(context).not.toMatch(/tikisAdmin: await verifyAdminSession\(/);
+    expect(context).toContain("tikisseAdmin: await authenticateAdminSession(adminSessionToken)");
+    expect(context).not.toMatch(/tikisseAdmin: await verifyAdminSession\(/);
   });
 
   it("l'écran des signalements n'offre les actions qu'aux rôles autorisés", () => {
@@ -109,7 +109,7 @@ describe("lot 1 — décisions financières encadrées dans les écrans", () => 
   it("la migration ajoute la référence de versement, unique", () => {
     const migration = read("drizzle/manual/0043_withdrawal_payout_reference.sql");
     expect(migration).toContain("ADD COLUMN IF NOT EXISTS `payoutReference` varchar(80)");
-    expect(migration).toContain("CREATE UNIQUE INDEX IF NOT EXISTS `tikis_payment_transactions_payoutReference_unique`");
+    expect(migration).toContain("CREATE UNIQUE INDEX IF NOT EXISTS `tikisse_payment_transactions_payoutReference_unique`");
     expect(read("drizzle/schema.ts")).toContain('payoutReference: varchar("payoutReference", { length: 80 }).unique()');
   });
 });
@@ -122,11 +122,11 @@ describe("lot 2 — la console ne manipule plus aucun jeton de session", () => {
     expect(trpcClient).not.toContain("localStorage.getItem");
     expect(trpcClient).not.toContain("localStorage.setItem");
     expect(trpcClient).toContain("localStorage.removeItem(LEGACY_SESSION_KEY)");
-    expect(trpcClient).not.toContain("x-tikis-admin-session");
+    expect(trpcClient).not.toContain("x-tikisse-admin-session");
   });
 
   it("chaque requête porte l'en-tête de la console et le cookie", () => {
-    expect(trpcClient).toContain('headers: () => ({ "x-tikis-admin": "1" })');
+    expect(trpcClient).toContain('headers: () => ({ "x-tikisse-admin": "1" })');
     expect(trpcClient).toContain('credentials: "include"');
   });
 
@@ -135,20 +135,20 @@ describe("lot 2 — la console ne manipule plus aucun jeton de session", () => {
   });
 
   it("le serveur n'accepte plus le jeton en en-tête, et CORS n'autorise plus cet en-tête", () => {
-    expect(read("server/_core/context.ts")).not.toContain('headers["x-tikis-admin-session"]');
+    expect(read("server/_core/context.ts")).not.toContain('headers["x-tikisse-admin-session"]');
     const security = read("server/_core/security.ts");
-    expect(security).not.toContain("X-Tikis-Admin-Session");
-    expect(security).toContain("X-Tikis-Admin,");
+    expect(security).not.toContain("X-Tikisse-Admin-Session");
+    expect(security).toContain("X-Tikisse-Admin,");
   });
 
   it("la carte en direct n'apparaît qu'aux rôles qui y ont droit", () => {
     expect(read("admin/src/App.tsx")).toContain('{ key: "map", label: "Carte temps réel", href: "/admin/map", icon: "◎", group: "ops", roles: ["super_admin", "support"] }');
-    expect(read("server/admin-router.ts")).toContain('liveLocations: adminProcedure.use(requireTikisAdminRole("super_admin", "support"))');
+    expect(read("server/admin-router.ts")).toContain('liveLocations: adminProcedure.use(requireTikisseAdminRole("super_admin", "support"))');
   });
 
   it("la migration crée la table des sessions, sans jamais y stocker le jeton en clair", () => {
     const migration = read("drizzle/manual/0044_admin_sessions.sql");
-    expect(migration).toContain("CREATE TABLE IF NOT EXISTS `tikis_admin_sessions`");
+    expect(migration).toContain("CREATE TABLE IF NOT EXISTS `tikisse_admin_sessions`");
     expect(migration).toContain("`tokenHash` varchar(64) NOT NULL");
     expect(migration).not.toMatch(/`token` /);
   });
@@ -176,14 +176,14 @@ describe("lot 3 — double authentification dans la console", () => {
 
   it("le serveur ferme toute la console tant que l'enrôlement obligatoire n'est pas fait", () => {
     const trpcCore = read("server/_core/trpc.ts");
-    expect(trpcCore).toContain("if (opts.ctx.tikisAdmin.mustEnrollTotp) {");
+    expect(trpcCore).toContain("if (opts.ctx.tikisseAdmin.mustEnrollTotp) {");
     const router = read("server/admin-router.ts");
-    expect(router).toContain("begin: tikisAdminEnrollmentProcedure");
-    expect(router).toContain("confirm: tikisAdminEnrollmentProcedure");
+    expect(router).toContain("begin: tikisseAdminEnrollmentProcedure");
+    expect(router).toContain("confirm: tikisseAdminEnrollmentProcedure");
     // La désactivation, elle, reste derrière la procédure complète.
     expect(router).toContain("disable: adminProcedure");
     // `adminProcedure` (trace d'audit) repose sur la procédure complète, qui ferme la console aux non-enrôlés.
-    expect(router).toContain("const adminProcedure = tikisAdminProcedure.use(");
+    expect(router).toContain("const adminProcedure = tikisseAdminProcedure.use(");
   });
 
   it("la liste des rôles soumis à l'obligation est la même côté écran et côté serveur", async () => {
@@ -233,8 +233,8 @@ describe("lot 5 — traçabilité et pilotage", () => {
   const router = read("server/admin-router.ts");
 
   it("toutes les procédures du routeur admin passent par la trace d'audit préalable", () => {
-    const body = router.slice(router.indexOf("export const tikisAdminRouter"));
-    expect(body).not.toContain("tikisAdminProcedure");
+    const body = router.slice(router.indexOf("export const tikisseAdminRouter"));
+    expect(body).not.toContain("tikisseAdminProcedure");
   });
 
   it("masque mots de passe, codes et jetons dans l'entrée recopiée", async () => {
@@ -257,7 +257,7 @@ describe("lot 5 — traçabilité et pilotage", () => {
   });
 
   it("un push de décision KYC ouvre l'écran Vérification de l'app", () => {
-    const runtime = read("components/tikis/push-notification-runtime.tsx");
+    const runtime = read("components/tikisse/push-notification-runtime.tsx");
     expect(runtime).toContain('if (data.screen === "verification") {');
     expect(runtime).toContain('router.push("/verification" as never);');
     expect(read("server/admin-db.ts")).toContain('data: { kind: "kyc_decision", screen: "verification" }');
@@ -290,7 +290,7 @@ describe("lot A — contrôle financier", () => {
     expect(read("admin/src/App.tsx")).toContain('{ key: "control", label: "Contrôle financier", href: "/admin/control", icon: "⊜", group: "finance", roles: ["super_admin", "finance"] }');
     const router = read("server/admin-router.ts");
     const control = router.slice(router.indexOf("control: router({"), router.indexOf("sendBonus:"));
-    expect(control.match(/adminProcedure\.use\(requireTikisAdminRole\("super_admin", "finance"\)\)/g)).toHaveLength(5);
+    expect(control.match(/adminProcedure\.use\(requireTikisseAdminRole\("super_admin", "finance"\)\)/g)).toHaveLength(5);
   });
 
   it("les fournisseurs simulés sont les mêmes que côté serveur", async () => {
@@ -345,7 +345,7 @@ describe("lot B — gouvernance", () => {
   });
 
   it("la garde des rôles restreints s'applique dans le middleware commun, pas procédure par procédure", () => {
-    expect(read("server/_core/trpc.ts")).toContain("if (!isAdminPathAllowed(opts.ctx.tikisAdmin.role, opts.path, opts.type)) {");
+    expect(read("server/_core/trpc.ts")).toContain("if (!isAdminPathAllowed(opts.ctx.tikisseAdmin.role, opts.path, opts.type)) {");
   });
 
   it("la console connaît les mêmes rôles que le serveur", async () => {
@@ -354,7 +354,7 @@ describe("lot B — gouvernance", () => {
     const declared = /export type AdminRole = ([^;]+);/.exec(auth)?.[1] ?? "";
     expect(declared.split("|").map((part) => part.trim().replace(/"/g, ""))).toEqual([...ADMIN_ROLES]);
     const schema = read("drizzle/schema.ts");
-    const adminTable = schema.slice(schema.indexOf('mysqlTable("tikis_admin_users"'));
+    const adminTable = schema.slice(schema.indexOf('mysqlTable("tikisse_admin_users"'));
     const schemaRoles = /role: mysqlEnum\("role", (\[[^\]]*\])\)/.exec(adminTable)?.[1];
     expect(JSON.parse(schemaRoles ?? "[]")).toEqual([...ADMIN_ROLES]);
   });
@@ -380,7 +380,7 @@ describe("lot B — gouvernance", () => {
     expect(page).toContain("trpc.adminConsole.auditLog.export.query(queryFilters())");
     const migration = read("drizzle/manual/0047_admin_governance.sql");
     expect(migration).toContain("enum('super_admin','support','finance','viewer','kyc_reviewer')");
-    expect(migration).toContain("CREATE TABLE IF NOT EXISTS `tikis_admin_approvals`");
+    expect(migration).toContain("CREATE TABLE IF NOT EXISTS `tikisse_admin_approvals`");
     expect(migration).toContain("ADD COLUMN IF NOT EXISTS `adminApprovalThreshold` int NOT NULL DEFAULT 100000");
   });
 });
@@ -389,10 +389,10 @@ describe("lot C — litiges et avis", () => {
   it("dédommagements : rattachés à la livraison, soumis au seuil, idempotents", () => {
     const router = read("server/admin-router.ts");
     expect(router).toContain("approvals.requestDeliveryRefund(");
-    expect(router).toMatch(/refund: adminProcedure\.use\(requireTikisAdminRole\("super_admin", "finance"\)\)/);
-    expect(router).toMatch(/refundCommission: adminProcedure\.use\(requireTikisAdminRole\("super_admin", "finance"\)\)/);
-    expect(router).toMatch(/removeDriver: adminProcedure\.use\(requireTikisAdminRole\("super_admin", "support"\)\)/);
-    expect(router).toMatch(/complete: adminProcedure\.use\(requireTikisAdminRole\("super_admin", "support"\)\)/);
+    expect(router).toMatch(/refund: adminProcedure\.use\(requireTikisseAdminRole\("super_admin", "finance"\)\)/);
+    expect(router).toMatch(/refundCommission: adminProcedure\.use\(requireTikisseAdminRole\("super_admin", "finance"\)\)/);
+    expect(router).toMatch(/removeDriver: adminProcedure\.use\(requireTikisseAdminRole\("super_admin", "support"\)\)/);
+    expect(router).toMatch(/complete: adminProcedure\.use\(requireTikisseAdminRole\("super_admin", "support"\)\)/);
     const disputes = read("server/admin-disputes.ts");
     expect(disputes).toContain('operation: "refund"');
     expect(disputes).toContain("await assertParticipant(tx, input.deliveryId, input.phone);");
@@ -402,7 +402,7 @@ describe("lot C — litiges et avis", () => {
 
   it("un avis masqué ne compte ni dans la note ni dans l'affichage côté livreur", () => {
     const db = read("server/db.ts");
-    expect(db.match(/isNull\(tikisDeliveryReviews\.hiddenAt\)/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(db.match(/isNull\(tikisseDeliveryReviews\.hiddenAt\)/g)?.length).toBeGreaterThanOrEqual(3);
     expect(read("server/admin-disputes.ts")).toContain("Indiquez pourquoi cet avis est masqué.");
   });
 
@@ -418,14 +418,14 @@ describe("lot D — utilisateurs", () => {
   it("la déconnexion forcée vaut pour tout jeton, vérifiée à la création du contexte", () => {
     const context = read("server/_core/context.ts");
     expect(context).toContain("if (profile && isRevokedByProfile(claims.issuedAt, profile.sessionsRevokedAt)) return null;");
-    expect(read("server/tikis-session.ts")).toContain("return issuedAt < Math.floor(sessionsRevokedAt.getTime() / 1000);");
+    expect(read("server/tikisse-session.ts")).toContain("return issuedAt < Math.floor(sessionsRevokedAt.getTime() / 1000);");
   });
 
   it("le blocage par numéro est en base, levable depuis la console ; le nettoyage reste dans sa limite", () => {
     const routers = read("server/routers.ts");
     expect(routers).not.toContain("perPhoneBuckets");
     expect(routers).toContain("await db.checkPhoneAttemptLimit(scope, phone)");
-    expect(read("server/db.ts")).toContain("like(tikisRateLimits.rateLimitKey, `${scope}:%`)");
+    expect(read("server/db.ts")).toContain("like(tikisseRateLimits.rateLimitKey, `${scope}:%`)");
   });
 
   it("la suppression définitive passe par les blocages, efface les pièces et pseudonymise", () => {
@@ -439,7 +439,7 @@ describe("lot D — utilisateurs", () => {
 
   it("la migration crée notes, correspondances et file d'effacement", () => {
     const migration = read("drizzle/manual/0049_user_support_and_deletion.sql");
-    for (const fragment of ["`sessionsRevokedAt`", "CREATE TABLE IF NOT EXISTS `tikis_profile_notes`", "CREATE TABLE IF NOT EXISTS `tikis_deleted_accounts`", "CREATE TABLE IF NOT EXISTS `tikis_storage_erasures`", "`documentsErasedAt`", "'manual_payout'"]) {
+    for (const fragment of ["`sessionsRevokedAt`", "CREATE TABLE IF NOT EXISTS `tikisse_profile_notes`", "CREATE TABLE IF NOT EXISTS `tikisse_deleted_accounts`", "CREATE TABLE IF NOT EXISTS `tikisse_storage_erasures`", "`documentsErasedAt`", "'manual_payout'"]) {
       expect(migration).toContain(fragment);
     }
   });

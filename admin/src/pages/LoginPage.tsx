@@ -54,12 +54,12 @@ export default function LoginPage() {
         <form className="login-card" onSubmit={handlePassword}>
           <div className="login-icon">⚙</div>
           <p className="login-title">Console opérateur</p>
-          <p className="login-subtitle">Accès réservé aux administrateurs Tikis.</p>
+          <p className="login-subtitle">Accès réservé aux administrateurs Tikisse.</p>
           {error ? <div className="banner-error">{error}</div> : null}
           <div className="login-form">
             <div>
               <label className="field-label" htmlFor="email">Email</label>
-              <input id="email" className="input" type="email" required autoFocus autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@tikis.app" />
+              <input id="email" className="input" type="email" required autoFocus autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@tikisse.app" />
             </div>
             <div>
               <label className="field-label" htmlFor="password">Mot de passe</label>

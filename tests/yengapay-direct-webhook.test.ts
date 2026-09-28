@@ -8,7 +8,7 @@ const secret = "secret-webhook-yengapay-test";
 describe("webhook YengaPay Direct (paiements Mobile Money in-app)", () => {
   it("reconnaît un paiement Direct réussi avec paymentAmount et paymentIntentId", () => {
     // Payload type envoyé par YengaPay pour les paiements directs — sans checkoutUrl
-    // (puisque l'utilisateur compose l'USSD depuis l'app Tikis et non depuis une page
+    // (puisque l'utilisateur compose l'USSD depuis l'app Tikisse et non depuis une page
     // checkout). Le format reste compatible avec le parser existant.
     const raw = JSON.stringify({
       type: "payment.succeeded",

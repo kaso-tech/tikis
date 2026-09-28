@@ -96,14 +96,14 @@ describe("sobriété de la palette", () => {
 
     // Chaque entrée : un texte réellement posé sur l'aplat de marque, relu depuis sa source.
     const surLAplat: [fichier: string, motif: RegExp][] = [
-      ["components/tikis/ui.tsx", /primary: \{ background: "#[0-9A-F]{6}", foreground: "(#[0-9A-F]{6})"/],
+      ["components/tikisse/ui.tsx", /primary: \{ background: "#[0-9A-F]{6}", foreground: "(#[0-9A-F]{6})"/],
       ["app/(tabs)/profile.tsx", /avatarText: \{ color: "(#[0-9A-F]{6})"/],
       ["app/(tabs)/earnings.tsx", /flowTabTextActive: \{ color: "(#[0-9A-F]{6})" \}/],
       ["app/(tabs)/earnings.tsx", /periodTabTextActive: \{ color: "(#[0-9A-F]{6})" \}/],
-      ["components/tikis/screens/home-screen.native.tsx", /chipCountText: \{ color: "(#[0-9A-F]{6})"/],
-      ["components/tikis/screens/home-screen.web.tsx", /chipCountText: \{ color: "(#[0-9A-F]{6})"/],
-      ["components/tikis/auth-flow.tsx", /vehicleTitleActive: \{ color: "(#[0-9A-F]{6})" \}/],
-      ["components/tikis/auth-flow.tsx", /vehicleTextActive: \{ color: "(#[0-9A-F]{6})" \}/],
+      ["components/tikisse/screens/home-screen.native.tsx", /chipCountText: \{ color: "(#[0-9A-F]{6})"/],
+      ["components/tikisse/screens/home-screen.web.tsx", /chipCountText: \{ color: "(#[0-9A-F]{6})"/],
+      ["components/tikisse/auth-flow.tsx", /vehicleTitleActive: \{ color: "(#[0-9A-F]{6})" \}/],
+      ["components/tikisse/auth-flow.tsx", /vehicleTextActive: \{ color: "(#[0-9A-F]{6})" \}/],
     ];
 
     const illisibles = surLAplat.flatMap(([fichier, motif]) => {

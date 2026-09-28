@@ -1,5 +1,5 @@
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { AuthFlow } from "@/components/tikis/auth-flow";
+import { AuthFlow } from "@/components/tikisse/auth-flow";
 import { useSessionRestore } from "@/hooks/use-session-restore";
 import { useThemeColors } from "@/lib/use-theme-colors";
 

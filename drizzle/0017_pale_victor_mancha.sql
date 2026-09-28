@@ -1,1 +1,1 @@
-ALTER TABLE `tikis_delivery_events` MODIFY COLUMN `status` enum('draft','open','pending_confirmation','active','completed','disabled','cancelled','expired');
+ALTER TABLE `tikisse_delivery_events` MODIFY COLUMN `status` enum('draft','open','pending_confirmation','active','completed','disabled','cancelled','expired');

@@ -3,11 +3,11 @@ import { router } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { TikisButton } from "@/components/tikis/ui";
+import { TikisseButton } from "@/components/tikisse/ui";
 import { useDriverLocation } from "@/hooks/use-driver-location";
 import { usePushEnrollment } from "@/hooks/use-push-registration";
 import { haptic } from "@/lib/haptics";
-import { useTikisStore } from "@/lib/tikis-store";
+import { useTikisseStore } from "@/lib/tikisse-store";
 import { type ThemedColors, useThemeColors } from "@/lib/use-theme-colors";
 import { trpc } from "@/lib/trpc";
 import { describePerimeter, PERIMETER_RADIUS_OPTIONS_KM } from "@/shared/driver-perimeter";
@@ -27,7 +27,7 @@ function formatBaseAge(updatedAt: string | null): string {
 export default function DriverAlertsScreen() {
   const { colors: theme } = useThemeColors();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { profile, role } = useTikisStore();
+  const { profile, role } = useTikisseStore();
   const utilities = trpc.useUtils();
   const enablePush = usePushEnrollment();
   const driverLocation = useDriverLocation({ enabled: false });
@@ -61,7 +61,7 @@ export default function DriverAlertsScreen() {
     if (next) {
       const outcome = await enablePush();
       if (outcome === "denied") {
-        setError("Les notifications sont bloquées au niveau du système. Autorisez Tikis dans les réglages de votre téléphone, puis réessayez.");
+        setError("Les notifications sont bloquées au niveau du système. Autorisez Tikisse dans les réglages de votre téléphone, puis réessayez.");
         return;
       }
       if (outcome === "registration-failed") {
@@ -82,7 +82,7 @@ export default function DriverAlertsScreen() {
     try {
       const position = await driverLocation.request();
       if (!position) {
-        setError("Position GPS indisponible. Vérifiez que la localisation est activée et autorisée pour Tikis.");
+        setError("Position GPS indisponible. Vérifiez que la localisation est activée et autorisée pour Tikisse.");
         return;
       }
       await basePositionMutation.mutateAsync({ latitude: position.coords.latitude, longitude: position.coords.longitude });
@@ -127,7 +127,7 @@ export default function DriverAlertsScreen() {
           <MaterialIcons name="cloud-off" size={34} color={theme.muted} />
           <Text style={styles.emptyTitle}>Réglages indisponibles</Text>
           <Text style={styles.emptyText}>{preferencesQuery.error?.message ?? "Vos réglages n’ont pas pu être chargés."}</Text>
-          <TikisButton label="Réessayer" icon="refresh" variant="secondary" onPress={() => void preferencesQuery.refetch()} loading={preferencesQuery.isFetching} style={styles.baseButton} />
+          <TikisseButton label="Réessayer" icon="refresh" variant="secondary" onPress={() => void preferencesQuery.refetch()} loading={preferencesQuery.isFetching} style={styles.baseButton} />
         </View>
       </SafeAreaView>
     );
@@ -202,7 +202,7 @@ export default function DriverAlertsScreen() {
               {hasBasePosition ? formatBaseAge(preferences.baseUpdatedAt) : "Position non enregistrée"}
             </Text>
           </View>
-          <TikisButton
+          <TikisseButton
             label={hasBasePosition ? "Actualiser ma position" : "Utiliser ma position actuelle"}
             icon="gps-fixed"
             variant="secondary"

@@ -1,6 +1,6 @@
 /** Liste des pays supportés avec leur bounding box approximative.
  *  Source : valeurs par défaut. Si on a besoin de plus de précision,
- *  on charge depuis la table `tikis_supported_countries` (migration 0022). */
+ *  on charge depuis la table `tikisse_supported_countries` (migration 0022). */
 const COUNTRY_BBOX: Record<string, { minLat: number; maxLat: number; minLng: number; maxLng: number }> = {
   CM: { minLat: 1.65, maxLat: 13.08, minLng: 8.5, maxLng: 16.2 },
   CI: { minLat: 4.36, maxLat: 10.74, minLng: -8.6, maxLng: -2.5 },
@@ -25,7 +25,7 @@ const COUNTRY_BBOX: Record<string, { minLat: number; maxLat: number; minLng: num
 
 /** Bbox d'erreur si le pays n'est pas dans la whitelist.
  *  Très large (englobe l'Afrique de l'Ouest + Centre) pour ne pas rejeter
- *  les pays frontaliers que Tikis pourrait servir en pilote. */
+ *  les pays frontaliers que Tikisse pourrait servir en pilote. */
 const DEFAULT_ALLOWED_BBOX = { minLat: -10, maxLat: 25, minLng: -20, maxLng: 25 };
 
 /** Renvoie true si la coordonnée est dans la bbox du pays. */

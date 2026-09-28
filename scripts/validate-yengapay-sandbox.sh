@@ -146,7 +146,7 @@ else
   fail "$TEST_FAILED fichier(s) de test ont échoué."
   echo
   info "Debug :"
-  echo "  - Logs serveur Tikis (filtrer 'webhook:yengapay')"
+  echo "  - Logs serveur Tikisse (filtrer 'webhook:yengapay')"
   echo "  - Console YengaPay → vérifier que les credentials sandbox sont valides"
   echo "  - tests/yengapay-config.test.ts → vérifier la lecture des env vars"
   exit 1

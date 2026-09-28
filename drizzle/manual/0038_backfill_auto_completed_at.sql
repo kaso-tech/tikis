@@ -1,7 +1,7 @@
 -- Redate les courses clôturées automatiquement à l'échéance de leurs 24 h, et non à l'heure où la tâche
 -- planifiée est passée.
 --
--- `expireOpenTikisDeliveries` enregistrait `completedAt = now`. Quand le serveur était resté arrêté, ou que
+-- `expireOpenTikisseDeliveries` enregistrait `completedAt = now`. Quand le serveur était resté arrêté, ou que
 -- le planificateur avait pris du retard, une course terminée le 31 août se retrouvait datée du jour où la
 -- tâche avait enfin tourné — et comptait dans les « Gains du jour » de ce jour-là, « il y a 15 h ». Le code
 -- corrige les clôtures à venir (shared/delivery-expiration.ts, `autoCompletionTimestamp`) ; ce script
@@ -19,8 +19,8 @@
 --
 -- Cette base étant en MySQL (voir drizzle.config.ts), appliquer directement :
 --   mysql -u <user> -p <database> < drizzle/manual/0038_backfill_auto_completed_at.sql
-UPDATE `tikis_deliveries` AS d
-JOIN `tikis_delivery_events` AS closing
+UPDATE `tikisse_deliveries` AS d
+JOIN `tikisse_delivery_events` AS closing
   ON closing.`idempotencyKey` = CONCAT(d.`id`, ':auto-completed-driver')
 SET d.`completedAt` = LEAST(
       d.`completedAt`,
@@ -28,7 +28,7 @@ SET d.`completedAt` = LEAST(
         d.`createdAt`,
         COALESCE(
           (SELECT MAX(previous.`createdAt`)
-             FROM `tikis_delivery_events` AS previous
+             FROM `tikisse_delivery_events` AS previous
             WHERE previous.`deliveryId` = d.`id`
               AND previous.`createdAt` < closing.`createdAt`),
           d.`createdAt`

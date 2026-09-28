@@ -3,7 +3,7 @@
 -- (cf. shared/driver-perimeter.ts) : pas d'alerte push, périmètre limité à la ville du profil.
 -- Cette base étant en MySQL (voir drizzle.config.ts), appliquer directement :
 --   mysql -u <user> -p <database> < drizzle/manual/0037_driver_preferences.sql
-CREATE TABLE IF NOT EXISTS `tikis_driver_preferences` (
+CREATE TABLE IF NOT EXISTS `tikisse_driver_preferences` (
   `profilePhone` varchar(20) NOT NULL,
   `opportunityPushEnabled` boolean NOT NULL DEFAULT false,
   `alertRadiusKm` int DEFAULT NULL,

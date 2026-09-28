@@ -1,4 +1,4 @@
-import type { FinancialRecord } from "@/shared/tikis-domain";
+import type { FinancialRecord } from "@/shared/tikisse-domain";
 
 export function isDeliveryEarning(entry: FinancialRecord): boolean {
   return entry.operation === "credit" && Boolean(entry.deliveryId);

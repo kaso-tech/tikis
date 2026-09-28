@@ -1,7 +1,7 @@
 -- Réglage des pays actifs sur la plateforme, gérable depuis la console admin.
 -- Appliquer : mysql -u <user> -p <database> < drizzle/manual/0022_supported_countries.sql
 
-CREATE TABLE IF NOT EXISTS `tikis_supported_countries` (
+CREATE TABLE IF NOT EXISTS `tikisse_supported_countries` (
   `id` varchar(2) NOT NULL,
   `name` varchar(80) NOT NULL,
   `dialCode` varchar(6) NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS `tikis_supported_countries` (
 
 -- Seed : reprend exactement la liste précédemment codée en dur dans lib/registration-rules.ts,
 -- afin qu'aucun comportement ne change tant que l'administration ne modifie rien.
-INSERT INTO `tikis_supported_countries` (`id`, `name`, `dialCode`, `digits`, `groups`, `timeZones`, `enabled`, `sortOrder`) VALUES
+INSERT INTO `tikisse_supported_countries` (`id`, `name`, `dialCode`, `digits`, `groups`, `timeZones`, `enabled`, `sortOrder`) VALUES
   ('BF', 'Burkina Faso', '+226', 8, '2,2,2,2', 'Africa/Ouagadougou', true, 0),
   ('CI', 'Côte d’Ivoire', '+225', 10, '2,2,2,2,2', 'Africa/Abidjan', true, 1),
   ('ML', 'Mali', '+223', 8, '2,2,2,2', 'Africa/Bamako', true, 2),

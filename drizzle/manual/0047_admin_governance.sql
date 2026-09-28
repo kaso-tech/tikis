@@ -4,20 +4,20 @@
 --  - `mustChangePassword` : un compte créé ou réinitialisé depuis la console reçoit un mot de passe
 --    provisoire, qu'il doit remplacer avant d'accéder au reste de la console.
 --  - `adminApprovalThreshold` : au-delà de ce montant (100 000 FCFA par défaut), un bonus, une pénalité ou
---    un retrait attend la validation d'un second admin (table tikis_admin_approvals).
+--    un retrait attend la validation d'un second admin (table tikisse_admin_approvals).
 --
 -- Idempotente. Appliquer directement :
 --   mysql -u <user> -p <database> < drizzle/manual/0047_admin_governance.sql
-ALTER TABLE `tikis_admin_users`
+ALTER TABLE `tikisse_admin_users`
   MODIFY COLUMN `role` enum('super_admin','support','finance','viewer','kyc_reviewer') NOT NULL DEFAULT 'support';
 
-ALTER TABLE `tikis_admin_users`
+ALTER TABLE `tikisse_admin_users`
   ADD COLUMN IF NOT EXISTS `mustChangePassword` boolean NOT NULL DEFAULT false AFTER `active`;
 
-ALTER TABLE `tikis_platform_settings`
+ALTER TABLE `tikisse_platform_settings`
   ADD COLUMN IF NOT EXISTS `adminApprovalThreshold` int NOT NULL DEFAULT 100000 AFTER `adminTotpRequired`;
 
-CREATE TABLE IF NOT EXISTS `tikis_admin_approvals` (
+CREATE TABLE IF NOT EXISTS `tikisse_admin_approvals` (
   `id` varchar(40) NOT NULL,
   `action` enum('wallet_bonus','wallet_penalty','withdrawal_settle') NOT NULL,
   `amount` int NOT NULL,
@@ -34,6 +34,6 @@ CREATE TABLE IF NOT EXISTS `tikis_admin_approvals` (
   `createdAt` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `decidedAt` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
-  KEY `tikis_admin_approvals_status_index` (`status`, `createdAt`),
-  KEY `tikis_admin_approvals_target_index` (`targetRef`, `status`)
+  KEY `tikisse_admin_approvals_status_index` (`status`, `createdAt`),
+  KEY `tikisse_admin_approvals_target_index` (`targetRef`, `status`)
 );

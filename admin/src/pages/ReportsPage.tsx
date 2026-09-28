@@ -135,7 +135,7 @@ export default function ReportsPage() {
               createdAt: new Date(row.report.createdAt).toISOString(),
               resolutionNotes: row.report.resolutionNotes ?? "",
             })));
-            downloadCsv(`tikis-reports-${statusFilter}-${new Date().toISOString().slice(0, 10)}`, csv);
+            downloadCsv(`tikisse-reports-${statusFilter}-${new Date().toISOString().slice(0, 10)}`, csv);
           }}
         >
           Exporter CSV

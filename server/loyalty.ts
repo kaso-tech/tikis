@@ -10,11 +10,11 @@
 
 import { and, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { tikisDeliveries, tikisLoyaltyGrants, tikisLoyaltyPrograms } from "../drizzle/schema";
+import { tikisseDeliveries, tikisseLoyaltyGrants, tikisseLoyaltyPrograms } from "../drizzle/schema";
 import { computeSessionExpiry } from "./_test-helpers/session-revocation";
 
 export type LoyaltyProgress = {
-  program: typeof tikisLoyaltyPrograms.$inferSelect;
+  program: typeof tikisseLoyaltyPrograms.$inferSelect;
   completedCount: number;
   alreadyGranted: boolean;
   /** true si la livraison qui vient d'être complétée déclenche le bonus. */
@@ -24,7 +24,7 @@ export type LoyaltyProgress = {
 export async function listActiveLoyaltyPrograms(role: "sender" | "driver") {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(tikisLoyaltyPrograms).where(and(eq(tikisLoyaltyPrograms.role, role), eq(tikisLoyaltyPrograms.enabled, true)));
+  return db.select().from(tikisseLoyaltyPrograms).where(and(eq(tikisseLoyaltyPrograms.role, role), eq(tikisseLoyaltyPrograms.enabled, true)));
 }
 
 export async function computeLoyaltyProgress(input: { profilePhone: string; role: "sender" | "driver"; completedDeliveryId?: string }) {
@@ -32,14 +32,14 @@ export async function computeLoyaltyProgress(input: { profilePhone: string; role
   const results: LoyaltyProgress[] = [];
   for (const program of programs) {
     const since = new Date(Date.now() - program.windowDays * 24 * 60 * 60 * 1000);
-    const phoneColumn = input.role === "sender" ? tikisDeliveries.senderPhone : tikisDeliveries.driverPhone;
-    const where = and(eq(phoneColumn, input.profilePhone), eq(tikisDeliveries.status, "completed"), gte(tikisDeliveries.completedAt, since));
+    const phoneColumn = input.role === "sender" ? tikisseDeliveries.senderPhone : tikisseDeliveries.driverPhone;
+    const where = and(eq(phoneColumn, input.profilePhone), eq(tikisseDeliveries.status, "completed"), gte(tikisseDeliveries.completedAt, since));
     const db = await getDb();
     if (!db) continue;
-    const [{ completedCount }] = await db.select({ completedCount: count() }).from(tikisDeliveries).where(where);
+    const [{ completedCount }] = await db.select({ completedCount: count() }).from(tikisseDeliveries).where(where);
     const completedNumber = Number(completedCount);
     const alreadyGrantedRows = input.completedDeliveryId
-      ? await db.select().from(tikisLoyaltyGrants).where(and(eq(tikisLoyaltyGrants.programId, program.id), eq(tikisLoyaltyGrants.deliveryId, input.completedDeliveryId))).limit(1)
+      ? await db.select().from(tikisseLoyaltyGrants).where(and(eq(tikisseLoyaltyGrants.programId, program.id), eq(tikisseLoyaltyGrants.deliveryId, input.completedDeliveryId))).limit(1)
       : [];
     const alreadyGranted = alreadyGrantedRows.length > 0;
     const justQualified = Boolean(input.completedDeliveryId) && !alreadyGranted && completedNumber === program.requiredDeliveries;
@@ -53,26 +53,26 @@ export async function computeLoyaltyProgress(input: { profilePhone: string; role
 export async function grantLoyaltyBonus(input: { programId: string; profilePhone: string; deliveryId: string }) {
   const db = await getDb();
   if (!db) throw new Error("Le programme de fidélité est temporairement indisponible.");
-  const existing = (await db.select().from(tikisLoyaltyGrants).where(and(eq(tikisLoyaltyGrants.programId, input.programId), eq(tikisLoyaltyGrants.deliveryId, input.deliveryId))).limit(1))[0];
+  const existing = (await db.select().from(tikisseLoyaltyGrants).where(and(eq(tikisseLoyaltyGrants.programId, input.programId), eq(tikisseLoyaltyGrants.deliveryId, input.deliveryId))).limit(1))[0];
   if (existing) return { grant: existing, created: false };
-  const programs = await db.select().from(tikisLoyaltyPrograms).where(eq(tikisLoyaltyPrograms.id, input.programId)).limit(1);
+  const programs = await db.select().from(tikisseLoyaltyPrograms).where(eq(tikisseLoyaltyPrograms.id, input.programId)).limit(1);
   const program = programs[0];
   if (!program) throw new Error("Programme de fidélité introuvable.");
   if (!program.enabled) throw new Error("Programme désactivé.");
   const { randomUUID } = await import("node:crypto");
   const id = randomUUID();
-  await db.insert(tikisLoyaltyGrants).values({ id, programId: program.id, profilePhone: input.profilePhone, deliveryId: input.deliveryId, bonusAmount: program.bonusAmount, status: "pending" });
-  const created = (await db.select().from(tikisLoyaltyGrants).where(eq(tikisLoyaltyGrants.id, id)).limit(1))[0];
+  await db.insert(tikisseLoyaltyGrants).values({ id, programId: program.id, profilePhone: input.profilePhone, deliveryId: input.deliveryId, bonusAmount: program.bonusAmount, status: "pending" });
+  const created = (await db.select().from(tikisseLoyaltyGrants).where(eq(tikisseLoyaltyGrants.id, id)).limit(1))[0];
   return { grant: created!, created: true };
 }
 
 export async function listPendingLoyaltyGrants(limit = 50) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(tikisLoyaltyGrants).where(eq(tikisLoyaltyGrants.status, "pending")).orderBy(desc(tikisLoyaltyGrants.grantedAt)).limit(Math.min(limit, 200));
+  return db.select().from(tikisseLoyaltyGrants).where(eq(tikisseLoyaltyGrants.status, "pending")).orderBy(desc(tikisseLoyaltyGrants.grantedAt)).limit(Math.min(limit, 200));
 }
 
-/** Appelé depuis completeTikisDeliveryWithEvents (et tout autre statut terminal).
+/** Appelé depuis completeTikisseDeliveryWithEvents (et tout autre statut terminal).
  *  Pour chaque programme actif ciblant le rôle du phone, on compte les livraisons
  *  terminées dans la fenêtre, on compare au seuil, et on insère un grant si
  *  (a) le compte vient de franchir le seuil, (b) aucun grant n'a déjà été créé
@@ -82,28 +82,28 @@ export async function listPendingLoyaltyGrants(limit = 50) {
 export async function evaluateLoyaltyGrantsForCompletedDelivery(input: { deliveryId: string; profilePhone: string; role: "sender" | "driver" }) {
   const db = await getDb();
   if (!db) return { created: [] as Array<{ programId: string; bonusAmount: number; grantId: string }> };
-  const programs = await db.select().from(tikisLoyaltyPrograms).where(and(eq(tikisLoyaltyPrograms.role, input.role), eq(tikisLoyaltyPrograms.enabled, true)));
+  const programs = await db.select().from(tikisseLoyaltyPrograms).where(and(eq(tikisseLoyaltyPrograms.role, input.role), eq(tikisseLoyaltyPrograms.enabled, true)));
   const created: Array<{ programId: string; bonusAmount: number; grantId: string }> = [];
   for (const program of programs) {
     const since = new Date(Date.now() - program.windowDays * 24 * 60 * 60 * 1000);
-    const phoneColumn = input.role === "sender" ? tikisDeliveries.senderPhone : tikisDeliveries.driverPhone;
-    const { count: total } = (await db.select({ count: sql<number>`COUNT(*)` }).from(tikisDeliveries).where(and(
+    const phoneColumn = input.role === "sender" ? tikisseDeliveries.senderPhone : tikisseDeliveries.driverPhone;
+    const { count: total } = (await db.select({ count: sql<number>`COUNT(*)` }).from(tikisseDeliveries).where(and(
       eq(phoneColumn, input.profilePhone),
-      eq(tikisDeliveries.status, "completed"),
-      gte(tikisDeliveries.completedAt, since),
+      eq(tikisseDeliveries.status, "completed"),
+      gte(tikisseDeliveries.completedAt, since),
     )))[0] ?? { count: 0 };
     const completedCount = Number(total);
     // Le grant se déclenche UNIQUEMENT quand la livraison qui vient d'être complétée
     // fait franchir exactement le seuil. On n'octroie pas rétroactivement.
     if (completedCount !== program.requiredDeliveries) continue;
     // Idempotence : si un grant existe déjà pour (programme, deliveryId), on skip.
-    const existing = (await db.select().from(tikisLoyaltyGrants).where(and(eq(tikisLoyaltyGrants.programId, program.id), eq(tikisLoyaltyGrants.deliveryId, input.deliveryId))).limit(1))[0];
+    const existing = (await db.select().from(tikisseLoyaltyGrants).where(and(eq(tikisseLoyaltyGrants.programId, program.id), eq(tikisseLoyaltyGrants.deliveryId, input.deliveryId))).limit(1))[0];
     if (existing) continue;
     const { randomUUID } = await import("node:crypto");
     const grantId = randomUUID();
     const expiresAt = computeSessionExpiry(new Date());
     try {
-      await db.insert(tikisLoyaltyGrants).values({
+      await db.insert(tikisseLoyaltyGrants).values({
         id: grantId,
         programId: program.id,
         profilePhone: input.profilePhone,
@@ -124,7 +124,7 @@ export async function evaluateLoyaltyGrantsForCompletedDelivery(input: { deliver
   return { created };
 }
 
-/** Wrapper appelé par completeTikisDeliveryWithEvents. Évalue les programmes actifs
+/** Wrapper appelé par completeTikisseDeliveryWithEvents. Évalue les programmes actifs
  *  ciblant le driver ET le sender, crée les grants éventuels, envoie un push
  *  notification best-effort au bénéficiaire. */
 export async function evaluateAndNotifyLoyaltyGrants(input: { deliveryId: string; driverPhone: string; senderPhone: string }) {
@@ -149,7 +149,7 @@ async function maybeAutoCreditGrant(grantId: string, programId: string, bonusAmo
   try {
     const db = await getDb();
     if (!db) return false;
-    const program = (await db.select().from(tikisLoyaltyPrograms).where(eq(tikisLoyaltyPrograms.id, programId)).limit(1))[0];
+    const program = (await db.select().from(tikisseLoyaltyPrograms).where(eq(tikisseLoyaltyPrograms.id, programId)).limit(1))[0];
     if (!program || !shouldAutoCredit(program)) return false;
     await creditLoyaltyGrantOnWallet(grantId);
     return true;
@@ -169,7 +169,7 @@ export async function enqueueLoyaltyGrantNotification(grants: Array<{ profilePho
         title: "🎁 Bonus de fidélité disponible",
         body: `Vous avez atteint un palier ! ${g.bonusAmount.toLocaleString("fr-FR")} FCFA vous attendent dans l'admin.`,
         data: { grantId: g.grantId, programId: g.programId, kind: "loyalty_grant" },
-        channelId: "tikis-loyalty",
+        channelId: "tikisse-loyalty",
       });
     } catch {
       // best-effort, on ne fait pas échouer
@@ -183,16 +183,16 @@ export async function expireLoyaltyGrants(now: Date = new Date()): Promise<{ can
   if (!db) return { cancelled: 0, ids: [] };
   const cutoff = now;
   const candidates = await db
-    .select({ id: tikisLoyaltyGrants.id })
-    .from(tikisLoyaltyGrants)
-    .where(and(eq(tikisLoyaltyGrants.status, "pending"), lte(tikisLoyaltyGrants.expiresAt, cutoff)));
+    .select({ id: tikisseLoyaltyGrants.id })
+    .from(tikisseLoyaltyGrants)
+    .where(and(eq(tikisseLoyaltyGrants.status, "pending"), lte(tikisseLoyaltyGrants.expiresAt, cutoff)));
   if (candidates.length === 0) return { cancelled: 0, ids: [] };
   const ids = candidates.map((c) => c.id);
   for (const id of ids) {
     await db
-      .update(tikisLoyaltyGrants)
+      .update(tikisseLoyaltyGrants)
       .set({ status: "cancelled", cancelledReason: "Expiré après 30 jours sans validation." })
-      .where(eq(tikisLoyaltyGrants.id, id));
+      .where(eq(tikisseLoyaltyGrants.id, id));
   }
   return { cancelled: ids.length, ids };
 }
@@ -204,10 +204,10 @@ export async function creditLoyaltyGrantOnWallet(grantId: string): Promise<{ cre
   const db = await getDb();
   if (!db) throw new Error("Le Wallet est temporairement indisponible.");
   return db.transaction(async (tx) => {
-    const grant = (await tx.select().from(tikisLoyaltyGrants).where(eq(tikisLoyaltyGrants.id, grantId)).limit(1).for("update"))[0];
+    const grant = (await tx.select().from(tikisseLoyaltyGrants).where(eq(tikisseLoyaltyGrants.id, grantId)).limit(1).for("update"))[0];
     if (!grant) throw new Error("Octroi de bonus introuvable.");
     if (grant.status !== "pending") {
-      const wallet = await import("./db").then((m) => m.ensureTikisWallet(tx, grant.profilePhone));
+      const wallet = await import("./db").then((m) => m.ensureTikisseWallet(tx, grant.profilePhone));
       return { credited: false, wallet };
     }
     const wallet = await import("./db").then((m) =>
@@ -221,7 +221,7 @@ export async function creditLoyaltyGrantOnWallet(grantId: string): Promise<{ cre
         idempotencyKey: `loyalty-grant:${grant.id}`,
       }),
     );
-    await tx.update(tikisLoyaltyGrants).set({ status: "credited", creditedAt: new Date(), ledgerEntryId: wallet.idempotencyKey }).where(eq(tikisLoyaltyGrants.id, grant.id));
+    await tx.update(tikisseLoyaltyGrants).set({ status: "credited", creditedAt: new Date(), ledgerEntryId: wallet.idempotencyKey }).where(eq(tikisseLoyaltyGrants.id, grant.id));
     return { credited: true, wallet };
   });
 }

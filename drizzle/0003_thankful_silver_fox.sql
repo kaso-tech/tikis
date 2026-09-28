@@ -1,2 +1,2 @@
-ALTER TABLE `tikis_profiles` ADD `referralCode` varchar(8);
-ALTER TABLE `tikis_profiles` ADD CONSTRAINT `tikis_profiles_referralCode_unique` UNIQUE(`referralCode`);
+ALTER TABLE `tikisse_profiles` ADD `referralCode` varchar(8);
+ALTER TABLE `tikisse_profiles` ADD CONSTRAINT `tikisse_profiles_referralCode_unique` UNIQUE(`referralCode`);

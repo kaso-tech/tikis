@@ -13,7 +13,7 @@ describe("contrat du cycle de livraison à vingt-quatre heures", () => {
 
   it("calcule l'historique de gains informatif depuis les livraisons terminées, jamais depuis le Wallet", () => {
     expect(databaseSource).toContain("getDriverCompletedDeliveryEarnings");
-    expect(databaseSource).toContain("non crédité au Wallet Tikis");
+    expect(databaseSource).toContain("non crédité au Wallet Tikisse");
   });
 
   it("finalise les courses actives et expire les courses jamais démarrées", () => {

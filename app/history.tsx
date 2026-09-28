@@ -4,10 +4,10 @@ import { useMemo, useState } from "react";
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useThemeColors } from "@/lib/use-theme-colors";
-import { useTikisStore } from "@/lib/tikis-store";
+import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
 import { formatListRouteParts } from "@/lib/geo-rules";
-import { formatMoney, type Delivery, type DeliveryStatus } from "@/shared/tikis-domain";
+import { formatMoney, type Delivery, type DeliveryStatus } from "@/shared/tikisse-domain";
 
 type StatusFilter = "all" | "completed" | "cancelled" | "expired";
 type PeriodFilter = "all" | "week" | "month";
@@ -107,7 +107,7 @@ function periodFilterMatches(filter: PeriodFilter, value: string) {
 }
 
 export default function HistoryScreen() {
-  const { profile } = useTikisStore();
+  const { profile } = useTikisseStore();
   const { colors: theme, isDark } = useThemeColors();
   const deliveriesQuery = trpc.deliveries.list.useQuery(undefined, { enabled: Boolean(profile?.phone), refetchInterval: 5_000 });
   const [search, setSearch] = useState("");

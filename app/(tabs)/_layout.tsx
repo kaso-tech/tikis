@@ -2,13 +2,13 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Redirect, Tabs } from "expo-router";
 import { Platform, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { TikisHeader } from "@/components/tikis/app-chrome";
+import { TikisseHeader } from "@/components/tikisse/app-chrome";
 import { useThemeColors } from "@/lib/use-theme-colors";
-import { useTikisStore } from "@/lib/tikis-store";
+import { useTikisseStore } from "@/lib/tikisse-store";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  const { profile } = useTikisStore();
+  const { profile } = useTikisseStore();
   const { colors: theme } = useThemeColors();
   const bottomPadding = Platform.OS === "web" ? 8 : Math.max(8, insets.bottom);
 
@@ -18,7 +18,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: true,
-        header: () => <TikisHeader />,
+        header: () => <TikisseHeader />,
         tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: theme.muted,
         tabBarLabelStyle: { fontSize: 10, fontWeight: "600", marginTop: 1 },

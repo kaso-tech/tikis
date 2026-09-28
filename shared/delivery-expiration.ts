@@ -1,4 +1,4 @@
-import type { DeliveryStatus } from "./tikis-domain";
+import type { DeliveryStatus } from "./tikisse-domain";
 
 export const DELIVERY_EXPIRATION_MS = 24 * 60 * 60 * 1_000;
 

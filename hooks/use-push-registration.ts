@@ -9,7 +9,7 @@ import {
   type PushPermissionOutcome,
 } from "@/lib/push-notifications";
 
-const PUSH_TOKEN_KEY = "tikis.push.registration.v2";
+const PUSH_TOKEN_KEY = "tikisse.push.registration.v2";
 type Storage = { getItem: (key: string) => Promise<string | null>; setItem: (key: string, value: string) => Promise<void>; removeItem: (key: string) => Promise<void> };
 type StoredRegistration = { phone: string; token: string };
 

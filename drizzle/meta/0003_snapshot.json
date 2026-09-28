@@ -4,8 +4,8 @@
   "id": "005f5416-71d5-47a8-8326-5b8e993480fe",
   "prevId": "e41acddb-4502-4738-b9fe-a7ffb1865bd2",
   "tables": {
-    "tikis_profiles": {
-      "name": "tikis_profiles",
+    "tikisse_profiles": {
+      "name": "tikisse_profiles",
       "columns": {
         "id": {
           "name": "id",
@@ -77,22 +77,22 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "tikis_profiles_id": {
-          "name": "tikis_profiles_id",
+        "tikisse_profiles_id": {
+          "name": "tikisse_profiles_id",
           "columns": [
             "id"
           ]
         }
       },
       "uniqueConstraints": {
-        "tikis_profiles_phone_unique": {
-          "name": "tikis_profiles_phone_unique",
+        "tikisse_profiles_phone_unique": {
+          "name": "tikisse_profiles_phone_unique",
           "columns": [
             "phone"
           ]
         },
-        "tikis_profiles_referralCode_unique": {
-          "name": "tikis_profiles_referralCode_unique",
+        "tikisse_profiles_referralCode_unique": {
+          "name": "tikisse_profiles_referralCode_unique",
           "columns": [
             "referralCode"
           ]

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { isValidOtp, isValidPhone, maskPhone, normalizePhone, OTP_MAX_ATTEMPTS, verifySimulationOtp } from "../lib/otp-simulator";
-import { SIMULATION_OTP } from "../shared/tikis-domain";
+import { SIMULATION_OTP } from "../shared/tikisse-domain";
 
-describe("OTP de simulation Tikis", () => {
+describe("OTP de simulation Tikisse", () => {
   it("accepte uniquement un code de six chiffres correspondant au code de démonstration", () => {
     expect(isValidOtp(SIMULATION_OTP)).toBe(true);
     expect(verifySimulationOtp(SIMULATION_OTP)).toBe(true);

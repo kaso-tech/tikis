@@ -11,7 +11,7 @@ afterEach(() => vi.unstubAllEnvs());
 describe("les options du cookie de session", () => {
   it("sont toujours same-site lax", () => {
     // `None` admettait le cookie sur une requête cross-site — une protection CSRF bien plus
-    // faible que ce dont ce cookie, jamais destiné à sortir de tikis.app, a jamais eu besoin.
+    // faible que ce dont ce cookie, jamais destiné à sortir de tikisse.app, a jamais eu besoin.
     expect(getSessionCookieOptions(fakeReq({}))).toMatchObject({ sameSite: "lax" });
   });
 
@@ -26,22 +26,22 @@ describe("les options du cookie de session", () => {
   });
 
   describe("le domaine du cookie", () => {
-    it("TIKIS_COOKIE_DOMAIN, quand il est configuré, prime sur l'en-tête Host de la requête", () => {
+    it("TIKISSE_COOKIE_DOMAIN, quand il est configuré, prime sur l'en-tête Host de la requête", () => {
       // Dériver le domaine de la requête revient à laisser quiconque contrôle l'en-tête Host
-      // choisir le domaine sur lequel le cookie de session s'applique — TIKIS_COOKIE_DOMAIN
+      // choisir le domaine sur lequel le cookie de session s'applique — TIKISSE_COOKIE_DOMAIN
       // ferme ça en production en fixant la valeur une fois pour toutes.
-      vi.stubEnv("TIKIS_COOKIE_DOMAIN", ".tikis.app");
+      vi.stubEnv("TIKISSE_COOKIE_DOMAIN", ".tikisse.app");
       const options = getSessionCookieOptions(fakeReq({ hostname: "attacker-controlled.example" }));
-      expect(options.domain).toBe(".tikis.app");
+      expect(options.domain).toBe(".tikisse.app");
     });
 
-    it("sans TIKIS_COOKIE_DOMAIN, retombe sur le domaine parent dérivé (sous-domaines de prévisualisation)", () => {
+    it("sans TIKISSE_COOKIE_DOMAIN, retombe sur le domaine parent dérivé (sous-domaines de prévisualisation)", () => {
       const options = getSessionCookieOptions(fakeReq({ hostname: "3000-abc123.manuspre.computer" }));
       expect(options.domain).toBe(".manuspre.computer");
     });
 
-    it("une valeur vide de TIKIS_COOKIE_DOMAIN ne bloque pas ce repli", () => {
-      vi.stubEnv("TIKIS_COOKIE_DOMAIN", "");
+    it("une valeur vide de TIKISSE_COOKIE_DOMAIN ne bloque pas ce repli", () => {
+      vi.stubEnv("TIKISSE_COOKIE_DOMAIN", "");
       const options = getSessionCookieOptions(fakeReq({ hostname: "3000-abc123.manuspre.computer" }));
       expect(options.domain).toBe(".manuspre.computer");
     });

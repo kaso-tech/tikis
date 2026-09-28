@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { commissionFor, netDriverEarning } from "../shared/tikis-domain";
+import { commissionFor, netDriverEarning } from "../shared/tikisse-domain";
 import { deliveryMetricsForDay } from "../lib/wallet-metrics";
-import type { FinancialRecord } from "../shared/tikis-domain";
+import type { FinancialRecord } from "../shared/tikisse-domain";
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
@@ -28,7 +28,7 @@ describe("le gain d'un livreur est net de commission", () => {
     const database = read("server/db.ts");
     const earnings = database.slice(
       database.indexOf("export async function getDriverCompletedDeliveryEarnings"),
-      database.indexOf("export async function requestTikisWalletOperation"),
+      database.indexOf("export async function requestTikisseWalletOperation"),
     );
     expect(earnings).toContain("netDriverEarning(gross, commission)");
     expect(earnings).toContain("row.accruedCommission ?? 0");

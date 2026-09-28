@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { SessionsSection } from "@/components/tikis/sessions-section";
+import { SessionsSection } from "@/components/tikisse/sessions-section";
 import { useThemeColors } from "@/lib/use-theme-colors";
 
 export default function SessionsScreen() {

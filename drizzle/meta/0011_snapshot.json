@@ -4,8 +4,8 @@
   "id": "b55bd1cf-24b4-4af9-8fae-3cc101955560",
   "prevId": "a9c10b14-0dae-4443-9072-7360b41c9013",
   "tables": {
-    "tikis_deliveries": {
-      "name": "tikis_deliveries",
+    "tikisse_deliveries": {
+      "name": "tikisse_deliveries",
       "columns": {
         "id": {
           "name": "id",
@@ -203,24 +203,24 @@
         }
       },
       "indexes": {
-        "tikis_deliveries_sender_status_index": {
-          "name": "tikis_deliveries_sender_status_index",
+        "tikisse_deliveries_sender_status_index": {
+          "name": "tikisse_deliveries_sender_status_index",
           "columns": [
             "senderPhone",
             "status"
           ],
           "isUnique": false
         },
-        "tikis_deliveries_driver_status_index": {
-          "name": "tikis_deliveries_driver_status_index",
+        "tikisse_deliveries_driver_status_index": {
+          "name": "tikisse_deliveries_driver_status_index",
           "columns": [
             "driverPhone",
             "status"
           ],
           "isUnique": false
         },
-        "tikis_deliveries_status_created_index": {
-          "name": "tikis_deliveries_status_created_index",
+        "tikisse_deliveries_status_created_index": {
+          "name": "tikisse_deliveries_status_created_index",
           "columns": [
             "status",
             "createdAt"
@@ -230,8 +230,8 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "tikis_deliveries_id": {
-          "name": "tikis_deliveries_id",
+        "tikisse_deliveries_id": {
+          "name": "tikisse_deliveries_id",
           "columns": [
             "id"
           ]
@@ -240,8 +240,8 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
-    "tikis_delivery_candidates": {
-      "name": "tikis_delivery_candidates",
+    "tikisse_delivery_candidates": {
+      "name": "tikisse_delivery_candidates",
       "columns": {
         "id": {
           "name": "id",
@@ -306,24 +306,24 @@
         }
       },
       "indexes": {
-        "tikis_delivery_candidates_delivery_driver_unique": {
-          "name": "tikis_delivery_candidates_delivery_driver_unique",
+        "tikisse_delivery_candidates_delivery_driver_unique": {
+          "name": "tikisse_delivery_candidates_delivery_driver_unique",
           "columns": [
             "deliveryId",
             "driverPhone"
           ],
           "isUnique": true
         },
-        "tikis_delivery_candidates_delivery_status_index": {
-          "name": "tikis_delivery_candidates_delivery_status_index",
+        "tikisse_delivery_candidates_delivery_status_index": {
+          "name": "tikisse_delivery_candidates_delivery_status_index",
           "columns": [
             "deliveryId",
             "status"
           ],
           "isUnique": false
         },
-        "tikis_delivery_candidates_driver_status_index": {
-          "name": "tikis_delivery_candidates_driver_status_index",
+        "tikisse_delivery_candidates_driver_status_index": {
+          "name": "tikisse_delivery_candidates_driver_status_index",
           "columns": [
             "driverPhone",
             "status"
@@ -333,8 +333,8 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "tikis_delivery_candidates_id": {
-          "name": "tikis_delivery_candidates_id",
+        "tikisse_delivery_candidates_id": {
+          "name": "tikisse_delivery_candidates_id",
           "columns": [
             "id"
           ]
@@ -343,8 +343,8 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
-    "tikis_delivery_events": {
-      "name": "tikis_delivery_events",
+    "tikisse_delivery_events": {
+      "name": "tikisse_delivery_events",
       "columns": {
         "id": {
           "name": "id",
@@ -434,16 +434,16 @@
         }
       },
       "indexes": {
-        "tikis_delivery_events_recipient_created_index": {
-          "name": "tikis_delivery_events_recipient_created_index",
+        "tikisse_delivery_events_recipient_created_index": {
+          "name": "tikisse_delivery_events_recipient_created_index",
           "columns": [
             "recipientPhone",
             "createdAt"
           ],
           "isUnique": false
         },
-        "tikis_delivery_events_delivery_created_index": {
-          "name": "tikis_delivery_events_delivery_created_index",
+        "tikisse_delivery_events_delivery_created_index": {
+          "name": "tikisse_delivery_events_delivery_created_index",
           "columns": [
             "deliveryId",
             "createdAt"
@@ -453,8 +453,8 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "tikis_delivery_events_id": {
-          "name": "tikis_delivery_events_id",
+        "tikisse_delivery_events_id": {
+          "name": "tikisse_delivery_events_id",
           "columns": [
             "id"
           ]
@@ -463,8 +463,8 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
-    "tikis_delivery_reviews": {
-      "name": "tikis_delivery_reviews",
+    "tikisse_delivery_reviews": {
+      "name": "tikisse_delivery_reviews",
       "columns": {
         "id": {
           "name": "id",
@@ -518,16 +518,16 @@
         }
       },
       "indexes": {
-        "tikis_delivery_reviews_delivery_reviewer_unique": {
-          "name": "tikis_delivery_reviews_delivery_reviewer_unique",
+        "tikisse_delivery_reviews_delivery_reviewer_unique": {
+          "name": "tikisse_delivery_reviews_delivery_reviewer_unique",
           "columns": [
             "deliveryId",
             "reviewerPhone"
           ],
           "isUnique": true
         },
-        "tikis_delivery_reviews_driver_index": {
-          "name": "tikis_delivery_reviews_driver_index",
+        "tikisse_delivery_reviews_driver_index": {
+          "name": "tikisse_delivery_reviews_driver_index",
           "columns": [
             "driverPhone"
           ],
@@ -536,8 +536,8 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "tikis_delivery_reviews_id": {
-          "name": "tikis_delivery_reviews_id",
+        "tikisse_delivery_reviews_id": {
+          "name": "tikisse_delivery_reviews_id",
           "columns": [
             "id"
           ]
@@ -546,8 +546,8 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
-    "tikis_favorite_places": {
-      "name": "tikis_favorite_places",
+    "tikisse_favorite_places": {
+      "name": "tikisse_favorite_places",
       "columns": {
         "id": {
           "name": "id",
@@ -587,8 +587,8 @@
         }
       },
       "indexes": {
-        "tikis_favorite_places_profile_place_unique": {
-          "name": "tikis_favorite_places_profile_place_unique",
+        "tikisse_favorite_places_profile_place_unique": {
+          "name": "tikisse_favorite_places_profile_place_unique",
           "columns": [
             "profilePhone",
             "placeId"
@@ -598,8 +598,8 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "tikis_favorite_places_id": {
-          "name": "tikis_favorite_places_id",
+        "tikisse_favorite_places_id": {
+          "name": "tikisse_favorite_places_id",
           "columns": [
             "id"
           ]
@@ -608,8 +608,8 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
-    "tikis_places": {
-      "name": "tikis_places",
+    "tikisse_places": {
+      "name": "tikisse_places",
       "columns": {
         "id": {
           "name": "id",
@@ -762,8 +762,8 @@
         }
       },
       "indexes": {
-        "tikis_places_coordinate_key_index": {
-          "name": "tikis_places_coordinate_key_index",
+        "tikisse_places_coordinate_key_index": {
+          "name": "tikisse_places_coordinate_key_index",
           "columns": [
             "coordinateKey"
           ],
@@ -772,22 +772,22 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "tikis_places_id": {
-          "name": "tikis_places_id",
+        "tikisse_places_id": {
+          "name": "tikisse_places_id",
           "columns": [
             "id"
           ]
         }
       },
       "uniqueConstraints": {
-        "tikis_places_googlePlaceId_unique": {
-          "name": "tikis_places_googlePlaceId_unique",
+        "tikisse_places_googlePlaceId_unique": {
+          "name": "tikisse_places_googlePlaceId_unique",
           "columns": [
             "googlePlaceId"
           ]
         },
-        "tikis_places_mapboxPlaceId_unique": {
-          "name": "tikis_places_mapboxPlaceId_unique",
+        "tikisse_places_mapboxPlaceId_unique": {
+          "name": "tikisse_places_mapboxPlaceId_unique",
           "columns": [
             "mapboxPlaceId"
           ]
@@ -795,8 +795,8 @@
       },
       "checkConstraint": {}
     },
-    "tikis_platform_settings": {
-      "name": "tikis_platform_settings",
+    "tikisse_platform_settings": {
+      "name": "tikisse_platform_settings",
       "columns": {
         "id": {
           "name": "id",
@@ -826,8 +826,8 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "tikis_platform_settings_id": {
-          "name": "tikis_platform_settings_id",
+        "tikisse_platform_settings_id": {
+          "name": "tikisse_platform_settings_id",
           "columns": [
             "id"
           ]
@@ -836,8 +836,8 @@
       "uniqueConstraints": {},
       "checkConstraint": {}
     },
-    "tikis_profiles": {
-      "name": "tikis_profiles",
+    "tikisse_profiles": {
+      "name": "tikisse_profiles",
       "columns": {
         "id": {
           "name": "id",
@@ -909,22 +909,22 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "tikis_profiles_id": {
-          "name": "tikis_profiles_id",
+        "tikisse_profiles_id": {
+          "name": "tikisse_profiles_id",
           "columns": [
             "id"
           ]
         }
       },
       "uniqueConstraints": {
-        "tikis_profiles_phone_unique": {
-          "name": "tikis_profiles_phone_unique",
+        "tikisse_profiles_phone_unique": {
+          "name": "tikisse_profiles_phone_unique",
           "columns": [
             "phone"
           ]
         },
-        "tikis_profiles_referralCode_unique": {
-          "name": "tikis_profiles_referralCode_unique",
+        "tikisse_profiles_referralCode_unique": {
+          "name": "tikisse_profiles_referralCode_unique",
           "columns": [
             "referralCode"
           ]
@@ -932,8 +932,8 @@
       },
       "checkConstraint": {}
     },
-    "tikis_wallet_ledger": {
-      "name": "tikis_wallet_ledger",
+    "tikisse_wallet_ledger": {
+      "name": "tikisse_wallet_ledger",
       "columns": {
         "id": {
           "name": "id",
@@ -1022,16 +1022,16 @@
         }
       },
       "indexes": {
-        "tikis_wallet_ledger_profile_created_index": {
-          "name": "tikis_wallet_ledger_profile_created_index",
+        "tikisse_wallet_ledger_profile_created_index": {
+          "name": "tikisse_wallet_ledger_profile_created_index",
           "columns": [
             "profilePhone",
             "createdAt"
           ],
           "isUnique": false
         },
-        "tikis_wallet_ledger_delivery_index": {
-          "name": "tikis_wallet_ledger_delivery_index",
+        "tikisse_wallet_ledger_delivery_index": {
+          "name": "tikisse_wallet_ledger_delivery_index",
           "columns": [
             "deliveryId"
           ],
@@ -1040,16 +1040,16 @@
       },
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "tikis_wallet_ledger_id": {
-          "name": "tikis_wallet_ledger_id",
+        "tikisse_wallet_ledger_id": {
+          "name": "tikisse_wallet_ledger_id",
           "columns": [
             "id"
           ]
         }
       },
       "uniqueConstraints": {
-        "tikis_wallet_ledger_idempotencyKey_unique": {
-          "name": "tikis_wallet_ledger_idempotencyKey_unique",
+        "tikisse_wallet_ledger_idempotencyKey_unique": {
+          "name": "tikisse_wallet_ledger_idempotencyKey_unique",
           "columns": [
             "idempotencyKey"
           ]
@@ -1057,8 +1057,8 @@
       },
       "checkConstraint": {}
     },
-    "tikis_wallets": {
-      "name": "tikis_wallets",
+    "tikisse_wallets": {
+      "name": "tikisse_wallets",
       "columns": {
         "id": {
           "name": "id",
@@ -1119,16 +1119,16 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {
-        "tikis_wallets_id": {
-          "name": "tikis_wallets_id",
+        "tikisse_wallets_id": {
+          "name": "tikisse_wallets_id",
           "columns": [
             "id"
           ]
         }
       },
       "uniqueConstraints": {
-        "tikis_wallets_profilePhone_unique": {
-          "name": "tikis_wallets_profilePhone_unique",
+        "tikisse_wallets_profilePhone_unique": {
+          "name": "tikisse_wallets_profilePhone_unique",
           "columns": [
             "profilePhone"
           ]

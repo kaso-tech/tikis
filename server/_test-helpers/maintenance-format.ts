@@ -1,4 +1,4 @@
-export const MAINTENANCE_DEFAULT_MESSAGE = "L’application Tikis est momentanément indisponible pour une amélioration du service. L’équipe technique travaille pour la rétablir. Merci de votre patience.";
+export const MAINTENANCE_DEFAULT_MESSAGE = "L’application Tikisse est momentanément indisponible pour une amélioration du service. L’équipe technique travaille pour la rétablir. Merci de votre patience.";
 
 export const MAINTENANCE_MESSAGE_MAX_LENGTH = 500;
 

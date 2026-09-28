@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const wallet = readFileSync(join(process.cwd(), "components/tikis/wallet-direct-deposit.tsx"), "utf8");
+const wallet = readFileSync(join(process.cwd(), "components/tikisse/wallet-direct-deposit.tsx"), "utf8");
 const profile = readFileSync(join(process.cwd(), "app/(tabs)/profile.tsx"), "utf8");
 const router = readFileSync(join(process.cwd(), "server/routers.ts"), "utf8");
 const geography = readFileSync(join(process.cwd(), "server/geography.ts"), "utf8");

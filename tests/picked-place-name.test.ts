@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { locationTitle, withMeaningfulName } from "../lib/geo-rules";
-import type { LocationLabel } from "../shared/tikis-domain";
+import type { LocationLabel } from "../shared/tikisse-domain";
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
@@ -41,8 +41,8 @@ describe("le lieu validé porte un vrai nom, plus « Point sélectionné »", ()
 
   it("les deux sélecteurs de carte l'appliquent au lieu qu'ils transmettent", () => {
     // « Utiliser » et « Enregistrer » partent tous deux de ce lieu : c'est là qu'il faut le nommer.
-    expect(read("components/tikis/address-map-picker.native.tsx")).toContain("setPlace(result ? withMeaningfulName<LocationLabel>({ ...result,");
-    expect(read("components/tikis/address-map-picker.web.tsx")).toContain("setPlace(result ? withMeaningfulName(result) : null)");
+    expect(read("components/tikisse/address-map-picker.native.tsx")).toContain("setPlace(result ? withMeaningfulName<LocationLabel>({ ...result,");
+    expect(read("components/tikisse/address-map-picker.web.tsx")).toContain("setPlace(result ? withMeaningfulName(result) : null)");
   });
 
   it("la liste des brouillons affiche le titre du lieu, pas son nom brut", () => {

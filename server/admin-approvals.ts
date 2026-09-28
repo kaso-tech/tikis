@@ -12,7 +12,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { and, count, desc, eq, inArray } from "drizzle-orm";
-import { tikisAdminApprovals, tikisPaymentTransactions, tikisPlatformSettings, type TikisAdminApproval } from "../drizzle/schema";
+import { tikisseAdminApprovals, tikissePaymentTransactions, tikissePlatformSettings, type TikisseAdminApproval } from "../drizzle/schema";
 import { adminPenalizeWallet, adminRewardWallet } from "./admin-db";
 import { adminDisputeRefund, validateDisputeRefund } from "./admin-disputes";
 import * as db from "./db";
@@ -20,7 +20,7 @@ import * as db from "./db";
 export const DEFAULT_APPROVAL_THRESHOLD = 100_000;
 export const MIN_APPROVAL_THRESHOLD = 1_000;
 
-export type ApprovalAction = TikisAdminApproval["action"];
+export type ApprovalAction = TikisseAdminApproval["action"];
 type WalletPayload = { phone: string; amount: number; reason: string; requestId: string };
 type WithdrawalPayload = { paymentId: string; payoutReference: string; notes: string };
 type DeliveryRefundPayload = WalletPayload & { deliveryId: string };
@@ -33,14 +33,14 @@ async function database() {
 
 export async function getApprovalThreshold(): Promise<number> {
   const handle = await database();
-  const row = (await handle.select({ threshold: tikisPlatformSettings.adminApprovalThreshold }).from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
+  const row = (await handle.select({ threshold: tikissePlatformSettings.adminApprovalThreshold }).from(tikissePlatformSettings).where(eq(tikissePlatformSettings.id, 1)).limit(1))[0];
   return row?.threshold ?? DEFAULT_APPROVAL_THRESHOLD;
 }
 
 export async function setApprovalThreshold(threshold: number) {
   if (!Number.isSafeInteger(threshold) || threshold < MIN_APPROVAL_THRESHOLD) throw new Error(`Le seuil doit être d’au moins ${MIN_APPROVAL_THRESHOLD.toLocaleString("fr-FR")} FCFA.`);
   const handle = await database();
-  await handle.insert(tikisPlatformSettings).values({ id: 1, adminApprovalThreshold: threshold }).onDuplicateKeyUpdate({ set: { adminApprovalThreshold: threshold } });
+  await handle.insert(tikissePlatformSettings).values({ id: 1, adminApprovalThreshold: threshold }).onDuplicateKeyUpdate({ set: { adminApprovalThreshold: threshold } });
   return { threshold };
 }
 
@@ -56,10 +56,10 @@ async function createRequest(requester: Requester, request: { action: ApprovalAc
   await handle.transaction(async (tx) => {
     // Une seule demande en cours par cible : deux clics, ou deux admins, ne créent pas deux demandes pour
     // le même retrait ou la même opération.
-    const open = await tx.select({ id: tikisAdminApprovals.id }).from(tikisAdminApprovals)
-      .where(and(eq(tikisAdminApprovals.targetRef, request.targetRef), inArray(tikisAdminApprovals.status, ["pending", "approved"]))).limit(1).for("update");
+    const open = await tx.select({ id: tikisseAdminApprovals.id }).from(tikisseAdminApprovals)
+      .where(and(eq(tikisseAdminApprovals.targetRef, request.targetRef), inArray(tikisseAdminApprovals.status, ["pending", "approved"]))).limit(1).for("update");
     if (open[0]) throw new Error("Une demande de validation est déjà en attente pour cette opération.");
-    await tx.insert(tikisAdminApprovals).values({
+    await tx.insert(tikisseAdminApprovals).values({
       id, action: request.action, amount: request.amount, targetPhone: request.targetPhone, targetRef: request.targetRef,
       payload: JSON.stringify(request.payload), status: "pending", requestedByAdminId: requester.adminId, requestedByEmail: requester.email,
     });
@@ -87,7 +87,7 @@ export async function requestDeliveryRefund(requester: Requester, input: Deliver
 
 export async function requestWithdrawalSettlement(requester: Requester, input: WithdrawalPayload) {
   const handle = await database();
-  const payment = (await handle.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, input.paymentId)).limit(1))[0];
+  const payment = (await handle.select().from(tikissePaymentTransactions).where(eq(tikissePaymentTransactions.id, input.paymentId)).limit(1))[0];
   if (!payment || payment.type !== "withdrawal") throw new Error("Retrait introuvable.");
   if (payment.status !== "pending") throw new Error("Ce retrait n’est plus en attente.");
   // Mêmes exigences que la validation directe, vérifiées dès la demande : inutile de faire valider une
@@ -99,16 +99,16 @@ export async function requestWithdrawalSettlement(requester: Requester, input: W
 
 export async function listApprovals(input: { status?: "open" | "closed"; limit?: number; offset?: number }) {
   const handle = await database();
-  const where = input.status === "open" ? inArray(tikisAdminApprovals.status, ["pending", "approved"])
-    : input.status === "closed" ? inArray(tikisAdminApprovals.status, ["executed", "failed", "rejected", "cancelled"]) : undefined;
+  const where = input.status === "open" ? inArray(tikisseAdminApprovals.status, ["pending", "approved"])
+    : input.status === "closed" ? inArray(tikisseAdminApprovals.status, ["executed", "failed", "rejected", "cancelled"]) : undefined;
   const [rows, total] = await Promise.all([
-    handle.select().from(tikisAdminApprovals).where(where).orderBy(desc(tikisAdminApprovals.createdAt)).limit(Math.min(input.limit ?? 50, 200)).offset(Math.max(input.offset ?? 0, 0)),
-    handle.select({ count: count() }).from(tikisAdminApprovals).where(where),
+    handle.select().from(tikisseAdminApprovals).where(where).orderBy(desc(tikisseAdminApprovals.createdAt)).limit(Math.min(input.limit ?? 50, 200)).offset(Math.max(input.offset ?? 0, 0)),
+    handle.select({ count: count() }).from(tikisseAdminApprovals).where(where),
   ]);
   return { rows: rows.map((row) => ({ ...row, payload: JSON.parse(row.payload) as Record<string, unknown> })), total: Number(total[0]?.count ?? 0) };
 }
 
-async function execute(approval: TikisAdminApproval, approver: Requester) {
+async function execute(approval: TikisseAdminApproval, approver: Requester) {
   const payload = JSON.parse(approval.payload) as DeliveryRefundPayload & WithdrawalPayload;
   if (approval.action === "wallet_bonus") return adminRewardWallet({ phone: payload.phone, amount: payload.amount, reason: payload.reason, adminId: approver.adminId, requestId: payload.requestId });
   if (approval.action === "wallet_penalty") return adminPenalizeWallet({ phone: payload.phone, amount: payload.amount, reason: payload.reason, adminId: approver.adminId, requestId: payload.requestId });
@@ -127,21 +127,21 @@ async function execute(approval: TikisAdminApproval, approver: Requester) {
 export async function approveRequest(input: { approvalId: string; approver: Requester }) {
   const handle = await database();
   const approval = await handle.transaction(async (tx) => {
-    const row = (await tx.select().from(tikisAdminApprovals).where(eq(tikisAdminApprovals.id, input.approvalId)).limit(1).for("update"))[0];
+    const row = (await tx.select().from(tikisseAdminApprovals).where(eq(tikisseAdminApprovals.id, input.approvalId)).limit(1).for("update"))[0];
     if (!row) throw new Error("Demande introuvable.");
     if (row.status !== "pending") throw new Error("Cette demande a déjà été traitée.");
     if (row.requestedByAdminId === input.approver.adminId) throw new Error("Vous ne pouvez pas valider votre propre demande : un second admin doit le faire.");
-    await tx.update(tikisAdminApprovals).set({ status: "approved", decidedByAdminId: input.approver.adminId, decidedByEmail: input.approver.email, decidedAt: new Date() }).where(eq(tikisAdminApprovals.id, row.id));
+    await tx.update(tikisseAdminApprovals).set({ status: "approved", decidedByAdminId: input.approver.adminId, decidedByEmail: input.approver.email, decidedAt: new Date() }).where(eq(tikisseAdminApprovals.id, row.id));
     return row;
   });
   try {
     await execute(approval, input.approver);
   } catch (cause) {
     const reason = cause instanceof Error ? cause.message : "Exécution impossible.";
-    await handle.update(tikisAdminApprovals).set({ status: "failed", failureReason: reason.slice(0, 500) }).where(eq(tikisAdminApprovals.id, approval.id));
+    await handle.update(tikisseAdminApprovals).set({ status: "failed", failureReason: reason.slice(0, 500) }).where(eq(tikisseAdminApprovals.id, approval.id));
     return { status: "failed" as const, failureReason: reason, approval };
   }
-  await handle.update(tikisAdminApprovals).set({ status: "executed" }).where(eq(tikisAdminApprovals.id, approval.id));
+  await handle.update(tikisseAdminApprovals).set({ status: "executed" }).where(eq(tikisseAdminApprovals.id, approval.id));
   return { status: "executed" as const, approval };
 }
 
@@ -149,11 +149,11 @@ export async function approveRequest(input: { approvalId: string; approver: Requ
 export async function closeRequest(input: { approvalId: string; admin: Requester; note?: string }) {
   const handle = await database();
   return handle.transaction(async (tx) => {
-    const row = (await tx.select().from(tikisAdminApprovals).where(eq(tikisAdminApprovals.id, input.approvalId)).limit(1).for("update"))[0];
+    const row = (await tx.select().from(tikisseAdminApprovals).where(eq(tikisseAdminApprovals.id, input.approvalId)).limit(1).for("update"))[0];
     if (!row) throw new Error("Demande introuvable.");
     if (row.status !== "pending") throw new Error("Cette demande a déjà été traitée.");
     const status = row.requestedByAdminId === input.admin.adminId ? "cancelled" as const : "rejected" as const;
-    await tx.update(tikisAdminApprovals).set({ status, decidedByAdminId: input.admin.adminId, decidedByEmail: input.admin.email, decidedAt: new Date(), decisionNote: input.note?.trim().slice(0, 300) || null }).where(eq(tikisAdminApprovals.id, row.id));
+    await tx.update(tikisseAdminApprovals).set({ status, decidedByAdminId: input.admin.adminId, decidedByEmail: input.admin.email, decidedAt: new Date(), decisionNote: input.note?.trim().slice(0, 300) || null }).where(eq(tikisseAdminApprovals.id, row.id));
     return { status, approval: row };
   });
 }

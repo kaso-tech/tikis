@@ -1,9 +1,9 @@
 /**
  * Code USSD pour les paiements directs YengaPay (in-app Mobile Money).
  *
- * Partagé entre le client (components/tikis/wallet-direct-deposit.tsx — affichage temps réel du
+ * Partagé entre le client (components/tikisse/wallet-direct-deposit.tsx — affichage temps réel du
  * code dans le lien "Appeler") et le serveur (server/yengapay-direct.ts — code stocké dans
- * tikis_payment_transactions.ussdCode au moment de la création de l'intent).
+ * tikisse_payment_transactions.ussdCode au moment de la création de l'intent).
  *
  * Si la sandbox YengaPay retourne un pattern différent pour Orange/Moov, ce fichier est l'unique
  * endroit à modifier. Voir docs/yengapay-sandbox-setup.md section 7 (debugging) et le runbook

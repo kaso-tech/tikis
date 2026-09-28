@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { deliveryMetricsForDay } from "../lib/wallet-metrics";
-import type { FinancialRecord } from "../shared/tikis-domain";
+import type { FinancialRecord } from "../shared/tikisse-domain";
 
 const record = (overrides: Partial<FinancialRecord>): FinancialRecord => ({
   id: "entry-1",

@@ -1,18 +1,18 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
-import { isRevokedByProfile, verifyTikisProfileSessionClaims } from "../tikis-session";
-import { getCachedTikisProfile } from "./profile-cache";
-import { ADMIN_CONSOLE_HEADER, ADMIN_SESSION_COOKIE, type AdminRole } from "../admin-auth";
+import { isRevokedByProfile, verifyTikisseProfileSessionClaims } from "../tikisse-session";
+import { getCachedTikisseProfile } from "./profile-cache";
+import { ADMIN_CONSOLE_HEADER, ADMIN_SESSION_COOKIE, LEGACY_ADMIN_SESSION_COOKIE, type AdminRole } from "../admin-auth";
 import { authenticateAdminSession } from "../admin-db";
-import { TIKIS_PROFILE_COOKIE } from "./cookies";
+import { LEGACY_TIKIS_PROFILE_COOKIE, TIKISSE_PROFILE_COOKIE } from "./cookies";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   user: User | null;
-  tikisProfilePhone: string | null;
-  tikisAdmin?: { adminId: number; email: string; role: AdminRole; totpEnabled?: boolean; mustEnrollTotp?: boolean; mustChangePassword?: boolean; sessionId?: string } | null;
+  tikisseProfilePhone: string | null;
+  tikisseAdmin?: { adminId: number; email: string; role: AdminRole; totpEnabled?: boolean; mustEnrollTotp?: boolean; mustChangePassword?: boolean; sessionId?: string } | null;
 };
 
 function parseCookies(header: string | undefined): Record<string, string> {
@@ -35,12 +35,15 @@ function parseCookies(header: string | undefined): Record<string, string> {
   return result;
 }
 
-// L'en-tête n'est envoyé que par le client natif (stockage sécurisé du système, cf. lib/tikis-session.ts) ;
+// L'en-tête n'est envoyé que par le client natif (stockage sécurisé du système, cf. lib/tikisse-session.ts) ;
 // le client web s'appuie uniquement sur le cookie httpOnly ci-dessous, jamais lisible ni renvoyable par
 // un script injecté. Ne jamais faire porter ce jeton par le client web via un en-tête/sessionStorage : cela
 // annulerait la protection XSS que ce cookie httpOnly existe précisément pour apporter.
-export function getTikisSessionTokenFromHeaders(headers: Record<string, string | string[] | undefined>): string | undefined {
-  const headerValue = headers["x-tikis-session"] ?? headers["x-tikis-profile-session"];
+export function getTikisseSessionTokenFromHeaders(headers: Record<string, string | string[] | undefined>): string | undefined {
+  // Renommage Tikis → Tikisse : contrairement au cookie web (posé et relu par le même déploiement serveur),
+  // l'app mobile déjà installée peut continuer d'envoyer l'ancien nom d'en-tête tant qu'elle n'a pas reçu la
+  // mise à jour qui le renomme (lib/tikisse-session.ts) — le serveur, lui, change instantanément au déploiement.
+  const headerValue = headers["x-tikisse-session"] ?? headers["x-tikisse-profile-session"] ?? headers["x-tikis-session"];
   const headerToken = Array.isArray(headerValue) ? headerValue[0] : headerValue;
   return headerToken;
 }
@@ -62,10 +65,13 @@ function requestCookies(opts: CreateExpressContextOptions): Record<string, strin
   return reqWithCookies.cookies;
 }
 
-function pickTikisSessionToken(opts: CreateExpressContextOptions): string | undefined {
-  const headerToken = getTikisSessionTokenFromHeaders(opts.req.headers);
+export function pickTikisseSessionToken(opts: CreateExpressContextOptions): string | undefined {
+  const headerToken = getTikisseSessionTokenFromHeaders(opts.req.headers);
   if (headerToken) return headerToken;
-  return requestCookies(opts)[TIKIS_PROFILE_COOKIE];
+  const cookies = requestCookies(opts);
+  // Renommage Tikis → Tikisse : un navigateur déjà connecté avant le déploiement porte encore l'ancien
+  // cookie ; il sera remplacé par le nouveau à la prochaine connexion (setTikisseProfileCookie).
+  return cookies[TIKISSE_PROFILE_COOKIE] ?? cookies[LEGACY_TIKIS_PROFILE_COOKIE];
 }
 
 /**
@@ -80,27 +86,30 @@ function pickTikisSessionToken(opts: CreateExpressContextOptions): string | unde
  * empêche un autre site de faire envoyer le cookie, et une page d'un autre domaine ne peut pas lire l'image.
  */
 export function adminSessionCookieValue(req: Pick<CreateExpressContextOptions["req"], "headers">): string | undefined {
-  return requestCookies({ req } as CreateExpressContextOptions)[ADMIN_SESSION_COOKIE];
+  const cookies = requestCookies({ req } as CreateExpressContextOptions);
+  return cookies[ADMIN_SESSION_COOKIE] ?? cookies[LEGACY_ADMIN_SESSION_COOKIE];
 }
 
 export function pickAdminSessionToken(opts: Pick<CreateExpressContextOptions, "req">): string | undefined {
   const marker = opts.req.headers[ADMIN_CONSOLE_HEADER];
   if ((Array.isArray(marker) ? marker[0] : marker) !== "1") return undefined;
-  return requestCookies(opts as CreateExpressContextOptions)[ADMIN_SESSION_COOKIE];
+  const cookies = requestCookies(opts as CreateExpressContextOptions);
+  // Renommage Tikis → Tikisse : un admin déjà connecté avant le déploiement porte encore l'ancien cookie.
+  return cookies[ADMIN_SESSION_COOKIE] ?? cookies[LEGACY_ADMIN_SESSION_COOKIE];
 }
 
-/** Numéro du profil connecté, sauf si l'équipe Tikis a forcé la déconnexion de ses sessions depuis. */
-async function authenticateTikisProfile(sessionToken: string | undefined) {
-  const claims = await verifyTikisProfileSessionClaims(sessionToken);
+/** Numéro du profil connecté, sauf si l'équipe Tikisse a forcé la déconnexion de ses sessions depuis. */
+async function authenticateTikisseProfile(sessionToken: string | undefined) {
+  const claims = await verifyTikisseProfileSessionClaims(sessionToken);
   if (!claims) return null;
-  const profile = await getCachedTikisProfile(claims.phone).catch(() => undefined);
+  const profile = await getCachedTikisseProfile(claims.phone).catch(() => undefined);
   if (profile && isRevokedByProfile(claims.issuedAt, profile.sessionsRevokedAt)) return null;
   return claims.phone;
 }
 
 export async function createContext(opts: CreateExpressContextOptions): Promise<TrpcContext> {
   let user: User | null = null;
-  const sessionToken = pickTikisSessionToken(opts);
+  const sessionToken = pickTikisseSessionToken(opts);
   const adminSessionToken = pickAdminSessionToken(opts);
 
   if (shouldAuthenticateManusRequest(opts.req.headers)) {
@@ -115,8 +124,8 @@ export async function createContext(opts: CreateExpressContextOptions): Promise<
     req: opts.req,
     res: opts.res,
     user,
-    tikisProfilePhone: await authenticateTikisProfile(sessionToken),
+    tikisseProfilePhone: await authenticateTikisseProfile(sessionToken),
     // Relit le compte à chaque requête : un admin suspendu ou rétrogradé perd ses droits tout de suite.
-    tikisAdmin: await authenticateAdminSession(adminSessionToken),
+    tikisseAdmin: await authenticateAdminSession(adminSessionToken),
   };
 }

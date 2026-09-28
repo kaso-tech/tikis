@@ -3,12 +3,12 @@
 --
 -- Appliquer : mysql -u <user> -p <database> < drizzle/manual/0031_loyalty_grants_expiry.sql
 
-ALTER TABLE `tikis_loyalty_grants`
+ALTER TABLE `tikisse_loyalty_grants`
   ADD COLUMN `expiresAt` timestamp NULL AFTER `creditedAt`,
   ADD COLUMN `cancelledReason` varchar(300) NULL AFTER `expiresAt`,
-  ADD KEY `tikis_loyalty_grants_expires_index` (`expiresAt`);
+  ADD KEY `tikisse_loyalty_grants_expires_index` (`expiresAt`);
 
 -- Rétro-remplissage : tous les grants pending existants expirent 30j après grantedAt.
-UPDATE `tikis_loyalty_grants`
+UPDATE `tikisse_loyalty_grants`
    SET `expiresAt` = DATE_ADD(`grantedAt`, INTERVAL 30 DAY)
  WHERE `status` = 'pending' AND `expiresAt` IS NULL;

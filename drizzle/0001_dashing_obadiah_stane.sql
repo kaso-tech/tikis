@@ -1,4 +1,4 @@
-CREATE TABLE `tikis_profiles` (
+CREATE TABLE `tikisse_profiles` (
 	`id` int AUTO_INCREMENT NOT NULL,
 	`phone` varchar(20) NOT NULL,
 	`fullName` varchar(70) NOT NULL,
@@ -6,6 +6,6 @@ CREATE TABLE `tikis_profiles` (
 	`vehicles` text NOT NULL,
 	`createdAt` timestamp NOT NULL DEFAULT (now()),
 	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
-	CONSTRAINT `tikis_profiles_id` PRIMARY KEY(`id`),
-	CONSTRAINT `tikis_profiles_phone_unique` UNIQUE(`phone`)
+	CONSTRAINT `tikisse_profiles_id` PRIMARY KEY(`id`),
+	CONSTRAINT `tikisse_profiles_phone_unique` UNIQUE(`phone`)
 );

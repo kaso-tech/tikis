@@ -87,7 +87,7 @@ export function distanceKmBetween(
 /**
  * Rayon de repli du mode « ma ville ». Les noms de villes des deux côtés de la comparaison ne
  * viennent pas de la même source et n'ont pas la même granularité : le profil livreur est saisi via
- * `searchCities` (Mapbox, `types=place,locality`), tandis que `tikis_places.city` retombe sur la
+ * `searchCities` (Mapbox, `types=place,locality`), tandis que `tikisse_places.city` retombe sur la
  * région (Mapbox) ou le `county` (OpenStreetMap) quand le géocodeur ne renvoie pas de ville — voir
  * `featureToLocation` et `openStreetMapLocation` dans server/geography.ts. Un livreur de Ouagadougou
  * ne reconnaîtrait donc pas un point stocké sous « Centre » ou « Kadiogo ».

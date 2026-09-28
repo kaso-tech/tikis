@@ -3,11 +3,11 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { KycUploader } from "@/components/tikis/kyc-uploader";
-import { SurfaceCard, TikisButton } from "@/components/tikis/ui";
+import { KycUploader } from "@/components/tikisse/kyc-uploader";
+import { SurfaceCard, TikisseButton } from "@/components/tikisse/ui";
 import { useKyc } from "@/hooks/use-kyc";
 import { useThemeColors } from "@/lib/use-theme-colors";
-import { useTikisStore } from "@/lib/tikis-store";
+import { useTikisseStore } from "@/lib/tikisse-store";
 import { haptic } from "@/lib/haptics";
 
 const STEP_COPY = {
@@ -26,7 +26,7 @@ const STEP_COPY = {
 } as const;
 
 export default function VerificationScreen() {
-  const { role, profile } = useTikisStore();
+  const { role, profile } = useTikisseStore();
   const { colors: theme } = useThemeColors();
   const { state, progress, loadingKind, pickDocument, clearDocument, submit } = useKyc();
   const [submitting, setSubmitting] = useState(false);
@@ -137,7 +137,7 @@ export default function VerificationScreen() {
 
               {error ? <Text style={[styles.error, { color: theme.error }]}>{error}</Text> : null}
 
-              <TikisButton label={rejected ? "Renvoyer le dossier" : "Envoyer la vérification"} icon="send" onPress={() => void handleSubmit()} loading={submitting} loadingLabel="Envoi en cours…" disabled={!progress.complete || submitting} />
+              <TikisseButton label={rejected ? "Renvoyer le dossier" : "Envoyer la vérification"} icon="send" onPress={() => void handleSubmit()} loading={submitting} loadingLabel="Envoi en cours…" disabled={!progress.complete || submitting} />
 
               <Text style={[styles.disclaimer, { color: theme.muted }]}>En soumettant, vous certifiez que les documents vous appartiennent. Toute falsification entraîne la suspension immédiate du compte.</Text>
             </>

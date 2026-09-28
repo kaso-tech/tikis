@@ -21,7 +21,7 @@ const FAQ: FaqItem[] = [
   {
     id: "payment",
     question: "Comment fonctionne le paiement ?",
-    answer: "Le prix de la course est préautorisé sur votre Wallet Tikis au moment de la publication. La commission Tikis et la rémunération du livreur sont libérées à la confirmation de livraison.",
+    answer: "Le prix de la course est préautorisé sur votre Wallet Tikisse au moment de la publication. La commission Tikisse et la rémunération du livreur sont libérées à la confirmation de livraison.",
   },
   {
     id: "rating",
@@ -44,8 +44,8 @@ const CHANNELS = [
   {
     icon: "mail-outline" as const,
     label: "Email",
-    value: "support@tikis.app",
-    action: "mailto:support@tikis.app",
+    value: "support@tikisse.app",
+    action: "mailto:support@tikisse.app",
   },
   {
     icon: "chat-bubble-outline" as const,

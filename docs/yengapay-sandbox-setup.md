@@ -10,12 +10,12 @@ configurer l'environnement local, et valider que tout fonctionne.
 
 1. Aller sur https://merchant.yengapay.com (ou l'URL d'admin sandbox fournie par YengaPay).
 2. Créer un compte marchand si pas déjà fait.
-3. Créer une **organisation** (UUID) et un **projet** (UUID) dédiés à Tikis.
+3. Créer une **organisation** (UUID) et un **projet** (UUID) dédiés à Tikisse.
 4. Générer une **clé API** avec les scopes `payment:create` et `payment:read`.
 5. Copier le **secret webhook** depuis la section "Webhooks" du projet.
 
 Ces 4 valeurs correspondent aux variables d'environnement :
-| Variable console YengaPay | Variable d'env Tikis |
+| Variable console YengaPay | Variable d'env Tikisse |
 |---|---|
 | Organization ID | `YENGAPAY_ORG_ID` |
 | Project ID | `YENGAPAY_PROJECT_ID` |
@@ -64,7 +64,7 @@ Codes de sortie :
 
 ## 4. Smoke test du handler webhook
 
-Une fois le serveur Tikis lancé en local (`pnpm dev`), valider que le handler
+Une fois le serveur Tikisse lancé en local (`pnpm dev`), valider que le handler
 `/api/webhooks/yengapay` accepte un payload signé et rejette une signature invalide :
 
 ```bash
@@ -86,7 +86,7 @@ ou 202 (settle en attente). En mode `test`, il renvoie 503 (webhook désactivé)
 Une fois l'environnement local validé :
 
 1. Console YengaPay → Projet → Webhooks.
-2. Ajouter une URL : `https://<host-de-tikis>/api/webhooks/yengapay`
+2. Ajouter une URL : `https://<host-de-tikisse>/api/webhooks/yengapay`
 3. Le PSP signe alors les events avec `YENGAPAY_WEBHOOK_SECRET`.
 4. Sélectionner les events à notifier :
    - `payment.pending`
@@ -94,26 +94,26 @@ Une fois l'environnement local validé :
    - `payment.failed`
    - `payment.cancelled`
 
-Tikis vérifie la signature dans `verifyYengapayWebhookSignature` (server/yengapay.ts).
+Tikisse vérifie la signature dans `verifyYengapayWebhookSignature` (server/yengapay.ts).
 
 ## 6. Tests end-to-end avec un vrai numéro sandbox
 
 Une fois le webhook configuré et le serveur accessible publiquement :
 
-1. Lancer l'app Tikis en mode `sandbox` (cf. `YENGAPAY_MODE=sandbox`).
+1. Lancer l'app Tikisse en mode `sandbox` (cf. `YENGAPAY_MODE=sandbox`).
 2. Ouvrir le wallet → "Dépôt direct" → saisir un numéro Mobile Money sandbox.
 3. Lancer le paiement.
 4. Vérifier côté serveur :
-   - `tikis_payment_transactions` : nouveau row avec `status='pending'`, `provider='yengapay_direct_sandbox'`.
+   - `tikisse_payment_transactions` : nouveau row avec `status='pending'`, `provider='yengapay_direct_sandbox'`.
    - Logs : `[webhook:yengapay] settle failed` ou succès selon le PSP.
-   - `tikis_yengapay_webhook_events` : event loggué avec provider exact.
+   - `tikisse_yengapay_webhook_events` : event loggué avec provider exact.
 5. Simuler la confirmation côté PSP sandbox (la console fournit un bouton "force
    succeeded" sur les paiements de test).
 6. Vérifier que :
    - Le webhook arrive avec `payment.succeeded`.
    - Le handler retourne 200.
-   - `tikis_payment_transactions.status = 'succeeded'`.
-   - Le Wallet est crédité (visible dans `tikis_wallet_ledger`).
+   - `tikisse_payment_transactions.status = 'succeeded'`.
+   - Le Wallet est crédité (visible dans `tikisse_wallet_ledger`).
    - L'utilisateur reçoit une push notif "Dépôt Mobile Money confirmé".
 
 ## 7. Debugging

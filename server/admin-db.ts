@@ -9,58 +9,58 @@ import {
 import { getDb } from "./db";
 import * as db from "./db";
 import {
-  tikisAdminAuditLog,
-  tikisAdminSessions,
-  tikisAdminUsers,
-  tikisDeliveries,
-  tikisDeliveryCandidates,
-  tikisDeliveryEvents,
-  tikisDeliveryLiveLocations,
-  tikisDeliveryReports,
-  tikisKycSubmissions,
-  tikisLoyaltyGrants,
-  tikisLoyaltyPrograms,
-  tikisPaymentTransactions,
-  tikisPlatformSettings,
-  tikisProfiles,
-  tikisRateLimits,
-  tikisReferrals,
-  tikisSupportedCountries,
-  tikisWalletLedger,
-  tikisWallets,
-  type TikisAdminUser,
-  type TikisDelivery,
+  tikisseAdminAuditLog,
+  tikisseAdminSessions,
+  tikisseAdminUsers,
+  tikisseDeliveries,
+  tikisseDeliveryCandidates,
+  tikisseDeliveryEvents,
+  tikisseDeliveryLiveLocations,
+  tikisseDeliveryReports,
+  tikisseKycSubmissions,
+  tikisseLoyaltyGrants,
+  tikisseLoyaltyPrograms,
+  tikissePaymentTransactions,
+  tikissePlatformSettings,
+  tikisseProfiles,
+  tikisseRateLimits,
+  tikisseReferrals,
+  tikisseSupportedCountries,
+  tikisseWalletLedger,
+  tikisseWallets,
+  type TikisseAdminUser,
+  type TikisseDelivery,
 } from "../drizzle/schema";
 
 // ————————————————————————————————————————————————————————————————————————
 // Comptes admin
 // ————————————————————————————————————————————————————————————————————————
 
-export async function getAdminByEmail(email: string): Promise<TikisAdminUser | undefined> {
+export async function getAdminByEmail(email: string): Promise<TikisseAdminUser | undefined> {
   const db = await getDb();
   if (!db) throw new Error("La console d’administration est temporairement indisponible.");
-  const rows = await db.select().from(tikisAdminUsers).where(eq(tikisAdminUsers.email, email.trim().toLowerCase())).limit(1);
+  const rows = await db.select().from(tikisseAdminUsers).where(eq(tikisseAdminUsers.email, email.trim().toLowerCase())).limit(1);
   return rows[0];
 }
 
 export async function touchAdminLastLogin(adminId: number) {
   const db = await getDb();
   if (!db) return;
-  await db.update(tikisAdminUsers).set({ lastLoginAt: new Date() }).where(eq(tikisAdminUsers.id, adminId));
+  await db.update(tikisseAdminUsers).set({ lastLoginAt: new Date() }).where(eq(tikisseAdminUsers.id, adminId));
 }
 
 /** Réservé au bootstrap (script one-off ou premier compte) — jamais exposé sur une route publique. */
 export async function createAdminUser(input: { email: string; passwordHash: string; fullName: string; role: AdminRole; mustChangePassword?: boolean }) {
   const db = await getDb();
   if (!db) throw new Error("La console d’administration est temporairement indisponible.");
-  await db.insert(tikisAdminUsers).values({ email: input.email.trim().toLowerCase(), passwordHash: input.passwordHash, fullName: input.fullName, role: input.role, mustChangePassword: input.mustChangePassword ?? false });
+  await db.insert(tikisseAdminUsers).values({ email: input.email.trim().toLowerCase(), passwordHash: input.passwordHash, fullName: input.fullName, role: input.role, mustChangePassword: input.mustChangePassword ?? false });
   return getAdminByEmail(input.email);
 }
 
 export async function listAdminUsers() {
   const db = await getDb();
   if (!db) return [];
-  const rows = await db.select({ id: tikisAdminUsers.id, email: tikisAdminUsers.email, fullName: tikisAdminUsers.fullName, role: tikisAdminUsers.role, active: tikisAdminUsers.active, lastLoginAt: tikisAdminUsers.lastLoginAt, createdAt: tikisAdminUsers.createdAt, totpEnabledAt: tikisAdminUsers.totpEnabledAt, mustChangePassword: tikisAdminUsers.mustChangePassword }).from(tikisAdminUsers).orderBy(desc(tikisAdminUsers.createdAt));
+  const rows = await db.select({ id: tikisseAdminUsers.id, email: tikisseAdminUsers.email, fullName: tikisseAdminUsers.fullName, role: tikisseAdminUsers.role, active: tikisseAdminUsers.active, lastLoginAt: tikisseAdminUsers.lastLoginAt, createdAt: tikisseAdminUsers.createdAt, totpEnabledAt: tikisseAdminUsers.totpEnabledAt, mustChangePassword: tikisseAdminUsers.mustChangePassword }).from(tikisseAdminUsers).orderBy(desc(tikisseAdminUsers.createdAt));
   return rows.map(({ totpEnabledAt, ...row }) => ({ ...row, totpEnabled: Boolean(totpEnabledAt) }));
 }
 
@@ -73,16 +73,16 @@ export async function setAdminUserActive(input: { actorAdminId: number; adminId:
   const db = await getDb();
   if (!db) throw new Error("La console d’administration est temporairement indisponible.");
   await db.transaction(async (tx) => {
-    const target = (await tx.select().from(tikisAdminUsers).where(eq(tikisAdminUsers.id, input.adminId)).limit(1).for("update"))[0];
+    const target = (await tx.select().from(tikisseAdminUsers).where(eq(tikisseAdminUsers.id, input.adminId)).limit(1).for("update"))[0];
     if (!target) throw new Error("Compte admin introuvable.");
     if (!input.active) {
       if (input.actorAdminId === input.adminId) throw new Error("Vous ne pouvez pas suspendre votre propre compte vous-même.");
       if (target.role === "super_admin" && target.active) {
-        const others = await tx.select({ id: tikisAdminUsers.id }).from(tikisAdminUsers).where(and(eq(tikisAdminUsers.role, "super_admin"), eq(tikisAdminUsers.active, true))).for("update");
+        const others = await tx.select({ id: tikisseAdminUsers.id }).from(tikisseAdminUsers).where(and(eq(tikisseAdminUsers.role, "super_admin"), eq(tikisseAdminUsers.active, true))).for("update");
         if (others.filter((row) => row.id !== target.id).length === 0) throw new Error("Impossible de suspendre le dernier super-admin actif.");
       }
     }
-    await tx.update(tikisAdminUsers).set({ active: input.active }).where(eq(tikisAdminUsers.id, input.adminId));
+    await tx.update(tikisseAdminUsers).set({ active: input.active }).where(eq(tikisseAdminUsers.id, input.adminId));
     // Le compte inactif suffit déjà à refuser ses sessions ; les révoquer en plus garantit qu'une
     // réactivation ultérieure ne ressuscite pas une session ouverte avant la suspension.
     if (!input.active) await revokeAllAdminSessions(input.adminId, tx);
@@ -102,7 +102,7 @@ export async function createAdminSession(input: { adminId: number; ipAddress?: s
   const token = newAdminSessionToken();
   const stage = input.stage ?? "active";
   const expiresAt = new Date(Date.now() + (stage === "pending_totp" ? PENDING_TOTP_TTL_MS : ADMIN_SESSION_TTL_SECONDS * 1000));
-  await db.insert(tikisAdminSessions).values({
+  await db.insert(tikisseAdminSessions).values({
     id: randomUUID(), adminId: input.adminId, tokenHash: hashAdminSessionToken(token),
     ipAddress: input.ipAddress?.slice(0, 64) ?? null, userAgent: input.userAgent?.slice(0, 255) ?? null, expiresAt, stage,
   });
@@ -123,14 +123,14 @@ export async function authenticateAdminSession(token: string | undefined): Promi
   const db = await getDb();
   if (!db) return null;
   const row = (await db.select({
-    sessionId: tikisAdminSessions.id, expiresAt: tikisAdminSessions.expiresAt, revokedAt: tikisAdminSessions.revokedAt, lastSeenAt: tikisAdminSessions.lastSeenAt, stage: tikisAdminSessions.stage,
-    id: tikisAdminUsers.id, email: tikisAdminUsers.email, role: tikisAdminUsers.role, active: tikisAdminUsers.active, totpEnabledAt: tikisAdminUsers.totpEnabledAt, mustChangePassword: tikisAdminUsers.mustChangePassword,
-  }).from(tikisAdminSessions).innerJoin(tikisAdminUsers, eq(tikisAdminSessions.adminId, tikisAdminUsers.id))
-    .where(eq(tikisAdminSessions.tokenHash, hashAdminSessionToken(token))).limit(1))[0];
+    sessionId: tikisseAdminSessions.id, expiresAt: tikisseAdminSessions.expiresAt, revokedAt: tikisseAdminSessions.revokedAt, lastSeenAt: tikisseAdminSessions.lastSeenAt, stage: tikisseAdminSessions.stage,
+    id: tikisseAdminUsers.id, email: tikisseAdminUsers.email, role: tikisseAdminUsers.role, active: tikisseAdminUsers.active, totpEnabledAt: tikisseAdminUsers.totpEnabledAt, mustChangePassword: tikisseAdminUsers.mustChangePassword,
+  }).from(tikisseAdminSessions).innerJoin(tikisseAdminUsers, eq(tikisseAdminSessions.adminId, tikisseAdminUsers.id))
+    .where(eq(tikisseAdminSessions.tokenHash, hashAdminSessionToken(token))).limit(1))[0];
   // Une session en attente du code de double authentification n'ouvre rien : mot de passe seul ≠ connexion.
   if (!row || row.stage !== "active" || row.revokedAt || row.expiresAt.getTime() <= Date.now() || !row.active) return null;
   if (Date.now() - row.lastSeenAt.getTime() > LAST_SEEN_REFRESH_MS) {
-    void db.update(tikisAdminSessions).set({ lastSeenAt: new Date() }).where(eq(tikisAdminSessions.id, row.sessionId)).catch(() => {});
+    void db.update(tikisseAdminSessions).set({ lastSeenAt: new Date() }).where(eq(tikisseAdminSessions.id, row.sessionId)).catch(() => {});
   }
   const totpEnabled = Boolean(row.totpEnabledAt);
   // Compte soumis à l'obligation mais pas encore enrôlé : il n'accède qu'à son propre enrôlement (trpc.ts).
@@ -143,13 +143,13 @@ export async function revokeAdminSession(token: string | undefined) {
   if (!token) return;
   const db = await getDb();
   if (!db) return;
-  await db.update(tikisAdminSessions).set({ revokedAt: new Date() }).where(and(eq(tikisAdminSessions.tokenHash, hashAdminSessionToken(token)), isNull(tikisAdminSessions.revokedAt)));
+  await db.update(tikisseAdminSessions).set({ revokedAt: new Date() }).where(and(eq(tikisseAdminSessions.tokenHash, hashAdminSessionToken(token)), isNull(tikisseAdminSessions.revokedAt)));
 }
 
 export async function revokeAllAdminSessions(adminId: number, tx?: any) {
   const handle = tx ?? await getDb();
   if (!handle) return;
-  await handle.update(tikisAdminSessions).set({ revokedAt: new Date() }).where(and(eq(tikisAdminSessions.adminId, adminId), isNull(tikisAdminSessions.revokedAt)));
+  await handle.update(tikisseAdminSessions).set({ revokedAt: new Date() }).where(and(eq(tikisseAdminSessions.adminId, adminId), isNull(tikisseAdminSessions.revokedAt)));
 }
 
 // ————————————————————————————————————————————————————————————————————————
@@ -163,7 +163,7 @@ export const isTotpRequiredRole = (role: AdminRole) => TOTP_REQUIRED_ROLES.inclu
 export async function isAdminTotpRequired(handle?: any): Promise<boolean> {
   const db = handle ?? await getDb();
   if (!db) return false;
-  const row = (await db.select({ required: tikisPlatformSettings.adminTotpRequired }).from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
+  const row = (await db.select({ required: tikissePlatformSettings.adminTotpRequired }).from(tikissePlatformSettings).where(eq(tikissePlatformSettings.id, 1)).limit(1))[0];
   return Boolean(row?.required);
 }
 
@@ -182,19 +182,19 @@ function parseRecoveryHashes(stored: string | null): string[] {
  * requêtes simultanées avec le même code ne passent jamais toutes les deux.
  */
 export async function consumeSecondFactor(tx: any, adminId: number, code: string): Promise<{ method: "totp" | "recovery_code"; remainingRecoveryCodes: number } | null> {
-  const account = (await tx.select().from(tikisAdminUsers).where(eq(tikisAdminUsers.id, adminId)).limit(1).for("update"))[0];
+  const account = (await tx.select().from(tikisseAdminUsers).where(eq(tikisseAdminUsers.id, adminId)).limit(1).for("update"))[0];
   if (!account?.totpSecret || !account.totpEnabledAt) return null;
   const hashes = parseRecoveryHashes(account.totpRecoveryCodes);
   if (looksLikeRecoveryCode(code)) {
     const hash = hashRecoveryCode(code);
     if (!hashes.includes(hash)) return null;
     const remaining = hashes.filter((value) => value !== hash);
-    await tx.update(tikisAdminUsers).set({ totpRecoveryCodes: JSON.stringify(remaining) }).where(eq(tikisAdminUsers.id, adminId));
+    await tx.update(tikisseAdminUsers).set({ totpRecoveryCodes: JSON.stringify(remaining) }).where(eq(tikisseAdminUsers.id, adminId));
     return { method: "recovery_code", remainingRecoveryCodes: remaining.length };
   }
   const step = matchTotpStep(decryptTotpSecret(account.totpSecret), code, { lastUsedStep: account.totpLastUsedStep });
   if (step === null) return null;
-  await tx.update(tikisAdminUsers).set({ totpLastUsedStep: step }).where(eq(tikisAdminUsers.id, adminId));
+  await tx.update(tikisseAdminUsers).set({ totpLastUsedStep: step }).where(eq(tikisseAdminUsers.id, adminId));
   return { method: "totp", remainingRecoveryCodes: hashes.length };
 }
 
@@ -209,28 +209,28 @@ export async function completeTotpLogin(input: { token: string | undefined; code
   const db = await getDb();
   if (!db) throw new Error("La console d’administration est temporairement indisponible.");
   if (!input.token) throw new Error("Session de connexion expirée. Reconnectez-vous.");
-  const pending = (await db.select({ sessionId: tikisAdminSessions.id, stage: tikisAdminSessions.stage, expiresAt: tikisAdminSessions.expiresAt, revokedAt: tikisAdminSessions.revokedAt, adminId: tikisAdminUsers.id, email: tikisAdminUsers.email, fullName: tikisAdminUsers.fullName, role: tikisAdminUsers.role, active: tikisAdminUsers.active })
-    .from(tikisAdminSessions).innerJoin(tikisAdminUsers, eq(tikisAdminSessions.adminId, tikisAdminUsers.id))
-    .where(eq(tikisAdminSessions.tokenHash, hashAdminSessionToken(input.token))).limit(1))[0];
+  const pending = (await db.select({ sessionId: tikisseAdminSessions.id, stage: tikisseAdminSessions.stage, expiresAt: tikisseAdminSessions.expiresAt, revokedAt: tikisseAdminSessions.revokedAt, adminId: tikisseAdminUsers.id, email: tikisseAdminUsers.email, fullName: tikisseAdminUsers.fullName, role: tikisseAdminUsers.role, active: tikisseAdminUsers.active })
+    .from(tikisseAdminSessions).innerJoin(tikisseAdminUsers, eq(tikisseAdminSessions.adminId, tikisseAdminUsers.id))
+    .where(eq(tikisseAdminSessions.tokenHash, hashAdminSessionToken(input.token))).limit(1))[0];
   if (!pending || pending.stage !== "pending_totp" || pending.revokedAt || pending.expiresAt.getTime() <= Date.now() || !pending.active) {
     throw new Error("Session de connexion expirée. Reconnectez-vous.");
   }
   const attemptsKey = `admin-totp:${pending.adminId}:${Math.floor(Date.now() / ADMIN_LOGIN_WINDOW_MS)}`;
-  const attempts = (await db.select({ count: tikisRateLimits.count }).from(tikisRateLimits).where(eq(tikisRateLimits.rateLimitKey, attemptsKey)).limit(1))[0]?.count ?? 0;
+  const attempts = (await db.select({ count: tikisseRateLimits.count }).from(tikisseRateLimits).where(eq(tikisseRateLimits.rateLimitKey, attemptsKey)).limit(1))[0]?.count ?? 0;
   if (attempts >= TOTP_ATTEMPT_LIMIT) {
-    await db.update(tikisAdminSessions).set({ revokedAt: new Date() }).where(eq(tikisAdminSessions.id, pending.sessionId));
+    await db.update(tikisseAdminSessions).set({ revokedAt: new Date() }).where(eq(tikisseAdminSessions.id, pending.sessionId));
     throw new Error("Trop de codes erronés. Reconnectez-vous dans quelques minutes.");
   }
   return db.transaction(async (tx) => {
     const factor = await consumeSecondFactor(tx, pending.adminId, input.code);
     if (!factor) {
       // Compté hors de la transaction qui échoue : l'échec doit rester enregistré.
-      await db.insert(tikisRateLimits).values({ rateLimitKey: attemptsKey, count: 1 }).onDuplicateKeyUpdate({ set: { count: sql`${tikisRateLimits.count} + 1` } });
+      await db.insert(tikisseRateLimits).values({ rateLimitKey: attemptsKey, count: 1 }).onDuplicateKeyUpdate({ set: { count: sql`${tikisseRateLimits.count} + 1` } });
       throw new Error("Code invalide.");
     }
-    await tx.update(tikisAdminSessions).set({ revokedAt: new Date() }).where(eq(tikisAdminSessions.id, pending.sessionId));
+    await tx.update(tikisseAdminSessions).set({ revokedAt: new Date() }).where(eq(tikisseAdminSessions.id, pending.sessionId));
     const session = await createAdminSession({ adminId: pending.adminId, ipAddress: input.ipAddress, userAgent: input.userAgent }, tx);
-    await tx.update(tikisAdminUsers).set({ lastLoginAt: new Date() }).where(eq(tikisAdminUsers.id, pending.adminId));
+    await tx.update(tikisseAdminUsers).set({ lastLoginAt: new Date() }).where(eq(tikisseAdminUsers.id, pending.adminId));
     return { session, factor, admin: { id: pending.adminId, email: pending.email, fullName: pending.fullName, role: pending.role } };
   });
 }
@@ -239,11 +239,11 @@ export async function completeTotpLogin(input: { token: string | undefined; code
 export async function beginTotpEnrollment(input: { adminId: number; email: string }) {
   const db = await getDb();
   if (!db) throw new Error("La console d’administration est temporairement indisponible.");
-  const account = (await db.select({ totpEnabledAt: tikisAdminUsers.totpEnabledAt }).from(tikisAdminUsers).where(eq(tikisAdminUsers.id, input.adminId)).limit(1))[0];
+  const account = (await db.select({ totpEnabledAt: tikisseAdminUsers.totpEnabledAt }).from(tikisseAdminUsers).where(eq(tikisseAdminUsers.id, input.adminId)).limit(1))[0];
   if (!account) throw new Error("Compte admin introuvable.");
   if (account.totpEnabledAt) throw new Error("La double authentification est déjà activée sur ce compte.");
   const secret = generateTotpSecret();
-  await db.update(tikisAdminUsers).set({ totpPendingSecret: encryptTotpSecret(secret) }).where(eq(tikisAdminUsers.id, input.adminId));
+  await db.update(tikisseAdminUsers).set({ totpPendingSecret: encryptTotpSecret(secret) }).where(eq(tikisseAdminUsers.id, input.adminId));
   const uri = otpauthUri(input.email, secret);
   return { secret, otpauthUri: uri, qrSvg: await otpauthQrSvg(uri) };
 }
@@ -256,17 +256,17 @@ export async function confirmTotpEnrollment(input: { adminId: number; code: stri
   const db = await getDb();
   if (!db) throw new Error("La console d’administration est temporairement indisponible.");
   return db.transaction(async (tx) => {
-    const account = (await tx.select().from(tikisAdminUsers).where(eq(tikisAdminUsers.id, input.adminId)).limit(1).for("update"))[0];
+    const account = (await tx.select().from(tikisseAdminUsers).where(eq(tikisseAdminUsers.id, input.adminId)).limit(1).for("update"))[0];
     if (!account) throw new Error("Compte admin introuvable.");
     if (account.totpEnabledAt) throw new Error("La double authentification est déjà activée sur ce compte.");
     if (!account.totpPendingSecret) throw new Error("Commencez par afficher le QR code d’enrôlement.");
     const step = matchTotpStep(decryptTotpSecret(account.totpPendingSecret), input.code);
     if (step === null) throw new Error("Code invalide. Vérifiez l’heure de votre téléphone et saisissez le code affiché.");
     const recoveryCodes = generateRecoveryCodes();
-    await tx.update(tikisAdminUsers).set({
+    await tx.update(tikisseAdminUsers).set({
       totpSecret: account.totpPendingSecret, totpPendingSecret: null, totpEnabledAt: new Date(), totpLastUsedStep: step,
       totpRecoveryCodes: JSON.stringify(recoveryCodes.map(hashRecoveryCode)),
-    }).where(eq(tikisAdminUsers.id, input.adminId));
+    }).where(eq(tikisseAdminUsers.id, input.adminId));
     return { recoveryCodes };
   });
 }
@@ -283,7 +283,7 @@ export async function disableOwnTotp(input: { adminId: number; role: AdminRole; 
   await db.transaction(async (tx) => {
     const factor = await consumeSecondFactor(tx, input.adminId, input.code);
     if (!factor) throw new Error("Code invalide.");
-    await tx.update(tikisAdminUsers).set(clearedTotp()).where(eq(tikisAdminUsers.id, input.adminId));
+    await tx.update(tikisseAdminUsers).set(clearedTotp()).where(eq(tikisseAdminUsers.id, input.adminId));
   });
 }
 
@@ -296,9 +296,9 @@ export async function resetAdminTotp(input: { actorAdminId: number; adminId: num
   const db = await getDb();
   if (!db) throw new Error("La console d’administration est temporairement indisponible.");
   await db.transaction(async (tx) => {
-    const target = (await tx.select({ id: tikisAdminUsers.id }).from(tikisAdminUsers).where(eq(tikisAdminUsers.id, input.adminId)).limit(1).for("update"))[0];
+    const target = (await tx.select({ id: tikisseAdminUsers.id }).from(tikisseAdminUsers).where(eq(tikisseAdminUsers.id, input.adminId)).limit(1).for("update"))[0];
     if (!target) throw new Error("Compte admin introuvable.");
-    await tx.update(tikisAdminUsers).set(clearedTotp()).where(eq(tikisAdminUsers.id, input.adminId));
+    await tx.update(tikisseAdminUsers).set(clearedTotp()).where(eq(tikisseAdminUsers.id, input.adminId));
     await revokeAllAdminSessions(input.adminId, tx);
   });
 }
@@ -312,16 +312,16 @@ export async function setAdminTotpRequired(input: { actorAdminId: number; requir
   const db = await getDb();
   if (!db) throw new Error("La console d’administration est temporairement indisponible.");
   if (input.required) {
-    const missing = await db.select({ email: tikisAdminUsers.email }).from(tikisAdminUsers)
-      .where(and(eq(tikisAdminUsers.active, true), inArray(tikisAdminUsers.role, [...TOTP_REQUIRED_ROLES]), isNull(tikisAdminUsers.totpEnabledAt)));
+    const missing = await db.select({ email: tikisseAdminUsers.email }).from(tikisseAdminUsers)
+      .where(and(eq(tikisseAdminUsers.active, true), inArray(tikisseAdminUsers.role, [...TOTP_REQUIRED_ROLES]), isNull(tikisseAdminUsers.totpEnabledAt)));
     if (missing.length > 0) throw new Error(`Impossible d’exiger la double authentification : ${missing.length} compte(s) super-admin ou finance ne l’ont pas encore activée (${missing.map((row) => row.email).join(", ")}).`);
   }
-  await db.insert(tikisPlatformSettings).values({ id: 1, adminTotpRequired: input.required }).onDuplicateKeyUpdate({ set: { adminTotpRequired: input.required } });
+  await db.insert(tikissePlatformSettings).values({ id: 1, adminTotpRequired: input.required }).onDuplicateKeyUpdate({ set: { adminTotpRequired: input.required } });
   return { required: input.required };
 }
 
 // ————————————————————————————————————————————————————————————————————————
-// Limiteur de connexion admin, partagé entre instances (tikis_rate_limits)
+// Limiteur de connexion admin, partagé entre instances (tikisse_rate_limits)
 // ————————————————————————————————————————————————————————————————————————
 
 /**
@@ -350,7 +350,7 @@ export async function assertAdminLoginAllowed(email: string, ip: string) {
   const db = await getDb();
   if (!db) throw new Error("La console d’administration est temporairement indisponible.");
   const keys = adminLoginKeys(email, ip);
-  const rows = await db.select().from(tikisRateLimits).where(inArray(tikisRateLimits.rateLimitKey, Object.values(keys)));
+  const rows = await db.select().from(tikisseRateLimits).where(inArray(tikisseRateLimits.rateLimitKey, Object.values(keys)));
   const failures = (key: string) => rows.find((row) => row.rateLimitKey === key)?.count ?? 0;
   if (failures(keys.emailIp) >= ADMIN_LOGIN_LIMITS.emailIp || failures(keys.email) >= ADMIN_LOGIN_LIMITS.email || failures(keys.ip) >= ADMIN_LOGIN_LIMITS.ip) {
     throw new Error("Trop de tentatives de connexion. Réessayez dans quelques minutes.");
@@ -361,7 +361,7 @@ export async function recordAdminLoginFailure(email: string, ip: string) {
   const db = await getDb();
   if (!db) return;
   for (const rateLimitKey of Object.values(adminLoginKeys(email, ip))) {
-    await db.insert(tikisRateLimits).values({ rateLimitKey, count: 1 }).onDuplicateKeyUpdate({ set: { count: sql`${tikisRateLimits.count} + 1` } });
+    await db.insert(tikisseRateLimits).values({ rateLimitKey, count: 1 }).onDuplicateKeyUpdate({ set: { count: sql`${tikisseRateLimits.count} + 1` } });
   }
 }
 
@@ -369,7 +369,7 @@ export async function recordAdminLoginFailure(email: string, ip: string) {
 export async function recordAdminLoginSuccess(email: string, ip: string) {
   const db = await getDb();
   if (!db) return;
-  await db.delete(tikisRateLimits).where(eq(tikisRateLimits.rateLimitKey, adminLoginKeys(email, ip).emailIp));
+  await db.delete(tikisseRateLimits).where(eq(tikisseRateLimits.rateLimitKey, adminLoginKeys(email, ip).emailIp));
 }
 
 // ————————————————————————————————————————————————————————————————————————
@@ -379,7 +379,7 @@ export async function recordAdminLoginSuccess(email: string, ip: string) {
 export async function writeAdminAuditLog(entry: { adminId: number; adminEmail: string; action: string; targetType: string; targetId: string; details?: unknown; ipAddress?: string }) {
   const db = await getDb();
   if (!db) return;
-  await db.insert(tikisAdminAuditLog).values({
+  await db.insert(tikisseAdminAuditLog).values({
     id: randomUUID(),
     adminId: entry.adminId,
     adminEmail: entry.adminEmail,
@@ -403,19 +403,19 @@ export async function listAdminAuditLog(input: AuditLogFilter & { limit?: number
   const limit = Math.min(input.limit ?? 50, maxLimit);
   const offset = Math.max(input.offset ?? 0, 0);
   const conditions = [
-    input.targetType ? eq(tikisAdminAuditLog.targetType, input.targetType) : undefined,
-    input.targetId ? eq(tikisAdminAuditLog.targetId, input.targetId) : undefined,
-    !input.includeRequests && !input.targetType ? ne(tikisAdminAuditLog.targetType, "admin_request") : undefined,
-    input.adminEmail ? eq(tikisAdminAuditLog.adminEmail, input.adminEmail.trim().toLowerCase()) : undefined,
+    input.targetType ? eq(tikisseAdminAuditLog.targetType, input.targetType) : undefined,
+    input.targetId ? eq(tikisseAdminAuditLog.targetId, input.targetId) : undefined,
+    !input.includeRequests && !input.targetType ? ne(tikisseAdminAuditLog.targetType, "admin_request") : undefined,
+    input.adminEmail ? eq(tikisseAdminAuditLog.adminEmail, input.adminEmail.trim().toLowerCase()) : undefined,
     // Préfixe : « wallet » retrouve wallet_bonus_credited comme wallet_penalty_applied.
-    input.action ? like(tikisAdminAuditLog.action, `${input.action.trim().replace(/[\\%_]/g, (char) => `\\${char}`)}%`) : undefined,
-    input.from ? gte(tikisAdminAuditLog.createdAt, input.from) : undefined,
-    input.to ? lt(tikisAdminAuditLog.createdAt, input.to) : undefined,
+    input.action ? like(tikisseAdminAuditLog.action, `${input.action.trim().replace(/[\\%_]/g, (char) => `\\${char}`)}%`) : undefined,
+    input.from ? gte(tikisseAdminAuditLog.createdAt, input.from) : undefined,
+    input.to ? lt(tikisseAdminAuditLog.createdAt, input.to) : undefined,
   ].filter((value): value is NonNullable<typeof value> => Boolean(value));
   const where = conditions.length ? and(...conditions) : undefined;
   const [rows, totalResult] = await Promise.all([
-    db.select().from(tikisAdminAuditLog).where(where).orderBy(desc(tikisAdminAuditLog.createdAt)).limit(limit).offset(offset),
-    db.select({ count: count() }).from(tikisAdminAuditLog).where(where),
+    db.select().from(tikisseAdminAuditLog).where(where).orderBy(desc(tikisseAdminAuditLog.createdAt)).limit(limit).offset(offset),
+    db.select({ count: count() }).from(tikisseAdminAuditLog).where(where),
   ]);
   return { rows, total: Number(totalResult[0]?.count ?? 0) };
 }
@@ -428,7 +428,7 @@ export async function adminUpdateCommissionRate(rate: number) {
   if (!Number.isFinite(rate) || rate <= 0 || rate >= 1) throw new Error("Le taux de commission doit être strictement compris entre 0 et 1 (ex. 0.10 pour 10 %).");
   const db = await getDb();
   if (!db) throw new Error("La console d’administration est temporairement indisponible.");
-  await db.insert(tikisPlatformSettings).values({ id: 1, commissionRate: rate.toFixed(5) }).onDuplicateKeyUpdate({ set: { commissionRate: rate.toFixed(5) } });
+  await db.insert(tikissePlatformSettings).values({ id: 1, commissionRate: rate.toFixed(5) }).onDuplicateKeyUpdate({ set: { commissionRate: rate.toFixed(5) } });
   return { rate };
 }
 
@@ -440,10 +440,10 @@ export async function createDeliveryReport(input: { deliveryId: string; reporter
   const db = await getDb();
   if (!db) throw new Error("Les signalements sont temporairement indisponibles.");
   const id = randomUUID();
-  await db.insert(tikisDeliveryReports).values({ id, deliveryId: input.deliveryId, reporterPhone: input.reporterPhone, reporterRole: input.reporterRole, reason: input.reason, description: input.description, attachmentKey: input.attachmentKey ?? null });
-  await db.insert(tikisDeliveryEvents).values({
+  await db.insert(tikisseDeliveryReports).values({ id, deliveryId: input.deliveryId, reporterPhone: input.reporterPhone, reporterRole: input.reporterRole, reason: input.reason, description: input.description, attachmentKey: input.attachmentKey ?? null });
+  await db.insert(tikisseDeliveryEvents).values({
     id: randomUUID(), deliveryId: input.deliveryId, eventType: "delivery_reported", status: null, actorPhone: input.reporterPhone,
-    recipientPhone: input.reporterPhone, title: "Signalement envoyé", body: "Votre signalement a été transmis à l’administration Tikis.", tone: "info",
+    recipientPhone: input.reporterPhone, title: "Signalement envoyé", body: "Votre signalement a été transmis à l’administration Tikisse.", tone: "info",
     idempotencyKey: `${id}:report-ack`,
   });
   return { id };
@@ -453,17 +453,17 @@ export async function listDeliveryReports(input: { status?: "open" | "reviewing"
   const db = await getDb();
   if (!db) return [];
   const base = db.select({
-    report: tikisDeliveryReports,
-    delivery: { id: tikisDeliveries.id, title: tikisDeliveries.title, status: tikisDeliveries.status, senderPhone: tikisDeliveries.senderPhone, driverPhone: tikisDeliveries.driverPhone },
-  }).from(tikisDeliveryReports).innerJoin(tikisDeliveries, eq(tikisDeliveryReports.deliveryId, tikisDeliveries.id));
-  const filtered = input.status ? base.where(eq(tikisDeliveryReports.status, input.status)) : base;
-  return filtered.orderBy(desc(tikisDeliveryReports.createdAt)).limit(Math.min(input.limit ?? 100, 500));
+    report: tikisseDeliveryReports,
+    delivery: { id: tikisseDeliveries.id, title: tikisseDeliveries.title, status: tikisseDeliveries.status, senderPhone: tikisseDeliveries.senderPhone, driverPhone: tikisseDeliveries.driverPhone },
+  }).from(tikisseDeliveryReports).innerJoin(tikisseDeliveries, eq(tikisseDeliveryReports.deliveryId, tikisseDeliveries.id));
+  const filtered = input.status ? base.where(eq(tikisseDeliveryReports.status, input.status)) : base;
+  return filtered.orderBy(desc(tikisseDeliveryReports.createdAt)).limit(Math.min(input.limit ?? 100, 500));
 }
 
 export async function getDeliveryReportById(reportId: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const rows = await db.select().from(tikisDeliveryReports).where(eq(tikisDeliveryReports.id, reportId)).limit(1);
+  const rows = await db.select().from(tikisseDeliveryReports).where(eq(tikisseDeliveryReports.id, reportId)).limit(1);
   return rows[0];
 }
 
@@ -482,18 +482,18 @@ export async function resolveDeliveryReport(input: { reportId: string; status: "
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   const previousStatus = await dbc.transaction(async (tx) => {
-    const report = (await tx.select().from(tikisDeliveryReports).where(eq(tikisDeliveryReports.id, input.reportId)).limit(1).for("update"))[0];
+    const report = (await tx.select().from(tikisseDeliveryReports).where(eq(tikisseDeliveryReports.id, input.reportId)).limit(1).for("update"))[0];
     if (!report) throw new Error("Signalement introuvable.");
     const closing = isClosedReportStatus(input.status);
     if (closing && isClosedReportStatus(report.status)) throw new Error("Ce signalement est déjà clos. Rouvrez-le (« en cours ») avant de rendre une autre décision.");
-    await tx.update(tikisDeliveryReports).set({
+    await tx.update(tikisseDeliveryReports).set({
       status: input.status,
       resolutionNotes: input.resolutionNotes ?? report.resolutionNotes ?? null,
       ...(closing ? { resolvedAt: new Date(), resolvedByAdminId: input.adminId } : { resolvedAt: null, resolvedByAdminId: null }),
-    }).where(eq(tikisDeliveryReports.id, input.reportId));
+    }).where(eq(tikisseDeliveryReports.id, input.reportId));
     if (closing) {
       const reply = input.replyToReporter?.trim();
-      const verdict = input.status === "resolved" ? "Votre signalement a été traité par l’équipe Tikis." : "Votre signalement a été examiné et classé sans suite.";
+      const verdict = input.status === "resolved" ? "Votre signalement a été traité par l’équipe Tikisse." : "Votre signalement a été examiné et classé sans suite.";
       await db.appendDeliveryEvent(tx, {
         deliveryId: report.deliveryId, eventType: "report_decision", recipientPhone: report.reporterPhone,
         title: input.status === "resolved" ? "Signalement traité" : "Signalement classé",
@@ -515,10 +515,10 @@ export async function adminSearchDeliveries(input: { query?: string; status?: st
   const db = await getDb();
   if (!db) return [];
   const conditions = [
-    input.query ? or(eq(tikisDeliveries.id, input.query), like(tikisDeliveries.senderPhone, `${input.query}%`), like(tikisDeliveries.driverPhone, `${input.query}%`), like(tikisDeliveries.title, `${input.query}%`)) : undefined,
-    input.status ? eq(tikisDeliveries.status, input.status as TikisDelivery["status"]) : undefined,
+    input.query ? or(eq(tikisseDeliveries.id, input.query), like(tikisseDeliveries.senderPhone, `${input.query}%`), like(tikisseDeliveries.driverPhone, `${input.query}%`), like(tikisseDeliveries.title, `${input.query}%`)) : undefined,
+    input.status ? eq(tikisseDeliveries.status, input.status as TikisseDelivery["status"]) : undefined,
   ].filter((value): value is NonNullable<typeof value> => Boolean(value));
-  return db.select().from(tikisDeliveries).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(tikisDeliveries.createdAt)).limit(Math.min(input.limit ?? 50, 200));
+  return db.select().from(tikisseDeliveries).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(tikisseDeliveries.createdAt)).limit(Math.min(input.limit ?? 50, 200));
 }
 
 /** Chronologie complète d'une livraison pour instruction d'un litige : statut, candidatures,
@@ -526,12 +526,12 @@ export async function adminSearchDeliveries(input: { query?: string; status?: st
 export async function adminGetDeliveryTimeline(deliveryId: string) {
   const db = await getDb();
   if (!db) return null;
-  const delivery = (await db.select().from(tikisDeliveries).where(eq(tikisDeliveries.id, deliveryId)).limit(1))[0];
+  const delivery = (await db.select().from(tikisseDeliveries).where(eq(tikisseDeliveries.id, deliveryId)).limit(1))[0];
   if (!delivery) return null;
-  const candidates = await db.select().from(tikisDeliveryCandidates).where(eq(tikisDeliveryCandidates.deliveryId, deliveryId)).orderBy(desc(tikisDeliveryCandidates.createdAt));
-  const events = await db.select().from(tikisDeliveryEvents).where(eq(tikisDeliveryEvents.deliveryId, deliveryId)).orderBy(tikisDeliveryEvents.createdAt);
-  const ledgerEntries = await db.select().from(tikisWalletLedger).where(eq(tikisWalletLedger.deliveryId, deliveryId)).orderBy(tikisWalletLedger.createdAt);
-  const reports = await db.select().from(tikisDeliveryReports).where(eq(tikisDeliveryReports.deliveryId, deliveryId)).orderBy(desc(tikisDeliveryReports.createdAt));
+  const candidates = await db.select().from(tikisseDeliveryCandidates).where(eq(tikisseDeliveryCandidates.deliveryId, deliveryId)).orderBy(desc(tikisseDeliveryCandidates.createdAt));
+  const events = await db.select().from(tikisseDeliveryEvents).where(eq(tikisseDeliveryEvents.deliveryId, deliveryId)).orderBy(tikisseDeliveryEvents.createdAt);
+  const ledgerEntries = await db.select().from(tikisseWalletLedger).where(eq(tikisseWalletLedger.deliveryId, deliveryId)).orderBy(tikisseWalletLedger.createdAt);
+  const reports = await db.select().from(tikisseDeliveryReports).where(eq(tikisseDeliveryReports.deliveryId, deliveryId)).orderBy(desc(tikisseDeliveryReports.createdAt));
   return { delivery, candidates, events, ledgerEntries, reports };
 }
 
@@ -546,11 +546,11 @@ export async function adminSearchProfiles(input: { query?: string; limit?: numbe
   const offset = Math.max(input.offset ?? 0, 0);
   const query = input.query?.trim();
   const where = query
-    ? or(like(tikisProfiles.phone, `${query}%`), like(tikisProfiles.fullName, `${query}%`), like(tikisProfiles.email, `${query}%`))
+    ? or(like(tikisseProfiles.phone, `${query}%`), like(tikisseProfiles.fullName, `${query}%`), like(tikisseProfiles.email, `${query}%`))
     : undefined;
   const [rows, totalResult] = await Promise.all([
-    db.select().from(tikisProfiles).where(where).orderBy(desc(tikisProfiles.createdAt)).limit(limit).offset(offset),
-    db.select({ count: count() }).from(tikisProfiles).where(where),
+    db.select().from(tikisseProfiles).where(where).orderBy(desc(tikisseProfiles.createdAt)).limit(limit).offset(offset),
+    db.select({ count: count() }).from(tikisseProfiles).where(where),
   ]);
   return { rows, total: Number(totalResult[0]?.count ?? 0) };
 }
@@ -558,12 +558,12 @@ export async function adminSearchProfiles(input: { query?: string; limit?: numbe
 export async function adminGetProfileDetail(phone: string) {
   const db = await getDb();
   if (!db) return null;
-  const profile = (await db.select().from(tikisProfiles).where(eq(tikisProfiles.phone, phone)).limit(1))[0];
+  const profile = (await db.select().from(tikisseProfiles).where(eq(tikisseProfiles.phone, phone)).limit(1))[0];
   if (!profile) return null;
-  const wallet = (await db.select().from(tikisWallets).where(eq(tikisWallets.profilePhone, phone)).limit(1))[0] ?? null;
-  const ledger = await db.select().from(tikisWalletLedger).where(eq(tikisWalletLedger.profilePhone, phone)).orderBy(desc(tikisWalletLedger.createdAt)).limit(100);
-  const deliveriesAsSender = await db.select({ count: count() }).from(tikisDeliveries).where(eq(tikisDeliveries.senderPhone, phone));
-  const deliveriesAsDriver = await db.select({ count: count() }).from(tikisDeliveries).where(eq(tikisDeliveries.driverPhone, phone));
+  const wallet = (await db.select().from(tikisseWallets).where(eq(tikisseWallets.profilePhone, phone)).limit(1))[0] ?? null;
+  const ledger = await db.select().from(tikisseWalletLedger).where(eq(tikisseWalletLedger.profilePhone, phone)).orderBy(desc(tikisseWalletLedger.createdAt)).limit(100);
+  const deliveriesAsSender = await db.select({ count: count() }).from(tikisseDeliveries).where(eq(tikisseDeliveries.senderPhone, phone));
+  const deliveriesAsDriver = await db.select({ count: count() }).from(tikisseDeliveries).where(eq(tikisseDeliveries.driverPhone, phone));
   return { profile, wallet, ledger, deliveriesAsSenderCount: Number(deliveriesAsSender[0]?.count ?? 0), deliveriesAsDriverCount: Number(deliveriesAsDriver[0]?.count ?? 0) };
 }
 
@@ -579,23 +579,23 @@ export async function adminDashboardMetrics(sinceDays = 30) {
   // Une course « terminée sur la période » l'a été pendant la période (completedAt), quelle que soit sa date
   // de publication. Compter par date de création sous-estimait les courses publiées juste avant la période
   // et terminées pendant, et gonflait la période suivante de courses publiées mais pas encore terminées.
-  const completedInPeriod = and(eq(tikisDeliveries.status, "completed"), gte(tikisDeliveries.completedAt, since));
-  const ledgerTotal = (operation: "commission_debit" | "compensation") => db.select({ total: sql<number>`coalesce(sum(${tikisWalletLedger.amount}), 0)` }).from(tikisWalletLedger)
-    .where(and(eq(tikisWalletLedger.operation, operation), gte(tikisWalletLedger.createdAt, since), lte(tikisWalletLedger.createdAt, now)));
+  const completedInPeriod = and(eq(tikisseDeliveries.status, "completed"), gte(tikisseDeliveries.completedAt, since));
+  const ledgerTotal = (operation: "commission_debit" | "compensation") => db.select({ total: sql<number>`coalesce(sum(${tikisseWalletLedger.amount}), 0)` }).from(tikisseWalletLedger)
+    .where(and(eq(tikisseWalletLedger.operation, operation), gte(tikisseWalletLedger.createdAt, since), lte(tikisseWalletLedger.createdAt, now)));
   const [deliveriesTotal, deliveriesCompleted, openReports, activeDrivers, commissionGross, commissionRefunds, recentDeliveries, recentCompletions] = await Promise.all([
-    db.select({ count: count() }).from(tikisDeliveries).where(gte(tikisDeliveries.createdAt, since)),
-    db.select({ count: count() }).from(tikisDeliveries).where(completedInPeriod),
-    db.select({ count: count() }).from(tikisDeliveryReports).where(eq(tikisDeliveryReports.status, "open")),
-    db.select({ count: sql<number>`count(distinct ${tikisDeliveries.driverPhone})` }).from(tikisDeliveries).where(completedInPeriod),
-    // "commission_debit" est le seul mouvement qui correspond à un revenu réel de Tikis ; "debit" générique
+    db.select({ count: count() }).from(tikisseDeliveries).where(gte(tikisseDeliveries.createdAt, since)),
+    db.select({ count: count() }).from(tikisseDeliveries).where(completedInPeriod),
+    db.select({ count: count() }).from(tikisseDeliveryReports).where(eq(tikisseDeliveryReports.status, "open")),
+    db.select({ count: sql<number>`count(distinct ${tikisseDeliveries.driverPhone})` }).from(tikisseDeliveries).where(completedInPeriod),
+    // "commission_debit" est le seul mouvement qui correspond à un revenu réel de Tikisse ; "debit" générique
     // couvre aussi les retraits (argent des utilisateurs qui sort de leur propre Wallet), à ne jamais compter ici.
     ledgerTotal("commission_debit"),
     // Toute "compensation" rend une commission déjà prélevée (livreur remplacé, course expirée ou annulée par
     // l'administration) : c'est du revenu qui repart. Sans la retrancher, le tableau de bord comptait ces
     // commissions comme acquises.
     ledgerTotal("compensation"),
-    db.select({ createdAt: tikisDeliveries.createdAt, status: tikisDeliveries.status, vehicleTypes: tikisDeliveries.vehicleTypes }).from(tikisDeliveries).where(gte(tikisDeliveries.createdAt, since)),
-    db.select({ completedAt: tikisDeliveries.completedAt }).from(tikisDeliveries).where(completedInPeriod),
+    db.select({ createdAt: tikisseDeliveries.createdAt, status: tikisseDeliveries.status, vehicleTypes: tikisseDeliveries.vehicleTypes }).from(tikisseDeliveries).where(gte(tikisseDeliveries.createdAt, since)),
+    db.select({ completedAt: tikisseDeliveries.completedAt }).from(tikisseDeliveries).where(completedInPeriod),
   ]);
 
   // Timeseries par jour
@@ -646,14 +646,14 @@ export async function adminDashboardMetrics(sinceDays = 30) {
 
 export type ProfileStatus = "active" | "suspended" | "banned";
 
-export type ProfileEngagement = { deliveryId: string; title: string; status: TikisDelivery["status"]; role: "sender" | "driver" };
+export type ProfileEngagement = { deliveryId: string; title: string; status: TikisseDelivery["status"]; role: "sender" | "driver" };
 
 /** Courses où ce profil est engagé et qu'une décision d'admin ne peut pas trancher à sa place. */
 async function profileEngagements(tx: any, phone: string): Promise<ProfileEngagement[]> {
-  const asDriver = await tx.select({ deliveryId: tikisDeliveries.id, title: tikisDeliveries.title, status: tikisDeliveries.status }).from(tikisDeliveries)
-    .where(and(eq(tikisDeliveries.driverPhone, phone), inArray(tikisDeliveries.status, ["pending_confirmation", "active"])));
-  const asSender = await tx.select({ deliveryId: tikisDeliveries.id, title: tikisDeliveries.title, status: tikisDeliveries.status }).from(tikisDeliveries)
-    .where(and(eq(tikisDeliveries.senderPhone, phone), inArray(tikisDeliveries.status, ["open", "pending_confirmation", "active", "disabled"])));
+  const asDriver = await tx.select({ deliveryId: tikisseDeliveries.id, title: tikisseDeliveries.title, status: tikisseDeliveries.status }).from(tikisseDeliveries)
+    .where(and(eq(tikisseDeliveries.driverPhone, phone), inArray(tikisseDeliveries.status, ["pending_confirmation", "active"])));
+  const asSender = await tx.select({ deliveryId: tikisseDeliveries.id, title: tikisseDeliveries.title, status: tikisseDeliveries.status }).from(tikisseDeliveries)
+    .where(and(eq(tikisseDeliveries.senderPhone, phone), inArray(tikisseDeliveries.status, ["open", "pending_confirmation", "active", "disabled"])));
   return [
     ...asDriver.map((row: Omit<ProfileEngagement, "role">) => ({ ...row, role: "driver" as const })),
     ...asSender.map((row: Omit<ProfileEngagement, "role">) => ({ ...row, role: "sender" as const })),
@@ -669,14 +669,14 @@ export async function adminSetProfileStatus(input: { phone: string; status: Prof
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   return dbc.transaction(async (tx) => {
-    const profile = (await tx.select().from(tikisProfiles).where(eq(tikisProfiles.phone, input.phone)).limit(1).for("update"))[0];
+    const profile = (await tx.select().from(tikisseProfiles).where(eq(tikisseProfiles.phone, input.phone)).limit(1).for("update"))[0];
     if (!profile) throw new Error("Profil introuvable.");
-    await tx.update(tikisProfiles).set({
+    await tx.update(tikisseProfiles).set({
       status: input.status,
       statusReason: input.status === "active" ? null : (input.reason?.trim() || null),
       statusUpdatedAt: new Date(),
       statusUpdatedByAdminId: input.adminId,
-    }).where(eq(tikisProfiles.phone, input.phone));
+    }).where(eq(tikisseProfiles.phone, input.phone));
     const releasedCandidacies = input.status === "active" ? 0 : await db.withdrawCandidaciesOfSuspendedDriver(tx, input.phone);
     const engagements = input.status === "active" ? [] : await profileEngagements(tx, input.phone);
     return { phone: input.phone, status: input.status, releasedCandidacies, engagements };
@@ -689,19 +689,19 @@ export async function adminChangeProfileRole(input: { phone: string; role: "send
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   return dbc.transaction(async (tx) => {
-    const profile = (await tx.select().from(tikisProfiles).where(eq(tikisProfiles.phone, input.phone)).limit(1).for("update"))[0];
+    const profile = (await tx.select().from(tikisseProfiles).where(eq(tikisseProfiles.phone, input.phone)).limit(1).for("update"))[0];
     if (!profile) throw new Error("Profil introuvable.");
     // Tout ce qui lie encore ce profil à son rôle actuel bloque le changement. Ne regarder que les courses
     // « en cours » laissait passer un livreur avec des candidatures ouvertes : devenu expéditeur, il n'avait
     // plus aucun écran pour les retirer, et leur commission restait réservée pour toujours.
-    const candidacies = await tx.select({ count: count() }).from(tikisDeliveryCandidates)
-      .where(and(eq(tikisDeliveryCandidates.driverPhone, input.phone), inArray(tikisDeliveryCandidates.status, ["applied", "selected", "confirmed"])));
+    const candidacies = await tx.select({ count: count() }).from(tikisseDeliveryCandidates)
+      .where(and(eq(tikisseDeliveryCandidates.driverPhone, input.phone), inArray(tikisseDeliveryCandidates.status, ["applied", "selected", "confirmed"])));
     if (Number(candidacies[0]?.count ?? 0) > 0) throw new Error("Impossible de changer le rôle : ce livreur a une candidature en cours. Elle doit d’abord être retirée ou la course terminée.");
     const engagements = await profileEngagements(tx, input.phone);
     if (engagements.length > 0) throw new Error(`Impossible de changer le rôle : ce profil a ${engagements.length} course(s) non terminée(s).`);
-    const wallet = (await tx.select().from(tikisWallets).where(eq(tikisWallets.profilePhone, input.phone)).limit(1))[0];
+    const wallet = (await tx.select().from(tikisseWallets).where(eq(tikisseWallets.profilePhone, input.phone)).limit(1))[0];
     if (wallet && wallet.heldBalance > 0) throw new Error("Impossible de changer le rôle : une partie du Wallet de ce profil est encore bloquée.");
-    await tx.update(tikisProfiles).set({ accountType: input.role, vehicles: input.role === "sender" ? "[]" : profile.vehicles }).where(eq(tikisProfiles.phone, input.phone));
+    await tx.update(tikisseProfiles).set({ accountType: input.role, vehicles: input.role === "sender" ? "[]" : profile.vehicles }).where(eq(tikisseProfiles.phone, input.phone));
     return { phone: input.phone, role: input.role };
   });
 }
@@ -729,12 +729,12 @@ export async function adminListDeliveries(input: { query?: string; status?: stri
   const dbc = await getDb();
   if (!dbc) return [];
   const conditions = [
-    input.query ? or(eq(tikisDeliveries.id, input.query), like(tikisDeliveries.senderPhone, `%${input.query}%`), like(tikisDeliveries.driverPhone, `%${input.query}%`), like(tikisDeliveries.title, `%${input.query}%`)) : undefined,
-    input.status ? eq(tikisDeliveries.status, input.status as TikisDelivery["status"]) : undefined,
-    input.from ? gte(tikisDeliveries.createdAt, input.from) : undefined,
-    input.to ? lte(tikisDeliveries.createdAt, input.to) : undefined,
+    input.query ? or(eq(tikisseDeliveries.id, input.query), like(tikisseDeliveries.senderPhone, `%${input.query}%`), like(tikisseDeliveries.driverPhone, `%${input.query}%`), like(tikisseDeliveries.title, `%${input.query}%`)) : undefined,
+    input.status ? eq(tikisseDeliveries.status, input.status as TikisseDelivery["status"]) : undefined,
+    input.from ? gte(tikisseDeliveries.createdAt, input.from) : undefined,
+    input.to ? lte(tikisseDeliveries.createdAt, input.to) : undefined,
   ].filter((value): value is NonNullable<typeof value> => Boolean(value));
-  return dbc.select().from(tikisDeliveries).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(tikisDeliveries.createdAt)).limit(Math.min(input.limit ?? 50, 200));
+  return dbc.select().from(tikisseDeliveries).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(tikisseDeliveries.createdAt)).limit(Math.min(input.limit ?? 50, 200));
 }
 
 /** Liste les positions GPS encore fraiches des livraisons en cours.
@@ -745,17 +745,17 @@ export async function adminListLiveLocations(input: { maxAgeSeconds: number }) {
   const minUpdatedAt = new Date(Date.now() - input.maxAgeSeconds * 1000);
   const rows = await dbc
     .select({
-      deliveryId: tikisDeliveryLiveLocations.deliveryId,
-      driverPhone: tikisDeliveryLiveLocations.driverPhone,
-      latitude: tikisDeliveryLiveLocations.latitude,
-      longitude: tikisDeliveryLiveLocations.longitude,
-      heading: tikisDeliveryLiveLocations.heading,
-      recordedAt: tikisDeliveryLiveLocations.recordedAt,
-      updatedAt: tikisDeliveryLiveLocations.updatedAt,
+      deliveryId: tikisseDeliveryLiveLocations.deliveryId,
+      driverPhone: tikisseDeliveryLiveLocations.driverPhone,
+      latitude: tikisseDeliveryLiveLocations.latitude,
+      longitude: tikisseDeliveryLiveLocations.longitude,
+      heading: tikisseDeliveryLiveLocations.heading,
+      recordedAt: tikisseDeliveryLiveLocations.recordedAt,
+      updatedAt: tikisseDeliveryLiveLocations.updatedAt,
     })
-    .from(tikisDeliveryLiveLocations)
-    .where(gte(tikisDeliveryLiveLocations.updatedAt, minUpdatedAt))
-    .orderBy(desc(tikisDeliveryLiveLocations.updatedAt))
+    .from(tikisseDeliveryLiveLocations)
+    .where(gte(tikisseDeliveryLiveLocations.updatedAt, minUpdatedAt))
+    .orderBy(desc(tikisseDeliveryLiveLocations.updatedAt))
     .limit(200);
   return rows.map((row) => ({
     deliveryId: row.deliveryId,
@@ -775,14 +775,14 @@ export async function adminForceCancelDelivery(input: { deliveryId: string; reas
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   return dbc.transaction(async (tx) => {
-    const delivery = (await tx.select().from(tikisDeliveries).where(eq(tikisDeliveries.id, input.deliveryId)).limit(1).for("update"))[0];
+    const delivery = (await tx.select().from(tikisseDeliveries).where(eq(tikisseDeliveries.id, input.deliveryId)).limit(1).for("update"))[0];
     if (!delivery) throw new Error("Livraison introuvable.");
     if (delivery.status === "completed" || delivery.status === "cancelled" || delivery.status === "expired") throw new Error("Cette livraison est déjà clôturée.");
     // Libère la commission de tout candidat encore engagé (selected/confirmed/applied).
-    const candidates = await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, input.deliveryId), or(eq(tikisDeliveryCandidates.status, "applied"), eq(tikisDeliveryCandidates.status, "selected"), eq(tikisDeliveryCandidates.status, "confirmed")))).for("update");
+    const candidates = await tx.select().from(tikisseDeliveryCandidates).where(and(eq(tikisseDeliveryCandidates.deliveryId, input.deliveryId), or(eq(tikisseDeliveryCandidates.status, "applied"), eq(tikisseDeliveryCandidates.status, "selected"), eq(tikisseDeliveryCandidates.status, "confirmed")))).for("update");
     for (const candidate of candidates) {
       // Deux situations très différentes, à ne jamais confondre (même règle que l'expiration automatique,
-      // `expireOpenTikisDeliveries`) :
+      // `expireOpenTikisseDeliveries`) :
       //  - commission réellement prélevée (candidat confirmé) : elle a quitté le Wallet, on la rembourse ;
       //  - commission seulement réservée (candidat postulé ou sélectionné) : elle est encore dans le solde
       //    bloqué, on la débloque. La créditer au disponible sans vider la réserve fabriquait de l'argent :
@@ -790,19 +790,19 @@ export async function adminForceCancelDelivery(input: { deliveryId: string; reas
       // Même transaction que les mises à jour de statut ci-dessous (via `tx`) : si une étape échoue plus
       // loin, ce mouvement fait partie du rollback. Clés déterministes par candidat : une relance ne peut
       // jamais rembourser ni débloquer deux fois.
-      const debits = await tx.select().from(tikisWalletLedger).where(and(eq(tikisWalletLedger.deliveryId, input.deliveryId), eq(tikisWalletLedger.profilePhone, candidate.driverPhone), inArray(tikisWalletLedger.operation, ["debit", "commission_debit"]))).for("update");
+      const debits = await tx.select().from(tikisseWalletLedger).where(and(eq(tikisseWalletLedger.deliveryId, input.deliveryId), eq(tikisseWalletLedger.profilePhone, candidate.driverPhone), inArray(tikisseWalletLedger.operation, ["debit", "commission_debit"]))).for("update");
       const debitedAmount = debits.reduce((total, entry) => total + Number(entry.amount), 0);
       if (debitedAmount > 0) {
         await db.applyWalletMovement(tx, { profilePhone: candidate.driverPhone, deliveryId: input.deliveryId, operation: "compensation", amount: debitedAmount, availableDelta: debitedAmount, heldDelta: 0, reason: `Annulation administrative de la livraison ${input.deliveryId} : commission remboursée`, idempotencyKey: `${input.deliveryId}:admin-force-cancel:${candidate.id}` });
       } else if (candidate.commissionBlocked > 0) {
         await db.applyWalletMovement(tx, { profilePhone: candidate.driverPhone, deliveryId: input.deliveryId, operation: "unblock", amount: candidate.commissionBlocked, availableDelta: candidate.commissionBlocked, heldDelta: -candidate.commissionBlocked, reason: `Annulation administrative de la livraison ${input.deliveryId} : commission libérée`, idempotencyKey: `${input.deliveryId}:admin-force-cancel-unblock:${candidate.id}` });
       }
-      await tx.update(tikisDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, candidate.id));
+      await tx.update(tikisseDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(eq(tikisseDeliveryCandidates.id, candidate.id));
     }
-    await tx.update(tikisDeliveries).set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, input.deliveryId));
-    await tx.insert(tikisDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.senderPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikis.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel` }).onDuplicateKeyUpdate({ set: { idempotencyKey: `${input.deliveryId}:admin-cancel` } });
+    await tx.update(tikisseDeliveries).set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() }).where(eq(tikisseDeliveries.id, input.deliveryId));
+    await tx.insert(tikisseDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.senderPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikisse.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel` }).onDuplicateKeyUpdate({ set: { idempotencyKey: `${input.deliveryId}:admin-cancel` } });
     if (delivery.driverPhone) {
-      await tx.insert(tikisDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.driverPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikis.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel-driver` }).onDuplicateKeyUpdate({ set: { idempotencyKey: `${input.deliveryId}:admin-cancel-driver` } });
+      await tx.insert(tikisseDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.driverPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikisse.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel-driver` }).onDuplicateKeyUpdate({ set: { idempotencyKey: `${input.deliveryId}:admin-cancel-driver` } });
     }
     return { id: input.deliveryId, status: "cancelled" as const };
   });
@@ -815,19 +815,19 @@ export async function adminForceCancelDelivery(input: { deliveryId: string; reas
 export async function adminListReferrals(input: { status?: "invited" | "qualified" | "rewarded" | "voided"; limit?: number }) {
   const dbc = await getDb();
   if (!dbc) return [];
-  const base = dbc.select().from(tikisReferrals);
-  const filtered = input.status ? base.where(eq(tikisReferrals.status, input.status)) : base;
-  return filtered.orderBy(desc(tikisReferrals.createdAt)).limit(Math.min(input.limit ?? 100, 500));
+  const base = dbc.select().from(tikisseReferrals);
+  const filtered = input.status ? base.where(eq(tikisseReferrals.status, input.status)) : base;
+  return filtered.orderBy(desc(tikisseReferrals.createdAt)).limit(Math.min(input.limit ?? 100, 500));
 }
 
 export async function adminRewardReferral(input: { referralId: string; adminId: number }) {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   return dbc.transaction(async (tx) => {
-    const referral = (await tx.select().from(tikisReferrals).where(eq(tikisReferrals.id, input.referralId)).limit(1).for("update"))[0];
+    const referral = (await tx.select().from(tikisseReferrals).where(eq(tikisseReferrals.id, input.referralId)).limit(1).for("update"))[0];
     if (!referral) throw new Error("Parrainage introuvable.");
     if (referral.status !== "qualified") throw new Error("Ce parrainage n’est pas (ou plus) éligible à une récompense.");
-    await tx.update(tikisReferrals).set({ status: "rewarded", rewardedAt: new Date(), rewardedByAdminId: input.adminId }).where(eq(tikisReferrals.id, referral.id));
+    await tx.update(tikisseReferrals).set({ status: "rewarded", rewardedAt: new Date(), rewardedByAdminId: input.adminId }).where(eq(tikisseReferrals.id, referral.id));
     // Même transaction que la mise à jour du statut : si le crédit échoue, le parrainage reste "qualified"
     // (rollback complet) plutôt que "rewarded" sans que l'argent n'ait jamais été crédité.
     await db.adminAdjustWallet({ profilePhone: referral.referrerPhone, amount: referral.rewardAmount, direction: "credit", operation: "bonus", reason: `Récompense de parrainage — filleul ${referral.refereePhone}`, idempotencyKey: `${referral.id}:admin-reward` }, tx);
@@ -838,8 +838,8 @@ export async function adminRewardReferral(input: { referralId: string; adminId: 
 export async function adminGetReferralSettings() {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  await dbc.insert(tikisPlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
-  const settings = (await dbc.select().from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
+  await dbc.insert(tikissePlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  const settings = (await dbc.select().from(tikissePlatformSettings).where(eq(tikissePlatformSettings.id, 1)).limit(1))[0];
   return { rewardAmount: settings?.referralRewardAmount ?? 1000, enabled: settings?.referralEnabled ?? true, requiredDeliveries: settings?.referralRequiredDeliveries ?? 1 };
 }
 
@@ -848,7 +848,7 @@ export async function adminUpdateReferralSettings(input: { rewardAmount: number;
   if (!Number.isSafeInteger(input.requiredDeliveries) || input.requiredDeliveries < 1 || input.requiredDeliveries > 100) throw new Error("Le nombre de courses requis doit être compris entre 1 et 100.");
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  await dbc.insert(tikisPlatformSettings).values({ id: 1, referralRewardAmount: input.rewardAmount, referralEnabled: input.enabled, referralRequiredDeliveries: input.requiredDeliveries }).onDuplicateKeyUpdate({ set: { referralRewardAmount: input.rewardAmount, referralEnabled: input.enabled, referralRequiredDeliveries: input.requiredDeliveries } });
+  await dbc.insert(tikissePlatformSettings).values({ id: 1, referralRewardAmount: input.rewardAmount, referralEnabled: input.enabled, referralRequiredDeliveries: input.requiredDeliveries }).onDuplicateKeyUpdate({ set: { referralRewardAmount: input.rewardAmount, referralEnabled: input.enabled, referralRequiredDeliveries: input.requiredDeliveries } });
   return input;
 }
 
@@ -859,13 +859,13 @@ export async function adminUpdateReferralSettings(input: { rewardAmount: number;
 export async function adminGetFinanceSettings() {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  await dbc.insert(tikisPlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
-  const settings = (await dbc.select().from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
-  // Réutilise la même validation stricte que le taux appliqué en production (db.getTikisCommissionRate) :
+  await dbc.insert(tikissePlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  const settings = (await dbc.select().from(tikissePlatformSettings).where(eq(tikissePlatformSettings.id, 1)).limit(1))[0];
+  // Réutilise la même validation stricte que le taux appliqué en production (db.getTikisseCommissionRate) :
   // si la configuration est absente ou invalide, l'admin doit voir une erreur explicite plutôt qu'un
   // taux par défaut silencieux de 10 % qui masquerait un vrai problème de configuration.
   return {
-    commissionRate: await db.getTikisCommissionRate(),
+    commissionRate: await db.getTikisseCommissionRate(),
     minWithdrawal: settings?.minWithdrawal ?? 500,
     maxWithdrawal: settings?.maxWithdrawal ?? 500000,
   };
@@ -876,14 +876,14 @@ export async function adminUpdateFinanceSettings(input: { minWithdrawal: number;
   if (!Number.isSafeInteger(input.maxWithdrawal) || input.maxWithdrawal <= input.minWithdrawal) throw new Error("Le montant maximum doit être supérieur au minimum.");
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  await dbc.insert(tikisPlatformSettings).values({ id: 1, minWithdrawal: input.minWithdrawal, maxWithdrawal: input.maxWithdrawal }).onDuplicateKeyUpdate({ set: { minWithdrawal: input.minWithdrawal, maxWithdrawal: input.maxWithdrawal } });
+  await dbc.insert(tikissePlatformSettings).values({ id: 1, minWithdrawal: input.minWithdrawal, maxWithdrawal: input.maxWithdrawal }).onDuplicateKeyUpdate({ set: { minWithdrawal: input.minWithdrawal, maxWithdrawal: input.maxWithdrawal } });
   return input;
 }
 
 export async function adminGetPaymentTransaction(id: string) {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  return (await dbc.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, id)).limit(1))[0];
+  return (await dbc.select().from(tikissePaymentTransactions).where(eq(tikissePaymentTransactions.id, id)).limit(1))[0];
 }
 
 export type PaymentTransactionStatus = "pending" | "succeeded" | "failed" | "cancelled" | "expired";
@@ -894,25 +894,25 @@ export type PaymentTransactionStatus = "pending" | "succeeded" | "failed" | "can
  */
 export async function adminListPaymentTransactions(input: { type?: "deposit" | "withdrawal"; status?: PaymentTransactionStatus; query?: string; limit?: number; offset?: number }) {
   const dbc = await getDb();
-  if (!dbc) return { rows: [] as (typeof tikisPaymentTransactions.$inferSelect)[], total: 0 };
+  if (!dbc) return { rows: [] as (typeof tikissePaymentTransactions.$inferSelect)[], total: 0 };
   const query = input.query?.trim();
   const digits = query?.replace(/[^0-9]/g, "") ?? "";
   const conditions = [
-    input.type ? eq(tikisPaymentTransactions.type, input.type) : undefined,
-    input.status ? eq(tikisPaymentTransactions.status, input.status) : undefined,
+    input.type ? eq(tikissePaymentTransactions.type, input.type) : undefined,
+    input.status ? eq(tikissePaymentTransactions.status, input.status) : undefined,
     query ? or(
-      eq(tikisPaymentTransactions.id, query),
-      eq(tikisPaymentTransactions.providerReference, query),
-      eq(tikisPaymentTransactions.payoutReference, query),
-      ...(digits.length >= 4 ? [like(tikisPaymentTransactions.profilePhone, `+${digits}%`), like(tikisPaymentTransactions.profilePhone, `+226${digits}%`)] : []),
+      eq(tikissePaymentTransactions.id, query),
+      eq(tikissePaymentTransactions.providerReference, query),
+      eq(tikissePaymentTransactions.payoutReference, query),
+      ...(digits.length >= 4 ? [like(tikissePaymentTransactions.profilePhone, `+${digits}%`), like(tikissePaymentTransactions.profilePhone, `+226${digits}%`)] : []),
     ) : undefined,
   ].filter((value): value is NonNullable<typeof value> => Boolean(value));
   const where = conditions.length ? and(...conditions) : undefined;
   const limit = Math.min(input.limit ?? 50, 200);
   const offset = Math.max(input.offset ?? 0, 0);
   const [rows, totalResult] = await Promise.all([
-    dbc.select().from(tikisPaymentTransactions).where(where).orderBy(desc(tikisPaymentTransactions.createdAt)).limit(limit).offset(offset),
-    dbc.select({ count: count() }).from(tikisPaymentTransactions).where(where),
+    dbc.select().from(tikissePaymentTransactions).where(where).orderBy(desc(tikissePaymentTransactions.createdAt)).limit(limit).offset(offset),
+    dbc.select({ count: count() }).from(tikissePaymentTransactions).where(where),
   ]);
   return { rows, total: Number(totalResult[0]?.count ?? 0) };
 }
@@ -941,8 +941,8 @@ const DEFAULT_PRICING_CONFIG: PricingConfig = {
 export async function adminGetPricingConfig(): Promise<PricingConfig> {
   const dbc = await getDb();
   if (!dbc) return DEFAULT_PRICING_CONFIG;
-  await dbc.insert(tikisPlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
-  const settings = (await dbc.select().from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
+  await dbc.insert(tikissePlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  const settings = (await dbc.select().from(tikissePlatformSettings).where(eq(tikissePlatformSettings.id, 1)).limit(1))[0];
   if (!settings?.pricingConfig) return DEFAULT_PRICING_CONFIG;
   try {
     const parsed = JSON.parse(settings.pricingConfig) as Partial<PricingConfig>;
@@ -963,7 +963,7 @@ export async function adminUpdatePricingConfig(config: PricingConfig) {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   const serialized = JSON.stringify(config);
-  await dbc.insert(tikisPlatformSettings).values({ id: 1, pricingConfig: serialized }).onDuplicateKeyUpdate({ set: { pricingConfig: serialized } });
+  await dbc.insert(tikissePlatformSettings).values({ id: 1, pricingConfig: serialized }).onDuplicateKeyUpdate({ set: { pricingConfig: serialized } });
   return config;
 }
 
@@ -974,7 +974,7 @@ export async function adminUpdatePricingConfig(config: PricingConfig) {
 export async function adminListCountries() {
   const dbc = await getDb();
   if (!dbc) return [];
-  const rows = await dbc.select().from(tikisSupportedCountries);
+  const rows = await dbc.select().from(tikisseSupportedCountries);
   // `issue` rend visibles les lignes enregistrées avant que la cohérence soit
   // vérifiée : la console les signale au lieu de les laisser passer pour bonnes.
   return rows
@@ -1006,20 +1006,20 @@ export async function adminUpsertCountry(input: { id: string; name: string; dial
     id: input.id, name: input.name.trim(), dialCode: input.dialCode, digits: input.digits,
     groups: input.groups.join(","), timeZones: input.timeZones.join(","), enabled: input.enabled, sortOrder: input.sortOrder,
   };
-  await dbc.insert(tikisSupportedCountries).values(values).onDuplicateKeyUpdate({ set: values });
+  await dbc.insert(tikisseSupportedCountries).values(values).onDuplicateKeyUpdate({ set: values });
   return values;
 }
 
 export async function adminSetCountryEnabled(id: string, enabled: boolean) {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  const country = (await dbc.select().from(tikisSupportedCountries).where(eq(tikisSupportedCountries.id, id)).limit(1))[0];
+  const country = (await dbc.select().from(tikisseSupportedCountries).where(eq(tikisseSupportedCountries.id, id)).limit(1))[0];
   if (!country) throw new Error("Pays introuvable.");
   if (!enabled) {
-    const remainingEnabled = await dbc.select({ count: count() }).from(tikisSupportedCountries).where(and(eq(tikisSupportedCountries.enabled, true), sql`${tikisSupportedCountries.id} != ${id}`));
+    const remainingEnabled = await dbc.select({ count: count() }).from(tikisseSupportedCountries).where(and(eq(tikisseSupportedCountries.enabled, true), sql`${tikisseSupportedCountries.id} != ${id}`));
     if (Number(remainingEnabled[0]?.count ?? 0) === 0) throw new Error("Impossible de désactiver le dernier pays actif.");
   }
-  await dbc.update(tikisSupportedCountries).set({ enabled }).where(eq(tikisSupportedCountries.id, id));
+  await dbc.update(tikisseSupportedCountries).set({ enabled }).where(eq(tikisseSupportedCountries.id, id));
   return { id, enabled };
 }
 
@@ -1030,7 +1030,7 @@ export async function adminSetCountryEnabled(id: string, enabled: boolean) {
 export async function adminSetMaintenance(input: { enabled: boolean; message?: string }) {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  await dbc.insert(tikisPlatformSettings).values({ id: 1, maintenanceEnabled: input.enabled, maintenanceMessage: input.message?.trim() || null }).onDuplicateKeyUpdate({ set: { maintenanceEnabled: input.enabled, maintenanceMessage: input.message?.trim() || null } });
+  await dbc.insert(tikissePlatformSettings).values({ id: 1, maintenanceEnabled: input.enabled, maintenanceMessage: input.message?.trim() || null }).onDuplicateKeyUpdate({ set: { maintenanceEnabled: input.enabled, maintenanceMessage: input.message?.trim() || null } });
   return { enabled: input.enabled, message: input.message?.trim() || undefined };
 }
 
@@ -1047,11 +1047,11 @@ export async function adminListKycSubmissions(status?: "submitted" | "approved" 
   const dbc = await getDb();
   if (!dbc) return [];
   const base = dbc.select({
-    submission: tikisKycSubmissions,
-    driverName: tikisProfiles.fullName,
-  }).from(tikisKycSubmissions).innerJoin(tikisProfiles, eq(tikisKycSubmissions.driverPhone, tikisProfiles.phone));
-  const filtered = status ? base.where(eq(tikisKycSubmissions.status, status)) : base;
-  return filtered.orderBy(desc(tikisKycSubmissions.submittedAt));
+    submission: tikisseKycSubmissions,
+    driverName: tikisseProfiles.fullName,
+  }).from(tikisseKycSubmissions).innerJoin(tikisseProfiles, eq(tikisseKycSubmissions.driverPhone, tikisseProfiles.phone));
+  const filtered = status ? base.where(eq(tikisseKycSubmissions.status, status)) : base;
+  return filtered.orderBy(desc(tikisseKycSubmissions.submittedAt));
 }
 
 /**
@@ -1064,10 +1064,10 @@ export async function adminReviewKyc(input: { submissionId: string; decision: "a
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   const rejectionReason = input.decision === "rejected" ? (input.rejectionReason?.trim() || "Documents non conformes.") : null;
   const driverPhone = await dbc.transaction(async (tx) => {
-    const submission = (await tx.select().from(tikisKycSubmissions).where(eq(tikisKycSubmissions.id, input.submissionId)).limit(1).for("update"))[0];
+    const submission = (await tx.select().from(tikisseKycSubmissions).where(eq(tikisseKycSubmissions.id, input.submissionId)).limit(1).for("update"))[0];
     if (!submission) throw new Error("Dossier introuvable.");
     if (submission.status !== "submitted") throw new Error(`Ce dossier a déjà été ${submission.status === "approved" ? "approuvé" : "refusé"}. Le livreur doit en soumettre un nouveau pour une nouvelle décision.`);
-    await tx.update(tikisKycSubmissions).set({ status: input.decision, rejectionReason, reviewedAt: new Date(), reviewedByAdminId: input.adminId }).where(eq(tikisKycSubmissions.id, input.submissionId));
+    await tx.update(tikisseKycSubmissions).set({ status: input.decision, rejectionReason, reviewedAt: new Date(), reviewedByAdminId: input.adminId }).where(eq(tikisseKycSubmissions.id, input.submissionId));
     return submission.driverPhone;
   });
   // Pas de livraison à laquelle rattacher une notification in-app : un push, et l'écran « Vérification »
@@ -1077,7 +1077,7 @@ export async function adminReviewKyc(input: { submissionId: string; decision: "a
     title: input.decision === "approved" ? "Identité vérifiée" : "Vérification d’identité refusée",
     body: input.decision === "approved" ? "Vos documents sont validés : vous pouvez candidater aux livraisons." : `Motif : ${rejectionReason} Vous pouvez soumettre de nouveaux documents.`,
     data: { kind: "kyc_decision", screen: "verification" },
-    channelId: "tikis-transactional",
+    channelId: "tikisse-transactional",
   }).catch((cause) => console.error("[kyc] notification non envoyée", cause));
   return { id: input.submissionId, status: input.decision, driverPhone };
 }
@@ -1089,7 +1089,7 @@ export async function adminReviewKyc(input: { submissionId: string; decision: "a
 export async function adminListLoyaltyPrograms() {
   const dbc = await getDb();
   if (!dbc) return [];
-  return dbc.select().from(tikisLoyaltyPrograms).orderBy(desc(tikisLoyaltyPrograms.updatedAt));
+  return dbc.select().from(tikisseLoyaltyPrograms).orderBy(desc(tikisseLoyaltyPrograms.updatedAt));
 }
 
 export async function adminUpsertLoyaltyProgram(input: {
@@ -1111,7 +1111,7 @@ export async function adminUpsertLoyaltyProgram(input: {
   const id = input.id ?? `prog-${randomUUID().slice(0, 12)}`;
   const autoCredit = input.autoCredit ?? false;
   const autoCreditMaxAmount = input.autoCreditMaxAmount ?? 0;
-  await dbc.insert(tikisLoyaltyPrograms).values({
+  await dbc.insert(tikisseLoyaltyPrograms).values({
     id,
     name: input.name.trim(),
     description: input.description?.trim() || null,
@@ -1135,20 +1135,20 @@ export async function adminUpsertLoyaltyProgram(input: {
       enabled: input.enabled,
     },
   });
-  const row = (await dbc.select().from(tikisLoyaltyPrograms).where(eq(tikisLoyaltyPrograms.id, id)).limit(1))[0];
+  const row = (await dbc.select().from(tikisseLoyaltyPrograms).where(eq(tikisseLoyaltyPrograms.id, id)).limit(1))[0];
   return row;
 }
 
 export async function adminSetLoyaltyProgramEnabled(input: { id: string; enabled: boolean }) {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  await dbc.update(tikisLoyaltyPrograms).set({ enabled: input.enabled }).where(eq(tikisLoyaltyPrograms.id, input.id));
+  await dbc.update(tikisseLoyaltyPrograms).set({ enabled: input.enabled }).where(eq(tikisseLoyaltyPrograms.id, input.id));
 }
 
 export async function adminListPendingLoyaltyGrants(limit: number) {
   const dbc = await getDb();
   if (!dbc) return [];
-  const rows = await dbc.select().from(tikisLoyaltyGrants).where(eq(tikisLoyaltyGrants.status, "pending")).orderBy(desc(tikisLoyaltyGrants.grantedAt)).limit(Math.min(limit, 200));
+  const rows = await dbc.select().from(tikisseLoyaltyGrants).where(eq(tikisseLoyaltyGrants.status, "pending")).orderBy(desc(tikisseLoyaltyGrants.grantedAt)).limit(Math.min(limit, 200));
   return rows;
 }
 
@@ -1158,16 +1158,16 @@ export async function adminCreditLoyaltyGrant(input: { grantId: string; adminId:
   const { creditLoyaltyGrantOnWallet } = await import("./loyalty");
   const result = await creditLoyaltyGrantOnWallet(input.grantId);
   if (!result.credited) {
-    const existing = (await dbc.select().from(tikisLoyaltyGrants).where(eq(tikisLoyaltyGrants.id, input.grantId)).limit(1))[0];
+    const existing = (await dbc.select().from(tikisseLoyaltyGrants).where(eq(tikisseLoyaltyGrants.id, input.grantId)).limit(1))[0];
     if (existing && existing.status !== "pending") throw new Error("Cet octroi a déjà été traité.");
     throw new Error("Cet octroi a déjà été traité.");
   }
-  const grant = (await dbc.select().from(tikisLoyaltyGrants).where(eq(tikisLoyaltyGrants.id, input.grantId)).limit(1))[0];
+  const grant = (await dbc.select().from(tikisseLoyaltyGrants).where(eq(tikisseLoyaltyGrants.id, input.grantId)).limit(1))[0];
   return { id: input.grantId, profilePhone: grant?.profilePhone ?? "", bonusAmount: grant?.bonusAmount ?? 0, wallet: result.wallet };
 }
 
 export async function adminCancelLoyaltyGrant(input: { grantId: string; reason: string; adminId: number }) {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  await dbc.update(tikisLoyaltyGrants).set({ status: "cancelled" }).where(and(eq(tikisLoyaltyGrants.id, input.grantId), eq(tikisLoyaltyGrants.status, "pending")));
+  await dbc.update(tikisseLoyaltyGrants).set({ status: "cancelled" }).where(and(eq(tikisseLoyaltyGrants.id, input.grantId), eq(tikisseLoyaltyGrants.status, "pending")));
 }

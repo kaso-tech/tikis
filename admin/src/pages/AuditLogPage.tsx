@@ -79,7 +79,7 @@ export default function AuditLogPage() {
         { key: "createdAt", label: "Date (UTC)" }, { key: "adminEmail", label: "Administrateur" }, { key: "action", label: "Action" },
         { key: "targetType", label: "Type de cible" }, { key: "targetId", label: "Cible" }, { key: "details", label: "Détails" }, { key: "ipAddress", label: "Adresse IP" },
       ], result.rows.map((row) => ({ ...row, createdAt: new Date(row.createdAt).toISOString() })));
-      downloadCsv(`tikis-journal-audit-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+      downloadCsv(`tikisse-journal-audit-${new Date().toISOString().slice(0, 10)}.csv`, csv);
       if (result.truncated) setError(`Export limité aux ${result.rows.length} entrées les plus récentes sur ${result.total} : resserrez les filtres pour le reste.`);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Export impossible.");
@@ -122,7 +122,7 @@ export default function AuditLogPage() {
       <form className="card" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", padding: 14, marginBottom: 16 }} onSubmit={(event) => { event.preventDefault(); setPage(0); setFilters(filterDraft); }}>
         <div style={{ flex: "1 1 200px" }}>
           <label className="field-label" htmlFor="audit-admin">Administrateur (email)</label>
-          <input id="audit-admin" className="input" value={filterDraft.adminEmail} onChange={(e) => setFilterDraft((f) => ({ ...f, adminEmail: e.target.value }))} placeholder="prenom@tikis.app" />
+          <input id="audit-admin" className="input" value={filterDraft.adminEmail} onChange={(e) => setFilterDraft((f) => ({ ...f, adminEmail: e.target.value }))} placeholder="prenom@tikisse.app" />
         </div>
         <div style={{ flex: "1 1 160px" }}>
           <label className="field-label" htmlFor="audit-action">Action (début du nom)</label>

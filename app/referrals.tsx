@@ -4,13 +4,13 @@ import { useMemo, useState } from "react";
 import { FlatList, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { TikisButton } from "@/components/tikis/ui";
+import { TikisseButton } from "@/components/tikisse/ui";
 import { createStyles } from "@/lib/create-styles";
 import { haptic } from "@/lib/haptics";
 import { useThemeColors, type ThemedColors } from "@/lib/use-theme-colors";
-import { useTikisStore } from "@/lib/tikis-store";
+import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
-import { formatMoney, type ReferralRecord } from "@/shared/tikis-domain";
+import { formatMoney, type ReferralRecord } from "@/shared/tikisse-domain";
 
 const stylesFor = createStyles((theme: ThemedColors) => ({
   safe: { flex: 1 },
@@ -56,7 +56,7 @@ const stylesFor = createStyles((theme: ThemedColors) => ({
 }));
 
 export default function ReferralsScreen() {
-  const { profile } = useTikisStore();
+  const { profile } = useTikisseStore();
   const { colors: theme } = useThemeColors();
   const styles = useMemo(() => stylesFor(theme), [theme]);
   const [copied, setCopied] = useState(false);
@@ -93,7 +93,7 @@ export default function ReferralsScreen() {
     if (!code || sharing) return;
     setSharing(true);
     try {
-      await Share.share({ message: `Rejoins Tikis avec mon code livreur ${code}. Après ${requiredDeliveries > 1 ? `mes ${requiredDeliveries} premières courses terminées` : "ma première course terminée"}, je reçois ${formatMoney(rewardAmount)} sur mon Wallet.` });
+      await Share.share({ message: `Rejoins Tikisse avec mon code livreur ${code}. Après ${requiredDeliveries > 1 ? `mes ${requiredDeliveries} premières courses terminées` : "ma première course terminée"}, je reçois ${formatMoney(rewardAmount)} sur mon Wallet.` });
       haptic.light();
     } catch {
       haptic.error();
@@ -136,8 +136,8 @@ export default function ReferralsScreen() {
               </View>
             )}
             <View style={styles.actions}>
-              <TikisButton label={copied ? "Code copié" : "Copier le code"} icon={copied ? "check" : "content-copy"} variant="secondary" onPress={() => void copyCode()} loading={copying} loadingLabel="Copie…" disabled={!code} style={styles.actionButton} />
-              <TikisButton label="Partager" icon="share" onPress={() => void shareCode()} loading={sharing} loadingLabel="Ouverture…" disabled={!code} style={styles.actionButton} />
+              <TikisseButton label={copied ? "Code copié" : "Copier le code"} icon={copied ? "check" : "content-copy"} variant="secondary" onPress={() => void copyCode()} loading={copying} loadingLabel="Copie…" disabled={!code} style={styles.actionButton} />
+              <TikisseButton label="Partager" icon="share" onPress={() => void shareCode()} loading={sharing} loadingLabel="Ouverture…" disabled={!code} style={styles.actionButton} />
             </View>
             <View style={styles.summaryRow}>
               <Metric icon="groups" value={String(referrals.length)} label="Filleuls" theme={theme} />
@@ -200,7 +200,7 @@ function ReferralRow({ referral, requiredDeliveries, theme }: { referral: Omit<R
         <Text style={[styles.reward, { color: theme.primary }]}>{formatMoney(referral.rewardAmount)}</Text>
       </View>
       {referral.status === "qualified" ? (
-        <Text style={[styles.waitingText, { color: theme.primary }]}>Éligible — en attente de validation par l’équipe Tikis.</Text>
+        <Text style={[styles.waitingText, { color: theme.primary }]}>Éligible — en attente de validation par l’équipe Tikisse.</Text>
       ) : referral.status === "invited" ? (
         <Text style={[styles.waitingText, { color: theme.muted }]}>La récompense se débloque après {requiredDeliveries} course{requiredDeliveries > 1 ? "s" : ""} terminée{requiredDeliveries > 1 ? "s" : ""}.</Text>
       ) : referral.status === "rewarded" ? (

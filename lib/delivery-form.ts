@@ -12,7 +12,7 @@
  * qui est transporté, tant que l'expéditeur ne l'a pas fixé lui-même.
  */
 
-import type { DeliveryType, SelectableVehicleType } from "@/shared/tikis-domain";
+import type { DeliveryType, SelectableVehicleType } from "@/shared/tikisse-domain";
 
 export type PublicationState = {
   pickup: boolean;

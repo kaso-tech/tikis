@@ -1,4 +1,4 @@
-import type { DeliveryStatus } from "@/shared/tikis-domain";
+import type { DeliveryStatus } from "@/shared/tikisse-domain";
 
 export function sanitizeReviewText(value: string) {
   return value.replace(/[<>\[\]{}]/g, "").replace(/\s+/g, " ").trim().slice(0, 500);

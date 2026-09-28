@@ -7,7 +7,7 @@
  * React Native.
  */
 
-import type { DeliveryStatus } from "@/shared/tikis-domain";
+import type { DeliveryStatus } from "@/shared/tikisse-domain";
 
 /** Au-delà de ce délai, la dernière position connue n'est plus « en direct ». */
 export const SIGNAL_STALE_AFTER_MS = 60_000;

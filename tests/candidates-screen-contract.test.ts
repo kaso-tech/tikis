@@ -4,10 +4,10 @@ import { describe, expect, it } from "vitest";
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
-const screen = read("components/tikis/candidates-sheet.tsx");
+const screen = read("components/tikisse/candidates-sheet.tsx");
 const detail = read("app/delivery/[id].tsx");
 const db = read("server/db.ts");
-const domain = read("shared/tikis-domain.ts");
+const domain = read("shared/tikisse-domain.ts");
 const routers = read("server/routers.ts");
 
 describe("la distance affichée est réelle, ou avouée inconnue", () => {
@@ -131,11 +131,11 @@ describe("le badge « vérifié » reflète un vrai contrôle d'identité", () =
     // dont l'identité n'avait été contrôlée par personne.
     expect(db).not.toContain("isVerified: true,");
     expect(db).toContain("isVerified: approvedDrivers.has(candidate.driverPhone)");
-    expect(db).toContain('eq(tikisKycSubmissions.status, "approved")');
+    expect(db).toContain('eq(tikisseKycSubmissions.status, "approved")');
   });
 
   it("candidater exige ce même statut approuvé, pas seulement une photo de profil", () => {
-    const mutation = routers.slice(routers.indexOf("submitApplication:"), routers.indexOf("update: tikisProtectedProcedure.input(deliveryInputSchema"));
+    const mutation = routers.slice(routers.indexOf("submitApplication:"), routers.indexOf("update: tikisseProtectedProcedure.input(deliveryInputSchema"));
     expect(mutation).toContain("getLatestKycSubmission(profile.phone)");
     expect(mutation).toContain('kyc?.status !== "approved"');
   });
@@ -148,7 +148,7 @@ describe("le numéro d'un candidat n'est révélé qu'une fois attribué", () =>
   });
 
   it("la procédure candidates applique ce masquage côté expéditeur", () => {
-    const procedure = routers.slice(routers.indexOf("candidates: tikisProtectedProcedure"), routers.indexOf("submitApplication:"));
+    const procedure = routers.slice(routers.indexOf("candidates: tikisseProtectedProcedure"), routers.indexOf("submitApplication:"));
     expect(procedure).toContain("candidates.map(candidateForSender)");
   });
 });

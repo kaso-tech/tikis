@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "../server/_core/context";
 
 const dbMock = vi.hoisted(() => ({
-  getTikisProfileByPhone: vi.fn(),
+  getTikisseProfileByPhone: vi.fn(),
   getLatestKycSubmission: vi.fn(),
-  applyForTikisDelivery: vi.fn(),
+  applyForTikisseDelivery: vi.fn(),
 }));
 
 vi.mock("../server/db", () => dbMock);
@@ -16,7 +16,7 @@ const driver = { phone: "+22676000000", fullName: "Moussa Kaboré", accountType:
 const deliveryId = "2d487499-19e9-4f5e-a9c8-8777af588997";
 
 function contextFor(phone: string): TrpcContext {
-  return { user: null, tikisProfilePhone: phone, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as unknown as TrpcContext["res"] };
+  return { user: null, tikisseProfilePhone: phone, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as unknown as TrpcContext["res"] };
 }
 
 async function apply() {
@@ -27,21 +27,21 @@ async function apply() {
 describe("candidater exige un KYC réellement approuvé, pas seulement une photo de profil", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    dbMock.getTikisProfileByPhone.mockResolvedValue(driver);
-    dbMock.applyForTikisDelivery.mockResolvedValue({ success: true, wallet: {} });
+    dbMock.getTikisseProfileByPhone.mockResolvedValue(driver);
+    dbMock.applyForTikisseDelivery.mockResolvedValue({ success: true, wallet: {} });
   });
 
   it("refuse sans photo de profil, avant même de regarder le KYC", async () => {
-    dbMock.getTikisProfileByPhone.mockResolvedValue({ ...driver, photoKey: null });
+    dbMock.getTikisseProfileByPhone.mockResolvedValue({ ...driver, photoKey: null });
     await expect(apply()).rejects.toThrow("photo");
     expect(dbMock.getLatestKycSubmission).not.toHaveBeenCalled();
-    expect(dbMock.applyForTikisDelivery).not.toHaveBeenCalled();
+    expect(dbMock.applyForTikisseDelivery).not.toHaveBeenCalled();
   });
 
   it("refuse quand aucun dossier KYC n'a jamais été soumis", async () => {
     dbMock.getLatestKycSubmission.mockResolvedValue(undefined);
     await expect(apply()).rejects.toThrow("identité doit être vérifiée");
-    expect(dbMock.applyForTikisDelivery).not.toHaveBeenCalled();
+    expect(dbMock.applyForTikisseDelivery).not.toHaveBeenCalled();
   });
 
   it("refuse un dossier encore en attente d'examen", async () => {
@@ -49,18 +49,18 @@ describe("candidater exige un KYC réellement approuvé, pas seulement une photo
     // n'avait jamais regardé les documents d'identité soumis à `kyc.submit`.
     dbMock.getLatestKycSubmission.mockResolvedValue({ status: "submitted" });
     await expect(apply()).rejects.toThrow("identité doit être vérifiée");
-    expect(dbMock.applyForTikisDelivery).not.toHaveBeenCalled();
+    expect(dbMock.applyForTikisseDelivery).not.toHaveBeenCalled();
   });
 
   it("refuse un dossier rejeté", async () => {
     dbMock.getLatestKycSubmission.mockResolvedValue({ status: "rejected" });
     await expect(apply()).rejects.toThrow("identité doit être vérifiée");
-    expect(dbMock.applyForTikisDelivery).not.toHaveBeenCalled();
+    expect(dbMock.applyForTikisseDelivery).not.toHaveBeenCalled();
   });
 
   it("autorise une fois le dossier approuvé", async () => {
     dbMock.getLatestKycSubmission.mockResolvedValue({ status: "approved" });
     await expect(apply()).resolves.toEqual({ success: true, wallet: {} });
-    expect(dbMock.applyForTikisDelivery).toHaveBeenCalledWith(expect.objectContaining({ driverPhone: driver.phone }));
+    expect(dbMock.applyForTikisseDelivery).toHaveBeenCalledWith(expect.objectContaining({ driverPhone: driver.phone }));
   });
 });
