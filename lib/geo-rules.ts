@@ -105,9 +105,29 @@ function localPart(location: LocationPresentation) {
   return location.district || location.street || (!isGenericName(location) ? location.name : undefined) || location.city || location.province || location.formattedAddress || "Point sélectionné";
 }
 
+/**
+ * Le titre d'un lieu : un lieu public par son nom, sinon le quartier, la rue, puis la ville.
+ *
+ * Un point dont on ne connaissait que la ville s'intitulait « Point sélectionné ». À la demande du produit,
+ * la ville sert désormais de titre quand rien de plus précis n'est connu : « Bingo » dit où est le point,
+ * « Point sélectionné » ne dit rien. Ce libellé ne reste qu'en dernier recours, sans aucune donnée.
+ */
 export function locationTitle(location: LocationPresentation) {
-  if (location.name && samePart(location.name, location.city) && !location.district && !location.street) return "Point sélectionné";
   return localPart(location);
+}
+
+/**
+ * Le lieu tel qu'il doit être enregistré quand l'utilisateur le valide.
+ *
+ * Le géocodage inverse du serveur nomme « Point sélectionné » tout point sans lieu public précis
+ * (server/geography.ts). L'affichage le remplaçait déjà, mais ce nom partait tel quel à la validation :
+ * c'est lui qu'enregistraient la livraison, le brouillon et l'adresse favorite. Le lieu validé prend
+ * donc son vrai titre comme nom — sauf s'il n'y a vraiment rien de mieux à dire.
+ */
+export function withMeaningfulName<T extends LocationPresentation>(location: T): T {
+  if (!isGenericName(location)) return location;
+  const title = locationTitle(location);
+  return samePart(title, "Point sélectionné") ? location : { ...location, name: title };
 }
 
 export function locationSubtitle(location: LocationPresentation) {

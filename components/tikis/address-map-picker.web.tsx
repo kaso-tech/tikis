@@ -4,7 +4,7 @@ import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "rea
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { SaveAddressDialog } from "@/components/tikis/save-address-dialog";
-import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
+import { formatDeliveryDetailPlace, withMeaningfulName } from "@/lib/geo-rules";
 import { useSearchLocationBias } from "@/hooks/use-search-location-bias";
 import { trpc } from "@/lib/trpc";
 import type { LocationLabel } from "@/shared/tikis-domain";
@@ -17,7 +17,7 @@ export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, 
   const initializedForOpening = useRef(false);
   const { mutateAsync: reverseGeocode, isPending: isReversePending } = trpc.geography.reverse.useMutation();
   const { status: gpsStatus, requestBias } = useSearchLocationBias();
-  const refreshLocation = useCallback(async () => { const position = await requestBias(); if (!position) { setMessage("Position indisponible ou non autorisée."); return; } try { setMessage("Identification de l’adresse…"); const result = await reverseGeocode(position); setPlace(result ?? null); setMessage(result ? "" : "Adresse introuvable. Utilisez la recherche."); } catch { setMessage("Le géocodage est momentanément indisponible."); } }, [requestBias, reverseGeocode]);
+  const refreshLocation = useCallback(async () => { const position = await requestBias(); if (!position) { setMessage("Position indisponible ou non autorisée."); return; } try { setMessage("Identification de l’adresse…"); const result = await reverseGeocode(position); setPlace(result ? withMeaningfulName(result) : null); setMessage(result ? "" : "Adresse introuvable. Utilisez la recherche."); } catch { setMessage("Le géocodage est momentanément indisponible."); } }, [requestBias, reverseGeocode]);
   // Efface le message dès la fermeture : ajustement pendant le rendu, comparé au rendu précédent,
   // plutôt qu'un setState synchrone dans le corps de l'effet ci-dessous (react-hooks/set-state-in-effect)
   // — sans quoi une prochaine ouverture pourrait brièvement montrer le message périmé de la précédente.

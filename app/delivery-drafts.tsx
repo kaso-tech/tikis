@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View }
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisButton } from "@/components/tikis/ui";
 import { deleteDeliveryDraft, listDeliveryDrafts, type DeliveryDraft } from "@/lib/delivery-drafts";
+import { locationTitle } from "@/lib/geo-rules";
 import { haptic } from "@/lib/haptics";
 import { useTikisStore } from "@/lib/tikis-store";
 import { useThemeColors } from "@/lib/use-theme-colors";
@@ -106,8 +107,10 @@ export default function DeliveryDraftsScreen() {
 function DraftRow({ draft, onRestore, onDelete, index }: { draft: DeliveryDraft; onRestore: () => void; onDelete: () => void; index: number }) {
   const { colors: theme } = useThemeColors();
   const typeLabel = draft.deliveryType;
-  const pickupLabel = draft.pickup?.name ?? "Récupération non définie";
-  const dropoffLabel = draft.dropoff?.name ?? "Destination non définie";
+  // Le titre du lieu, pas son nom brut : un brouillon enregistré avant la correction du sélecteur peut
+  // encore porter « Point sélectionné » comme nom.
+  const pickupLabel = draft.pickup ? locationTitle(draft.pickup) : "Récupération non définie";
+  const dropoffLabel = draft.dropoff ? locationTitle(draft.dropoff) : "Destination non définie";
   const dateLabel = new Date(draft.updatedAt).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
   return (
     <View style={[styles.draftCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>

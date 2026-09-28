@@ -21,9 +21,17 @@ describe("libellés d’adresse Tikis", () => {
     expect(locationTitle(location)).toBe("Avenue Kwame Nkrumah");
   });
 
-  it("distingue clairement un point sans adresse officielle", () => {
+  it("intitule par sa ville un point dont on ne connaît rien de plus précis", () => {
+    // Ce cas s'intitulait « Point sélectionné ». À la demande du produit, la ville sert de titre quand rien
+    // de plus précis n'est connu : elle dit où est le point, « Point sélectionné » ne disait rien.
     const location = { name: "Ouagadougou", district: "", city: "Ouagadougou", formattedAddress: "Ouagadougou, Burkina Faso", latitude: 12.37, longitude: -1.52 };
-    expect(locationTitle(location)).toBe("Point sélectionné");
-    expect(locationSubtitle(location)).toBe("Ouagadougou");
+    expect(locationTitle(location)).toBe("Ouagadougou");
+    // Le sous-titre ne répète pas le titre : il retombe sur l'adresse complète.
+    expect(locationSubtitle(location)).toBe("Ouagadougou, Burkina Faso");
+  });
+
+  it("ne garde « Point sélectionné » qu'en dernier recours, sans aucune donnée de lieu", () => {
+    const nothingKnown = { name: "", district: "", city: "", latitude: 12.37, longitude: -1.52 };
+    expect(locationTitle(nothingKnown)).toBe("Point sélectionné");
   });
 });

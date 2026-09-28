@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import MapView from "react-native-maps";
 import { TikisButton } from "@/components/tikis/ui";
 import { SaveAddressDialog } from "@/components/tikis/save-address-dialog";
-import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
+import { formatDeliveryDetailPlace, withMeaningfulName } from "@/lib/geo-rules";
 import { useSearchLocationBias } from "@/hooks/use-search-location-bias";
 import { trpc } from "@/lib/trpc";
 import type { LocationLabel } from "@/shared/tikis-domain";
@@ -49,7 +49,7 @@ export function AddressMapPicker({ visible, targetTitle, initialPlace, onClose, 
       // laissait `lastResolvedRef` bloqué sur ce point pour le reste de la session de la modale — un
       // nudge du marqueur à moins de 15 m ne redéclenchait alors plus jamais de nouvelle tentative.
       lastResolvedRef.current = coordinate;
-      setPlace(result ? { ...result, latitude: coordinate.latitude, longitude: coordinate.longitude, source: "reverse", precision: "exact" } : null);
+      setPlace(result ? withMeaningfulName<LocationLabel>({ ...result, latitude: coordinate.latitude, longitude: coordinate.longitude, source: "reverse", precision: "exact" }) : null);
       setMessage(result ? "" : "Adresse introuvable. Ajustez légèrement le marqueur.");
     } catch (cause) {
       lastResolvedRef.current = null;
