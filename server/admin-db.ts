@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, count, desc, eq, gte, inArray, isNull, like, lte, ne, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, like, lt, lte, ne, or, sql } from "drizzle-orm";
 import { countryDraftIssue, countryPlanWarning } from "../shared/iso-countries";
 import { ADMIN_SESSION_TTL_SECONDS, hashAdminSessionToken, newAdminSessionToken, type AdminRole } from "./admin-auth";
 import {
@@ -50,17 +50,17 @@ export async function touchAdminLastLogin(adminId: number) {
 }
 
 /** Réservé au bootstrap (script one-off ou premier compte) — jamais exposé sur une route publique. */
-export async function createAdminUser(input: { email: string; passwordHash: string; fullName: string; role: "super_admin" | "support" | "finance" }) {
+export async function createAdminUser(input: { email: string; passwordHash: string; fullName: string; role: AdminRole; mustChangePassword?: boolean }) {
   const db = await getDb();
   if (!db) throw new Error("La console d’administration est temporairement indisponible.");
-  await db.insert(tikisAdminUsers).values({ email: input.email.trim().toLowerCase(), passwordHash: input.passwordHash, fullName: input.fullName, role: input.role });
+  await db.insert(tikisAdminUsers).values({ email: input.email.trim().toLowerCase(), passwordHash: input.passwordHash, fullName: input.fullName, role: input.role, mustChangePassword: input.mustChangePassword ?? false });
   return getAdminByEmail(input.email);
 }
 
 export async function listAdminUsers() {
   const db = await getDb();
   if (!db) return [];
-  const rows = await db.select({ id: tikisAdminUsers.id, email: tikisAdminUsers.email, fullName: tikisAdminUsers.fullName, role: tikisAdminUsers.role, active: tikisAdminUsers.active, lastLoginAt: tikisAdminUsers.lastLoginAt, createdAt: tikisAdminUsers.createdAt, totpEnabledAt: tikisAdminUsers.totpEnabledAt }).from(tikisAdminUsers).orderBy(desc(tikisAdminUsers.createdAt));
+  const rows = await db.select({ id: tikisAdminUsers.id, email: tikisAdminUsers.email, fullName: tikisAdminUsers.fullName, role: tikisAdminUsers.role, active: tikisAdminUsers.active, lastLoginAt: tikisAdminUsers.lastLoginAt, createdAt: tikisAdminUsers.createdAt, totpEnabledAt: tikisAdminUsers.totpEnabledAt, mustChangePassword: tikisAdminUsers.mustChangePassword }).from(tikisAdminUsers).orderBy(desc(tikisAdminUsers.createdAt));
   return rows.map(({ totpEnabledAt, ...row }) => ({ ...row, totpEnabled: Boolean(totpEnabledAt) }));
 }
 
@@ -116,7 +116,7 @@ const LAST_SEEN_REFRESH_MS = 5 * 60_000;
  * compte doit être actif ; le rôle appliqué est celui du compte à cet instant. Sans base, aucune session
  * n'est acceptée — rien n'y fonctionnerait de toute façon.
  */
-export type AdminIdentity = { adminId: number; email: string; role: AdminRole; totpEnabled: boolean; mustEnrollTotp: boolean };
+export type AdminIdentity = { adminId: number; email: string; role: AdminRole; totpEnabled: boolean; mustEnrollTotp: boolean; mustChangePassword: boolean; sessionId: string };
 
 export async function authenticateAdminSession(token: string | undefined): Promise<AdminIdentity | null> {
   if (!token || token.length > 200) return null;
@@ -124,7 +124,7 @@ export async function authenticateAdminSession(token: string | undefined): Promi
   if (!db) return null;
   const row = (await db.select({
     sessionId: tikisAdminSessions.id, expiresAt: tikisAdminSessions.expiresAt, revokedAt: tikisAdminSessions.revokedAt, lastSeenAt: tikisAdminSessions.lastSeenAt, stage: tikisAdminSessions.stage,
-    id: tikisAdminUsers.id, email: tikisAdminUsers.email, role: tikisAdminUsers.role, active: tikisAdminUsers.active, totpEnabledAt: tikisAdminUsers.totpEnabledAt,
+    id: tikisAdminUsers.id, email: tikisAdminUsers.email, role: tikisAdminUsers.role, active: tikisAdminUsers.active, totpEnabledAt: tikisAdminUsers.totpEnabledAt, mustChangePassword: tikisAdminUsers.mustChangePassword,
   }).from(tikisAdminSessions).innerJoin(tikisAdminUsers, eq(tikisAdminSessions.adminId, tikisAdminUsers.id))
     .where(eq(tikisAdminSessions.tokenHash, hashAdminSessionToken(token))).limit(1))[0];
   // Une session en attente du code de double authentification n'ouvre rien : mot de passe seul ≠ connexion.
@@ -135,7 +135,7 @@ export async function authenticateAdminSession(token: string | undefined): Promi
   const totpEnabled = Boolean(row.totpEnabledAt);
   // Compte soumis à l'obligation mais pas encore enrôlé : il n'accède qu'à son propre enrôlement (trpc.ts).
   const mustEnrollTotp = !totpEnabled && isTotpRequiredRole(row.role) && await isAdminTotpRequired(db);
-  return { adminId: row.id, email: row.email, role: row.role, totpEnabled, mustEnrollTotp };
+  return { adminId: row.id, email: row.email, role: row.role, totpEnabled, mustEnrollTotp, mustChangePassword: row.mustChangePassword, sessionId: row.sessionId };
 }
 
 /** Déconnexion : la session ne vaut plus rien, même si quelqu'un a copié le cookie. */
@@ -181,7 +181,7 @@ function parseRecoveryHashes(stored: string | null): string[] {
  * Vérifie un second facteur — code TOTP ou code de secours — et le consomme, sous verrou du compte : deux
  * requêtes simultanées avec le même code ne passent jamais toutes les deux.
  */
-async function consumeSecondFactor(tx: any, adminId: number, code: string): Promise<{ method: "totp" | "recovery_code"; remainingRecoveryCodes: number } | null> {
+export async function consumeSecondFactor(tx: any, adminId: number, code: string): Promise<{ method: "totp" | "recovery_code"; remainingRecoveryCodes: number } | null> {
   const account = (await tx.select().from(tikisAdminUsers).where(eq(tikisAdminUsers.id, adminId)).limit(1).for("update"))[0];
   if (!account?.totpSecret || !account.totpEnabledAt) return null;
   const hashes = parseRecoveryHashes(account.totpRecoveryCodes);
@@ -395,15 +395,22 @@ export async function writeAdminAuditLog(entry: { adminId: number; adminEmail: s
  * Par défaut, le journal montre les actions détaillées ; les traces de demande (`admin_request`, écrites
  * avant chaque modification) n'apparaissent qu'à la demande, ou quand on filtre explicitement dessus.
  */
-export async function listAdminAuditLog(input: { includeRequests?: boolean; targetType?: string; targetId?: string; limit?: number; offset?: number }) {
+export type AuditLogFilter = { includeRequests?: boolean; targetType?: string; targetId?: string; adminEmail?: string; action?: string; from?: Date; to?: Date };
+
+export async function listAdminAuditLog(input: AuditLogFilter & { limit?: number; offset?: number }, maxLimit = 200) {
   const db = await getDb();
-  if (!db) return { rows: [] as Array<{ id: string; adminEmail: string; action: string; targetType: string; targetId: string; details: string | null; createdAt: Date }>, total: 0 };
-  const limit = Math.min(input.limit ?? 50, 200);
+  if (!db) return { rows: [] as Array<{ id: string; adminEmail: string; action: string; targetType: string; targetId: string; details: string | null; createdAt: Date; ipAddress: string | null }>, total: 0 };
+  const limit = Math.min(input.limit ?? 50, maxLimit);
   const offset = Math.max(input.offset ?? 0, 0);
   const conditions = [
     input.targetType ? eq(tikisAdminAuditLog.targetType, input.targetType) : undefined,
     input.targetId ? eq(tikisAdminAuditLog.targetId, input.targetId) : undefined,
     !input.includeRequests && !input.targetType ? ne(tikisAdminAuditLog.targetType, "admin_request") : undefined,
+    input.adminEmail ? eq(tikisAdminAuditLog.adminEmail, input.adminEmail.trim().toLowerCase()) : undefined,
+    // Préfixe : « wallet » retrouve wallet_bonus_credited comme wallet_penalty_applied.
+    input.action ? like(tikisAdminAuditLog.action, `${input.action.trim().replace(/[\\%_]/g, (char) => `\\${char}`)}%`) : undefined,
+    input.from ? gte(tikisAdminAuditLog.createdAt, input.from) : undefined,
+    input.to ? lt(tikisAdminAuditLog.createdAt, input.to) : undefined,
   ].filter((value): value is NonNullable<typeof value> => Boolean(value));
   const where = conditions.length ? and(...conditions) : undefined;
   const [rows, totalResult] = await Promise.all([
@@ -871,6 +878,12 @@ export async function adminUpdateFinanceSettings(input: { minWithdrawal: number;
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   await dbc.insert(tikisPlatformSettings).values({ id: 1, minWithdrawal: input.minWithdrawal, maxWithdrawal: input.maxWithdrawal }).onDuplicateKeyUpdate({ set: { minWithdrawal: input.minWithdrawal, maxWithdrawal: input.maxWithdrawal } });
   return input;
+}
+
+export async function adminGetPaymentTransaction(id: string) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  return (await dbc.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, id)).limit(1))[0];
 }
 
 export type PaymentTransactionStatus = "pending" | "succeeded" | "failed" | "cancelled" | "expired";

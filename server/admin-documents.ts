@@ -20,7 +20,8 @@ import { authenticateAdminSession, writeAdminAuditLog } from "./admin-db";
 import { getDb } from "./db";
 import { storageReadObject } from "./storage";
 
-export const ADMIN_DOCUMENT_ROLES = ["super_admin", "support"] as const;
+/** Qui voit quoi : les pièces d'identité aussi pour le rôle « KYC seul », les photos de signalement non. */
+export const ADMIN_DOCUMENT_ROLES = { kyc: ["super_admin", "support", "kyc_reviewer"], report: ["super_admin", "support"] } as const;
 export const KYC_DOCUMENT_SIDES = { "id-front": "idFrontKey", "id-back": "idBackKey", selfie: "selfieKey" } as const;
 export type KycDocumentSide = keyof typeof KYC_DOCUMENT_SIDES;
 
@@ -45,7 +46,8 @@ export async function resolveAdminDocument(input: { sessionToken: string | undef
   const admin = await authenticateAdminSession(input.sessionToken);
   if (!admin) return { status: 401, message: "Session d’administration invalide ou expirée." };
   if (admin.mustEnrollTotp) return { status: 403, message: "Activez la double authentification pour accéder à la console." };
-  if (!(ADMIN_DOCUMENT_ROLES as readonly string[]).includes(admin.role)) return { status: 403, message: "Votre rôle d’administration ne donne pas accès aux pièces justificatives." };
+  if (admin.mustChangePassword) return { status: 403, message: "Choisissez votre mot de passe pour accéder à la console." };
+  if (!(ADMIN_DOCUMENT_ROLES[input.request.kind] as readonly string[]).includes(admin.role)) return { status: 403, message: "Votre rôle d’administration ne donne pas accès aux pièces justificatives." };
   const key = await documentKey(input.request);
   if (!key) return { status: 404, message: "Document introuvable." };
   let object: { body: Buffer; contentType: string };

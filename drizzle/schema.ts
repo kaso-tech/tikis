@@ -179,6 +179,8 @@ export const tikisPlatformSettings = mysqlTable("tikis_platform_settings", {
   maintenanceMessage: varchar("maintenanceMessage", { length: 500 }),
   /** Double authentification exigée pour les rôles super_admin et finance. */
   adminTotpRequired: boolean("adminTotpRequired").notNull().default(false),
+  /** Montant (FCFA) à partir duquel un bonus, une pénalité ou un retrait attend la validation d'un second admin. */
+  adminApprovalThreshold: int("adminApprovalThreshold").notNull().default(100000),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
@@ -280,8 +282,11 @@ export const tikisAdminUsers = mysqlTable("tikis_admin_users", {
   email: varchar("email", { length: 180 }).notNull().unique(),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   fullName: varchar("fullName", { length: 120 }).notNull(),
-  role: mysqlEnum("role", ["super_admin", "support", "finance"]).notNull().default("support"),
+  /** Voir shared/admin-roles.ts : `viewer` lit sans rien modifier, `kyc_reviewer` ne voit que les vérifications d'identité. */
+  role: mysqlEnum("role", ["super_admin", "support", "finance", "viewer", "kyc_reviewer"]).notNull().default("support"),
   active: boolean("active").notNull().default(true),
+  /** Mot de passe provisoire (compte créé ou réinitialisé depuis la console) : à changer avant tout accès. */
+  mustChangePassword: boolean("mustChangePassword").notNull().default(false),
   /** Double authentification (server/admin-totp.ts). Secret chiffré AES-256-GCM, jamais en clair. */
   totpSecret: varchar("totpSecret", { length: 255 }),
   /** Secret proposé à l'enrôlement, pas encore confirmé par un premier code. */
@@ -317,6 +322,32 @@ export const tikisAdminSessions = mysqlTable("tikis_admin_sessions", {
   index("tikis_admin_sessions_admin_index").on(table.adminId, table.revokedAt),
 ]);
 
+/**
+ * Double validation : un bonus, une pénalité ou un retrait au-delà du seuil n'est pas exécuté par l'admin qui
+ * le demande, mais mis en attente jusqu'à ce qu'un autre admin le valide (server/admin-approvals.ts).
+ */
+export const tikisAdminApprovals = mysqlTable("tikis_admin_approvals", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  action: mysqlEnum("action", ["wallet_bonus", "wallet_penalty", "withdrawal_settle"]).notNull(),
+  amount: int("amount").notNull(),
+  targetPhone: varchar("targetPhone", { length: 20 }).notNull(),
+  /** Ce que la demande vise précisément (transaction de retrait, identifiant d'opération) : une seule demande en attente par cible. */
+  targetRef: varchar("targetRef", { length: 80 }).notNull(),
+  payload: text("payload").notNull(),
+  status: mysqlEnum("status", ["pending", "approved", "executed", "failed", "rejected", "cancelled"]).notNull().default("pending"),
+  requestedByAdminId: int("requestedByAdminId").notNull(),
+  requestedByEmail: varchar("requestedByEmail", { length: 180 }).notNull(),
+  decidedByAdminId: int("decidedByAdminId"),
+  decidedByEmail: varchar("decidedByEmail", { length: 180 }),
+  decisionNote: varchar("decisionNote", { length: 300 }),
+  failureReason: varchar("failureReason", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  decidedAt: timestamp("decidedAt"),
+}, (table) => [
+  index("tikis_admin_approvals_status_index").on(table.status, table.createdAt),
+  index("tikis_admin_approvals_target_index").on(table.targetRef, table.status),
+]);
+
 /** Journal d'audit immuable de toute action d'administration (CAS N°10 — décisions tracées). */
 export const tikisAdminAuditLog = mysqlTable("tikis_admin_audit_log", {
   id: varchar("id", { length: 40 }).primaryKey(),
@@ -336,6 +367,7 @@ export const tikisAdminAuditLog = mysqlTable("tikis_admin_audit_log", {
 export type TikisDeliveryReport = typeof tikisDeliveryReports.$inferSelect;
 export type TikisAdminUser = typeof tikisAdminUsers.$inferSelect;
 export type TikisAdminSession = typeof tikisAdminSessions.$inferSelect;
+export type TikisAdminApproval = typeof tikisAdminApprovals.$inferSelect;
 export type TikisAdminAuditLog = typeof tikisAdminAuditLog.$inferSelect;
 
 export type User = typeof users.$inferSelect;

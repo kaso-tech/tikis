@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { trpc } from "../lib/trpc";
+import { downloadCsv, rowsToCsv } from "../lib/csv";
 
-type AuditRow = { id: string; adminEmail: string; action: string; targetType: string; targetId: string; details: string | null; createdAt: Date };
+type AuditRow = { id: string; adminEmail: string; action: string; targetType: string; targetId: string; details: string | null; createdAt: Date; ipAddress?: string | null };
 
 const ACTION_TONE: Record<string, string> = {
   login: "pill-info",
@@ -54,12 +55,44 @@ export default function AuditLogPage() {
   // Chaque modification est tracée deux fois : la demande, avant exécution, puis le détail de l'action.
   // Les demandes ne s'affichent qu'à la demande.
   const [includeRequests, setIncludeRequests] = useState(false);
+  // Filtres appliqués (et brouillon en cours de saisie) : admin, action (préfixe), période en jours calendaires.
+  const [filterDraft, setFilterDraft] = useState({ adminEmail: "", action: "", from: "", to: "" });
+  const [filters, setFilters] = useState(filterDraft);
+  const [exporting, setExporting] = useState(false);
+
+  function queryFilters() {
+    return {
+      includeRequests,
+      adminEmail: filters.adminEmail.trim() || undefined,
+      action: filters.action.trim() || undefined,
+      from: filters.from ? new Date(`${filters.from}T00:00:00`).toISOString() : undefined,
+      // Jour de fin inclus : la borne est le lendemain à minuit.
+      to: filters.to ? new Date(new Date(`${filters.to}T00:00:00`).getTime() + 86_400_000).toISOString() : undefined,
+    };
+  }
+
+  async function exportLog() {
+    setExporting(true); setError("");
+    try {
+      const result = await trpc.adminConsole.auditLog.export.query(queryFilters());
+      const csv = rowsToCsv([
+        { key: "createdAt", label: "Date (UTC)" }, { key: "adminEmail", label: "Administrateur" }, { key: "action", label: "Action" },
+        { key: "targetType", label: "Type de cible" }, { key: "targetId", label: "Cible" }, { key: "details", label: "Détails" }, { key: "ipAddress", label: "Adresse IP" },
+      ], result.rows.map((row) => ({ ...row, createdAt: new Date(row.createdAt).toISOString() })));
+      downloadCsv(`tikis-journal-audit-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+      if (result.truncated) setError(`Export limité aux ${result.rows.length} entrées les plus récentes sur ${result.total} : resserrez les filtres pour le reste.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Export impossible.");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   async function load() {
     setLoading(true);
     setError("");
     try {
-      const response = await trpc.adminConsole.auditLog.list.query({ includeRequests, limit: PAGE_SIZE, offset: page * PAGE_SIZE }) as { rows: AuditRow[]; total: number };
+      const response = await trpc.adminConsole.auditLog.list.query({ ...queryFilters(), limit: PAGE_SIZE, offset: page * PAGE_SIZE }) as { rows: AuditRow[]; total: number };
       setRows(response.rows);
       setTotal(response.total);
     } catch (cause: unknown) {
@@ -69,7 +102,7 @@ export default function AuditLogPage() {
     }
   }
 
-  useEffect(() => { void load(); }, [page, includeRequests]);
+  useEffect(() => { void load(); }, [page, includeRequests, filters]);
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasPrev = page > 0;
@@ -85,6 +118,28 @@ export default function AuditLogPage() {
       </div>
 
       {error ? <div className="banner-error">{error}</div> : null}
+
+      <form className="card" style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", padding: 14, marginBottom: 16 }} onSubmit={(event) => { event.preventDefault(); setPage(0); setFilters(filterDraft); }}>
+        <div style={{ flex: "1 1 200px" }}>
+          <label className="field-label" htmlFor="audit-admin">Administrateur (email)</label>
+          <input id="audit-admin" className="input" value={filterDraft.adminEmail} onChange={(e) => setFilterDraft((f) => ({ ...f, adminEmail: e.target.value }))} placeholder="prenom@tikis.app" />
+        </div>
+        <div style={{ flex: "1 1 160px" }}>
+          <label className="field-label" htmlFor="audit-action">Action (début du nom)</label>
+          <input id="audit-action" className="input" value={filterDraft.action} onChange={(e) => setFilterDraft((f) => ({ ...f, action: e.target.value }))} placeholder="wallet, kyc, login…" />
+        </div>
+        <div>
+          <label className="field-label" htmlFor="audit-from">Du</label>
+          <input id="audit-from" className="input" type="date" value={filterDraft.from} onChange={(e) => setFilterDraft((f) => ({ ...f, from: e.target.value }))} />
+        </div>
+        <div>
+          <label className="field-label" htmlFor="audit-to">Au</label>
+          <input id="audit-to" className="input" type="date" value={filterDraft.to} onChange={(e) => setFilterDraft((f) => ({ ...f, to: e.target.value }))} />
+        </div>
+        <button className="btn btn-primary" type="submit">Filtrer</button>
+        <button className="btn" type="button" onClick={() => { const empty = { adminEmail: "", action: "", from: "", to: "" }; setFilterDraft(empty); setPage(0); setFilters(empty); }}>Effacer</button>
+        <button className="btn" type="button" disabled={exporting} onClick={() => void exportLog()}>{exporting ? "Export…" : "Exporter (CSV)"}</button>
+      </form>
 
       <div className="card">
         <div className="card-head">

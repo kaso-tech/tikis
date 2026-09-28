@@ -1,12 +1,20 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { trpc } from "./trpc";
 
-export type AdminRole = "super_admin" | "support" | "finance";
+// Même liste que shared/admin-roles.ts.
+export type AdminRole = "super_admin" | "support" | "finance" | "viewer" | "kyc_reviewer";
+export const ADMIN_ROLE_LABELS: Record<AdminRole, string> = {
+  super_admin: "Super admin",
+  support: "Support",
+  finance: "Finance",
+  viewer: "Lecture seule",
+  kyc_reviewer: "KYC seul",
+};
 /**
  * `mustEnrollTotp` : la double authentification est exigée pour ce rôle et pas encore activée. Le serveur
  * refuse alors tout sauf l'enrôlement ; la console n'affiche que « Mon compte ».
  */
-export type AdminIdentity = { adminId: number; email: string; role: AdminRole; totpEnabled: boolean; mustEnrollTotp: boolean };
+export type AdminIdentity = { adminId: number; email: string; role: AdminRole; totpEnabled: boolean; mustEnrollTotp: boolean; mustChangePassword: boolean; sessionId: string };
 
 type AuthState = {
   admin: AdminIdentity | null;

@@ -44,7 +44,7 @@ export async function verifyAdminPassword(password: string, storedHash: string):
   return timingSafeEqual(derived, expected);
 }
 
-export type AdminRole = "super_admin" | "support" | "finance";
+export type { AdminRole } from "../shared/admin-roles";
 
 // Empreinte d'un mot de passe que personne ne connaît, calculée une fois. Quand l'email est inconnu, on
 // vérifie quand même le mot de passe contre elle : sans ça, la réponse arrivait sans calcul scrypt,

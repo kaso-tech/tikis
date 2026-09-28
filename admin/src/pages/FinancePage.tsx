@@ -92,8 +92,8 @@ export default function FinancePage() {
     setBusyId(transaction.id);
     setError(""); setSuccess(""); setSettleError("");
     try {
-      await trpc.adminConsole.finance.settleTransaction.mutate({ paymentId: transaction.id, outcome, notes: notes || undefined, payoutReference: needsPayoutProof ? payoutReference : undefined });
-      setSuccess(outcome === "succeeded" ? "Transaction validée." : "Transaction rejetée.");
+      const result = await trpc.adminConsole.finance.settleTransaction.mutate({ paymentId: transaction.id, outcome, notes: notes || undefined, payoutReference: needsPayoutProof ? payoutReference : undefined });
+      setSuccess("approvalRequired" in result ? "Montant au-delà du seuil : demande envoyée pour validation par un second admin (Finance → Validations)." : outcome === "succeeded" ? "Transaction validée." : "Transaction rejetée.");
       setPendingSettle(null);
       loadTransactions(transaction.type);
     } catch (cause) {
@@ -149,8 +149,8 @@ export default function FinancePage() {
     if (!pendingBonus) return;
     setSendingBonus(true);
     try {
-      await trpc.adminConsole.finance.sendBonus.mutate({ phone: pendingBonus.phone, amount: pendingBonus.amount, reason: pendingBonus.reason, requestId: pendingBonus.requestId });
-      setSuccess(`${formatMoney(pendingBonus.amount)} envoyés à ${pendingBonus.phone}.`);
+      const result = await trpc.adminConsole.finance.sendBonus.mutate({ phone: pendingBonus.phone, amount: pendingBonus.amount, reason: pendingBonus.reason, requestId: pendingBonus.requestId });
+      setSuccess("approvalRequired" in result ? "Montant au-delà du seuil : demande envoyée pour validation par un second admin (Finance → Validations)." : `${formatMoney(pendingBonus.amount)} envoyés à ${pendingBonus.phone}.`);
       setBonusDraft({ phone: "", amount: "", reason: "" });
       setPendingBonus(null);
     } catch (cause) {
@@ -263,12 +263,12 @@ export default function FinancePage() {
           <div className="card-head"><div><div className="card-title">Créditer un utilisateur</div><div className="card-sub">Bonus, geste commercial ou correction manuelle</div></div></div>
           {!canEdit ? <div style={{ fontSize: 13, color: "var(--muted)" }}>Réservé aux rôles Super-admin et Finance.</div> : (
             <>
-              <label className="field-label">Téléphone du bénéficiaire</label>
-              <input className="input" value={bonusDraft.phone} onChange={(e) => setBonusDraft((s) => ({ ...s, phone: e.target.value }))} style={{ marginBottom: 10 }} />
-              <label className="field-label">Montant (FCFA)</label>
-              <input className="input" inputMode="numeric" value={bonusDraft.amount} onChange={(e) => setBonusDraft((s) => ({ ...s, amount: e.target.value.replace(/[^0-9]/g, "") }))} style={{ marginBottom: 10 }} />
-              <label className="field-label">Motif</label>
-              <input className="input" value={bonusDraft.reason} onChange={(e) => setBonusDraft((s) => ({ ...s, reason: e.target.value }))} style={{ marginBottom: 14 }} />
+              <label className="field-label" htmlFor="bonus-phone">Téléphone du bénéficiaire</label>
+              <input id="bonus-phone" className="input" value={bonusDraft.phone} onChange={(e) => setBonusDraft((s) => ({ ...s, phone: e.target.value }))} style={{ marginBottom: 10 }} />
+              <label className="field-label" htmlFor="bonus-amount">Montant (FCFA)</label>
+              <input id="bonus-amount" className="input" inputMode="numeric" value={bonusDraft.amount} onChange={(e) => setBonusDraft((s) => ({ ...s, amount: e.target.value.replace(/[^0-9]/g, "") }))} style={{ marginBottom: 10 }} />
+              <label className="field-label" htmlFor="bonus-reason">Motif</label>
+              <input id="bonus-reason" className="input" value={bonusDraft.reason} onChange={(e) => setBonusDraft((s) => ({ ...s, reason: e.target.value }))} style={{ marginBottom: 14 }} />
               <button className="btn btn-primary" disabled={sendingBonus} onClick={requestSendBonus}>{sendingBonus ? "…" : "Envoyer le bonus"}</button>
             </>
           )}

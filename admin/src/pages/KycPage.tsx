@@ -23,7 +23,7 @@ function documentUrl(submissionId: string, side: "id-front" | "id-back" | "selfi
 
 export default function KycPage() {
   const { admin } = useAdminAuth();
-  const canReview = admin?.role === "super_admin" || admin?.role === "support";
+  const canReview = admin?.role === "super_admin" || admin?.role === "support" || admin?.role === "kyc_reviewer";
   const [statusFilter, setStatusFilter] = useState<"submitted" | "approved" | "rejected">("submitted");
   const [rows, setRows] = useState<Row[]>([]);
   const [selected, setSelected] = useState<Row | null>(null);

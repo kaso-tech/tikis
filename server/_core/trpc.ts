@@ -1,3 +1,4 @@
+import { isAdminPathAllowed, type AdminRole } from "../../shared/admin-roles";
 import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from "../../shared/const.js";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
@@ -114,10 +115,18 @@ const requireTikisAdmin = t.middleware(async (opts) => {
   if (!opts.ctx.tikisAdmin) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Session d’administration Tikis invalide ou expirée." });
   }
-  // Double authentification exigée pour ce rôle et pas encore activée : seul l'enrôlement reste ouvert
-  // (`tikisAdminEnrollmentProcedure`), rien d'autre de la console.
+  // Mot de passe provisoire, ou double authentification exigée et pas encore activée : seule la mise en
+  // place du compte reste ouverte (`tikisAdminEnrollmentProcedure`), rien d'autre de la console.
+  if (opts.ctx.tikisAdmin.mustChangePassword) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Choisissez votre mot de passe depuis « Mon compte » pour accéder à la console." });
+  }
   if (opts.ctx.tikisAdmin.mustEnrollTotp) {
     throw new TRPCError({ code: "FORBIDDEN", message: "Activez la double authentification depuis « Mon compte » pour accéder à la console." });
+  }
+  // Rôles restreints (lecture seule, KYC seul) : encadrés ici pour toutes les procédures, y compris
+  // celles ajoutées plus tard (shared/admin-roles.ts).
+  if (!isAdminPathAllowed(opts.ctx.tikisAdmin.role, opts.path, opts.type)) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Votre rôle d’administration ne permet pas cette action." });
   }
   return opts.next({ ctx: { ...opts.ctx, tikisAdmin: opts.ctx.tikisAdmin } });
 });
@@ -125,10 +134,10 @@ const requireTikisAdmin = t.middleware(async (opts) => {
 /** Procédure pour la console d'administration Tikis — distincte de `adminProcedure` (plateforme interne). */
 export const tikisAdminProcedure = t.procedure.use(requireTikisAdmin);
 
-/** Session admin valide, même si l'enrôlement à la double authentification reste à faire. */
+/** Session admin valide, même si le mot de passe provisoire ou l'enrôlement à la double authentification reste à faire. */
 export const tikisAdminEnrollmentProcedure = t.procedure.use(requireTikisAdminSession);
 
-export function requireTikisAdminRole(...roles: Array<"super_admin" | "support" | "finance">) {
+export function requireTikisAdminRole(...roles: AdminRole[]) {
   return t.middleware(async (opts) => {
     if (!opts.ctx.tikisAdmin || !roles.includes(opts.ctx.tikisAdmin.role)) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Votre rôle d’administration ne permet pas cette action." });

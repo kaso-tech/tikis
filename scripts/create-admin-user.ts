@@ -11,16 +11,17 @@
 import "dotenv/config";
 import { hashAdminPassword } from "../server/admin-auth";
 import { createAdminUser, getAdminByEmail } from "../server/admin-db";
+import { ADMIN_ROLES, type AdminRole } from "../shared/admin-roles";
 
 async function main() {
   const [email, password, fullName, role] = process.argv.slice(2);
   if (!email || !password || !fullName) {
-    console.error("Usage: node --import tsx scripts/create-admin-user.ts <email> <password> <fullName> [role=super_admin|support|finance]");
+    console.error(`Usage: node --import tsx scripts/create-admin-user.ts <email> <password> <fullName> [role=${ADMIN_ROLES.join("|")}]`);
     process.exit(1);
   }
-  const safeRole = (role as "super_admin" | "support" | "finance") ?? "super_admin";
-  if (!["super_admin", "support", "finance"].includes(safeRole)) {
-    console.error("Rôle invalide. Utilisez super_admin, support ou finance.");
+  const safeRole = (role ?? "super_admin") as AdminRole;
+  if (!(ADMIN_ROLES as readonly string[]).includes(safeRole)) {
+    console.error(`Rôle invalide. Utilisez ${ADMIN_ROLES.join(", ")}.`);
     process.exit(1);
   }
 

@@ -36,6 +36,7 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
   const [actionError, setActionError] = useState("");
   // Ce que la suspension a fait d'elle-même (candidatures retirées) et ce qu'elle laisse à décider (courses
   // attribuées ou publiées). Rattaché au numéro : ne s'affiche que sur la fiche concernée.
+  const [actionNotice, setActionNotice] = useState("");
   const [statusOutcome, setStatusOutcome] = useState<{ phone: string; releasedCandidacies: number; engagements: { deliveryId: string; title: string; status: string; role: "sender" | "driver" }[] } | null>(null);
   const [statusReasonDraft, setStatusReasonDraft] = useState("");
   // Un identifiant par opération, pas par clic : il ne change qu'une fois le mouvement enregistré. Une
@@ -113,7 +114,8 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
     setActionBusy(true);
     setActionError("");
     try {
-      await trpc.adminConsole.users.reward.mutate({ phone: detail.profile.phone, amount, reason: rewardDraft.reason.trim() || "Bonus accordé par l’administration", requestId: rewardDraft.requestId });
+      const result = await trpc.adminConsole.users.reward.mutate({ phone: detail.profile.phone, amount, reason: rewardDraft.reason.trim() || "Bonus accordé par l’administration", requestId: rewardDraft.requestId });
+      setActionNotice("approvalRequired" in result ? "Montant au-delà du seuil : demande envoyée pour validation par un second admin (Finance → Validations)." : "");
       setRewardDraft({ amount: "", reason: "", requestId: crypto.randomUUID() });
       await openDetail(detail.profile.phone);
     } catch (cause) {
@@ -130,7 +132,8 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
     setActionBusy(true);
     setActionError("");
     try {
-      await trpc.adminConsole.users.penalize.mutate({ phone: detail.profile.phone, amount, reason: penaltyDraft.reason.trim() || "Pénalité appliquée par l’administration", requestId: penaltyDraft.requestId });
+      const result = await trpc.adminConsole.users.penalize.mutate({ phone: detail.profile.phone, amount, reason: penaltyDraft.reason.trim() || "Pénalité appliquée par l’administration", requestId: penaltyDraft.requestId });
+      setActionNotice("approvalRequired" in result ? "Montant au-delà du seuil : demande envoyée pour validation par un second admin (Finance → Validations)." : "");
       setPenaltyDraft({ amount: "", reason: "", requestId: crypto.randomUUID() });
       await openDetail(detail.profile.phone);
     } catch (cause) {
@@ -171,6 +174,7 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
         <div className="card">
           <div className="card-head"><div><div className="card-title">Actions administrateur</div><div className="card-sub">Chaque action est tracée dans le journal d’audit</div></div></div>
           {actionError ? <div className="banner-error">{actionError}</div> : null}
+          {actionNotice ? <div className="banner-ok">{actionNotice}</div> : null}
           {statusOutcome && statusOutcome.phone === detail.profile.phone ? (
             <div className={statusOutcome.engagements.length > 0 ? "banner-error" : "banner-ok"}>
               <div>

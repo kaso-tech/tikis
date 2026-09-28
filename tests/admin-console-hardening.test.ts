@@ -165,7 +165,7 @@ describe("lot 3 — double authentification dans la console", () => {
   it("un compte qui doit s'enrôler ne voit que « Mon compte »", () => {
     const app = read("admin/src/App.tsx");
     expect(app).toContain('NAV.filter((item) => item.key === "account")');
-    expect(app).toContain('const activePage: PageKey = admin.mustEnrollTotp ? "account" : page;');
+    expect(app).toContain('const activePage: PageKey = setupPending ? "account" :');
   });
 
   it("les codes de secours restent affichés jusqu'à ce que l'admin confirme les avoir notés", () => {
@@ -217,8 +217,9 @@ describe("lot 4 — pièces justificatives servies par la route admin", () => {
 
   it("les rôles qui voient les pièces sont les mêmes côté écran et côté serveur", async () => {
     const { ADMIN_DOCUMENT_ROLES } = await import("../server/admin-documents");
-    expect([...ADMIN_DOCUMENT_ROLES]).toEqual(["super_admin", "support"]);
-    expect(read("admin/src/pages/KycPage.tsx")).toContain('const canReview = admin?.role === "super_admin" || admin?.role === "support";');
+    expect([...ADMIN_DOCUMENT_ROLES.kyc]).toEqual(["super_admin", "support", "kyc_reviewer"]);
+    expect([...ADMIN_DOCUMENT_ROLES.report]).toEqual(["super_admin", "support"]);
+    expect(read("admin/src/pages/KycPage.tsx")).toContain('const canReview = admin?.role === "super_admin" || admin?.role === "support" || admin?.role === "kyc_reviewer";');
   });
 
   it("le proxy public filtre avant toute autre étape, et la route admin est montée", () => {
@@ -319,5 +320,67 @@ describe("tableaux défilants", () => {
     for (const page of ["admin/src/pages/FinanceControlPage.tsx", "admin/src/pages/FinancePage.tsx"]) {
       expect(read(page), page).not.toContain('style={{ overflowX: "auto" }}');
     }
+  });
+});
+
+describe("chaque entrée du menu affiche une page", () => {
+  it("toute clé de navigation a son rendu dans la console", () => {
+    const app = read("admin/src/App.tsx");
+    const keys = [...app.matchAll(/\{ key: "([a-zA-Z]+)", label:/g)].map((match) => match[1]);
+    expect(keys.length).toBeGreaterThan(15);
+    for (const key of keys) expect(app, key).toContain(`{activePage === "${key}" ? <`);
+  });
+});
+
+describe("lot B — gouvernance", () => {
+  it("rôles restreints : lecture seule ne modifie rien, KYC seul ne voit que le KYC, chacun garde son compte", async () => {
+    const { isAdminPathAllowed } = await import("../shared/admin-roles");
+    expect(isAdminPathAllowed("viewer", "dashboard.metrics", "query")).toBe(true);
+    expect(isAdminPathAllowed("viewer", "maintenance.set", "mutation")).toBe(false);
+    expect(isAdminPathAllowed("viewer", "auth.changePassword", "mutation")).toBe(true);
+    expect(isAdminPathAllowed("kyc_reviewer", "kyc.review", "mutation")).toBe(true);
+    expect(isAdminPathAllowed("kyc_reviewer", "users.search", "query")).toBe(false);
+    expect(isAdminPathAllowed("kyc_reviewer", "auth.sessions.list", "query")).toBe(true);
+    expect(isAdminPathAllowed("finance", "finance.sendBonus", "mutation")).toBe(true);
+  });
+
+  it("la garde des rôles restreints s'applique dans le middleware commun, pas procédure par procédure", () => {
+    expect(read("server/_core/trpc.ts")).toContain("if (!isAdminPathAllowed(opts.ctx.tikisAdmin.role, opts.path, opts.type)) {");
+  });
+
+  it("la console connaît les mêmes rôles que le serveur", async () => {
+    const { ADMIN_ROLES } = await import("../shared/admin-roles");
+    const auth = read("admin/src/lib/auth.tsx");
+    const declared = /export type AdminRole = ([^;]+);/.exec(auth)?.[1] ?? "";
+    expect(declared.split("|").map((part) => part.trim().replace(/"/g, ""))).toEqual([...ADMIN_ROLES]);
+    const schema = read("drizzle/schema.ts");
+    const adminTable = schema.slice(schema.indexOf('mysqlTable("tikis_admin_users"'));
+    const schemaRoles = /role: mysqlEnum\("role", (\[[^\]]*\])\)/.exec(adminTable)?.[1];
+    expect(JSON.parse(schemaRoles ?? "[]")).toEqual([...ADMIN_ROLES]);
+  });
+
+  it("mot de passe provisoire ou rôle KYC seul : la navigation se restreint comme le serveur", () => {
+    const app = read("admin/src/App.tsx");
+    expect(app).toContain("const setupPending = admin.mustEnrollTotp || admin.mustChangePassword;");
+    expect(app).toContain('NAV.filter((item) => item.key === "kyc" || item.key === "account")');
+    expect(app).toContain('{ key: "approvals", label: "Validations", href: "/admin/approvals", icon: "⇄", group: "finance", roles: ["super_admin", "finance"] }');
+  });
+
+  it("les montants au-delà du seuil passent par une demande, partout où l'argent bouge", () => {
+    const router = read("server/admin-router.ts");
+    expect(router.match(/approvals\.requestWalletAdjustment\(/g)).toHaveLength(3); // users.reward, users.penalize, finance.sendBonus
+    expect(router).toContain("approvals.requestWithdrawalSettlement(");
+    for (const page of ["admin/src/pages/FinancePage.tsx", "admin/src/pages/UsersPage.tsx"]) {
+      expect(read(page), page).toContain('"approvalRequired" in result');
+    }
+  });
+
+  it("le journal se filtre et s'exporte ; la migration crée la gouvernance", () => {
+    const page = read("admin/src/pages/AuditLogPage.tsx");
+    expect(page).toContain("trpc.adminConsole.auditLog.export.query(queryFilters())");
+    const migration = read("drizzle/manual/0047_admin_governance.sql");
+    expect(migration).toContain("enum('super_admin','support','finance','viewer','kyc_reviewer')");
+    expect(migration).toContain("CREATE TABLE IF NOT EXISTS `tikis_admin_approvals`");
+    expect(migration).toContain("ADD COLUMN IF NOT EXISTS `adminApprovalThreshold` int NOT NULL DEFAULT 100000");
   });
 });

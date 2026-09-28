@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { AdminAuthProvider, useAdminAuth } from "./lib/auth";
+import { ADMIN_ROLE_LABELS, AdminAuthProvider, useAdminAuth, type AdminRole } from "./lib/auth";
 import { trpc } from "./lib/trpc";
 import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
@@ -22,11 +22,12 @@ import LoyaltyPage from "./pages/LoyaltyPage";
 import LoyaltyGrantsPage from "./pages/LoyaltyGrantsPage";
 import AccountPage from "./pages/AccountPage";
 import FinanceControlPage from "./pages/FinanceControlPage";
+import ApprovalsPage from "./pages/ApprovalsPage";
 
-type PageKey = "dashboard" | "map" | "reports" | "disputes" | "deliveries" | "users" | "kyc" | "referrals" | "finance" | "pricing" | "commission" | "countries" | "maintenance" | "settings" | "admins" | "auditLog" | "loyalty" | "loyaltyGrants" | "account" | "control";
+type PageKey = "dashboard" | "map" | "reports" | "disputes" | "deliveries" | "users" | "kyc" | "referrals" | "finance" | "pricing" | "commission" | "countries" | "maintenance" | "settings" | "admins" | "auditLog" | "loyalty" | "loyaltyGrants" | "account" | "control" | "approvals";
 type GroupKey = "ops" | "people" | "trust" | "finance" | "system";
 
-const NAV: { key: PageKey; label: string; href: string; icon: string; group: GroupKey; roles?: Array<"super_admin" | "support" | "finance"> }[] = [
+const NAV: { key: PageKey; label: string; href: string; icon: string; group: GroupKey; roles?: AdminRole[] }[] = [
   { key: "dashboard", label: "Vue d'ensemble", href: "/admin", icon: "▦", group: "ops" },
   { key: "map", label: "Carte temps réel", href: "/admin/map", icon: "◎", group: "ops", roles: ["super_admin", "support"] },
   { key: "deliveries", label: "Livraisons", href: "/admin/deliveries", icon: "▣", group: "ops" },
@@ -36,6 +37,7 @@ const NAV: { key: PageKey; label: string; href: string; icon: string; group: Gro
   { key: "kyc", label: "Validations KYC", href: "/admin/kyc", icon: "✓", group: "people" },
   { key: "referrals", label: "Parrainage", href: "/admin/referrals", icon: "◈", group: "people" },
   { key: "finance", label: "Finance", href: "/admin/finance", icon: "$", group: "finance", roles: ["super_admin", "finance"] },
+  { key: "approvals", label: "Validations", href: "/admin/approvals", icon: "⇄", group: "finance", roles: ["super_admin", "finance"] },
   { key: "control", label: "Contrôle financier", href: "/admin/control", icon: "⊜", group: "finance", roles: ["super_admin", "finance"] },
   { key: "commission", label: "Commission", href: "/admin/commission", icon: "₣", group: "finance", roles: ["super_admin", "finance"] },
   { key: "pricing", label: "Estimation intelligente", href: "/admin/pricing", icon: "≈", group: "finance", roles: ["super_admin", "finance"] },
@@ -73,6 +75,8 @@ function Shell() {
     // Avant ce correctif, un nouveau signalement n'était visible qu'en rechargeant la page Tableau de
     // bord : aucune notification. Le bouton "Notifications" de la barre du haut affichait un point fixe,
     // sans donnée réelle. Un sondage léger suffit ici (pas besoin de temps réel pour ce cas d'usage admin).
+    // Rien à sonder tant que le compte n'est pas prêt, ni pour le rôle « KYC seul » : le serveur refuserait.
+    if (!admin || admin.mustChangePassword || admin.mustEnrollTotp || admin.role === "kyc_reviewer") return;
     let cancelled = false;
     async function poll() {
       try {
@@ -83,7 +87,7 @@ function Shell() {
     void poll();
     const interval = setInterval(() => void poll(), OPEN_REPORTS_POLL_MS);
     return () => { cancelled = true; clearInterval(interval); };
-  }, []);
+  }, [admin?.mustChangePassword, admin?.mustEnrollTotp, admin?.role]);
   useEffect(() => {
     function onNavigate(event: Event) {
       const custom = event as CustomEvent<{ page: PageKey }>;
@@ -96,10 +100,14 @@ function Shell() {
 
   // Double authentification exigée et pas encore activée : le serveur refuse tout le reste, la console
   // ne montre que « Mon compte ».
-  const visibleNav = admin.mustEnrollTotp
+  // Mot de passe provisoire à changer : même règle. Rôle « KYC seul » : les vérifications et son compte.
+  const setupPending = admin.mustEnrollTotp || admin.mustChangePassword;
+  const visibleNav = setupPending
     ? NAV.filter((item) => item.key === "account")
-    : NAV.filter((item) => !item.roles || item.roles.includes(admin.role));
-  const activePage: PageKey = admin.mustEnrollTotp ? "account" : page;
+    : admin.role === "kyc_reviewer"
+      ? NAV.filter((item) => item.key === "kyc" || item.key === "account")
+      : NAV.filter((item) => !item.roles || item.roles.includes(admin.role));
+  const activePage: PageKey = setupPending ? "account" : visibleNav.some((item) => item.key === page) ? page : visibleNav[0]?.key ?? "account";
   const grouped = visibleNav.reduce<Record<GroupKey, typeof visibleNav>>((acc, item) => {
     (acc[item.group] ??= []).push(item);
     return acc;
@@ -143,7 +151,7 @@ function Shell() {
           <div className="sidebar-avatar">{initials(admin.email)}</div>
           <div className="sidebar-user">
             <div className="sidebar-user-email" title={admin.email}>{admin.email}</div>
-            <div className="sidebar-user-role">{admin.role.replace("_", " ")}</div>
+            <div className="sidebar-user-role">{ADMIN_ROLE_LABELS[admin.role] ?? admin.role}</div>
           </div>
           <button className="sidebar-logout" onClick={() => void logout()} title="Se déconnecter">⏻</button>
         </div>
@@ -175,26 +183,27 @@ function Shell() {
         </header>
         <main className="main">
           {activePage === "account" ? <AccountPage /> : null}
-          {admin.mustEnrollTotp ? null : <>
-          {page === "dashboard" ? <DashboardPage search={search} /> : null}
-          {page === "map" ? <LiveMapPage /> : null}
-          {page === "deliveries" ? <DeliveriesPage /> : null}
-          {page === "reports" ? <ReportsPage /> : null}
-          {page === "disputes" ? <DisputesPage /> : null}
-          {page === "users" ? <UsersPage search={search} /> : null}
-          {page === "kyc" ? <KycPage /> : null}
-          {page === "referrals" ? <ReferralsPage /> : null}
-          {page === "finance" ? <FinancePage /> : null}
-          {page === "control" ? <FinanceControlPage /> : null}
-          {page === "pricing" ? <PricingPage /> : null}
-          {page === "commission" ? <CommissionPage /> : null}
-          {page === "countries" ? <CountriesPage /> : null}
-          {page === "maintenance" ? <MaintenancePage /> : null}
-          {page === "settings" ? <SettingsPage /> : null}
-          {page === "admins" ? <AdminsPage /> : null}
-          {page === "auditLog" ? <AuditLogPage /> : null}
-          {page === "loyalty" ? <LoyaltyPage /> : null}
-          {page === "loyaltyGrants" ? <LoyaltyGrantsPage /> : null}
+          {setupPending ? null : <>
+          {activePage === "dashboard" ? <DashboardPage search={search} /> : null}
+          {activePage === "map" ? <LiveMapPage /> : null}
+          {activePage === "deliveries" ? <DeliveriesPage /> : null}
+          {activePage === "reports" ? <ReportsPage /> : null}
+          {activePage === "disputes" ? <DisputesPage /> : null}
+          {activePage === "users" ? <UsersPage search={search} /> : null}
+          {activePage === "kyc" ? <KycPage /> : null}
+          {activePage === "referrals" ? <ReferralsPage /> : null}
+          {activePage === "finance" ? <FinancePage /> : null}
+          {activePage === "control" ? <FinanceControlPage /> : null}
+          {activePage === "approvals" ? <ApprovalsPage /> : null}
+          {activePage === "pricing" ? <PricingPage /> : null}
+          {activePage === "commission" ? <CommissionPage /> : null}
+          {activePage === "countries" ? <CountriesPage /> : null}
+          {activePage === "maintenance" ? <MaintenancePage /> : null}
+          {activePage === "settings" ? <SettingsPage /> : null}
+          {activePage === "admins" ? <AdminsPage /> : null}
+          {activePage === "auditLog" ? <AuditLogPage /> : null}
+          {activePage === "loyalty" ? <LoyaltyPage /> : null}
+          {activePage === "loyaltyGrants" ? <LoyaltyGrantsPage /> : null}
           </>}
         </main>
       </div>
