@@ -16,6 +16,19 @@ type Metrics = {
   vehicleBreakdown?: { vehicle: string; count: number }[];
 };
 
+type DashboardReport = {
+  id: string;
+  reason: string;
+  description: string;
+  deliveryId: string;
+  reporterPhone: string;
+  createdAt: string | Date;
+};
+
+type ReportListEntry = {
+  report?: Partial<DashboardReport> | null;
+};
+
 const REPORT_REASONS = ["Comportement", "Sécurité", "Paiement", "Objet endommagé", "Retard", "Autre"];
 
 function formatMoney(amount: number) {
@@ -38,7 +51,7 @@ function relativeTime(iso: string | Date): string {
 
 export default function DashboardPage(_props: { search?: string }) {
   const [metrics, setMetrics] = useState<Metrics | null>(null);
-  const [reports, setReports] = useState<Array<{ id: string; reason: string; description: string; deliveryId: string; reporterPhone: string; createdAt: string | Date }>>([]);
+  const [reports, setReports] = useState<DashboardReport[]>([]);
   const [error, setError] = useState("");
   const [period, setPeriod] = useState<7 | 14 | 30 | 90>(30);
 
@@ -52,7 +65,19 @@ export default function DashboardPage(_props: { search?: string }) {
       .then(([data, list]) => {
         if (cancelled) return;
         setMetrics((data as Metrics) ?? null);
-        setReports((list as Array<{ id: string; reason: string; description: string; deliveryId: string; reporterPhone: string; createdAt: string | Date }>) ?? []);
+        const entries = (list as ReportListEntry[] | null | undefined) ?? [];
+        setReports(entries.flatMap((entry) => {
+          const report = entry.report;
+          if (!report?.id) return [];
+          return [{
+            id: String(report.id),
+            reason: String(report.reason ?? "Signalement"),
+            description: String(report.description ?? ""),
+            deliveryId: String(report.deliveryId ?? ""),
+            reporterPhone: String(report.reporterPhone ?? "—"),
+            createdAt: report.createdAt ?? new Date().toISOString(),
+          }];
+        }));
       })
       .catch((cause: unknown) => {
         if (cancelled) return;
