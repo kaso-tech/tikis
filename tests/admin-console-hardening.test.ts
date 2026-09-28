@@ -30,7 +30,7 @@ describe("droits par rôle", () => {
   const router = read("server/admin-router.ts");
 
   it("trancher un signalement est réservé au support et aux super-admins", () => {
-    expect(router).toMatch(/resolve: tikisAdminProcedure\.use\(requireTikisAdminRole\("super_admin", "support"\)\)/);
+    expect(router).toMatch(/resolve: adminProcedure\.use\(requireTikisAdminRole\("super_admin", "support"\)\)/);
   });
 
   it("la suspension d'un admin passe l'auteur de l'action au serveur", () => {
@@ -46,7 +46,7 @@ describe("droits par rôle", () => {
   it("l'écran des signalements n'offre les actions qu'aux rôles autorisés", () => {
     const page = read("admin/src/pages/ReportsPage.tsx");
     expect(page).toContain('const canResolve = admin?.role === "super_admin" || admin?.role === "support";');
-    expect(page).toContain("{canResolve ? <div");
+    expect(page).toContain("{!canResolve ? <p");
   });
 
   it("l'écran de l'équipe n'offre pas de se suspendre soi-même", () => {
@@ -143,7 +143,7 @@ describe("lot 2 — la console ne manipule plus aucun jeton de session", () => {
 
   it("la carte en direct n'apparaît qu'aux rôles qui y ont droit", () => {
     expect(read("admin/src/App.tsx")).toContain('{ key: "map", label: "Carte temps réel", href: "/admin/map", icon: "◎", group: "ops", roles: ["super_admin", "support"] }');
-    expect(read("server/admin-router.ts")).toContain('liveLocations: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "support"))');
+    expect(read("server/admin-router.ts")).toContain('liveLocations: adminProcedure.use(requireTikisAdminRole("super_admin", "support"))');
   });
 
   it("la migration crée la table des sessions, sans jamais y stocker le jeton en clair", () => {
@@ -181,7 +181,9 @@ describe("lot 3 — double authentification dans la console", () => {
     expect(router).toContain("begin: tikisAdminEnrollmentProcedure");
     expect(router).toContain("confirm: tikisAdminEnrollmentProcedure");
     // La désactivation, elle, reste derrière la procédure complète.
-    expect(router).toContain("disable: tikisAdminProcedure");
+    expect(router).toContain("disable: adminProcedure");
+    // `adminProcedure` (trace d'audit) repose sur la procédure complète, qui ferme la console aux non-enrôlés.
+    expect(router).toContain("const adminProcedure = tikisAdminProcedure.use(");
   });
 
   it("la liste des rôles soumis à l'obligation est la même côté écran et côté serveur", async () => {
@@ -223,5 +225,59 @@ describe("lot 4 — pièces justificatives servies par la route admin", () => {
     const proxy = read("server/_core/storageProxy.ts");
     expect(proxy.indexOf("isPrivateStorageKey(key)")).toBeLessThan(proxy.indexOf("ENV.forgeApiUrl"));
     expect(read("server/_core/index.ts")).toContain("registerAdminDocumentRoutes(app);");
+  });
+});
+
+describe("lot 5 — traçabilité et pilotage", () => {
+  const router = read("server/admin-router.ts");
+
+  it("toutes les procédures du routeur admin passent par la trace d'audit préalable", () => {
+    const body = router.slice(router.indexOf("export const tikisAdminRouter"));
+    expect(body).not.toContain("tikisAdminProcedure");
+  });
+
+  it("masque mots de passe, codes et jetons dans l'entrée recopiée", async () => {
+    const { auditableInput } = await import("../server/admin-router");
+    expect(auditableInput({ password: "x", code: "123456", nested: { sessionToken: "t", amount: 5 }, list: [{ secret: "s" }] }))
+      .toEqual({ password: "[masqué]", code: "[masqué]", nested: { sessionToken: "[masqué]", amount: 5 }, list: [{ secret: "[masqué]" }] });
+  });
+
+  it("les réglages gardent leur valeur avant et après", () => {
+    for (const action of ["commission_rate_updated", "referral_settings_updated", "finance_settings_updated", "pricing_config_updated", "country_upserted", "country_enabled_changed", "maintenance_mode_changed", "loyalty_program_upserted", "loyalty_program_toggled", "totp_policy_changed", "profile_status_changed", "profile_role_changed", "report_resolved"]) {
+      const line = router.split("\n").find((candidate) => candidate.includes(`"${action}"`));
+      expect(line, action).toMatch(/before/);
+    }
+  });
+
+  it("le journal affiche avant/après et propose les demandes brutes", () => {
+    const page = read("admin/src/pages/AuditLogPage.tsx");
+    expect(page).toContain("<AuditDetails details={row.details} />");
+    expect(page).toContain("includeRequests");
+  });
+
+  it("un push de décision KYC ouvre l'écran Vérification de l'app", () => {
+    const runtime = read("components/tikis/push-notification-runtime.tsx");
+    expect(runtime).toContain('if (data.screen === "verification") {');
+    expect(runtime).toContain('router.push("/verification" as never);');
+    expect(read("server/admin-db.ts")).toContain('data: { kind: "kyc_decision", screen: "verification" }');
+  });
+
+  it("les signalements clos se rouvrent avant un autre verdict, et l'auteur reçoit le message qui lui est destiné", () => {
+    const page = read("admin/src/pages/ReportsPage.tsx");
+    expect(page).toContain("Rouvrir");
+    expect(page).toContain("replyToReporter: reply.trim() || undefined");
+  });
+
+  it("le tableau de bord affiche le revenu net et plafonne le taux de complétion", () => {
+    const page = read("admin/src/pages/DashboardPage.tsx");
+    expect(page).toContain('label="Commissions nettes"');
+    expect(page).toContain("Math.min(100,");
+  });
+
+  it("l'historique des transactions se filtre, se cherche et se pagine", () => {
+    const page = read("admin/src/pages/FinancePage.tsx");
+    expect(page).toContain('onClick={() => setTab("history")}>Historique</button>');
+    expect(page).toContain("offset: historyPage * HISTORY_PAGE_SIZE");
+    expect(page).toContain('expired: "Expirée"');
   });
 });

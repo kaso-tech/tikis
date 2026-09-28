@@ -23,6 +23,7 @@ export default function ReportsPage() {
   const [rows, setRows] = useState<ReportRow[]>([]);
   const [selected, setSelected] = useState<ReportRow | null>(null);
   const [notes, setNotes] = useState("");
+  const [reply, setReply] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -40,9 +41,10 @@ export default function ReportsPage() {
     setBusy(true);
     setError("");
     try {
-      await trpc.adminConsole.reports.resolve.mutate({ reportId: selected.report.id, status, resolutionNotes: notes.trim() || undefined });
+      await trpc.adminConsole.reports.resolve.mutate({ reportId: selected.report.id, status, resolutionNotes: notes.trim() || undefined, replyToReporter: reply.trim() || undefined });
       setSelected(null);
       setNotes("");
+      setReply("");
       load();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Action impossible.");
@@ -53,11 +55,12 @@ export default function ReportsPage() {
 
   // ———— Vue détail : page dédiée, remplace la liste ————
   if (selected) {
+    const isClosed = selected.report.status === "resolved" || selected.report.status === "dismissed";
     return (
       <div>
         <div className="page-head">
           <div>
-            <button className="btn btn-secondary btn-sm" onClick={() => { setSelected(null); setNotes(""); }} style={{ marginBottom: 10 }}>← Retour à la liste</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => { setSelected(null); setNotes(""); setReply(""); }} style={{ marginBottom: 10 }}>← Retour à la liste</button>
             <h1 className="page-title">{selected.delivery.title}</h1>
             <p className="page-sub" style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>Livraison {selected.report.deliveryId}</p>
           </div>
@@ -82,14 +85,28 @@ export default function ReportsPage() {
               ) : null}
             </div>
             <div>
-              <label className="field-label" htmlFor="notes">Notes de résolution</label>
-              <textarea id="notes" className="textarea" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Décision prise, actions menées, communication à l'utilisateur…" />
+              <label className="field-label" htmlFor="notes">Notes internes</label>
+              <textarea id="notes" className="textarea" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Décision prise, actions menées (visible par l’équipe seulement)" />
             </div>
-            {canResolve ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button className="btn btn-secondary" disabled={busy} onClick={() => void resolve("reviewing")}>Marquer « en cours »</button>
-              <button className="btn btn-primary" disabled={busy} onClick={() => void resolve("resolved")}>Résoudre</button>
-              <button className="btn btn-danger" disabled={busy} onClick={() => void resolve("dismissed")}>Classer sans suite</button>
-            </div> : <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Lecture seule : le traitement des signalements est réservé au support.</p>}
+            {canResolve && !isClosed ? (
+              <div>
+                <label className="field-label" htmlFor="reply">Message à l’auteur (facultatif)</label>
+                <textarea id="reply" className="textarea" rows={2} maxLength={500} value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Joint à la notification envoyée quand vous résolvez ou classez le signalement" />
+              </div>
+            ) : null}
+            {!canResolve ? <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Lecture seule : le traitement des signalements est réservé au support.</p>
+              : isClosed ? (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  <span className="muted" style={{ fontSize: 12.5 }}>Signalement clos. Pour rendre une autre décision, rouvrez-le d’abord.</span>
+                  <button className="btn btn-secondary" disabled={busy} onClick={() => void resolve("reviewing")}>Rouvrir</button>
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button className="btn btn-secondary" disabled={busy} onClick={() => void resolve("reviewing")}>Marquer « en cours »</button>
+                  <button className="btn btn-primary" disabled={busy} onClick={() => void resolve("resolved")}>Résoudre et prévenir l’auteur</button>
+                  <button className="btn btn-danger" disabled={busy} onClick={() => void resolve("dismissed")}>Classer et prévenir l’auteur</button>
+                </div>
+              )}
           </div>
         </div>
       </div>

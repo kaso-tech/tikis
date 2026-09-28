@@ -742,3 +742,143 @@ describe.skipIf(!TEST_DB)("lot 4 — pièces KYC et pièces jointes, réservées
     expect(reads.at(-1)).toBe("tikis-reports/x/photo.png");
   });
 });
+
+describe.skipIf(!TEST_DB)("lot 5 — traçabilité et pilotage", () => {
+  async function adminCaller(role: "super_admin" | "support" | "finance" = "super_admin") {
+    const admin = (await adminDb.createAdminUser({ email: `lot5-${randomUUID()}@tikis.test`, passwordHash: await adminAuth.hashAdminPassword("mot-de-passe-lot5"), fullName: "Audit", role }))!;
+    const { token } = await adminDb.createAdminSession({ adminId: admin.id });
+    const { tikisAdminRouter } = await import("../server/admin-router");
+    const { createContext } = await import("../server/_core/context");
+    const req = { headers: { "x-tikis-admin": "1", cookie: `tikis_admin_session=${token}` }, ip: "203.0.113.50", secure: true, socket: {} } as never;
+    const res = { cookie: () => {}, clearCookie: () => {} } as never;
+    return { admin, api: tikisAdminRouter.createCaller(await createContext({ req, res, info: {} as never })) };
+  }
+
+  async function auditRows(adminId: number) {
+    const handle = (await db.getDb())!;
+    const { desc, eq } = await import("drizzle-orm");
+    return handle.select().from(schema.tikisAdminAuditLog).where(eq(schema.tikisAdminAuditLog.adminId, adminId)).orderBy(desc(schema.tikisAdminAuditLog.createdAt));
+  }
+
+  it("chaque modification laisse la demande, puis le détail avec la valeur avant et après", async () => {
+    const { admin, api } = await adminCaller();
+    const before = await db.getTikisCommissionRate();
+    const next = before === 0.1 ? 0.12 : 0.1;
+    try {
+      await api.commission.update({ rate: next });
+      const rows = await auditRows(admin.id);
+      expect(rows.find((row) => row.targetType === "admin_request")).toMatchObject({ action: "commission.update" });
+      const detail = rows.find((row) => row.action === "commission_rate_updated")!;
+      expect(JSON.parse(detail.details!)).toEqual({ before, after: next });
+    } finally {
+      await adminDb.adminUpdateCommissionRate(before);
+    }
+  });
+
+  it("si le journal est indisponible, la modification est refusée et n'a pas lieu", async () => {
+    const { api } = await adminCaller();
+    const before = await db.getTikisCommissionRate();
+    const handle = (await db.getDb())!;
+    const { sql } = await import("drizzle-orm");
+    await handle.execute(sql`RENAME TABLE tikis_admin_audit_log TO tikis_admin_audit_log_offline`);
+    try {
+      await expect(api.commission.update({ rate: before === 0.1 ? 0.15 : 0.1 })).rejects.toThrow(/journal d’audit est indisponible/);
+    } finally {
+      await handle.execute(sql`RENAME TABLE tikis_admin_audit_log_offline TO tikis_admin_audit_log`);
+    }
+    expect(await db.getTikisCommissionRate()).toBe(before);
+  });
+
+  it("aucun code ni mot de passe n'est recopié dans le journal", async () => {
+    const { admin, api } = await adminCaller("support");
+    await expect(api.auth.totp.disable({ code: "123456" })).rejects.toThrow();
+    const request = (await auditRows(admin.id)).find((row) => row.targetType === "admin_request")!;
+    expect(request.details).not.toContain("123456");
+    expect(JSON.parse(request.details!)).toEqual({ code: "[masqué]" });
+  });
+
+  it("le journal montre les actions ; les demandes brutes seulement sur demande", async () => {
+    const { admin, api } = await adminCaller();
+    await api.maintenance.set({ enabled: false });
+    const shown = await adminDb.listAdminAuditLog({ limit: 200 });
+    expect(shown.rows.some((row) => row.adminEmail === admin.email && row.targetType === "admin_request")).toBe(false);
+    expect(shown.rows.some((row) => row.adminEmail === admin.email && row.action === "maintenance_mode_changed")).toBe(true);
+    const all = await adminDb.listAdminAuditLog({ includeRequests: true, limit: 200 });
+    expect(all.rows.some((row) => row.adminEmail === admin.email && row.targetType === "admin_request")).toBe(true);
+  });
+
+  it("KYC : un dossier ne se tranche qu'une fois", async () => {
+    const { api } = await adminCaller("support");
+    const { id } = await db.createKycSubmission({ driverPhone: newPhone(), idFrontKey: "tikis-kyc/x/f.jpg", idBackKey: "tikis-kyc/x/b.jpg", selfieKey: "tikis-kyc/x/s.jpg" });
+    await api.kyc.review({ submissionId: id, decision: "approved" });
+    // Avant correction : accepté, le dossier approuvé devenait refusé sans que le livreur le sache.
+    await expect(api.kyc.review({ submissionId: id, decision: "rejected", rejectionReason: "Flou" })).rejects.toThrow(/déjà été approuvé/);
+  });
+
+  it("signalement : l'auteur est prévenu de la décision, un dossier clos se rouvre avant un autre verdict", async () => {
+    const { api } = await adminCaller("support");
+    const handle = (await db.getDb())!;
+    const { and, eq } = await import("drizzle-orm");
+    const reporterPhone = newPhone();
+    const { id } = await adminDb.createDeliveryReport({ deliveryId: randomUUID(), reporterPhone, reporterRole: "sender", reason: "late", description: "Très en retard" });
+    const decisions = async () => handle.select().from(schema.tikisDeliveryEvents).where(and(eq(schema.tikisDeliveryEvents.recipientPhone, reporterPhone), eq(schema.tikisDeliveryEvents.eventType, "report_decision")));
+
+    await api.reports.resolve({ reportId: id, status: "resolved", resolutionNotes: "Livreur averti (interne)", replyToReporter: "Le livreur a été averti." });
+    let events = await decisions();
+    expect(events).toHaveLength(1);
+    expect(events[0]!.body).toContain("Le livreur a été averti.");
+    expect(events[0]!.body).not.toContain("interne");
+
+    await expect(api.reports.resolve({ reportId: id, status: "dismissed" })).rejects.toThrow(/déjà clos/);
+    await api.reports.resolve({ reportId: id, status: "reviewing" });
+    expect((await adminDb.getDeliveryReportById(id))!.resolvedAt).toBeNull();
+    await api.reports.resolve({ reportId: id, status: "dismissed" });
+    events = await decisions();
+    expect(events).toHaveLength(2);
+  });
+
+  it("tableau de bord : terminées comptées à leur date de fin, revenu net des commissions rendues", async () => {
+    const handle = (await db.getDb())!;
+    const before = (await adminDb.adminDashboardMetrics(30))!;
+    const driverPhone = newPhone();
+    // Publiée il y a 40 jours, terminée hier : elle compte dans les 30 derniers jours.
+    await handle.insert(schema.tikisDeliveries).values({
+      id: randomUUID(), senderPhone: newPhone(), pickupPlaceId: 1, dropoffPlaceId: 2, title: "Ancienne course", details: "",
+      deliveryType: "Plis", distanceKm: "3.00", estimatedPrice: 3000, vehicleTypes: "Moto", status: "completed", driverPhone,
+      createdAt: new Date(Date.now() - 40 * 86_400_000), completedAt: new Date(Date.now() - 86_400_000),
+    });
+    await handle.transaction(async (tx) => {
+      await db.applyWalletMovement(tx, { profilePhone: driverPhone, operation: "credit", amount: 1000, availableDelta: 1000, heldDelta: 0, reason: "Solde (test)", idempotencyKey: `${driverPhone}:seed` });
+      await db.applyWalletMovement(tx, { profilePhone: driverPhone, operation: "commission_debit", amount: 500, availableDelta: -500, heldDelta: 0, reason: "Commission (test)", idempotencyKey: `${driverPhone}:commission` });
+      await db.applyWalletMovement(tx, { profilePhone: driverPhone, operation: "compensation", amount: 200, availableDelta: 200, heldDelta: 0, reason: "Commission rendue (test)", idempotencyKey: `${driverPhone}:refund` });
+    });
+    const after = (await adminDb.adminDashboardMetrics(30))!;
+    expect(after.deliveriesCompleted - before.deliveriesCompleted).toBe(1);
+    expect(after.commissionGross - before.commissionGross).toBe(500);
+    expect(after.commissionRefunds - before.commissionRefunds).toBe(200);
+    // Avant correction : +500, la commission rendue restait comptée comme revenu.
+    expect(after.commissionRevenue - before.commissionRevenue).toBe(300);
+  });
+
+  it("transactions : recherche par téléphone (format local ou international) et par référence, filtre expirée, pagination", async () => {
+    const { api } = await adminCaller("finance");
+    const handle = (await db.getDb())!;
+    const phone = newPhone();
+    const ids: string[] = [];
+    for (const status of ["succeeded", "expired", "failed"] as const) {
+      const id = randomUUID();
+      ids.push(id);
+      await handle.insert(schema.tikisPaymentTransactions).values({ id, profilePhone: phone, type: "deposit", provider: "yengapay_live", amount: 1000, status, providerReference: `pi_lot5_${id}`, checkoutUrl: null, idempotencyKey: `lot5:${id}` });
+    }
+    const local = phone.replace("+226", "");
+    expect((await api.finance.transactions({ query: local })).total).toBe(3);
+    expect((await api.finance.transactions({ query: phone })).total).toBe(3);
+    expect((await api.finance.transactions({ query: `pi_lot5_${ids[1]}` })).rows.map((row) => row.id)).toEqual([ids[1]]);
+    expect((await api.finance.transactions({ query: local, status: "expired" })).rows.map((row) => row.id)).toEqual([ids[1]]);
+    const firstPage = await api.finance.transactions({ query: local, limit: 2, offset: 0 });
+    const secondPage = await api.finance.transactions({ query: local, limit: 2, offset: 2 });
+    expect(firstPage.rows).toHaveLength(2);
+    expect(secondPage.rows).toHaveLength(1);
+    expect(firstPage.total).toBe(3);
+  });
+});

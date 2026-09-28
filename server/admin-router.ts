@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { router, publicProcedure, tikisAdminProcedure, tikisAdminEnrollmentProcedure, requireTikisAdminRole, invalidateTikisProfileCache } from "./_core/trpc";
 import { clientIp } from "./_core/security";
@@ -8,10 +9,51 @@ import * as adminDb from "./admin-db";
 import * as db from "./db";
 import { publishDeliveryStatusBroadcast } from "./supabase-realtime";
 
+/**
+ * Détail d'une action, écrit après qu'elle a réussi. Ne fait jamais échouer la requête : l'action est faite,
+ * et la trace de la demande existe déjà (`adminProcedure`). Faire croire à l'admin qu'une action réussie a
+ * échoué l'inciterait à la relancer.
+ */
 async function audit(ctx: { tikisAdmin?: { adminId: number; email: string } | null; req: { ip?: string; socket?: { remoteAddress?: string } } }, action: string, targetType: string, targetId: string, details?: unknown) {
   if (!ctx.tikisAdmin) return;
-  await adminDb.writeAdminAuditLog({ adminId: ctx.tikisAdmin.adminId, adminEmail: ctx.tikisAdmin.email, action, targetType, targetId, details, ipAddress: clientIp(ctx.req) });
+  try {
+    await adminDb.writeAdminAuditLog({ adminId: ctx.tikisAdmin.adminId, adminEmail: ctx.tikisAdmin.email, action, targetType, targetId, details, ipAddress: clientIp(ctx.req) });
+  } catch (cause) {
+    console.error("[admin-audit] détail non enregistré après une action réussie", { action, targetType, targetId }, cause);
+  }
 }
+
+const SENSITIVE_INPUT_KEY = /password|code|token|secret/i;
+
+/** Copie de l'entrée d'une requête, sans mot de passe, code ni jeton, bornée en profondeur. */
+export function auditableInput(value: unknown, depth = 0): unknown {
+  if (depth > 4) return "…";
+  if (Array.isArray(value)) return value.slice(0, 50).map((item) => auditableInput(item, depth + 1));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [key, SENSITIVE_INPUT_KEY.test(key) ? "[masqué]" : auditableInput(item, depth + 1)]));
+  }
+  return value;
+}
+
+/**
+ * Toute modification demandée depuis la console est inscrite au journal AVANT d'être exécutée ; si
+ * l'inscription échoue, la modification est refusée. Aucune action ne peut donc avoir lieu sans trace,
+ * même si le détail écrit après coup (`audit`) venait à manquer. Les tentatives refusées faute de droits
+ * sont tracées aussi.
+ */
+const adminProcedure = tikisAdminProcedure.use(async ({ ctx, type, path, getRawInput, next }) => {
+  if (type !== "mutation") return next();
+  try {
+    await adminDb.writeAdminAuditLog({
+      adminId: ctx.tikisAdmin.adminId, adminEmail: ctx.tikisAdmin.email, action: path.slice(0, 80),
+      targetType: "admin_request", targetId: path.slice(0, 80), details: auditableInput(await getRawInput()), ipAddress: clientIp(ctx.req),
+    });
+  } catch (cause) {
+    console.error("[admin-audit] demande non tracée : refusée", path, cause);
+    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Le journal d’audit est indisponible : action refusée par précaution. Réessayez dans un instant." });
+  }
+  return next();
+});
 
 function requestUserAgent(req: { headers: Record<string, string | string[] | undefined> }) {
   const value = req.headers["user-agent"];
@@ -70,7 +112,7 @@ export const tikisAdminRouter = router({
         await audit(ctx, "totp_enabled", "admin_user", String(ctx.tikisAdmin.adminId));
         return result;
       }),
-      disable: tikisAdminProcedure.input(z.object({ code: z.string().trim().min(6).max(20) })).mutation(async ({ ctx, input }) => {
+      disable: adminProcedure.input(z.object({ code: z.string().trim().min(6).max(20) })).mutation(async ({ ctx, input }) => {
         await adminDb.disableOwnTotp({ adminId: ctx.tikisAdmin.adminId, role: ctx.tikisAdmin.role, code: input.code });
         await audit(ctx, "totp_disabled", "admin_user", String(ctx.tikisAdmin.adminId));
         return { success: true } as const;
@@ -79,31 +121,32 @@ export const tikisAdminRouter = router({
   }),
 
   dashboard: router({
-    metrics: tikisAdminProcedure.input(z.object({ periodDays: z.number().int().min(1).max(365).default(30) })).query(({ input }) => adminDb.adminDashboardMetrics(input.periodDays)),
+    metrics: adminProcedure.input(z.object({ periodDays: z.number().int().min(1).max(365).default(30) })).query(({ input }) => adminDb.adminDashboardMetrics(input.periodDays)),
   }),
 
   commission: router({
-    get: tikisAdminProcedure.query(() => db.getTikisCommissionRate()),
-    update: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ rate: z.number().min(0.001).max(0.9) })).mutation(async ({ ctx, input }) => {
+    get: adminProcedure.query(() => db.getTikisCommissionRate()),
+    update: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ rate: z.number().min(0.001).max(0.9) })).mutation(async ({ ctx, input }) => {
+      const before = await db.getTikisCommissionRate().catch(() => null);
       const result = await adminDb.adminUpdateCommissionRate(input.rate);
-      await audit(ctx, "commission_rate_updated", "platform_settings", "commissionRate", { newRate: input.rate });
+      await audit(ctx, "commission_rate_updated", "platform_settings", "commissionRate", { before, after: input.rate });
       return result;
     }),
   }),
 
   reports: router({
-    list: tikisAdminProcedure.input(z.object({ status: z.enum(["open", "reviewing", "resolved", "dismissed"]).optional() })).query(({ input }) => adminDb.listDeliveryReports({ status: input.status })),
-    resolve: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ reportId: z.string(), status: z.enum(["reviewing", "resolved", "dismissed"]), resolutionNotes: z.string().max(1000).optional() })).mutation(async ({ ctx, input }) => {
+    list: adminProcedure.input(z.object({ status: z.enum(["open", "reviewing", "resolved", "dismissed"]).optional() })).query(({ input }) => adminDb.listDeliveryReports({ status: input.status })),
+    resolve: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ reportId: z.string(), status: z.enum(["reviewing", "resolved", "dismissed"]), resolutionNotes: z.string().max(1000).optional(), replyToReporter: z.string().max(500).optional() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
-      const result = await adminDb.resolveDeliveryReport({ reportId: input.reportId, status: input.status, resolutionNotes: input.resolutionNotes, adminId: ctx.tikisAdmin.adminId });
-      await audit(ctx, "report_resolved", "delivery_report", input.reportId, { status: input.status, notes: input.resolutionNotes });
-      return result;
+      const { report, previousStatus } = await adminDb.resolveDeliveryReport({ reportId: input.reportId, status: input.status, resolutionNotes: input.resolutionNotes, replyToReporter: input.replyToReporter, adminId: ctx.tikisAdmin.adminId });
+      await audit(ctx, "report_resolved", "delivery_report", input.reportId, { before: previousStatus, after: input.status, notes: input.resolutionNotes, replyToReporter: input.replyToReporter });
+      return report;
     }),
   }),
 
   disputes: router({
-    searchDeliveries: tikisAdminProcedure.input(z.object({ query: z.string().max(120).optional(), status: z.string().optional() })).query(({ input }) => adminDb.adminSearchDeliveries(input)),
-    timeline: tikisAdminProcedure.input(z.object({ deliveryId: z.string().uuid() })).query(async ({ ctx, input }) => {
+    searchDeliveries: adminProcedure.input(z.object({ query: z.string().max(120).optional(), status: z.string().optional() })).query(({ input }) => adminDb.adminSearchDeliveries(input)),
+    timeline: adminProcedure.input(z.object({ deliveryId: z.string().uuid() })).query(async ({ ctx, input }) => {
       const timeline = await adminDb.adminGetDeliveryTimeline(input.deliveryId);
       await audit(ctx, "delivery_timeline_viewed", "delivery", input.deliveryId);
       return timeline;
@@ -111,7 +154,7 @@ export const tikisAdminRouter = router({
   }),
 
   users: router({
-    search: tikisAdminProcedure.input(z.object({
+    search: adminProcedure.input(z.object({
       query: z.string().trim().min(2).max(120).optional(),
       limit: z.number().int().min(1).max(100).optional(),
       offset: z.number().int().min(0).max(10_000).optional(),
@@ -119,31 +162,33 @@ export const tikisAdminRouter = router({
       const result = await adminDb.adminSearchProfiles({ query: input.query, limit: input.limit ?? 25, offset: input.offset ?? 0 });
       return { rows: result.rows, total: result.total, limit: input.limit ?? 25, offset: input.offset ?? 0 };
     }),
-    detail: tikisAdminProcedure.input(z.object({ phone: z.string() })).query(async ({ ctx, input }) => {
+    detail: adminProcedure.input(z.object({ phone: z.string() })).query(async ({ ctx, input }) => {
       const detail = await adminDb.adminGetProfileDetail(input.phone);
       await audit(ctx, "profile_viewed", "profile", input.phone);
       return detail;
     }),
-    setStatus: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ phone: z.string(), status: z.enum(["active", "suspended", "banned"]), reason: z.string().max(500).optional() })).mutation(async ({ ctx, input }) => {
+    setStatus: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ phone: z.string(), status: z.enum(["active", "suspended", "banned"]), reason: z.string().max(500).optional() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
+      const before = (await db.getTikisProfileByPhone(input.phone))?.status ?? null;
       const result = await adminDb.adminSetProfileStatus({ phone: input.phone, status: input.status, reason: input.reason, adminId: ctx.tikisAdmin.adminId });
       invalidateTikisProfileCache(input.phone);
-      await audit(ctx, "profile_status_changed", "profile", input.phone, { status: input.status, reason: input.reason, releasedCandidacies: result.releasedCandidacies, engagements: result.engagements.map((engagement) => engagement.deliveryId) });
+      await audit(ctx, "profile_status_changed", "profile", input.phone, { before, after: input.status, reason: input.reason, releasedCandidacies: result.releasedCandidacies, engagements: result.engagements.map((engagement) => engagement.deliveryId) });
       return result;
     }),
-    changeRole: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ phone: z.string(), role: z.enum(["sender", "driver"]) })).mutation(async ({ ctx, input }) => {
+    changeRole: adminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ phone: z.string(), role: z.enum(["sender", "driver"]) })).mutation(async ({ ctx, input }) => {
+      const before = (await db.getTikisProfileByPhone(input.phone))?.accountType ?? null;
       const result = await adminDb.adminChangeProfileRole(input);
       invalidateTikisProfileCache(input.phone);
-      await audit(ctx, "profile_role_changed", "profile", input.phone, { role: input.role });
+      await audit(ctx, "profile_role_changed", "profile", input.phone, { before, after: input.role });
       return result;
     }),
-    reward: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string(), amount: z.number().int().positive(), reason: z.string().max(300), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+    reward: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string(), amount: z.number().int().positive(), reason: z.string().max(300), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await adminDb.adminRewardWallet({ ...input, adminId: ctx.tikisAdmin.adminId });
       await audit(ctx, "wallet_bonus_credited", "profile", input.phone, { amount: input.amount, reason: input.reason });
       return result;
     }),
-    penalize: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string(), amount: z.number().int().positive(), reason: z.string().max(300), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+    penalize: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string(), amount: z.number().int().positive(), reason: z.string().max(300), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await adminDb.adminPenalizeWallet({ ...input, adminId: ctx.tikisAdmin.adminId });
       await audit(ctx, "wallet_penalty_applied", "profile", input.phone, { amount: input.amount, reason: input.reason });
@@ -152,14 +197,14 @@ export const tikisAdminRouter = router({
   }),
 
   deliveriesOps: router({
-    list: tikisAdminProcedure.input(z.object({
+    list: adminProcedure.input(z.object({
       query: z.string().max(120).optional(),
       status: z.string().optional(),
       from: z.string().datetime().optional(),
       to: z.string().datetime().optional(),
       limit: z.number().int().min(1).max(200).optional(),
     })).query(({ input }) => adminDb.adminListDeliveries({ ...input, from: input.from ? new Date(input.from) : undefined, to: input.to ? new Date(input.to) : undefined })),
-    forceCancel: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ deliveryId: z.string().uuid(), reason: z.string().max(500) })).mutation(async ({ ctx, input }) => {
+    forceCancel: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ deliveryId: z.string().uuid(), reason: z.string().max(500) })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await adminDb.adminForceCancelDelivery({ ...input, adminId: ctx.tikisAdmin.adminId });
       await audit(ctx, "delivery_force_cancelled", "delivery", input.deliveryId, { reason: input.reason });
@@ -173,24 +218,25 @@ export const tikisAdminRouter = router({
       return result;
     }),
     // Positions GPS en direct des livreurs : utiles au support pour suivre une course, pas à la finance.
-    liveLocations: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({
+    liveLocations: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({
       maxAgeSeconds: z.number().int().min(10).max(3600).default(120),
     })).query(({ input }) => adminDb.adminListLiveLocations(input)),
   }),
 
   referrals: router({
-    list: tikisAdminProcedure.input(z.object({ status: z.enum(["invited", "qualified", "rewarded", "voided"]).optional() })).query(({ input }) => adminDb.adminListReferrals(input)),
-    reward: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ referralId: z.string() })).mutation(async ({ ctx, input }) => {
+    list: adminProcedure.input(z.object({ status: z.enum(["invited", "qualified", "rewarded", "voided"]).optional() })).query(({ input }) => adminDb.adminListReferrals(input)),
+    reward: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ referralId: z.string() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await adminDb.adminRewardReferral({ referralId: input.referralId, adminId: ctx.tikisAdmin.adminId });
       await audit(ctx, "referral_rewarded", "referral", input.referralId);
       return result;
     }),
     settings: router({
-      get: tikisAdminProcedure.query(() => adminDb.adminGetReferralSettings()),
-      update: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ rewardAmount: z.number().int().min(0).max(100000), enabled: z.boolean(), requiredDeliveries: z.number().int().min(1).max(100) })).mutation(async ({ ctx, input }) => {
+      get: adminProcedure.query(() => adminDb.adminGetReferralSettings()),
+      update: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ rewardAmount: z.number().int().min(0).max(100000), enabled: z.boolean(), requiredDeliveries: z.number().int().min(1).max(100) })).mutation(async ({ ctx, input }) => {
+        const before = await adminDb.adminGetReferralSettings().catch(() => null);
         const result = await adminDb.adminUpdateReferralSettings(input);
-        await audit(ctx, "referral_settings_updated", "platform_settings", "referral", input);
+        await audit(ctx, "referral_settings_updated", "platform_settings", "referral", { before, after: input });
         return result;
       }),
     }),
@@ -198,15 +244,22 @@ export const tikisAdminRouter = router({
 
   finance: router({
     settings: router({
-      get: tikisAdminProcedure.query(() => adminDb.adminGetFinanceSettings()),
-      update: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ minWithdrawal: z.number().int().min(0), maxWithdrawal: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+      get: adminProcedure.query(() => adminDb.adminGetFinanceSettings()),
+      update: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ minWithdrawal: z.number().int().min(0), maxWithdrawal: z.number().int().positive() })).mutation(async ({ ctx, input }) => {
+        const previous = await adminDb.adminGetFinanceSettings().catch(() => null);
         const result = await adminDb.adminUpdateFinanceSettings(input);
-        await audit(ctx, "finance_settings_updated", "platform_settings", "withdrawal_limits", input);
+        await audit(ctx, "finance_settings_updated", "platform_settings", "withdrawal_limits", { before: previous ? { minWithdrawal: previous.minWithdrawal, maxWithdrawal: previous.maxWithdrawal } : null, after: input });
         return result;
       }),
     }),
-    transactions: tikisAdminProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]).optional(), status: z.enum(["pending", "succeeded", "failed", "cancelled"]).optional() })).query(({ input }) => adminDb.adminListPaymentTransactions(input)),
-    settleTransaction: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ paymentId: z.string(), outcome: z.enum(["succeeded", "failed"]), notes: z.string().max(300).optional(), payoutReference: z.string().max(80).optional() })).mutation(async ({ ctx, input }) => {
+    transactions: adminProcedure.input(z.object({
+      type: z.enum(["deposit", "withdrawal"]).optional(),
+      status: z.enum(["pending", "succeeded", "failed", "cancelled", "expired"]).optional(),
+      query: z.string().trim().max(80).optional(),
+      limit: z.number().int().min(1).max(200).optional(),
+      offset: z.number().int().min(0).max(100_000).optional(),
+    })).query(({ input }) => adminDb.adminListPaymentTransactions(input)),
+    settleTransaction: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ paymentId: z.string(), outcome: z.enum(["succeeded", "failed"]), notes: z.string().max(300).optional(), payoutReference: z.string().max(80).optional() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await db.adminSettlePaymentTransaction({ ...input, adminId: ctx.tikisAdmin.adminId });
       await audit(ctx, "payment_transaction_settled", "payment_transaction", input.paymentId, { outcome: input.outcome, notes: input.notes, payoutReference: input.payoutReference });
@@ -216,13 +269,13 @@ export const tikisAdminRouter = router({
     // dont le webhook a échoué (503 YengaPay, signature invalide transitoire, timeout réseau,
     // DB temporairement indisponible au moment du settle). Le mode test renvoie une erreur —
     // il n'y a rien à réconcilier puisque aucun PSP n'est appelé. Réservé super_admin/finance.
-    reconcileYengapayPayment: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ providerReference: z.string().min(8).max(80) })).mutation(async ({ ctx, input }) => {
+    reconcileYengapayPayment: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ providerReference: z.string().min(8).max(80) })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await db.reconcileYengapayPayment(input.providerReference);
       await audit(ctx, "yengapay_payment_reconciled", "payment_transaction", input.providerReference, { result });
       return result;
     }),
-    sendBonus: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string(), amount: z.number().int().positive().max(1000000), reason: z.string().max(300), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+    sendBonus: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string(), amount: z.number().int().positive().max(1000000), reason: z.string().max(300), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await adminDb.adminRewardWallet({ ...input, adminId: ctx.tikisAdmin.adminId });
       await audit(ctx, "wallet_bonus_credited", "profile", input.phone, { amount: input.amount, reason: input.reason });
@@ -231,52 +284,56 @@ export const tikisAdminRouter = router({
   }),
 
   pricing: router({
-    get: tikisAdminProcedure.query(() => adminDb.adminGetPricingConfig()),
-    update: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({
+    get: adminProcedure.query(() => adminDb.adminGetPricingConfig()),
+    update: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({
       vehicles: z.record(z.string(), z.object({ minimum: z.number().min(0).max(100000), perKm: z.number().min(0).max(10000) })),
       typeAdjustment: z.object({ plis: z.number().min(0).max(100000), personnePerPassenger: z.number().min(0).max(100000) }),
       cargo: z.object({ base: z.number().min(0).max(100000), perKg: z.number().min(0).max(100000), perKgCap: z.number().min(0).max(100000), perM3: z.number().min(0).max(100000), perM3Cap: z.number().min(0).max(100000) }),
     })).mutation(async ({ ctx, input }) => {
+      const before = await adminDb.adminGetPricingConfig().catch(() => null);
       const result = await adminDb.adminUpdatePricingConfig(input);
-      await audit(ctx, "pricing_config_updated", "platform_settings", "pricing", input);
+      await audit(ctx, "pricing_config_updated", "platform_settings", "pricing", { before, after: input });
       return result;
     }),
   }),
 
   countries: router({
-    list: tikisAdminProcedure.query(() => adminDb.adminListCountries()),
-    upsert: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({
+    list: adminProcedure.query(() => adminDb.adminListCountries()),
+    upsert: adminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({
       id: z.string().length(2), name: z.string().min(2).max(80), dialCode: z.string().min(2).max(6),
       digits: z.number().int().min(4).max(15), groups: z.array(z.number().int().positive()).min(1),
       timeZones: z.array(z.string().min(1)).min(1), enabled: z.boolean(), sortOrder: z.number().int().default(0),
     })).mutation(async ({ ctx, input }) => {
+      const before = (await adminDb.adminListCountries()).find((country) => country.id === input.id) ?? null;
       const result = await adminDb.adminUpsertCountry(input);
-      await audit(ctx, "country_upserted", "platform_settings", input.id, input);
+      await audit(ctx, "country_upserted", "platform_settings", input.id, { before, after: input });
       return result;
     }),
-    setEnabled: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ id: z.string().length(2), enabled: z.boolean() })).mutation(async ({ ctx, input }) => {
+    setEnabled: adminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ id: z.string().length(2), enabled: z.boolean() })).mutation(async ({ ctx, input }) => {
+      const before = (await adminDb.adminListCountries()).find((country) => country.id === input.id)?.enabled ?? null;
       const result = await adminDb.adminSetCountryEnabled(input.id, input.enabled);
-      await audit(ctx, "country_enabled_changed", "platform_settings", input.id, { enabled: input.enabled });
+      await audit(ctx, "country_enabled_changed", "platform_settings", input.id, { before, after: input.enabled });
       return result;
     }),
   }),
 
   maintenance: router({
-    get: tikisAdminProcedure.query(() => db.getMaintenanceStatus()),
-    set: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ enabled: z.boolean(), message: z.string().max(500).optional() })).mutation(async ({ ctx, input }) => {
+    get: adminProcedure.query(() => db.getMaintenanceStatus()),
+    set: adminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ enabled: z.boolean(), message: z.string().max(500).optional() })).mutation(async ({ ctx, input }) => {
+      const before = await db.getMaintenanceStatus().catch(() => null);
       const result = await adminDb.adminSetMaintenance(input);
-      await audit(ctx, "maintenance_mode_changed", "platform_settings", "maintenance", input);
+      await audit(ctx, "maintenance_mode_changed", "platform_settings", "maintenance", { before, after: input });
       return result;
     }),
   }),
 
   accountDeletions: router({
-    list: tikisAdminProcedure.query(() => adminDb.adminListPendingDeletions()),
+    list: adminProcedure.query(() => adminDb.adminListPendingDeletions()),
   }),
 
   kyc: router({
-    list: tikisAdminProcedure.input(z.object({ status: z.enum(["submitted", "approved", "rejected"]).optional() })).query(({ input }) => adminDb.adminListKycSubmissions(input.status)),
-    review: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ submissionId: z.string(), decision: z.enum(["approved", "rejected"]), rejectionReason: z.string().max(500).optional() })).mutation(async ({ ctx, input }) => {
+    list: adminProcedure.input(z.object({ status: z.enum(["submitted", "approved", "rejected"]).optional() })).query(({ input }) => adminDb.adminListKycSubmissions(input.status)),
+    review: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ submissionId: z.string(), decision: z.enum(["approved", "rejected"]), rejectionReason: z.string().max(500).optional() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await adminDb.adminReviewKyc({ ...input, adminId: ctx.tikisAdmin.adminId });
       await audit(ctx, "kyc_reviewed", "kyc_submission", input.submissionId, { decision: input.decision, rejectionReason: input.rejectionReason });
@@ -285,8 +342,8 @@ export const tikisAdminRouter = router({
   }),
 
   admins: router({
-    list: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).query(() => adminDb.listAdminUsers()),
-    setActive: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ adminId: z.number().int(), active: z.boolean() })).mutation(async ({ ctx, input }) => {
+    list: adminProcedure.use(requireTikisAdminRole("super_admin")).query(() => adminDb.listAdminUsers()),
+    setActive: adminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ adminId: z.number().int(), active: z.boolean() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       await adminDb.setAdminUserActive({ actorAdminId: ctx.tikisAdmin.adminId, adminId: input.adminId, active: input.active });
       await audit(ctx, input.active ? "admin_reactivated" : "admin_suspended", "admin_user", String(input.adminId));
@@ -295,13 +352,14 @@ export const tikisAdminRouter = router({
   }),
 
   security: router({
-    get: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).query(async () => ({ totpRequired: await adminDb.isAdminTotpRequired(), totpRequiredRoles: adminDb.TOTP_REQUIRED_ROLES })),
-    setTotpRequired: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ required: z.boolean() })).mutation(async ({ ctx, input }) => {
+    get: adminProcedure.use(requireTikisAdminRole("super_admin")).query(async () => ({ totpRequired: await adminDb.isAdminTotpRequired(), totpRequiredRoles: adminDb.TOTP_REQUIRED_ROLES })),
+    setTotpRequired: adminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ required: z.boolean() })).mutation(async ({ ctx, input }) => {
+      const before = await adminDb.isAdminTotpRequired();
       const result = await adminDb.setAdminTotpRequired({ actorAdminId: ctx.tikisAdmin.adminId, required: input.required });
-      await audit(ctx, "totp_policy_changed", "platform_settings", "adminTotpRequired", { required: input.required });
+      await audit(ctx, "totp_policy_changed", "platform_settings", "adminTotpRequired", { before, after: input.required });
       return result;
     }),
-    resetTotp: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ adminId: z.number().int() })).mutation(async ({ ctx, input }) => {
+    resetTotp: adminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ adminId: z.number().int() })).mutation(async ({ ctx, input }) => {
       await adminDb.resetAdminTotp({ actorAdminId: ctx.tikisAdmin.adminId, adminId: input.adminId });
       await audit(ctx, "totp_reset", "admin_user", String(input.adminId));
       return { success: true } as const;
@@ -309,15 +367,15 @@ export const tikisAdminRouter = router({
   }),
 
   auditLog: router({
-    list: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ targetType: z.string().optional(), targetId: z.string().optional(), limit: z.number().int().min(1).max(200).optional(), offset: z.number().int().min(0).max(10_000).optional() })).query(async ({ input }) => {
+    list: adminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ includeRequests: z.boolean().optional(), targetType: z.string().optional(), targetId: z.string().optional(), limit: z.number().int().min(1).max(200).optional(), offset: z.number().int().min(0).max(10_000).optional() })).query(async ({ input }) => {
       const result = await adminDb.listAdminAuditLog({ ...input, limit: input.limit ?? 50, offset: input.offset ?? 0 });
       return { rows: result.rows, total: result.total, limit: input.limit ?? 50, offset: input.offset ?? 0 };
     }),
   }),
 
   loyalty: router({
-    listPrograms: tikisAdminProcedure.query(() => adminDb.adminListLoyaltyPrograms()),
-    upsertProgram: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({
+    listPrograms: adminProcedure.query(() => adminDb.adminListLoyaltyPrograms()),
+    upsertProgram: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({
       id: z.string().min(3).max(40).optional(),
       name: z.string().min(3).max(80),
       description: z.string().max(300).optional(),
@@ -330,24 +388,27 @@ export const tikisAdminRouter = router({
       enabled: z.boolean().default(true),
     })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
+      const previous = input.id ? (await adminDb.adminListLoyaltyPrograms()).find((program) => program.id === input.id) ?? null : null;
       const result = await adminDb.adminUpsertLoyaltyProgram({ ...input, adminId: ctx.tikisAdmin.adminId });
-      await audit(ctx, "loyalty_program_upserted", "loyalty_program", result.id, { name: input.name, role: input.role, requiredDeliveries: input.requiredDeliveries, bonusAmount: input.bonusAmount, enabled: input.enabled, autoCredit: input.autoCredit, autoCreditMaxAmount: input.autoCreditMaxAmount });
+      const loyaltyFields = (program: { name: string; role: string; requiredDeliveries: number; bonusAmount: number; enabled: boolean; autoCredit?: boolean | null; autoCreditMaxAmount?: number | null }) => ({ name: program.name, role: program.role, requiredDeliveries: program.requiredDeliveries, bonusAmount: program.bonusAmount, enabled: program.enabled, autoCredit: program.autoCredit, autoCreditMaxAmount: program.autoCreditMaxAmount });
+      await audit(ctx, "loyalty_program_upserted", "loyalty_program", result.id, { before: previous ? loyaltyFields(previous) : null, after: loyaltyFields(input) });
       return result;
     }),
-    setProgramEnabled: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ id: z.string(), enabled: z.boolean() })).mutation(async ({ ctx, input }) => {
+    setProgramEnabled: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ id: z.string(), enabled: z.boolean() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
+      const before = (await adminDb.adminListLoyaltyPrograms()).find((program) => program.id === input.id)?.enabled ?? null;
       await adminDb.adminSetLoyaltyProgramEnabled(input);
-      await audit(ctx, "loyalty_program_toggled", "loyalty_program", input.id, { enabled: input.enabled });
+      await audit(ctx, "loyalty_program_toggled", "loyalty_program", input.id, { before, after: input.enabled });
       return { id: input.id, enabled: input.enabled };
     }),
-    listPendingGrants: tikisAdminProcedure.input(z.object({ limit: z.number().int().min(1).max(200).optional() })).query(({ input }) => adminDb.adminListPendingLoyaltyGrants(input.limit ?? 50)),
-    creditGrant: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ grantId: z.string() })).mutation(async ({ ctx, input }) => {
+    listPendingGrants: adminProcedure.input(z.object({ limit: z.number().int().min(1).max(200).optional() })).query(({ input }) => adminDb.adminListPendingLoyaltyGrants(input.limit ?? 50)),
+    creditGrant: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ grantId: z.string() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await adminDb.adminCreditLoyaltyGrant({ grantId: input.grantId, adminId: ctx.tikisAdmin.adminId });
       await audit(ctx, "loyalty_grant_credited", "loyalty_grant", input.grantId, { profilePhone: result.profilePhone, bonusAmount: result.bonusAmount });
       return result;
     }),
-    cancelGrant: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ grantId: z.string(), reason: z.string().max(300) })).mutation(async ({ ctx, input }) => {
+    cancelGrant: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ grantId: z.string(), reason: z.string().max(300) })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       await adminDb.adminCancelLoyaltyGrant({ grantId: input.grantId, reason: input.reason, adminId: ctx.tikisAdmin.adminId });
       await audit(ctx, "loyalty_grant_cancelled", "loyalty_grant", input.grantId, { reason: input.reason });

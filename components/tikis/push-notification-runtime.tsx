@@ -8,7 +8,7 @@ type NotificationData = {
   deliveryId?: string;
   eventType?: string;
   status?: string;
-  screen?: "delivery" | "tracking" | "notifications";
+  screen?: "delivery" | "tracking" | "notifications" | "verification";
   notificationId?: string;
 };
 
@@ -20,13 +20,18 @@ function readData(response: { notification?: { request?: { content?: { data?: un
     deliveryId: typeof data.deliveryId === "string" ? data.deliveryId : undefined,
     eventType: typeof data.eventType === "string" ? data.eventType : undefined,
     status: typeof data.status === "string" ? data.status : undefined,
-    screen: data.screen === "tracking" || data.screen === "notifications" || data.screen === "delivery" ? data.screen : undefined,
+    screen: data.screen === "tracking" || data.screen === "notifications" || data.screen === "delivery" || data.screen === "verification" ? data.screen : undefined,
     notificationId: typeof data.notificationId === "string" ? data.notificationId : undefined,
   };
 }
 
 function openNotification(data: NotificationData, markRead: (notificationId: string) => void) {
   if (data.notificationId) markRead(data.notificationId);
+  // Décision sur la vérification d'identité : l'écran « Vérification » affiche le statut et le motif.
+  if (data.screen === "verification") {
+    router.push("/verification" as never);
+    return;
+  }
   if (data.screen === "notifications" || !data.deliveryId) {
     router.push("/notifications" as never);
     return;

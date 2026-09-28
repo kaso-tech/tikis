@@ -3,10 +3,12 @@ import { trpc } from "../lib/trpc";
 import { useAdminAuth } from "../lib/auth";
 import { ConfirmDialog } from "../lib/confirm-dialog";
 
-type Transaction = { id: string; profilePhone: string; type: "deposit" | "withdrawal"; provider: string; amount: number; status: "pending" | "succeeded" | "failed" | "cancelled"; providerReference: string; createdAt: Date | string };
+type TransactionStatus = "pending" | "succeeded" | "failed" | "cancelled" | "expired";
+type Transaction = { id: string; profilePhone: string; type: "deposit" | "withdrawal"; provider: string; amount: number; status: TransactionStatus; providerReference: string; payoutReference?: string | null; adminNotes?: string | null; createdAt: Date | string; settledAt?: Date | string | null };
 
-const STATUS_LABEL: Record<string, string> = { pending: "En attente", succeeded: "Validée", failed: "Échouée", cancelled: "Annulée" };
-const STATUS_PILL: Record<string, string> = { pending: "pill-warning", succeeded: "pill-success", failed: "pill-error", cancelled: "pill-neutral" };
+const STATUS_LABEL: Record<TransactionStatus, string> = { pending: "En attente", succeeded: "Validée", failed: "Échouée", cancelled: "Annulée", expired: "Expirée" };
+const STATUS_PILL: Record<TransactionStatus, string> = { pending: "pill-warning", succeeded: "pill-success", failed: "pill-error", cancelled: "pill-neutral", expired: "pill-neutral" };
+const HISTORY_PAGE_SIZE = 50;
 
 // Même liste que YENGAPAY_TEST_PROVIDERS (server/yengapay.ts) : tout autre fournisseur est un vrai
 // paiement YengaPay, que seul YengaPay peut confirmer — le serveur refuse de le valider à la main.
@@ -20,7 +22,12 @@ function formatMoney(amount: number) {
 export default function FinancePage() {
   const { admin } = useAdminAuth();
   const canEdit = admin?.role === "super_admin" || admin?.role === "finance";
-  const [tab, setTab] = useState<"withdrawals" | "deposits" | "settings" | "bonus">("withdrawals");
+  const [tab, setTab] = useState<"withdrawals" | "deposits" | "history" | "settings" | "bonus">("withdrawals");
+  // Historique : toutes les transactions, filtrables, avec recherche par téléphone ou référence.
+  const [historyFilter, setHistoryFilter] = useState<{ type: "" | "deposit" | "withdrawal"; status: "" | TransactionStatus; query: string }>({ type: "", status: "", query: "" });
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyPage, setHistoryPage] = useState(0);
+  const [history, setHistory] = useState<{ rows: Transaction[]; total: number }>({ rows: [], total: 0 });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -40,11 +47,26 @@ export default function FinancePage() {
   const [pendingBonus, setPendingBonus] = useState<{ phone: string; amount: number; reason: string; requestId: string } | null>(null);
 
   function loadTransactions(type: "deposit" | "withdrawal") {
-    trpc.adminConsole.finance.transactions.query({ type, status: "pending" })
-      .then((data) => setTransactions(data as Transaction[]))
+    trpc.adminConsole.finance.transactions.query({ type, status: "pending", limit: 200 })
+      .then((data) => setTransactions(data.rows as Transaction[]))
       .catch((cause) => setError(cause instanceof Error ? cause.message : "Chargement impossible."));
   }
   useEffect(() => { if (tab === "withdrawals") loadTransactions("withdrawal"); if (tab === "deposits") loadTransactions("deposit"); }, [tab]);
+
+  useEffect(() => {
+    if (tab !== "history") return;
+    trpc.adminConsole.finance.transactions.query({
+      type: historyFilter.type || undefined,
+      status: historyFilter.status || undefined,
+      query: historyFilter.query || undefined,
+      limit: HISTORY_PAGE_SIZE,
+      offset: historyPage * HISTORY_PAGE_SIZE,
+    })
+      .then((data) => setHistory({ rows: data.rows as Transaction[], total: data.total }))
+      .catch((cause) => setError(cause instanceof Error ? cause.message : "Chargement impossible."));
+  }, [tab, historyFilter, historyPage]);
+
+  const historyPages = Math.max(1, Math.ceil(history.total / HISTORY_PAGE_SIZE));
 
   useEffect(() => {
     trpc.adminConsole.finance.settings.get.query()
@@ -154,10 +176,58 @@ export default function FinancePage() {
         <div className="tabs">
           <button className={`tab ${tab === "withdrawals" ? "active" : ""}`} onClick={() => setTab("withdrawals")}>Retraits en attente</button>
           <button className={`tab ${tab === "deposits" ? "active" : ""}`} onClick={() => setTab("deposits")}>Dépôts en attente</button>
+          <button className={`tab ${tab === "history" ? "active" : ""}`} onClick={() => setTab("history")}>Historique</button>
           <button className={`tab ${tab === "bonus" ? "active" : ""}`} onClick={() => setTab("bonus")}>Envoyer un bonus</button>
           <button className={`tab ${tab === "settings" ? "active" : ""}`} onClick={() => setTab("settings")}>Réglages</button>
         </div>
       </div>
+
+      {tab === "history" ? (
+        <div className="card">
+          <form
+            style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}
+            onSubmit={(event) => { event.preventDefault(); setHistoryPage(0); setHistoryFilter((f) => ({ ...f, query: historySearch.trim() })); }}
+          >
+            <input id="history-search" className="input" style={{ flex: "1 1 220px" }} value={historySearch} onChange={(e) => setHistorySearch(e.target.value)} placeholder="Téléphone, référence YengaPay ou de versement" />
+            <select id="history-type" className="input" style={{ width: "auto" }} value={historyFilter.type} onChange={(e) => { setHistoryPage(0); setHistoryFilter((f) => ({ ...f, type: e.target.value as "" | "deposit" | "withdrawal" })); }}>
+              <option value="">Dépôts et retraits</option>
+              <option value="deposit">Dépôts</option>
+              <option value="withdrawal">Retraits</option>
+            </select>
+            <select id="history-status" className="input" style={{ width: "auto" }} value={historyFilter.status} onChange={(e) => { setHistoryPage(0); setHistoryFilter((f) => ({ ...f, status: e.target.value as "" | TransactionStatus })); }}>
+              <option value="">Tous les statuts</option>
+              {(Object.keys(STATUS_LABEL) as TransactionStatus[]).map((status) => <option key={status} value={status}>{STATUS_LABEL[status]}</option>)}
+            </select>
+            <button className="btn btn-primary" type="submit">Rechercher</button>
+          </form>
+          {history.rows.length === 0 ? <div className="empty-state">Aucune transaction ne correspond.</div> : (
+            <div style={{ overflowX: "auto" }}>
+              <table className="table">
+                <thead><tr><th>Date</th><th>Profil</th><th>Type</th><th>Montant</th><th>Statut</th><th>Fournisseur</th><th>Référence</th><th>Décision manuelle</th></tr></thead>
+                <tbody>
+                  {history.rows.map((t) => (
+                    <tr key={t.id}>
+                      <td style={{ fontSize: 11.5, color: "var(--muted)", whiteSpace: "nowrap" }}>{new Date(t.createdAt).toLocaleString("fr-FR")}</td>
+                      <td style={{ fontSize: 12 }}>{t.profilePhone}</td>
+                      <td style={{ fontSize: 12 }}>{t.type === "deposit" ? "Dépôt" : "Retrait"}</td>
+                      <td className="price">{formatMoney(t.amount)}</td>
+                      <td><span className={`pill ${STATUS_PILL[t.status]}`}><span className="dot" />{STATUS_LABEL[t.status]}</span></td>
+                      <td style={{ fontSize: 12 }}>{t.provider}</td>
+                      <td style={{ fontSize: 11, fontFamily: "ui-monospace, monospace" }}>{t.providerReference}{t.payoutReference ? <div className="muted">versement : {t.payoutReference}</div> : null}</td>
+                      <td style={{ fontSize: 12 }}>{t.adminNotes ?? <span className="muted">—</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end", marginTop: 12, fontSize: 12.5 }}>
+            <span className="muted">{history.total} transaction(s) · page {historyPage + 1} / {historyPages}</span>
+            <button type="button" className="btn btn-sm" disabled={historyPage === 0} onClick={() => setHistoryPage((p) => p - 1)}>← Précédent</button>
+            <button type="button" className="btn btn-sm" disabled={historyPage + 1 >= historyPages} onClick={() => setHistoryPage((p) => p + 1)}>Suivant →</button>
+          </div>
+        </div>
+      ) : null}
 
       {(tab === "withdrawals" || tab === "deposits") ? (
         <div className="card">

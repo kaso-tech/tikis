@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, count, desc, eq, gte, inArray, isNull, like, lte, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, like, lte, ne, or, sql } from "drizzle-orm";
 import { countryDraftIssue, countryPlanWarning } from "../shared/iso-countries";
 import { ADMIN_SESSION_TTL_SECONDS, hashAdminSessionToken, newAdminSessionToken, type AdminRole } from "./admin-auth";
 import {
@@ -391,7 +391,11 @@ export async function writeAdminAuditLog(entry: { adminId: number; adminEmail: s
   });
 }
 
-export async function listAdminAuditLog(input: { targetType?: string; targetId?: string; limit?: number; offset?: number }) {
+/**
+ * Par défaut, le journal montre les actions détaillées ; les traces de demande (`admin_request`, écrites
+ * avant chaque modification) n'apparaissent qu'à la demande, ou quand on filtre explicitement dessus.
+ */
+export async function listAdminAuditLog(input: { includeRequests?: boolean; targetType?: string; targetId?: string; limit?: number; offset?: number }) {
   const db = await getDb();
   if (!db) return { rows: [] as Array<{ id: string; adminEmail: string; action: string; targetType: string; targetId: string; details: string | null; createdAt: Date }>, total: 0 };
   const limit = Math.min(input.limit ?? 50, 200);
@@ -399,6 +403,7 @@ export async function listAdminAuditLog(input: { targetType?: string; targetId?:
   const conditions = [
     input.targetType ? eq(tikisAdminAuditLog.targetType, input.targetType) : undefined,
     input.targetId ? eq(tikisAdminAuditLog.targetId, input.targetId) : undefined,
+    !input.includeRequests && !input.targetType ? ne(tikisAdminAuditLog.targetType, "admin_request") : undefined,
   ].filter((value): value is NonNullable<typeof value> => Boolean(value));
   const where = conditions.length ? and(...conditions) : undefined;
   const [rows, totalResult] = await Promise.all([
@@ -455,15 +460,44 @@ export async function getDeliveryReportById(reportId: string) {
   return rows[0];
 }
 
-export async function resolveDeliveryReport(input: { reportId: string; status: "reviewing" | "resolved" | "dismissed"; resolutionNotes?: string; adminId: number }) {
-  const db = await getDb();
-  if (!db) throw new Error("La console d’administration est temporairement indisponible.");
-  await db.update(tikisDeliveryReports).set({
-    status: input.status,
-    resolutionNotes: input.resolutionNotes ?? null,
-    ...(input.status === "resolved" || input.status === "dismissed" ? { resolvedAt: new Date(), resolvedByAdminId: input.adminId } : {}),
-  }).where(eq(tikisDeliveryReports.id, input.reportId));
-  return getDeliveryReportById(input.reportId);
+const CLOSED_REPORT_STATUSES = ["resolved", "dismissed"] as const;
+const isClosedReportStatus = (status: string) => (CLOSED_REPORT_STATUSES as readonly string[]).includes(status);
+
+/**
+ * Décision sur un signalement, sous verrou.
+ *  - Clore (résolu, classé) prévient l'auteur dans l'app, avec le message qui lui est destiné s'il y en a
+ *    un. Les notes de résolution, elles, restent internes.
+ *  - Un signalement clos ne se reclôt pas d'un autre verdict : il faut d'abord le rouvrir (« en cours »),
+ *    ce qui efface la date et l'auteur de la clôture précédente. Avant, la clôture restait affichée sur un
+ *    dossier rouvert, et un second verdict remplaçait le premier sans que rien ne le signale.
+ */
+export async function resolveDeliveryReport(input: { reportId: string; status: "reviewing" | "resolved" | "dismissed"; resolutionNotes?: string; replyToReporter?: string; adminId: number }) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  const previousStatus = await dbc.transaction(async (tx) => {
+    const report = (await tx.select().from(tikisDeliveryReports).where(eq(tikisDeliveryReports.id, input.reportId)).limit(1).for("update"))[0];
+    if (!report) throw new Error("Signalement introuvable.");
+    const closing = isClosedReportStatus(input.status);
+    if (closing && isClosedReportStatus(report.status)) throw new Error("Ce signalement est déjà clos. Rouvrez-le (« en cours ») avant de rendre une autre décision.");
+    await tx.update(tikisDeliveryReports).set({
+      status: input.status,
+      resolutionNotes: input.resolutionNotes ?? report.resolutionNotes ?? null,
+      ...(closing ? { resolvedAt: new Date(), resolvedByAdminId: input.adminId } : { resolvedAt: null, resolvedByAdminId: null }),
+    }).where(eq(tikisDeliveryReports.id, input.reportId));
+    if (closing) {
+      const reply = input.replyToReporter?.trim();
+      const verdict = input.status === "resolved" ? "Votre signalement a été traité par l’équipe Tikis." : "Votre signalement a été examiné et classé sans suite.";
+      await db.appendDeliveryEvent(tx, {
+        deliveryId: report.deliveryId, eventType: "report_decision", recipientPhone: report.reporterPhone,
+        title: input.status === "resolved" ? "Signalement traité" : "Signalement classé",
+        body: reply ? `${verdict} ${reply}` : verdict, tone: input.status === "resolved" ? "success" : "info",
+        // Une décision par clôture : un signalement rouvert puis reclos notifie de nouveau.
+        idempotencyKey: `${report.id}:decision:${randomUUID()}`,
+      });
+    }
+    return report.status;
+  });
+  return { report: await getDeliveryReportById(input.reportId), previousStatus };
 }
 
 // ————————————————————————————————————————————————————————————————————————
@@ -534,15 +568,27 @@ export async function adminDashboardMetrics(sinceDays = 30) {
   const db = await getDb();
   if (!db) return null;
   const since = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000);
-  const [deliveriesTotal, deliveriesCompleted, openReports, activeDrivers, commissionRevenue, recentDeliveries] = await Promise.all([
+  const now = new Date();
+  // Une course « terminée sur la période » l'a été pendant la période (completedAt), quelle que soit sa date
+  // de publication. Compter par date de création sous-estimait les courses publiées juste avant la période
+  // et terminées pendant, et gonflait la période suivante de courses publiées mais pas encore terminées.
+  const completedInPeriod = and(eq(tikisDeliveries.status, "completed"), gte(tikisDeliveries.completedAt, since));
+  const ledgerTotal = (operation: "commission_debit" | "compensation") => db.select({ total: sql<number>`coalesce(sum(${tikisWalletLedger.amount}), 0)` }).from(tikisWalletLedger)
+    .where(and(eq(tikisWalletLedger.operation, operation), gte(tikisWalletLedger.createdAt, since), lte(tikisWalletLedger.createdAt, now)));
+  const [deliveriesTotal, deliveriesCompleted, openReports, activeDrivers, commissionGross, commissionRefunds, recentDeliveries, recentCompletions] = await Promise.all([
     db.select({ count: count() }).from(tikisDeliveries).where(gte(tikisDeliveries.createdAt, since)),
-    db.select({ count: count() }).from(tikisDeliveries).where(and(eq(tikisDeliveries.status, "completed"), gte(tikisDeliveries.createdAt, since))),
+    db.select({ count: count() }).from(tikisDeliveries).where(completedInPeriod),
     db.select({ count: count() }).from(tikisDeliveryReports).where(eq(tikisDeliveryReports.status, "open")),
-    db.select({ count: sql<number>`count(distinct ${tikisDeliveries.driverPhone})` }).from(tikisDeliveries).where(and(gte(tikisDeliveries.createdAt, since), eq(tikisDeliveries.status, "completed"))),
+    db.select({ count: sql<number>`count(distinct ${tikisDeliveries.driverPhone})` }).from(tikisDeliveries).where(completedInPeriod),
     // "commission_debit" est le seul mouvement qui correspond à un revenu réel de Tikis ; "debit" générique
     // couvre aussi les retraits (argent des utilisateurs qui sort de leur propre Wallet), à ne jamais compter ici.
-    db.select({ total: sql<number>`coalesce(sum(${tikisWalletLedger.amount}), 0)` }).from(tikisWalletLedger).where(and(eq(tikisWalletLedger.operation, "commission_debit"), gte(tikisWalletLedger.createdAt, since), lte(tikisWalletLedger.createdAt, new Date()))),
+    ledgerTotal("commission_debit"),
+    // Toute "compensation" rend une commission déjà prélevée (livreur remplacé, course expirée ou annulée par
+    // l'administration) : c'est du revenu qui repart. Sans la retrancher, le tableau de bord comptait ces
+    // commissions comme acquises.
+    ledgerTotal("compensation"),
     db.select({ createdAt: tikisDeliveries.createdAt, status: tikisDeliveries.status, vehicleTypes: tikisDeliveries.vehicleTypes }).from(tikisDeliveries).where(gte(tikisDeliveries.createdAt, since)),
+    db.select({ completedAt: tikisDeliveries.completedAt }).from(tikisDeliveries).where(completedInPeriod),
   ]);
 
   // Timeseries par jour
@@ -552,12 +598,12 @@ export async function adminDashboardMetrics(sinceDays = 30) {
     byDay.set(d.toISOString().slice(0, 10), { published: 0, completed: 0 });
   }
   for (const d of recentDeliveries) {
-    const day = d.createdAt.toISOString().slice(0, 10);
-    const slot = byDay.get(day);
-    if (slot) {
-      slot.published += 1;
-      if (d.status === "completed") slot.completed += 1;
-    }
+    const slot = byDay.get(d.createdAt.toISOString().slice(0, 10));
+    if (slot) slot.published += 1;
+  }
+  for (const d of recentCompletions) {
+    const slot = d.completedAt ? byDay.get(d.completedAt.toISOString().slice(0, 10)) : undefined;
+    if (slot) slot.completed += 1;
   }
   const timeseries = Array.from(byDay.entries()).map(([date, slot]) => ({ date, ...slot }));
 
@@ -578,7 +624,10 @@ export async function adminDashboardMetrics(sinceDays = 30) {
     deliveriesCompleted: Number(deliveriesCompleted[0]?.count ?? 0),
     openReports: Number(openReports[0]?.count ?? 0),
     activeDrivers: Number(activeDrivers[0]?.count ?? 0),
-    commissionRevenue: Number(commissionRevenue[0]?.total ?? 0),
+    /** Revenu net : commissions prélevées moins commissions rendues sur la période. */
+    commissionRevenue: Number(commissionGross[0]?.total ?? 0) - Number(commissionRefunds[0]?.total ?? 0),
+    commissionGross: Number(commissionGross[0]?.total ?? 0),
+    commissionRefunds: Number(commissionRefunds[0]?.total ?? 0),
     timeseries,
     vehicleBreakdown,
   };
@@ -824,14 +873,35 @@ export async function adminUpdateFinanceSettings(input: { minWithdrawal: number;
   return input;
 }
 
-export async function adminListPaymentTransactions(input: { type?: "deposit" | "withdrawal"; status?: "pending" | "succeeded" | "failed" | "cancelled"; limit?: number }) {
+export type PaymentTransactionStatus = "pending" | "succeeded" | "failed" | "cancelled" | "expired";
+
+/**
+ * Transactions de paiement, paginées, avec le total. `query` retrouve une transaction par numéro de téléphone
+ * (préfixe, « +226 70… » ou « 70… »), par référence YengaPay ou de versement (exacte), ou par identifiant.
+ */
+export async function adminListPaymentTransactions(input: { type?: "deposit" | "withdrawal"; status?: PaymentTransactionStatus; query?: string; limit?: number; offset?: number }) {
   const dbc = await getDb();
-  if (!dbc) return [];
+  if (!dbc) return { rows: [] as (typeof tikisPaymentTransactions.$inferSelect)[], total: 0 };
+  const query = input.query?.trim();
+  const digits = query?.replace(/[^0-9]/g, "") ?? "";
   const conditions = [
     input.type ? eq(tikisPaymentTransactions.type, input.type) : undefined,
     input.status ? eq(tikisPaymentTransactions.status, input.status) : undefined,
+    query ? or(
+      eq(tikisPaymentTransactions.id, query),
+      eq(tikisPaymentTransactions.providerReference, query),
+      eq(tikisPaymentTransactions.payoutReference, query),
+      ...(digits.length >= 4 ? [like(tikisPaymentTransactions.profilePhone, `+${digits}%`), like(tikisPaymentTransactions.profilePhone, `+226${digits}%`)] : []),
+    ) : undefined,
   ].filter((value): value is NonNullable<typeof value> => Boolean(value));
-  return dbc.select().from(tikisPaymentTransactions).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(tikisPaymentTransactions.createdAt)).limit(Math.min(input.limit ?? 100, 500));
+  const where = conditions.length ? and(...conditions) : undefined;
+  const limit = Math.min(input.limit ?? 50, 200);
+  const offset = Math.max(input.offset ?? 0, 0);
+  const [rows, totalResult] = await Promise.all([
+    dbc.select().from(tikisPaymentTransactions).where(where).orderBy(desc(tikisPaymentTransactions.createdAt)).limit(limit).offset(offset),
+    dbc.select({ count: count() }).from(tikisPaymentTransactions).where(where),
+  ]);
+  return { rows, total: Number(totalResult[0]?.count ?? 0) };
 }
 
 // ————————————————————————————————————————————————————————————————————————
@@ -976,16 +1046,32 @@ export async function adminListKycSubmissions(status?: "submitted" | "approved" 
   return filtered.orderBy(desc(tikisKycSubmissions.submittedAt));
 }
 
+/**
+ * Décision sur un dossier d'identité, sous verrou : un dossier se tranche une seule fois. Avant, deux admins
+ * pouvaient statuer en même temps sans le voir, et un dossier déjà approuvé pouvait être refusé après coup
+ * (ou l'inverse) sans que le livreur en sache rien. Le livreur est désormais prévenu de la décision.
+ */
 export async function adminReviewKyc(input: { submissionId: string; decision: "approved" | "rejected"; rejectionReason?: string; adminId: number }) {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  const submission = (await dbc.select().from(tikisKycSubmissions).where(eq(tikisKycSubmissions.id, input.submissionId)).limit(1))[0];
-  if (!submission) throw new Error("Dossier introuvable.");
-  await dbc.update(tikisKycSubmissions).set({
-    status: input.decision, rejectionReason: input.decision === "rejected" ? (input.rejectionReason?.trim() || "Documents non conformes.") : null,
-    reviewedAt: new Date(), reviewedByAdminId: input.adminId,
-  }).where(eq(tikisKycSubmissions.id, input.submissionId));
-  return { id: input.submissionId, status: input.decision };
+  const rejectionReason = input.decision === "rejected" ? (input.rejectionReason?.trim() || "Documents non conformes.") : null;
+  const driverPhone = await dbc.transaction(async (tx) => {
+    const submission = (await tx.select().from(tikisKycSubmissions).where(eq(tikisKycSubmissions.id, input.submissionId)).limit(1).for("update"))[0];
+    if (!submission) throw new Error("Dossier introuvable.");
+    if (submission.status !== "submitted") throw new Error(`Ce dossier a déjà été ${submission.status === "approved" ? "approuvé" : "refusé"}. Le livreur doit en soumettre un nouveau pour une nouvelle décision.`);
+    await tx.update(tikisKycSubmissions).set({ status: input.decision, rejectionReason, reviewedAt: new Date(), reviewedByAdminId: input.adminId }).where(eq(tikisKycSubmissions.id, input.submissionId));
+    return submission.driverPhone;
+  });
+  // Pas de livraison à laquelle rattacher une notification in-app : un push, et l'écran « Vérification »
+  // de l'app affiche déjà le statut et le motif du refus. Best-effort : la décision est enregistrée.
+  void db.enqueuePushToPhone({
+    phone: driverPhone,
+    title: input.decision === "approved" ? "Identité vérifiée" : "Vérification d’identité refusée",
+    body: input.decision === "approved" ? "Vos documents sont validés : vous pouvez candidater aux livraisons." : `Motif : ${rejectionReason} Vous pouvez soumettre de nouveaux documents.`,
+    data: { kind: "kyc_decision", screen: "verification" },
+    channelId: "tikis-transactional",
+  }).catch((cause) => console.error("[kyc] notification non envoyée", cause));
+  return { id: input.submissionId, status: input.decision, driverPhone };
 }
 
 // ————————————————————————————————————————————————————————————————————————

@@ -8,7 +8,10 @@ type Metrics = {
   deliveriesCompleted: number;
   openReports: number;
   activeDrivers: number;
+  /** Net : commissions prélevées moins commissions rendues (remplacement, expiration, annulation admin). */
   commissionRevenue: number;
+  commissionGross?: number;
+  commissionRefunds?: number;
   timeseries?: { date: string; published: number; completed: number }[];
   vehicleBreakdown?: { vehicle: string; count: number }[];
 };
@@ -58,7 +61,8 @@ export default function DashboardPage(_props: { search?: string }) {
     return () => { cancelled = true; };
   }, [period]);
 
-  const completionRate = metrics && metrics.deliveriesTotal > 0 ? Math.round((metrics.deliveriesCompleted / metrics.deliveriesTotal) * 100) : 0;
+  // Les terminées sont comptées à leur date de fin : certaines ont été publiées avant la période, d'où le plafond.
+  const completionRate = metrics && metrics.deliveriesTotal > 0 ? Math.min(100, Math.round((metrics.deliveriesCompleted / metrics.deliveriesTotal) * 100)) : 0;
   const vehicleColors = ["#9A6201", "#176C52", "#2C5BA8", "#A65300", "#A43740"];
 
   const maxSeries = useMemo(() => {
@@ -104,8 +108,14 @@ export default function DashboardPage(_props: { search?: string }) {
       ) : (
         <>
           <div className="kpi-grid">
-            <KpiCard label="Livraisons créées" value={metrics.deliveriesTotal.toString()} foot={`${metrics.deliveriesCompleted} terminées`} tone="primary" progress={completionRate} sparkline={sparklines.published} />
-            <KpiCard label="Commissions perçues" value={formatMoney(metrics.commissionRevenue)} foot="depuis le début de la période" tone="success" sparkline={sparklines.commission} />
+            <KpiCard label="Livraisons créées" value={metrics.deliveriesTotal.toString()} foot={`${metrics.deliveriesCompleted} terminées sur la période`} tone="primary" progress={completionRate} sparkline={sparklines.published} />
+            <KpiCard
+              label="Commissions nettes"
+              value={formatMoney(metrics.commissionRevenue)}
+              foot={metrics.commissionRefunds ? `${formatMoney(metrics.commissionGross ?? 0)} prélevées − ${formatMoney(metrics.commissionRefunds)} rendues` : "sur la période"}
+              tone="success"
+              sparkline={sparklines.commission}
+            />
             <KpiCard label="Livreurs uniques" value={metrics.activeDrivers.toString()} foot="ayant terminé au moins une course" tone="primary" sparkline={sparklines.drivers} />
             <KpiCard label="Signalements ouverts" value={metrics.openReports.toString()} foot={metrics.openReports > 0 ? "à traiter en priorité" : "Aucun signalement"} tone={metrics.openReports > 0 ? "error" : "success"} sparkline={sparklines.reports} />
           </div>

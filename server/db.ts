@@ -877,7 +877,7 @@ async function notifyWalletChanged(profilePhone: string) {
   }
 }
 
-async function appendDeliveryEvent(tx: any, event: DeliveryEventInput) {
+export async function appendDeliveryEvent(tx: any, event: DeliveryEventInput) {
   const eventId = randomUUID();
   await tx.insert(tikisDeliveryEvents).values({
     id: eventId, deliveryId: event.deliveryId, eventType: event.eventType, status: event.status ?? null,
