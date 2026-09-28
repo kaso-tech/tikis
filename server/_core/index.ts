@@ -174,6 +174,13 @@ async function startServer() {
     app.get("/admin", (_req, res) => res.status(503).send("Console d’administration non compilée. Voir admin/README.md pour la builder (npm run build dans le dossier admin/)."));
   }
 
+  const webDistPath = path.resolve(process.cwd(), "web-build");
+  const webIndexPath = path.join(webDistPath, "index.html");
+  const hasWebBuild = fs.existsSync(webIndexPath);
+  if (hasWebBuild) {
+    app.use(express.static(webDistPath, { extensions: ["html"] }));
+  }
+
   const trpcHandlerOptions = {
     router: appRouter,
     createContext,
@@ -189,6 +196,18 @@ async function startServer() {
   // que la limite de charge élargie ci-dessus ne s'applique qu'à elle. Même routeur, même
   // contexte : ce n'est qu'un second point d'entrée vers la même API.
   app.use("/api/trpc-kyc", createExpressMiddleware(trpcHandlerOptions));
+
+  if (hasWebBuild) {
+    app.get("*", (req, res, next) => {
+      if (req.path === "/api" || req.path.startsWith("/api/") || req.path === "/admin" || req.path.startsWith("/admin/")) {
+        return next();
+      }
+      if (path.extname(req.path)) return res.status(404).end();
+      return res.sendFile(webIndexPath);
+    });
+  } else {
+    app.get("/", (_req, res) => res.status(503).send("Application web non compilée. Exécutez pnpm build avant le démarrage de production."));
+  }
 
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
     if (res.headersSent) return;
