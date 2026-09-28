@@ -1321,9 +1321,13 @@ export async function adminAdjustWallet(
 }
 
 /** Traitement admin d'une demande de dépôt/retrait YengaPay en attente (validation manuelle du provider). */
-export async function adminSettlePaymentTransaction(input: { paymentId: string; outcome: "succeeded" | "failed"; adminId: number; notes?: string }) {
+export async function adminSettlePaymentTransaction(input: { paymentId: string; outcome: "succeeded" | "failed"; adminId: number; notes?: string; payoutReference?: string }) {
   const db = await getDb();
   if (!db) throw new Error("Le paiement est temporairement indisponible.");
+  const notes = input.notes?.trim() || null;
+  const payoutReference = input.payoutReference?.trim() || null;
+  // Qui a tranché, et pourquoi : gardé sur la transaction elle-même, pas seulement dans le journal d'audit.
+  const decision = { adminNotes: notes, settledByAdminId: input.adminId };
   return db.transaction(async (tx) => {
     const payment = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, input.paymentId)).limit(1).for("update"))[0];
     if (!payment) throw new Error("Transaction introuvable.");
@@ -1332,7 +1336,7 @@ export async function adminSettlePaymentTransaction(input: { paymentId: string; 
       return { payment: yengaPayTestPaymentToView(payment), wallet: walletSnapshotFromRecord(wallet) } satisfies YengaPayTestPaymentSettlement;
     }
     if (input.outcome === "failed") {
-      await tx.update(tikisPaymentTransactions).set({ status: "failed", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
+      await tx.update(tikisPaymentTransactions).set({ status: "failed", settledAt: new Date(), ...decision }).where(eq(tikisPaymentTransactions.id, payment.id));
     } else if (payment.type === "deposit") {
       // Un dépôt YengaPay réel n'est crédité que sur la parole de YengaPay (webhook ou réconciliation).
       // Un clic « Valider » sur une intention restée en attente — l'utilisateur a pu ne jamais payer —
@@ -1342,12 +1346,28 @@ export async function adminSettlePaymentTransaction(input: { paymentId: string; 
         throw new Error("Ce dépôt passe par YengaPay : seul YengaPay peut en confirmer le paiement. Utilisez « Vérifier auprès de YengaPay ».");
       }
       await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "credit", amount: payment.amount, availableDelta: payment.amount, heldDelta: 0, reason: "Dépôt validé manuellement par l’administration", idempotencyKey: `${payment.id}:admin-settled` });
-      await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
+      await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date(), ...decision }).where(eq(tikisPaymentTransactions.id, payment.id));
     } else {
+      // Le versement Mobile Money se fait hors application : valider un retrait, c'est attester qu'il a eu
+      // lieu. Sans référence, rien ne distinguait un retrait réellement versé d'un clic distrait — et rien
+      // n'empêchait de justifier deux retraits par le même versement (index unique sur la colonne).
+      if (!payoutReference || payoutReference.length < 4 || payoutReference.length > 80) throw new Error("Indiquez la référence du versement Mobile Money (4 à 80 caractères) pour valider ce retrait.");
+      if (!notes) throw new Error("Ajoutez une note sur le versement (opérateur, numéro crédité…) pour valider ce retrait.");
+      const reused = (await tx.select({ id: tikisPaymentTransactions.id }).from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.payoutReference, payoutReference)).limit(1))[0];
+      if (reused) throw new Error("Cette référence de versement est déjà utilisée pour un autre retrait.");
       const wallet = await ensureTikisWallet(tx, payment.profilePhone);
       if (wallet.availableBalance < payment.amount) throw new Error("Le solde disponible de l’utilisateur est désormais insuffisant pour ce retrait.");
-      await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "debit", amount: payment.amount, availableDelta: -payment.amount, heldDelta: 0, reason: "Retrait validé manuellement par l’administration", idempotencyKey: `${payment.id}:admin-settled` });
-      await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
+      await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "debit", amount: payment.amount, availableDelta: -payment.amount, heldDelta: 0, reason: `Retrait versé (réf. ${payoutReference}) et validé par l’administration`, idempotencyKey: `${payment.id}:admin-settled` });
+      try {
+        await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date(), payoutReference, ...decision }).where(eq(tikisPaymentTransactions.id, payment.id));
+      } catch (cause) {
+        // Deux validations simultanées avec la même référence : l'index unique tranche, la transaction entière
+        // (débit compris) est annulée.
+        if ((cause as { code?: string; cause?: { code?: string } })?.code === "ER_DUP_ENTRY" || (cause as { cause?: { code?: string } })?.cause?.code === "ER_DUP_ENTRY") {
+          throw new Error("Cette référence de versement est déjà utilisée pour un autre retrait.");
+        }
+        throw cause;
+      }
     }
     const settled = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, payment.id)).limit(1))[0];
     if (!settled) throw new Error("La transaction n’a pas pu être finalisée.");
@@ -1624,6 +1644,28 @@ export async function cancelTikisDeliveryFromSender(deliveryId: string, senderPh
     await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_cancelled", status: "cancelled", actorPhone: senderPhone, recipientPhone: senderPhone, title: "Livraison annulée", body: "Votre livraison est conservée dans l’historique avec son statut d’annulation.", tone: "warning", idempotencyKey: `${deliveryId}:cancelled:sender` });
   });
   return getTikisDeliveryById(deliveryId);
+}
+
+/**
+ * Retire toutes les candidatures encore ouvertes d'un livreur que l'administration suspend ou bannit, et lui
+ * rend la commission réservée pour chacune. Sans ça, ses candidatures restaient proposées aux expéditeurs —
+ * qui pouvaient choisir un livreur qui ne peut plus se connecter — et sa réserve restait bloquée.
+ * Seules les candidatures « applied » sont concernées : une course déjà attribuée engage aussi l'expéditeur,
+ * c'est à l'admin d'en décider (annulation forcée), elle est seulement renvoyée dans `engagements`.
+ */
+export async function withdrawCandidaciesOfSuspendedDriver(tx: any, driverPhone: string) {
+  const candidates = await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.driverPhone, driverPhone), eq(tikisDeliveryCandidates.status, "applied"))).for("update");
+  for (const candidate of candidates) {
+    const delivery = (await tx.select().from(tikisDeliveries).where(eq(tikisDeliveries.id, candidate.deliveryId)).limit(1))[0];
+    // La version de la candidature (updatedAt) fait partie des clés : une candidature reposée après une
+    // réactivation, puis suspendue de nouveau, doit être libérée une seconde fois, pas reconnue comme déjà faite.
+    const version = candidate.updatedAt.getTime();
+    await releaseCandidateCommission(tx, candidate, "Commission libérée : compte suspendu par l’administration", `admin-suspend:release:${version}`);
+    await tx.update(tikisDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, candidate.id));
+    await appendDeliveryEvent(tx, { deliveryId: candidate.deliveryId, eventType: "candidate_withdrawn", status: delivery?.status ?? "open", recipientPhone: driverPhone, title: "Candidature retirée", body: "Votre compte a été suspendu : cette candidature est retirée et sa commission libérée.", tone: "warning", idempotencyKey: `${candidate.id}:admin-suspend-driver:${version}` });
+    if (delivery) await appendDeliveryEvent(tx, { deliveryId: candidate.deliveryId, eventType: "candidate_withdrawn", status: delivery.status, recipientPhone: delivery.senderPhone, title: "Candidature retirée", body: "Un livreur n’est plus disponible pour votre livraison.", tone: "info", idempotencyKey: `${candidate.id}:admin-suspend-sender:${version}` });
+  }
+  return candidates.length as number;
 }
 
 export async function withdrawTikisDeliveryCandidateWithWallet(deliveryId: string, driverPhone: string) {

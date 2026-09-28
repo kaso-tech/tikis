@@ -216,6 +216,12 @@ export const tikisPaymentTransactions = mysqlTable("tikis_payment_transactions",
   expiresAt: timestamp("expiresAt"),
   idempotencyKey: varchar("idempotencyKey", { length: 100 }).notNull().unique(),
   settledAt: timestamp("settledAt"),
+  /** Référence du versement Mobile Money fait hors application, exigée pour valider un retrait à la main.
+   *  Unique : une même preuve de versement ne peut justifier deux retraits. */
+  payoutReference: varchar("payoutReference", { length: 80 }).unique(),
+  /** Note laissée par l'admin qui a tranché la transaction à la main. */
+  adminNotes: varchar("adminNotes", { length: 300 }),
+  settledByAdminId: int("settledByAdminId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
   index("tikis_payment_transactions_profile_created_index").on(table.profilePhone, table.createdAt),

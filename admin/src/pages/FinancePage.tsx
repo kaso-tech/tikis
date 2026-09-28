@@ -25,6 +25,11 @@ export default function FinancePage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Décision en attente de confirmation. Valider un retrait atteste qu'il a été versé hors application :
+  // la référence Mobile Money et une note sont exigées (le serveur les exige aussi).
+  const [pendingSettle, setPendingSettle] = useState<{ transaction: Transaction; outcome: "succeeded" | "failed" } | null>(null);
+  const [settleDraft, setSettleDraft] = useState({ payoutReference: "", notes: "" });
+  const [settleError, setSettleError] = useState("");
 
   const [settings, setSettings] = useState<{ commissionRate: number; minWithdrawal: number; maxWithdrawal: number } | null>(null);
   const [settingsDraft, setSettingsDraft] = useState({ min: "", max: "" });
@@ -47,15 +52,31 @@ export default function FinancePage() {
       .catch(() => {});
   }, []);
 
-  async function settle(paymentId: string, outcome: "succeeded" | "failed") {
-    setBusyId(paymentId);
-    setError(""); setSuccess("");
+  function askSettle(transaction: Transaction, outcome: "succeeded" | "failed") {
+    setSettleDraft({ payoutReference: "", notes: "" });
+    setSettleError("");
+    setPendingSettle({ transaction, outcome });
+  }
+
+  const needsPayoutProof = pendingSettle?.transaction.type === "withdrawal" && pendingSettle.outcome === "succeeded";
+
+  async function confirmSettle() {
+    if (!pendingSettle || busyId) return;
+    const { transaction, outcome } = pendingSettle;
+    const payoutReference = settleDraft.payoutReference.trim();
+    const notes = settleDraft.notes.trim();
+    if (needsPayoutProof && payoutReference.length < 4) { setSettleError("Indiquez la référence du versement Mobile Money."); return; }
+    if (needsPayoutProof && !notes) { setSettleError("Ajoutez une note sur le versement (opérateur, numéro crédité…)."); return; }
+    setBusyId(transaction.id);
+    setError(""); setSuccess(""); setSettleError("");
     try {
-      await trpc.adminConsole.finance.settleTransaction.mutate({ paymentId, outcome });
+      await trpc.adminConsole.finance.settleTransaction.mutate({ paymentId: transaction.id, outcome, notes: notes || undefined, payoutReference: needsPayoutProof ? payoutReference : undefined });
       setSuccess(outcome === "succeeded" ? "Transaction validée." : "Transaction rejetée.");
-      loadTransactions(tab === "deposits" ? "deposit" : "withdrawal");
+      setPendingSettle(null);
+      loadTransactions(transaction.type);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Action impossible.");
+      // L'erreur reste dans la boîte de dialogue : l'admin corrige la référence sans tout ressaisir.
+      setSettleError(cause instanceof Error ? cause.message : "Action impossible.");
     } finally {
       setBusyId(null);
     }
@@ -155,8 +176,8 @@ export default function FinancePage() {
                       {canEdit ? <>
                         {isRealYengapayDeposit(t)
                           ? <button className="btn btn-sm btn-primary" disabled={busyId === t.id} onClick={() => void reconcile(t)}>Vérifier auprès de YengaPay</button>
-                          : <button className="btn btn-sm btn-primary" disabled={busyId === t.id} onClick={() => void settle(t.id, "succeeded")}>Valider</button>}
-                        <button className="btn btn-sm btn-danger" disabled={busyId === t.id} onClick={() => void settle(t.id, "failed")}>Rejeter</button>
+                          : <button className="btn btn-sm btn-primary" disabled={busyId === t.id} onClick={() => askSettle(t, "succeeded")}>Valider</button>}
+                        <button className="btn btn-sm btn-danger" disabled={busyId === t.id} onClick={() => askSettle(t, "failed")}>Rejeter</button>
                       </> : null}
                     </td>
                   </tr>
@@ -198,6 +219,34 @@ export default function FinancePage() {
           )}
         </div>
       ) : null}
+      <ConfirmDialog
+        open={pendingSettle !== null}
+        title={!pendingSettle ? "" : pendingSettle.outcome === "failed" ? (pendingSettle.transaction.type === "withdrawal" ? "Rejeter ce retrait" : "Rejeter ce dépôt") : (pendingSettle.transaction.type === "withdrawal" ? "Valider un retrait versé" : "Valider ce dépôt")}
+        tone={pendingSettle?.outcome === "failed" ? "danger" : "primary"}
+        confirmLabel={pendingSettle?.outcome === "failed" ? "Rejeter" : "Valider"}
+        busy={busyId !== null}
+        description={pendingSettle ? (
+          <div style={{ display: "grid", gap: 8 }}>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.6 }}>
+              <li><strong>Profil :</strong> {pendingSettle.transaction.profilePhone}</li>
+              <li><strong>Montant :</strong> {formatMoney(pendingSettle.transaction.amount)}</li>
+              <li><strong>Fournisseur :</strong> {pendingSettle.transaction.provider}</li>
+            </ul>
+            {needsPayoutProof ? (
+              <>
+                <p style={{ fontSize: 12.5 }}>Validez seulement après avoir versé l’argent. Le Wallet sera débité de ce montant.</p>
+                <label className="field-label" htmlFor="payout-reference">Référence du versement Mobile Money</label>
+                <input id="payout-reference" className="input" value={settleDraft.payoutReference} maxLength={80} onChange={(e) => setSettleDraft((s) => ({ ...s, payoutReference: e.target.value }))} placeholder="ex. CI240928.1532.A12345" />
+              </>
+            ) : null}
+            <label className="field-label" htmlFor="settle-notes">{needsPayoutProof ? "Note sur le versement" : "Motif (facultatif)"}</label>
+            <input id="settle-notes" className="input" value={settleDraft.notes} maxLength={300} onChange={(e) => setSettleDraft((s) => ({ ...s, notes: e.target.value }))} placeholder={needsPayoutProof ? "Opérateur, numéro crédité…" : ""} />
+            {settleError ? <div className="banner-error" style={{ marginBottom: 0 }}>{settleError}</div> : null}
+          </div>
+        ) : null}
+        onConfirm={() => void confirmSettle()}
+        onCancel={() => { if (!busyId) setPendingSettle(null); }}
+      />
       <ConfirmDialog
         open={pendingBonus !== null}
         title={pendingBonus && pendingBonus.amount >= 50_000 ? "Confirmer l'envoi d'un montant élevé" : "Confirmer l'envoi du bonus"}

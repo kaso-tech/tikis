@@ -315,18 +315,41 @@ export async function adminDashboardMetrics(sinceDays = 30) {
 
 export type ProfileStatus = "active" | "suspended" | "banned";
 
+export type ProfileEngagement = { deliveryId: string; title: string; status: TikisDelivery["status"]; role: "sender" | "driver" };
+
+/** Courses où ce profil est engagé et qu'une décision d'admin ne peut pas trancher à sa place. */
+async function profileEngagements(tx: any, phone: string): Promise<ProfileEngagement[]> {
+  const asDriver = await tx.select({ deliveryId: tikisDeliveries.id, title: tikisDeliveries.title, status: tikisDeliveries.status }).from(tikisDeliveries)
+    .where(and(eq(tikisDeliveries.driverPhone, phone), inArray(tikisDeliveries.status, ["pending_confirmation", "active"])));
+  const asSender = await tx.select({ deliveryId: tikisDeliveries.id, title: tikisDeliveries.title, status: tikisDeliveries.status }).from(tikisDeliveries)
+    .where(and(eq(tikisDeliveries.senderPhone, phone), inArray(tikisDeliveries.status, ["open", "pending_confirmation", "active", "disabled"])));
+  return [
+    ...asDriver.map((row: Omit<ProfileEngagement, "role">) => ({ ...row, role: "driver" as const })),
+    ...asSender.map((row: Omit<ProfileEngagement, "role">) => ({ ...row, role: "sender" as const })),
+  ];
+}
+
+/**
+ * Suspendre ou bannir retire aussi les candidatures ouvertes du profil et libère leur commission (voir
+ * `withdrawCandidaciesOfSuspendedDriver`), dans la même transaction que le changement de statut. Les courses
+ * déjà attribuées ou publiées sont renvoyées dans `engagements` : l'admin décide de les annuler ou non.
+ */
 export async function adminSetProfileStatus(input: { phone: string; status: ProfileStatus; reason?: string; adminId: number }) {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  const profile = (await dbc.select().from(tikisProfiles).where(eq(tikisProfiles.phone, input.phone)).limit(1))[0];
-  if (!profile) throw new Error("Profil introuvable.");
-  await dbc.update(tikisProfiles).set({
-    status: input.status,
-    statusReason: input.status === "active" ? null : (input.reason?.trim() || null),
-    statusUpdatedAt: new Date(),
-    statusUpdatedByAdminId: input.adminId,
-  }).where(eq(tikisProfiles.phone, input.phone));
-  return { phone: input.phone, status: input.status };
+  return dbc.transaction(async (tx) => {
+    const profile = (await tx.select().from(tikisProfiles).where(eq(tikisProfiles.phone, input.phone)).limit(1).for("update"))[0];
+    if (!profile) throw new Error("Profil introuvable.");
+    await tx.update(tikisProfiles).set({
+      status: input.status,
+      statusReason: input.status === "active" ? null : (input.reason?.trim() || null),
+      statusUpdatedAt: new Date(),
+      statusUpdatedByAdminId: input.adminId,
+    }).where(eq(tikisProfiles.phone, input.phone));
+    const releasedCandidacies = input.status === "active" ? 0 : await db.withdrawCandidaciesOfSuspendedDriver(tx, input.phone);
+    const engagements = input.status === "active" ? [] : await profileEngagements(tx, input.phone);
+    return { phone: input.phone, status: input.status, releasedCandidacies, engagements };
+  });
 }
 
 /** Le rôle (sender/driver) est normalement immuable côté app ; ce changement est réservé aux super-admins
@@ -334,15 +357,22 @@ export async function adminSetProfileStatus(input: { phone: string; status: Prof
 export async function adminChangeProfileRole(input: { phone: string; role: "sender" | "driver" }) {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  const profile = (await dbc.select().from(tikisProfiles).where(eq(tikisProfiles.phone, input.phone)).limit(1))[0];
-  if (!profile) throw new Error("Profil introuvable.");
-  const activeDeliveries = await dbc.select({ count: count() }).from(tikisDeliveries).where(and(
-    or(eq(tikisDeliveries.senderPhone, input.phone), eq(tikisDeliveries.driverPhone, input.phone)),
-    or(eq(tikisDeliveries.status, "active"), eq(tikisDeliveries.status, "pending_confirmation")),
-  ));
-  if (Number(activeDeliveries[0]?.count ?? 0) > 0) throw new Error("Impossible de changer le rôle : ce profil a une livraison en cours.");
-  await dbc.update(tikisProfiles).set({ accountType: input.role, vehicles: input.role === "sender" ? "[]" : profile.vehicles }).where(eq(tikisProfiles.phone, input.phone));
-  return { phone: input.phone, role: input.role };
+  return dbc.transaction(async (tx) => {
+    const profile = (await tx.select().from(tikisProfiles).where(eq(tikisProfiles.phone, input.phone)).limit(1).for("update"))[0];
+    if (!profile) throw new Error("Profil introuvable.");
+    // Tout ce qui lie encore ce profil à son rôle actuel bloque le changement. Ne regarder que les courses
+    // « en cours » laissait passer un livreur avec des candidatures ouvertes : devenu expéditeur, il n'avait
+    // plus aucun écran pour les retirer, et leur commission restait réservée pour toujours.
+    const candidacies = await tx.select({ count: count() }).from(tikisDeliveryCandidates)
+      .where(and(eq(tikisDeliveryCandidates.driverPhone, input.phone), inArray(tikisDeliveryCandidates.status, ["applied", "selected", "confirmed"])));
+    if (Number(candidacies[0]?.count ?? 0) > 0) throw new Error("Impossible de changer le rôle : ce livreur a une candidature en cours. Elle doit d’abord être retirée ou la course terminée.");
+    const engagements = await profileEngagements(tx, input.phone);
+    if (engagements.length > 0) throw new Error(`Impossible de changer le rôle : ce profil a ${engagements.length} course(s) non terminée(s).`);
+    const wallet = (await tx.select().from(tikisWallets).where(eq(tikisWallets.profilePhone, input.phone)).limit(1))[0];
+    if (wallet && wallet.heldBalance > 0) throw new Error("Impossible de changer le rôle : une partie du Wallet de ce profil est encore bloquée.");
+    await tx.update(tikisProfiles).set({ accountType: input.role, vehicles: input.role === "sender" ? "[]" : profile.vehicles }).where(eq(tikisProfiles.phone, input.phone));
+    return { phone: input.phone, role: input.role };
+  });
 }
 
 export async function adminRewardWallet(input: { phone: string; amount: number; reason: string; adminId: number; requestId: string }) {

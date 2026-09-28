@@ -206,3 +206,144 @@ describe.skipIf(!TEST_DB)("validation manuelle d'un dépôt — jamais sans preu
     expect(await wallet(phone)).toEqual({ available: 5000, held: 0 });
   });
 });
+
+async function profile(phone: string, accountType: "sender" | "driver") {
+  const handle = (await db.getDb())!;
+  await handle.insert(schema.tikisProfiles).values({ phone, fullName: "Profil audit", accountType, vehicles: accountType === "driver" ? "[\"Moto\"]" : "[]" });
+}
+
+async function candidateStatus(deliveryId: string, driverPhone: string) {
+  const handle = (await db.getDb())!;
+  const { and, eq } = await import("drizzle-orm");
+  return (await handle.select().from(schema.tikisDeliveryCandidates).where(and(eq(schema.tikisDeliveryCandidates.deliveryId, deliveryId), eq(schema.tikisDeliveryCandidates.driverPhone, driverPhone))).limit(1))[0]?.status;
+}
+
+describe.skipIf(!TEST_DB)("changement de rôle — jamais avec de l'argent ou des courses engagés", () => {
+  it("refuse de passer expéditeur un livreur qui a une candidature en cours (commission réservée)", async () => {
+    const { driverPhone } = await engagedDelivery("applied");
+    await profile(driverPhone, "driver");
+    // Avant correction : accepté, et les 300 FCFA réservés n'avaient plus aucun chemin de sortie.
+    await expect(adminDb.adminChangeProfileRole({ phone: driverPhone, role: "sender" })).rejects.toThrow(/candidature/);
+  });
+
+  it("refuse de passer livreur un expéditeur qui a une course ouverte", async () => {
+    const handle = (await db.getDb())!;
+    const senderPhone = newPhone();
+    await profile(senderPhone, "sender");
+    await handle.insert(schema.tikisDeliveries).values({
+      id: randomUUID(), senderPhone, pickupPlaceId: 1, dropoffPlaceId: 2, title: "Course ouverte", details: "",
+      deliveryType: "Plis", distanceKm: "3.00", estimatedPrice: 3000, vehicleTypes: "Moto", status: "open",
+    });
+    await expect(adminDb.adminChangeProfileRole({ phone: senderPhone, role: "driver" })).rejects.toThrow(/course/);
+  });
+
+  it("accepte un profil sans engagement", async () => {
+    const phone = newPhone();
+    await profile(phone, "sender");
+    await expect(adminDb.adminChangeProfileRole({ phone, role: "driver" })).resolves.toMatchObject({ role: "driver" });
+  });
+});
+
+describe.skipIf(!TEST_DB)("suspension d'un livreur — ses candidatures sont retirées et sa commission libérée", () => {
+  for (const status of ["suspended", "banned"] as const) {
+    it(`${status} : candidature retirée, réserve rendue`, async () => {
+      const { deliveryId, driverPhone } = await engagedDelivery("applied");
+      await profile(driverPhone, "driver");
+
+      const result = await adminDb.adminSetProfileStatus({ phone: driverPhone, status, reason: "Audit", adminId: 1 });
+
+      // Avant correction : la candidature restait visible de l'expéditeur, et 300 FCFA restaient bloqués.
+      expect(await wallet(driverPhone)).toEqual({ available: 5000, held: 0 });
+      expect(await candidateStatus(deliveryId, driverPhone)).toBe("withdrawn");
+      expect(result.releasedCandidacies).toBe(1);
+    });
+  }
+
+  it("une course déjà attribuée n'est pas touchée, mais elle est signalée à l'admin", async () => {
+    const { deliveryId, driverPhone } = await engagedDelivery("confirmed");
+    await profile(driverPhone, "driver");
+
+    const result = await adminDb.adminSetProfileStatus({ phone: driverPhone, status: "suspended", reason: "Audit", adminId: 1 });
+
+    expect(await candidateStatus(deliveryId, driverPhone)).toBe("confirmed");
+    expect(result.engagements).toEqual([expect.objectContaining({ deliveryId, role: "driver", status: "active" })]);
+  });
+
+  it("réactiver un profil ne touche à rien", async () => {
+    const { deliveryId, driverPhone } = await engagedDelivery("applied");
+    await profile(driverPhone, "driver");
+    const result = await adminDb.adminSetProfileStatus({ phone: driverPhone, status: "active", adminId: 1 });
+    expect(result.releasedCandidacies).toBe(0);
+    expect(await candidateStatus(deliveryId, driverPhone)).toBe("applied");
+    expect(await wallet(driverPhone)).toEqual({ available: 4700, held: 300 });
+  });
+
+  it("une candidature suspendue, reposée puis suspendue de nouveau est libérée les deux fois", async () => {
+    const { deliveryId, driverPhone } = await engagedDelivery("applied");
+    await profile(driverPhone, "driver");
+    await adminDb.adminSetProfileStatus({ phone: driverPhone, status: "suspended", reason: "Audit", adminId: 1 });
+    // Réactivé, il repostule : nouvelle réserve de 300 FCFA sur la même ligne de candidature.
+    const handle = (await db.getDb())!;
+    const { and, eq } = await import("drizzle-orm");
+    await handle.transaction(async (tx) => {
+      await db.applyWalletMovement(tx, { profilePhone: driverPhone, deliveryId, operation: "block", amount: 300, availableDelta: -300, heldDelta: 300, reason: "Nouvelle candidature (test)", idempotencyKey: `${deliveryId}:${driverPhone}:reblock` });
+    });
+    await new Promise((resolve) => setTimeout(resolve, 1100)); // updatedAt a une précision d'une seconde
+    await handle.update(schema.tikisDeliveryCandidates).set({ status: "applied", updatedAt: new Date() }).where(and(eq(schema.tikisDeliveryCandidates.deliveryId, deliveryId), eq(schema.tikisDeliveryCandidates.driverPhone, driverPhone)));
+
+    await adminDb.adminSetProfileStatus({ phone: driverPhone, status: "suspended", reason: "Audit", adminId: 1 });
+    expect(await wallet(driverPhone)).toEqual({ available: 5000, held: 0 });
+  });
+});
+
+describe.skipIf(!TEST_DB)("validation manuelle d'un retrait — jamais sans preuve de versement", () => {
+  async function pendingWithdrawal(amount = 2000) {
+    const handle = (await db.getDb())!;
+    const phone = newPhone();
+    const id = randomUUID();
+    await handle.transaction(async (tx) => {
+      await db.applyWalletMovement(tx, { profilePhone: phone, operation: "credit", amount: 5000, availableDelta: 5000, heldDelta: 0, reason: "Solde de départ (test)", idempotencyKey: `${id}:seed` });
+    });
+    await handle.insert(schema.tikisPaymentTransactions).values({
+      id, profilePhone: phone, type: "withdrawal", provider: "yengapay_test", amount, status: "pending", providerReference: `wd_admin_${id}`,
+      checkoutUrl: null, idempotencyKey: `admin-audit-wd:${id}`,
+    });
+    return { id, phone };
+  }
+
+  it("refuse de valider un retrait sans référence de versement", async () => {
+    const { id, phone } = await pendingWithdrawal();
+    await expect(db.adminSettlePaymentTransaction({ paymentId: id, outcome: "succeeded", adminId: 1, notes: "Versé" })).rejects.toThrow(/référence/);
+    expect(await wallet(phone)).toEqual({ available: 5000, held: 0 });
+  });
+
+  it("refuse de valider un retrait sans note", async () => {
+    const { id } = await pendingWithdrawal();
+    await expect(db.adminSettlePaymentTransaction({ paymentId: id, outcome: "succeeded", adminId: 1, payoutReference: "OM-123456" })).rejects.toThrow(/note/);
+  });
+
+  it("valide avec référence et note, et les enregistre avec l'admin", async () => {
+    const { id, phone } = await pendingWithdrawal();
+    await db.adminSettlePaymentTransaction({ paymentId: id, outcome: "succeeded", adminId: 42, payoutReference: ` OM-${id.slice(0, 8)} `, notes: "Versé par Orange Money" });
+    expect(await wallet(phone)).toEqual({ available: 3000, held: 0 });
+    const handle = (await db.getDb())!;
+    const { eq } = await import("drizzle-orm");
+    const row = (await handle.select().from(schema.tikisPaymentTransactions).where(eq(schema.tikisPaymentTransactions.id, id)).limit(1))[0]!;
+    expect(row).toMatchObject({ status: "succeeded", payoutReference: `OM-${id.slice(0, 8)}`, adminNotes: "Versé par Orange Money", settledByAdminId: 42 });
+  });
+
+  it("une même référence ne justifie jamais deux retraits", async () => {
+    const first = await pendingWithdrawal();
+    const second = await pendingWithdrawal();
+    const reference = `OM-${first.id.slice(0, 12)}`;
+    await db.adminSettlePaymentTransaction({ paymentId: first.id, outcome: "succeeded", adminId: 1, payoutReference: reference, notes: "Versé" });
+    await expect(db.adminSettlePaymentTransaction({ paymentId: second.id, outcome: "succeeded", adminId: 1, payoutReference: reference, notes: "Versé" })).rejects.toThrow(/déjà utilisée/);
+    expect(await wallet(second.phone)).toEqual({ available: 5000, held: 0 });
+  });
+
+  it("un rejet de retrait se fait sans référence", async () => {
+    const { id, phone } = await pendingWithdrawal();
+    await db.adminSettlePaymentTransaction({ paymentId: id, outcome: "failed", adminId: 1, notes: "Numéro invalide" });
+    expect(await wallet(phone)).toEqual({ available: 5000, held: 0 });
+  });
+});

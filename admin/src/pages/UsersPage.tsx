@@ -34,6 +34,9 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
 
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState("");
+  // Ce que la suspension a fait d'elle-même (candidatures retirées) et ce qu'elle laisse à décider (courses
+  // attribuées ou publiées). Rattaché au numéro : ne s'affiche que sur la fiche concernée.
+  const [statusOutcome, setStatusOutcome] = useState<{ phone: string; releasedCandidacies: number; engagements: { deliveryId: string; title: string; status: string; role: "sender" | "driver" }[] } | null>(null);
   const [statusReasonDraft, setStatusReasonDraft] = useState("");
   // Un identifiant par opération, pas par clic : il ne change qu'une fois le mouvement enregistré. Une
   // requête qui a expiré côté navigateur mais abouti côté serveur, puis un second clic, renvoient le même
@@ -76,7 +79,8 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
     setActionBusy(true);
     setActionError("");
     try {
-      await trpc.adminConsole.users.setStatus.mutate({ phone: detail.profile.phone, status, reason: statusReasonDraft.trim() || undefined });
+      const result = await trpc.adminConsole.users.setStatus.mutate({ phone: detail.profile.phone, status, reason: statusReasonDraft.trim() || undefined });
+      setStatusOutcome(status === "active" ? null : { phone: result.phone, releasedCandidacies: result.releasedCandidacies, engagements: result.engagements });
       setStatusReasonDraft("");
       await openDetail(detail.profile.phone);
       await loadUsers(query || undefined);
@@ -167,6 +171,27 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
         <div className="card">
           <div className="card-head"><div><div className="card-title">Actions administrateur</div><div className="card-sub">Chaque action est tracée dans le journal d’audit</div></div></div>
           {actionError ? <div className="banner-error">{actionError}</div> : null}
+          {statusOutcome && statusOutcome.phone === detail.profile.phone ? (
+            <div className={statusOutcome.engagements.length > 0 ? "banner-error" : "banner-ok"}>
+              <div>
+                {statusOutcome.releasedCandidacies > 0
+                  ? `${statusOutcome.releasedCandidacies} candidature(s) retirée(s), commission libérée.`
+                  : "Aucune candidature en cours à retirer."}
+              </div>
+              {statusOutcome.engagements.length > 0 ? (
+                <div style={{ marginTop: 6 }}>
+                  À décider : {statusOutcome.engagements.length} course(s) toujours engagée(s). Annulez-les depuis Livraisons si nécessaire.
+                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                    {statusOutcome.engagements.map((engagement) => (
+                      <li key={`${engagement.role}:${engagement.deliveryId}`}>
+                        {engagement.title} — {engagement.role === "driver" ? "livreur" : "expéditeur"}, statut {engagement.status} <code>{engagement.deliveryId}</code>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <div className="grid grid-4">
             <div className="action-block">
               <div className="action-block-title">Statut du compte</div>

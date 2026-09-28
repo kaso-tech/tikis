@@ -84,3 +84,32 @@ describe("dépôts YengaPay dans l'écran Finance", () => {
     expect(page).toContain("finance.reconcileYengapayPayment.mutate({ providerReference: t.providerReference })");
   });
 });
+
+describe("lot 1 — décisions financières encadrées dans les écrans", () => {
+  const finance = read("admin/src/pages/FinancePage.tsx");
+
+  it("Valider et Rejeter passent par une confirmation, jamais par un appel direct", () => {
+    expect(finance).not.toMatch(/onClick=\{\(\) => void settle\(/);
+    expect(finance).toContain('onClick={() => askSettle(t, "succeeded")}');
+    expect(finance).toContain('onClick={() => askSettle(t, "failed")}');
+  });
+
+  it("valider un retrait demande la référence de versement et une note", () => {
+    expect(finance).toContain('const needsPayoutProof = pendingSettle?.transaction.type === "withdrawal" && pendingSettle.outcome === "succeeded";');
+    expect(finance).toContain('id="payout-reference"');
+    expect(finance).toContain("payoutReference: needsPayoutProof ? payoutReference : undefined");
+  });
+
+  it("la fiche utilisateur montre ce que la suspension a libéré et ce qui reste à décider", () => {
+    const users = read("admin/src/pages/UsersPage.tsx");
+    expect(users).toContain("statusOutcome.releasedCandidacies");
+    expect(users).toContain("statusOutcome.engagements.map(");
+  });
+
+  it("la migration ajoute la référence de versement, unique", () => {
+    const migration = read("drizzle/manual/0043_withdrawal_payout_reference.sql");
+    expect(migration).toContain("ADD COLUMN IF NOT EXISTS `payoutReference` varchar(80)");
+    expect(migration).toContain("CREATE UNIQUE INDEX IF NOT EXISTS `tikis_payment_transactions_payoutReference_unique`");
+    expect(read("drizzle/schema.ts")).toContain('payoutReference: varchar("payoutReference", { length: 80 }).unique()');
+  });
+});

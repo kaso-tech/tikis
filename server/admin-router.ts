@@ -81,7 +81,7 @@ export const tikisAdminRouter = router({
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await adminDb.adminSetProfileStatus({ phone: input.phone, status: input.status, reason: input.reason, adminId: ctx.tikisAdmin.adminId });
       invalidateTikisProfileCache(input.phone);
-      await audit(ctx, "profile_status_changed", "profile", input.phone, { status: input.status, reason: input.reason });
+      await audit(ctx, "profile_status_changed", "profile", input.phone, { status: input.status, reason: input.reason, releasedCandidacies: result.releasedCandidacies, engagements: result.engagements.map((engagement) => engagement.deliveryId) });
       return result;
     }),
     changeRole: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ phone: z.string(), role: z.enum(["sender", "driver"]) })).mutation(async ({ ctx, input }) => {
@@ -158,10 +158,10 @@ export const tikisAdminRouter = router({
       }),
     }),
     transactions: tikisAdminProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]).optional(), status: z.enum(["pending", "succeeded", "failed", "cancelled"]).optional() })).query(({ input }) => adminDb.adminListPaymentTransactions(input)),
-    settleTransaction: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ paymentId: z.string(), outcome: z.enum(["succeeded", "failed"]), notes: z.string().max(300).optional() })).mutation(async ({ ctx, input }) => {
+    settleTransaction: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ paymentId: z.string(), outcome: z.enum(["succeeded", "failed"]), notes: z.string().max(300).optional(), payoutReference: z.string().max(80).optional() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await db.adminSettlePaymentTransaction({ ...input, adminId: ctx.tikisAdmin.adminId });
-      await audit(ctx, "payment_transaction_settled", "payment_transaction", input.paymentId, { outcome: input.outcome, notes: input.notes });
+      await audit(ctx, "payment_transaction_settled", "payment_transaction", input.paymentId, { outcome: input.outcome, notes: input.notes, payoutReference: input.payoutReference });
       return result;
     }),
     // Réconciliation YengaPay : interroge le PSP pour connaître l'état réel d'une transaction
