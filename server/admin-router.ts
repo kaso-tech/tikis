@@ -46,7 +46,7 @@ export const tikisAdminRouter = router({
 
   reports: router({
     list: tikisAdminProcedure.input(z.object({ status: z.enum(["open", "reviewing", "resolved", "dismissed"]).optional() })).query(({ input }) => adminDb.listDeliveryReports({ status: input.status })),
-    resolve: tikisAdminProcedure.input(z.object({ reportId: z.string(), status: z.enum(["reviewing", "resolved", "dismissed"]), resolutionNotes: z.string().max(1000).optional() })).mutation(async ({ ctx, input }) => {
+    resolve: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ reportId: z.string(), status: z.enum(["reviewing", "resolved", "dismissed"]), resolutionNotes: z.string().max(1000).optional() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       const result = await adminDb.resolveDeliveryReport({ reportId: input.reportId, status: input.status, resolutionNotes: input.resolutionNotes, adminId: ctx.tikisAdmin.adminId });
       await audit(ctx, "report_resolved", "delivery_report", input.reportId, { status: input.status, notes: input.resolutionNotes });
@@ -239,7 +239,8 @@ export const tikisAdminRouter = router({
   admins: router({
     list: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).query(() => adminDb.listAdminUsers()),
     setActive: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ adminId: z.number().int(), active: z.boolean() })).mutation(async ({ ctx, input }) => {
-      await adminDb.setAdminUserActive(input.adminId, input.active);
+      if (!ctx.tikisAdmin) throw new Error("Session invalide.");
+      await adminDb.setAdminUserActive({ actorAdminId: ctx.tikisAdmin.adminId, adminId: input.adminId, active: input.active });
       await audit(ctx, input.active ? "admin_reactivated" : "admin_suspended", "admin_user", String(input.adminId));
       return { success: true } as const;
     }),

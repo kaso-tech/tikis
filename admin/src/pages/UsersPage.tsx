@@ -35,8 +35,12 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState("");
   const [statusReasonDraft, setStatusReasonDraft] = useState("");
-  const [rewardDraft, setRewardDraft] = useState({ amount: "", reason: "" });
-  const [penaltyDraft, setPenaltyDraft] = useState({ amount: "", reason: "" });
+  // Un identifiant par opération, pas par clic : il ne change qu'une fois le mouvement enregistré. Une
+  // requête qui a expiré côté navigateur mais abouti côté serveur, puis un second clic, renvoient le même
+  // identifiant — le serveur reconnaît le mouvement déjà passé au lieu de créditer ou débiter deux fois.
+  // Changer le montant, c'est décider d'une autre opération : nouvel identifiant.
+  const [rewardDraft, setRewardDraft] = useState(() => ({ amount: "", reason: "", requestId: crypto.randomUUID() }));
+  const [penaltyDraft, setPenaltyDraft] = useState(() => ({ amount: "", reason: "", requestId: crypto.randomUUID() }));
 
   async function loadUsers(searchQuery?: string) {
     setError("");
@@ -105,8 +109,8 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
     setActionBusy(true);
     setActionError("");
     try {
-      await trpc.adminConsole.users.reward.mutate({ phone: detail.profile.phone, amount, reason: rewardDraft.reason.trim() || "Bonus accordé par l’administration", requestId: crypto.randomUUID() });
-      setRewardDraft({ amount: "", reason: "" });
+      await trpc.adminConsole.users.reward.mutate({ phone: detail.profile.phone, amount, reason: rewardDraft.reason.trim() || "Bonus accordé par l’administration", requestId: rewardDraft.requestId });
+      setRewardDraft({ amount: "", reason: "", requestId: crypto.randomUUID() });
       await openDetail(detail.profile.phone);
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Envoi du bonus impossible.");
@@ -122,8 +126,8 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
     setActionBusy(true);
     setActionError("");
     try {
-      await trpc.adminConsole.users.penalize.mutate({ phone: detail.profile.phone, amount, reason: penaltyDraft.reason.trim() || "Pénalité appliquée par l’administration", requestId: crypto.randomUUID() });
-      setPenaltyDraft({ amount: "", reason: "" });
+      await trpc.adminConsole.users.penalize.mutate({ phone: detail.profile.phone, amount, reason: penaltyDraft.reason.trim() || "Pénalité appliquée par l’administration", requestId: penaltyDraft.requestId });
+      setPenaltyDraft({ amount: "", reason: "", requestId: crypto.randomUUID() });
       await openDetail(detail.profile.phone);
     } catch (cause) {
       setActionError(cause instanceof Error ? cause.message : "Application de la pénalité impossible.");
@@ -184,14 +188,14 @@ export default function UsersPage({ search: topSearch = "" }: { search?: string 
 
             <div className="action-block">
               <div className="action-block-title">Bonus / récompense</div>
-              <input className="input" placeholder="Montant FCFA" inputMode="numeric" value={rewardDraft.amount} onChange={(e) => setRewardDraft((s) => ({ ...s, amount: e.target.value.replace(/[^0-9]/g, "") }))} style={{ marginBottom: 6 }} />
+              <input className="input" placeholder="Montant FCFA" inputMode="numeric" value={rewardDraft.amount} onChange={(e) => setRewardDraft((s) => ({ ...s, amount: e.target.value.replace(/[^0-9]/g, ""), requestId: crypto.randomUUID() }))} style={{ marginBottom: 6 }} />
               <input className="input" placeholder="Motif" value={rewardDraft.reason} onChange={(e) => setRewardDraft((s) => ({ ...s, reason: e.target.value }))} style={{ marginBottom: 8 }} />
               <button className="btn btn-sm btn-primary" disabled={actionBusy} onClick={() => void sendReward()}>Créditer</button>
             </div>
 
             <div className="action-block">
               <div className="action-block-title">Pénalité</div>
-              <input className="input" placeholder="Montant FCFA" inputMode="numeric" value={penaltyDraft.amount} onChange={(e) => setPenaltyDraft((s) => ({ ...s, amount: e.target.value.replace(/[^0-9]/g, "") }))} style={{ marginBottom: 6 }} />
+              <input className="input" placeholder="Montant FCFA" inputMode="numeric" value={penaltyDraft.amount} onChange={(e) => setPenaltyDraft((s) => ({ ...s, amount: e.target.value.replace(/[^0-9]/g, ""), requestId: crypto.randomUUID() }))} style={{ marginBottom: 6 }} />
               <input className="input" placeholder="Motif" value={penaltyDraft.reason} onChange={(e) => setPenaltyDraft((s) => ({ ...s, reason: e.target.value }))} style={{ marginBottom: 8 }} />
               <button className="btn btn-sm btn-danger" disabled={actionBusy} onClick={() => void sendPenalty()}>Débiter</button>
             </div>

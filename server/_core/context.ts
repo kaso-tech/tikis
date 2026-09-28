@@ -2,7 +2,8 @@ import type { CreateExpressContextOptions } from "@trpc/server/adapters/express"
 import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
 import { verifyTikisProfileSession } from "../tikis-session";
-import { verifyAdminSession, type AdminRole } from "../admin-auth";
+import { type AdminRole } from "../admin-auth";
+import { authenticateAdminSession } from "../admin-db";
 import { TIKIS_PROFILE_COOKIE } from "./cookies";
 
 export type TrpcContext = {
@@ -81,6 +82,7 @@ export async function createContext(opts: CreateExpressContextOptions): Promise<
     res: opts.res,
     user,
     tikisProfilePhone: await verifyTikisProfileSession(sessionToken),
-    tikisAdmin: await verifyAdminSession(adminSessionToken),
+    // Relit le compte à chaque requête : un admin suspendu ou rétrogradé perd ses droits tout de suite.
+    tikisAdmin: await authenticateAdminSession(adminSessionToken),
   };
 }

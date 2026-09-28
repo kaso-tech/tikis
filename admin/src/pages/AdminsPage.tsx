@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAdminAuth } from "../lib/auth";
 import { trpc } from "../lib/trpc";
 
 type AdminRow = { id: number; email: string; fullName: string; role: string; active: boolean; lastLoginAt: Date | null; createdAt: Date };
@@ -8,6 +9,7 @@ function initials(name: string): string {
 }
 
 export default function AdminsPage() {
+  const { admin } = useAdminAuth();
   const [rows, setRows] = useState<AdminRow[]>([]);
   const [error, setError] = useState("");
 
@@ -82,9 +84,12 @@ export default function AdminsPage() {
                     {row.lastLoginAt ? new Date(row.lastLoginAt).toLocaleString("fr-FR") : <span className="muted">Jamais</span>}
                   </td>
                   <td style={{ textAlign: "right" }}>
-                    <button className={`btn btn-sm ${row.active ? "btn-danger" : "btn-primary"}`} onClick={() => void toggle(row.id, row.active)}>
-                      {row.active ? "Suspendre" : "Réactiver"}
-                    </button>
+                    {/* Le serveur refuse de toute façon l'auto-suspension : on n'offre pas le bouton. */}
+                    {row.id === admin?.adminId ? <span className="muted" style={{ fontSize: 11.5 }}>Vous</span> : (
+                      <button className={`btn btn-sm ${row.active ? "btn-danger" : "btn-primary"}`} onClick={() => void toggle(row.id, row.active)}>
+                        {row.active ? "Suspendre" : "Réactiver"}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

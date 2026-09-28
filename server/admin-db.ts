@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
-import { and, count, desc, eq, gte, like, lte, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, like, lte, or, sql } from "drizzle-orm";
 import { countryDraftIssue, countryPlanWarning } from "../shared/iso-countries";
+import { verifyAdminSession, type AdminRole } from "./admin-auth";
 import { getDb } from "./db";
 import * as db from "./db";
 import {
@@ -57,10 +58,43 @@ export async function listAdminUsers() {
   return rows;
 }
 
-export async function setAdminUserActive(adminId: number, active: boolean) {
+/**
+ * Suspendre ou réactiver un compte admin. Deux verrous empêchent de perdre la main sur la console :
+ * personne ne se suspend soi-même, et le dernier super-admin actif ne peut pas être suspendu — sans
+ * lui, plus personne ne pourrait réactiver un compte ni gérer l'équipe autrement qu'en base.
+ */
+export async function setAdminUserActive(input: { actorAdminId: number; adminId: number; active: boolean }) {
   const db = await getDb();
   if (!db) throw new Error("La console d’administration est temporairement indisponible.");
-  await db.update(tikisAdminUsers).set({ active }).where(eq(tikisAdminUsers.id, adminId));
+  await db.transaction(async (tx) => {
+    const target = (await tx.select().from(tikisAdminUsers).where(eq(tikisAdminUsers.id, input.adminId)).limit(1).for("update"))[0];
+    if (!target) throw new Error("Compte admin introuvable.");
+    if (!input.active) {
+      if (input.actorAdminId === input.adminId) throw new Error("Vous ne pouvez pas suspendre votre propre compte vous-même.");
+      if (target.role === "super_admin" && target.active) {
+        const others = await tx.select({ id: tikisAdminUsers.id }).from(tikisAdminUsers).where(and(eq(tikisAdminUsers.role, "super_admin"), eq(tikisAdminUsers.active, true))).for("update");
+        if (others.filter((row) => row.id !== target.id).length === 0) throw new Error("Impossible de suspendre le dernier super-admin actif.");
+      }
+    }
+    await tx.update(tikisAdminUsers).set({ active: input.active }).where(eq(tikisAdminUsers.id, input.adminId));
+  });
+}
+
+/**
+ * Identité admin effective d'une requête. Le jeton signé prouve qui s'est connecté ; il ne dit rien de
+ * l'état du compte depuis. Sans cette relecture, un admin suspendu gardait tous ses droits jusqu'à
+ * l'expiration de son jeton (8 h), et un rôle retiré restait appliqué tant que le jeton vivait. La
+ * console a peu de trafic : une lecture par clé primaire à chaque requête ne coûte rien. Sans base,
+ * aucune session n'est acceptée — rien n'y fonctionnerait de toute façon.
+ */
+export async function authenticateAdminSession(token: string | undefined): Promise<{ adminId: number; email: string; role: AdminRole } | null> {
+  const session = await verifyAdminSession(token);
+  if (!session) return null;
+  const db = await getDb();
+  if (!db) return null;
+  const account = (await db.select({ id: tikisAdminUsers.id, email: tikisAdminUsers.email, role: tikisAdminUsers.role, active: tikisAdminUsers.active }).from(tikisAdminUsers).where(eq(tikisAdminUsers.id, session.adminId)).limit(1))[0];
+  if (!account?.active) return null;
+  return { adminId: account.id, email: account.email, role: account.role };
 }
 
 // ————————————————————————————————————————————————————————————————————————
@@ -315,12 +349,15 @@ export async function adminRewardWallet(input: { phone: string; amount: number; 
   if (!Number.isSafeInteger(input.amount) || input.amount <= 0 || input.amount > 1_000_000) throw new Error("Montant de récompense invalide.");
   // `requestId` est généré une seule fois côté client au moment du clic : un double-clic ou une
   // relance réseau renvoie le même identifiant et ne produit donc jamais un second crédit réel.
-  return db.adminAdjustWallet({ profilePhone: input.phone, amount: input.amount, direction: "credit", operation: "bonus", reason: input.reason || "Bonus accordé par l’administration", idempotencyKey: `admin-reward:${input.requestId}` });
+  // La clé porte aussi le numéro : `applyWalletMovement` rend le mouvement déjà enregistré sous une clé
+  // connue sans regarder à qui il appartenait. Un identifiant réutilisé pour un autre profil (brouillon
+  // conservé d'une fiche à l'autre) aurait « réussi » sans rien créditer à ce profil-là.
+  return db.adminAdjustWallet({ profilePhone: input.phone, amount: input.amount, direction: "credit", operation: "bonus", reason: input.reason || "Bonus accordé par l’administration", idempotencyKey: `admin-reward:${input.phone}:${input.requestId}` });
 }
 
 export async function adminPenalizeWallet(input: { phone: string; amount: number; reason: string; adminId: number; requestId: string }) {
   if (!Number.isSafeInteger(input.amount) || input.amount <= 0 || input.amount > 1_000_000) throw new Error("Montant de pénalité invalide.");
-  return db.adminAdjustWallet({ profilePhone: input.phone, amount: input.amount, direction: "debit", operation: "penalty", reason: input.reason || "Pénalité appliquée par l’administration", idempotencyKey: `admin-penalty:${input.requestId}` });
+  return db.adminAdjustWallet({ profilePhone: input.phone, amount: input.amount, direction: "debit", operation: "penalty", reason: input.reason || "Pénalité appliquée par l’administration", idempotencyKey: `admin-penalty:${input.phone}:${input.requestId}` });
 }
 
 // ————————————————————————————————————————————————————————————————————————
@@ -381,17 +418,27 @@ export async function adminForceCancelDelivery(input: { deliveryId: string; reas
     if (!delivery) throw new Error("Livraison introuvable.");
     if (delivery.status === "completed" || delivery.status === "cancelled" || delivery.status === "expired") throw new Error("Cette livraison est déjà clôturée.");
     // Libère la commission de tout candidat encore engagé (selected/confirmed/applied).
-    const candidates = await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, input.deliveryId), or(eq(tikisDeliveryCandidates.status, "applied"), eq(tikisDeliveryCandidates.status, "selected"), eq(tikisDeliveryCandidates.status, "confirmed"))));
+    const candidates = await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, input.deliveryId), or(eq(tikisDeliveryCandidates.status, "applied"), eq(tikisDeliveryCandidates.status, "selected"), eq(tikisDeliveryCandidates.status, "confirmed")))).for("update");
     for (const candidate of candidates) {
-      if (candidate.commissionBlocked > 0) {
-        // Même transaction que les mises à jour de statut ci-dessous (via `tx`) : si une étape
-        // échoue plus loin, ce crédit fait partie du rollback plutôt que de rester acquis seul.
-        // Clé déterministe par candidat : une relance de cette action ne peut jamais créditer deux fois.
-        await db.adminAdjustWallet({ profilePhone: candidate.driverPhone, amount: candidate.commissionBlocked, direction: "credit", operation: "credit", reason: `Annulation administrative de la livraison ${input.deliveryId} : commission libérée`, idempotencyKey: `${input.deliveryId}:admin-force-cancel:${candidate.id}` }, tx);
+      // Deux situations très différentes, à ne jamais confondre (même règle que l'expiration automatique,
+      // `expireOpenTikisDeliveries`) :
+      //  - commission réellement prélevée (candidat confirmé) : elle a quitté le Wallet, on la rembourse ;
+      //  - commission seulement réservée (candidat postulé ou sélectionné) : elle est encore dans le solde
+      //    bloqué, on la débloque. La créditer au disponible sans vider la réserve fabriquait de l'argent :
+      //    le livreur retrouvait sa commission ET la gardait bloquée, sans aucun parcours pour la libérer.
+      // Même transaction que les mises à jour de statut ci-dessous (via `tx`) : si une étape échoue plus
+      // loin, ce mouvement fait partie du rollback. Clés déterministes par candidat : une relance ne peut
+      // jamais rembourser ni débloquer deux fois.
+      const debits = await tx.select().from(tikisWalletLedger).where(and(eq(tikisWalletLedger.deliveryId, input.deliveryId), eq(tikisWalletLedger.profilePhone, candidate.driverPhone), inArray(tikisWalletLedger.operation, ["debit", "commission_debit"]))).for("update");
+      const debitedAmount = debits.reduce((total, entry) => total + Number(entry.amount), 0);
+      if (debitedAmount > 0) {
+        await db.applyWalletMovement(tx, { profilePhone: candidate.driverPhone, deliveryId: input.deliveryId, operation: "compensation", amount: debitedAmount, availableDelta: debitedAmount, heldDelta: 0, reason: `Annulation administrative de la livraison ${input.deliveryId} : commission remboursée`, idempotencyKey: `${input.deliveryId}:admin-force-cancel:${candidate.id}` });
+      } else if (candidate.commissionBlocked > 0) {
+        await db.applyWalletMovement(tx, { profilePhone: candidate.driverPhone, deliveryId: input.deliveryId, operation: "unblock", amount: candidate.commissionBlocked, availableDelta: candidate.commissionBlocked, heldDelta: -candidate.commissionBlocked, reason: `Annulation administrative de la livraison ${input.deliveryId} : commission libérée`, idempotencyKey: `${input.deliveryId}:admin-force-cancel-unblock:${candidate.id}` });
       }
       await tx.update(tikisDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, candidate.id));
     }
-    await tx.update(tikisDeliveries).set({ status: "cancelled", updatedAt: new Date() }).where(eq(tikisDeliveries.id, input.deliveryId));
+    await tx.update(tikisDeliveries).set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, input.deliveryId));
     await tx.insert(tikisDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.senderPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikis.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel` }).onDuplicateKeyUpdate({ set: { idempotencyKey: `${input.deliveryId}:admin-cancel` } });
     if (delivery.driverPhone) {
       await tx.insert(tikisDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.driverPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikis.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel-driver` }).onDuplicateKeyUpdate({ set: { idempotencyKey: `${input.deliveryId}:admin-cancel-driver` } });

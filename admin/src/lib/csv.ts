@@ -1,8 +1,16 @@
 type CsvCell = string | number | boolean | null | undefined;
 
-function escapeCell(value: CsvCell) {
+// Une cellule qui commence par l'un de ces caractères est interprétée comme une formule par Excel,
+// LibreOffice ou Google Sheets. Les noms, motifs et descriptions exportés sont saisis par les
+// utilisateurs de l'application : un nom « =HYPERLINK(...) » deviendrait un lien actif dans le fichier
+// ouvert par l'équipe. Préfixer d'une apostrophe fait lire la cellule comme du texte (OWASP, CSV injection).
+const FORMULA_TRIGGER = /^[=+\-@\t\r]/;
+
+export function escapeCell(value: CsvCell) {
   if (value === null || value === undefined) return "";
-  const stringValue = typeof value === "string" ? value : String(value);
+  const raw = typeof value === "string" ? value : String(value);
+  // Les nombres restent des nombres : -1500 est un montant, pas une formule.
+  const stringValue = typeof value === "string" && FORMULA_TRIGGER.test(raw) ? `'${raw}` : raw;
   if (/[";\n,]/.test(stringValue)) {
     return `"${stringValue.replace(/"/g, '""')}"`;
   }

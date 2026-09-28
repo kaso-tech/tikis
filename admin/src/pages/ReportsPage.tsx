@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAdminAuth } from "../lib/auth";
 import { trpc } from "../lib/trpc";
 import { downloadCsv, rowsToCsv } from "../lib/csv";
 
@@ -15,6 +16,9 @@ const STATUS_LABEL: Record<string, string> = { open: "Ouvert", reviewing: "En co
 const STATUS_PILL: Record<string, string> = { open: "pill-error", reviewing: "pill-warning", resolved: "pill-success", dismissed: "pill-neutral" };
 
 export default function ReportsPage() {
+  const { admin } = useAdminAuth();
+  // Même règle que le serveur (reports.resolve) : trancher un signalement relève du support.
+  const canResolve = admin?.role === "super_admin" || admin?.role === "support";
   const [statusFilter, setStatusFilter] = useState<"all" | "open" | "reviewing" | "resolved" | "dismissed">("open");
   const [rows, setRows] = useState<ReportRow[]>([]);
   const [selected, setSelected] = useState<ReportRow | null>(null);
@@ -73,11 +77,11 @@ export default function ReportsPage() {
               <label className="field-label" htmlFor="notes">Notes de résolution</label>
               <textarea id="notes" className="textarea" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Décision prise, actions menées, communication à l'utilisateur…" />
             </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {canResolve ? <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button className="btn btn-secondary" disabled={busy} onClick={() => void resolve("reviewing")}>Marquer « en cours »</button>
               <button className="btn btn-primary" disabled={busy} onClick={() => void resolve("resolved")}>Résoudre</button>
               <button className="btn btn-danger" disabled={busy} onClick={() => void resolve("dismissed")}>Classer sans suite</button>
-            </div>
+            </div> : <p className="muted" style={{ fontSize: 12.5, margin: 0 }}>Lecture seule : le traitement des signalements est réservé au support.</p>}
           </div>
         </div>
       </div>
