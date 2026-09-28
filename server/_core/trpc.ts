@@ -103,15 +103,30 @@ const requireTikisSessionOnly = t.middleware(async (opts) => {
 
 export const tikisSessionProcedure = t.procedure.use(requireTikisSessionOnly);
 
-const requireTikisAdmin = t.middleware(async (opts) => {
+const requireTikisAdminSession = t.middleware(async (opts) => {
   if (!opts.ctx.tikisAdmin) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Session d’administration Tikis invalide ou expirée." });
   }
   return opts.next({ ctx: { ...opts.ctx, tikisAdmin: opts.ctx.tikisAdmin } });
 });
 
+const requireTikisAdmin = t.middleware(async (opts) => {
+  if (!opts.ctx.tikisAdmin) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Session d’administration Tikis invalide ou expirée." });
+  }
+  // Double authentification exigée pour ce rôle et pas encore activée : seul l'enrôlement reste ouvert
+  // (`tikisAdminEnrollmentProcedure`), rien d'autre de la console.
+  if (opts.ctx.tikisAdmin.mustEnrollTotp) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Activez la double authentification depuis « Mon compte » pour accéder à la console." });
+  }
+  return opts.next({ ctx: { ...opts.ctx, tikisAdmin: opts.ctx.tikisAdmin } });
+});
+
 /** Procédure pour la console d'administration Tikis — distincte de `adminProcedure` (plateforme interne). */
 export const tikisAdminProcedure = t.procedure.use(requireTikisAdmin);
+
+/** Session admin valide, même si l'enrôlement à la double authentification reste à faire. */
+export const tikisAdminEnrollmentProcedure = t.procedure.use(requireTikisAdminSession);
 
 export function requireTikisAdminRole(...roles: Array<"super_admin" | "support" | "finance">) {
   return t.middleware(async (opts) => {

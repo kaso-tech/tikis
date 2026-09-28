@@ -9,10 +9,11 @@
  *   TIKIS_TEST_DATABASE_URL=<url> npx vitest run tests/admin-console-audit.db.test.ts
  */
 import { randomUUID } from "node:crypto";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const TEST_DB = process.env.TIKIS_TEST_DATABASE_URL;
 if (TEST_DB) process.env.DATABASE_URL = TEST_DB;
+process.env.TIKIS_ADMIN_TOTP_KEY ??= "cle-totp-de-test-uniquement-0123456789abcdef";
 
 type Db = typeof import("../server/db");
 let db: Db;
@@ -454,5 +455,189 @@ describe.skipIf(!TEST_DB)("lot 2 — session admin révocable, en cookie", () =>
     const { token } = await adminDb.createAdminSession({ adminId: admin.id });
     const { api } = await caller({ cookie: `tikis_admin_session=${token}` });
     await expect(api.deliveriesOps.liveLocations({ maxAgeSeconds: 120 })).rejects.toThrow(/rôle/);
+  });
+});
+
+describe.skipIf(!TEST_DB)("lot 3 — double authentification TOTP", () => {
+  const PASSWORD = "mot-de-passe-lot3";
+
+  async function newAdmin(role: "super_admin" | "support" | "finance" = "support") {
+    const email = `lot3-${randomUUID()}@tikis.test`;
+    return (await adminDb.createAdminUser({ email, passwordHash: await adminAuth.hashAdminPassword(PASSWORD), fullName: "Audit", role }))!;
+  }
+
+  async function caller(cookie?: string) {
+    const { tikisAdminRouter } = await import("../server/admin-router");
+    const { createContext } = await import("../server/_core/context");
+    const cookies: Array<{ name: string; value: string }> = [];
+    const headers: Record<string, string> = { "x-tikis-admin": "1" };
+    if (cookie) headers.cookie = `tikis_admin_session=${cookie}`;
+    const req = { headers, ip: `203.0.113.${Math.floor(Math.random() * 250)}`, secure: true, socket: {} } as never;
+    const res = { cookie: (name: string, value: string) => { cookies.push({ name, value }); }, clearCookie: () => {} } as never;
+    const ctx = await createContext({ req, res, info: {} as never });
+    return { api: tikisAdminRouter.createCaller(ctx), cookies };
+  }
+
+  /** Enrôle un compte comme le ferait la console ; renvoie le secret et les codes de secours. */
+  async function enroll(adminId: number) {
+    const { token } = await adminDb.createAdminSession({ adminId });
+    const { api } = await caller(token);
+    const { secret, qrSvg, otpauthUri } = await api.auth.totp.begin();
+    expect(qrSvg).toContain("<svg");
+    expect(otpauthUri).toContain(`secret=${secret}`);
+    const { recoveryCodes } = await api.auth.totp.confirm({ code: totp.totpCode(secret) });
+    return { secret, recoveryCodes, token };
+  }
+
+  let totp: typeof import("../server/admin-totp");
+  beforeAll(async () => { if (TEST_DB) totp = await import("../server/admin-totp"); });
+
+  async function setPolicy(required: boolean) {
+    const handle = (await db.getDb())!;
+    await handle.insert(schema.tikisPlatformSettings).values({ id: 1, adminTotpRequired: required }).onDuplicateKeyUpdate({ set: { adminTotpRequired: required } });
+  }
+  afterAll(async () => { if (TEST_DB) await setPolicy(false); });
+
+  it("l'enrôlement active la double authentification et rend 10 codes de secours ; le secret est chiffré en base", async () => {
+    const admin = await newAdmin();
+    const { secret, recoveryCodes, token } = await enroll(admin.id);
+    expect(recoveryCodes).toHaveLength(10);
+    const { api } = await caller(token);
+    expect(await api.auth.me()).toMatchObject({ adminId: admin.id, totpEnabled: true, mustEnrollTotp: false });
+    const handle = (await db.getDb())!;
+    const { eq } = await import("drizzle-orm");
+    const row = (await handle.select().from(schema.tikisAdminUsers).where(eq(schema.tikisAdminUsers.id, admin.id)).limit(1))[0]!;
+    expect(row.totpSecret).not.toContain(secret);
+    expect(row.totpRecoveryCodes).not.toContain(recoveryCodes[0]);
+  });
+
+  it("un code faux ne confirme pas l'enrôlement", async () => {
+    const admin = await newAdmin();
+    const { token } = await adminDb.createAdminSession({ adminId: admin.id });
+    const { api } = await caller(token);
+    await api.auth.totp.begin();
+    await expect(api.auth.totp.confirm({ code: "000000" })).rejects.toThrow(/Code invalide/);
+    expect(await api.auth.me()).toMatchObject({ totpEnabled: false });
+  });
+
+  it("avec la double authentification, le mot de passe seul n'ouvre rien", async () => {
+    const admin = await newAdmin();
+    await enroll(admin.id);
+    const login = await caller();
+    expect(await login.api.auth.login({ email: admin.email, password: PASSWORD })).toEqual({ status: "totp_required" });
+    const pendingToken = login.cookies[0]!.value;
+    const pending = await caller(pendingToken);
+    expect(await pending.api.auth.me()).toBeNull();
+    await expect(pending.api.dashboard.metrics({ periodDays: 7 })).rejects.toThrow(/invalide ou expirée/);
+  });
+
+  it("le bon code ouvre une session neuve ; le jeton d'attente ne vaut plus rien", async () => {
+    const admin = await newAdmin();
+    const { secret } = await enroll(admin.id);
+    const login = await caller();
+    await login.api.auth.login({ email: admin.email, password: PASSWORD });
+    const pendingToken = login.cookies[0]!.value;
+    const verify = await caller(pendingToken);
+    // Pas suivant : celui de l'enrôlement vient d'être consommé.
+    await expect(verify.api.auth.verifyTotp({ code: totp.totpCode(secret, Date.now() + 30_000) })).resolves.toMatchObject({ status: "ok" });
+    const activeToken = verify.cookies[0]!.value;
+    expect(activeToken).not.toBe(pendingToken);
+    expect(await (await caller(activeToken)).api.auth.me()).toMatchObject({ adminId: admin.id });
+    await expect((await caller(pendingToken)).api.auth.verifyTotp({ code: "123456" })).rejects.toThrow(/expirée/);
+  });
+
+  it("un code déjà utilisé est refusé (pas de rejeu)", async () => {
+    const admin = await newAdmin();
+    const { secret } = await enroll(admin.id);
+    const code = totp.totpCode(secret, Date.now() + 30_000);
+    const first = await caller();
+    await first.api.auth.login({ email: admin.email, password: PASSWORD });
+    await (await caller(first.cookies[0]!.value)).api.auth.verifyTotp({ code });
+    const second = await caller();
+    await second.api.auth.login({ email: admin.email, password: PASSWORD });
+    await expect((await caller(second.cookies[0]!.value)).api.auth.verifyTotp({ code })).rejects.toThrow(/Code invalide/);
+  });
+
+  it("un code de secours fonctionne une seule fois", async () => {
+    const admin = await newAdmin();
+    const { recoveryCodes } = await enroll(admin.id);
+    const first = await caller();
+    await first.api.auth.login({ email: admin.email, password: PASSWORD });
+    await expect((await caller(first.cookies[0]!.value)).api.auth.verifyTotp({ code: recoveryCodes[0]!.toUpperCase() })).resolves.toMatchObject({ remainingRecoveryCodes: 9 });
+    const second = await caller();
+    await second.api.auth.login({ email: admin.email, password: PASSWORD });
+    await expect((await caller(second.cookies[0]!.value)).api.auth.verifyTotp({ code: recoveryCodes[0]! })).rejects.toThrow(/Code invalide/);
+  });
+
+  it("5 codes faux révoquent la tentative : il faut repasser par le mot de passe", async () => {
+    const admin = await newAdmin();
+    const { secret } = await enroll(admin.id);
+    const login = await caller();
+    await login.api.auth.login({ email: admin.email, password: PASSWORD });
+    const pendingToken = login.cookies[0]!.value;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await expect((await caller(pendingToken)).api.auth.verifyTotp({ code: "000000" })).rejects.toThrow(/Code invalide/);
+    }
+    await expect((await caller(pendingToken)).api.auth.verifyTotp({ code: totp.totpCode(secret, Date.now() + 30_000) })).rejects.toThrow(/Trop de codes/);
+  });
+
+  it("l'obligation ne peut pas être activée tant qu'un super-admin ou finance n'est pas enrôlé", async () => {
+    const handle = (await db.getDb())!;
+    const { inArray } = await import("drizzle-orm");
+    await handle.update(schema.tikisAdminUsers).set({ active: false }).where(inArray(schema.tikisAdminUsers.role, ["super_admin", "finance"]));
+    const actor = await newAdmin("super_admin");
+    const { token } = await enroll(actor.id);
+    const laggard = await newAdmin("finance");
+    const { api } = await caller(token);
+    await expect(api.security.setTotpRequired({ required: true })).rejects.toThrow(new RegExp(laggard.email.replace(/[.]/g, "\\.")));
+    await enroll(laggard.id);
+    await expect(api.security.setTotpRequired({ required: true })).resolves.toEqual({ required: true });
+    await setPolicy(false);
+  });
+
+  it("obligation active : un compte finance non enrôlé n'accède qu'à son enrôlement", async () => {
+    await setPolicy(true);
+    try {
+      const admin = await newAdmin("finance");
+      const { token } = await adminDb.createAdminSession({ adminId: admin.id });
+      const { api } = await caller(token);
+      expect(await api.auth.me()).toMatchObject({ mustEnrollTotp: true });
+      await expect(api.finance.transactions({})).rejects.toThrow(/double authentification/);
+      await expect(api.auth.totp.begin()).resolves.toMatchObject({ secret: expect.any(String) });
+      // Le support n'est pas concerné par l'obligation.
+      const support = await newAdmin("support");
+      const supportSession = await adminDb.createAdminSession({ adminId: support.id });
+      expect(await (await caller(supportSession.token)).api.auth.me()).toMatchObject({ mustEnrollTotp: false });
+    } finally {
+      await setPolicy(false);
+    }
+  });
+
+  it("obligation active : un super-admin ne peut pas désactiver sa double authentification ; un support le peut", async () => {
+    const boss = await newAdmin("super_admin");
+    const bossEnrolled = await enroll(boss.id);
+    const support = await newAdmin("support");
+    const supportEnrolled = await enroll(support.id);
+    await setPolicy(true);
+    try {
+      await expect((await caller(bossEnrolled.token)).api.auth.totp.disable({ code: bossEnrolled.recoveryCodes[0]! })).rejects.toThrow(/obligatoire/);
+      await (await caller(supportEnrolled.token)).api.auth.totp.disable({ code: supportEnrolled.recoveryCodes[0]! });
+      expect(await (await caller(supportEnrolled.token)).api.auth.me()).toMatchObject({ totpEnabled: false });
+    } finally {
+      await setPolicy(false);
+    }
+  });
+
+  it("téléphone perdu : un super-admin réinitialise un autre compte, dont les sessions tombent ; jamais le sien", async () => {
+    const boss = await newAdmin("super_admin");
+    const bossSession = await adminDb.createAdminSession({ adminId: boss.id });
+    const target = await newAdmin("finance");
+    const { token: targetToken } = await enroll(target.id);
+    const { api } = await caller(bossSession.token);
+    await api.security.resetTotp({ adminId: target.id });
+    expect(await adminDb.authenticateAdminSession(targetToken)).toBeNull();
+    const list = await api.admins.list();
+    expect(list.find((row) => row.id === target.id)).toMatchObject({ totpEnabled: false });
+    await expect(api.security.resetTotp({ adminId: boss.id })).rejects.toThrow(/propre/);
   });
 });

@@ -2,32 +2,56 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { trpc } from "./trpc";
 
 export type AdminRole = "super_admin" | "support" | "finance";
-export type AdminIdentity = { adminId: number; email: string; role: AdminRole };
+/**
+ * `mustEnrollTotp` : la double authentification est exigée pour ce rôle et pas encore activée. Le serveur
+ * refuse alors tout sauf l'enrôlement ; la console n'affiche que « Mon compte ».
+ */
+export type AdminIdentity = { adminId: number; email: string; role: AdminRole; totpEnabled: boolean; mustEnrollTotp: boolean };
 
 type AuthState = {
   admin: AdminIdentity | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  /** « totp_required » : mot de passe accepté, code de double authentification attendu. */
+  login: (email: string, password: string) => Promise<"ok" | "totp_required">;
+  verifyTotp: (code: string) => Promise<{ remainingRecoveryCodes?: number }>;
   logout: () => Promise<void>;
+  /** Relit l'identité auprès du serveur (après activation de la double authentification, par exemple). */
+  refresh: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
+
+async function fetchIdentity() {
+  // Le cookie httpOnly est invisible pour la page : seul le serveur sait si une session est ouverte.
+  return (await trpc.adminConsole.auth.me.query()) as AdminIdentity | null;
+}
 
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [admin, setAdmin] = useState<AdminIdentity | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Le cookie httpOnly est invisible pour la page : seul le serveur sait si une session est ouverte.
-    trpc.adminConsole.auth.me.query()
-      .then((identity) => setAdmin(identity as AdminIdentity | null))
+    fetchIdentity()
+      .then(setAdmin)
       .catch(() => setAdmin(null))
       .finally(() => setLoading(false));
   }, []);
 
+  async function refresh() {
+    setAdmin(await fetchIdentity());
+  }
+
   async function login(email: string, password: string) {
     const result = await trpc.adminConsole.auth.login.mutate({ email, password });
-    setAdmin({ adminId: result.admin.id, email: result.admin.email, role: result.admin.role as AdminRole });
+    if (result.status === "totp_required") return "totp_required" as const;
+    await refresh();
+    return "ok" as const;
+  }
+
+  async function verifyTotp(code: string) {
+    const result = await trpc.adminConsole.auth.verifyTotp.mutate({ code });
+    await refresh();
+    return { remainingRecoveryCodes: result.remainingRecoveryCodes };
   }
 
   async function logout() {
@@ -39,7 +63,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  return <AuthContext.Provider value={{ admin, loading, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ admin, loading, login, verifyTotp, logout, refresh }}>{children}</AuthContext.Provider>;
 }
 
 export function useAdminAuth() {

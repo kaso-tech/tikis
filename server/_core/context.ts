@@ -11,7 +11,7 @@ export type TrpcContext = {
   res: CreateExpressContextOptions["res"];
   user: User | null;
   tikisProfilePhone: string | null;
-  tikisAdmin?: { adminId: number; email: string; role: AdminRole } | null;
+  tikisAdmin?: { adminId: number; email: string; role: AdminRole; totpEnabled?: boolean; mustEnrollTotp?: boolean } | null;
 };
 
 function parseCookies(header: string | undefined): Record<string, string> {

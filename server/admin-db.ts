@@ -2,6 +2,10 @@ import { randomUUID } from "crypto";
 import { and, count, desc, eq, gte, inArray, isNull, like, lte, or, sql } from "drizzle-orm";
 import { countryDraftIssue, countryPlanWarning } from "../shared/iso-countries";
 import { ADMIN_SESSION_TTL_SECONDS, hashAdminSessionToken, newAdminSessionToken, type AdminRole } from "./admin-auth";
+import {
+  decryptTotpSecret, encryptTotpSecret, generateRecoveryCodes, generateTotpSecret, hashRecoveryCode, looksLikeRecoveryCode,
+  matchTotpStep, otpauthQrSvg, otpauthUri,
+} from "./admin-totp";
 import { getDb } from "./db";
 import * as db from "./db";
 import {
@@ -56,8 +60,8 @@ export async function createAdminUser(input: { email: string; passwordHash: stri
 export async function listAdminUsers() {
   const db = await getDb();
   if (!db) return [];
-  const rows = await db.select({ id: tikisAdminUsers.id, email: tikisAdminUsers.email, fullName: tikisAdminUsers.fullName, role: tikisAdminUsers.role, active: tikisAdminUsers.active, lastLoginAt: tikisAdminUsers.lastLoginAt, createdAt: tikisAdminUsers.createdAt }).from(tikisAdminUsers).orderBy(desc(tikisAdminUsers.createdAt));
-  return rows;
+  const rows = await db.select({ id: tikisAdminUsers.id, email: tikisAdminUsers.email, fullName: tikisAdminUsers.fullName, role: tikisAdminUsers.role, active: tikisAdminUsers.active, lastLoginAt: tikisAdminUsers.lastLoginAt, createdAt: tikisAdminUsers.createdAt, totpEnabledAt: tikisAdminUsers.totpEnabledAt }).from(tikisAdminUsers).orderBy(desc(tikisAdminUsers.createdAt));
+  return rows.map(({ totpEnabledAt, ...row }) => ({ ...row, totpEnabled: Boolean(totpEnabledAt) }));
 }
 
 /**
@@ -85,15 +89,22 @@ export async function setAdminUserActive(input: { actorAdminId: number; adminId:
   });
 }
 
-/** Ouvre une session : le jeton part dans le cookie, la base n'en garde que l'empreinte. */
-export async function createAdminSession(input: { adminId: number; ipAddress?: string; userAgent?: string }) {
-  const db = await getDb();
+/** Délai pour saisir le code de double authentification après le mot de passe. */
+export const PENDING_TOTP_TTL_MS = 5 * 60_000;
+
+/**
+ * Ouvre une session : le jeton part dans le cookie, la base n'en garde que l'empreinte. Une session
+ * `pending_totp` ne donne accès à rien (voir `authenticateAdminSession`) et expire en 5 minutes.
+ */
+export async function createAdminSession(input: { adminId: number; ipAddress?: string; userAgent?: string; stage?: "pending_totp" | "active" }, tx?: any) {
+  const db = tx ?? await getDb();
   if (!db) throw new Error("La console d’administration est temporairement indisponible.");
   const token = newAdminSessionToken();
-  const expiresAt = new Date(Date.now() + ADMIN_SESSION_TTL_SECONDS * 1000);
+  const stage = input.stage ?? "active";
+  const expiresAt = new Date(Date.now() + (stage === "pending_totp" ? PENDING_TOTP_TTL_MS : ADMIN_SESSION_TTL_SECONDS * 1000));
   await db.insert(tikisAdminSessions).values({
     id: randomUUID(), adminId: input.adminId, tokenHash: hashAdminSessionToken(token),
-    ipAddress: input.ipAddress?.slice(0, 64) ?? null, userAgent: input.userAgent?.slice(0, 255) ?? null, expiresAt,
+    ipAddress: input.ipAddress?.slice(0, 64) ?? null, userAgent: input.userAgent?.slice(0, 255) ?? null, expiresAt, stage,
   });
   return { token, expiresAt };
 }
@@ -105,20 +116,26 @@ const LAST_SEEN_REFRESH_MS = 5 * 60_000;
  * compte doit être actif ; le rôle appliqué est celui du compte à cet instant. Sans base, aucune session
  * n'est acceptée — rien n'y fonctionnerait de toute façon.
  */
-export async function authenticateAdminSession(token: string | undefined): Promise<{ adminId: number; email: string; role: AdminRole } | null> {
+export type AdminIdentity = { adminId: number; email: string; role: AdminRole; totpEnabled: boolean; mustEnrollTotp: boolean };
+
+export async function authenticateAdminSession(token: string | undefined): Promise<AdminIdentity | null> {
   if (!token || token.length > 200) return null;
   const db = await getDb();
   if (!db) return null;
   const row = (await db.select({
-    sessionId: tikisAdminSessions.id, expiresAt: tikisAdminSessions.expiresAt, revokedAt: tikisAdminSessions.revokedAt, lastSeenAt: tikisAdminSessions.lastSeenAt,
-    id: tikisAdminUsers.id, email: tikisAdminUsers.email, role: tikisAdminUsers.role, active: tikisAdminUsers.active,
+    sessionId: tikisAdminSessions.id, expiresAt: tikisAdminSessions.expiresAt, revokedAt: tikisAdminSessions.revokedAt, lastSeenAt: tikisAdminSessions.lastSeenAt, stage: tikisAdminSessions.stage,
+    id: tikisAdminUsers.id, email: tikisAdminUsers.email, role: tikisAdminUsers.role, active: tikisAdminUsers.active, totpEnabledAt: tikisAdminUsers.totpEnabledAt,
   }).from(tikisAdminSessions).innerJoin(tikisAdminUsers, eq(tikisAdminSessions.adminId, tikisAdminUsers.id))
     .where(eq(tikisAdminSessions.tokenHash, hashAdminSessionToken(token))).limit(1))[0];
-  if (!row || row.revokedAt || row.expiresAt.getTime() <= Date.now() || !row.active) return null;
+  // Une session en attente du code de double authentification n'ouvre rien : mot de passe seul ≠ connexion.
+  if (!row || row.stage !== "active" || row.revokedAt || row.expiresAt.getTime() <= Date.now() || !row.active) return null;
   if (Date.now() - row.lastSeenAt.getTime() > LAST_SEEN_REFRESH_MS) {
     void db.update(tikisAdminSessions).set({ lastSeenAt: new Date() }).where(eq(tikisAdminSessions.id, row.sessionId)).catch(() => {});
   }
-  return { adminId: row.id, email: row.email, role: row.role };
+  const totpEnabled = Boolean(row.totpEnabledAt);
+  // Compte soumis à l'obligation mais pas encore enrôlé : il n'accède qu'à son propre enrôlement (trpc.ts).
+  const mustEnrollTotp = !totpEnabled && isTotpRequiredRole(row.role) && await isAdminTotpRequired(db);
+  return { adminId: row.id, email: row.email, role: row.role, totpEnabled, mustEnrollTotp };
 }
 
 /** Déconnexion : la session ne vaut plus rien, même si quelqu'un a copié le cookie. */
@@ -133,6 +150,174 @@ export async function revokeAllAdminSessions(adminId: number, tx?: any) {
   const handle = tx ?? await getDb();
   if (!handle) return;
   await handle.update(tikisAdminSessions).set({ revokedAt: new Date() }).where(and(eq(tikisAdminSessions.adminId, adminId), isNull(tikisAdminSessions.revokedAt)));
+}
+
+// ————————————————————————————————————————————————————————————————————————
+// Double authentification (TOTP)
+// ————————————————————————————————————————————————————————————————————————
+
+/** Rôles soumis à l'obligation quand elle est activée : ceux qui touchent à l'argent et aux accès. */
+export const TOTP_REQUIRED_ROLES: readonly AdminRole[] = ["super_admin", "finance"];
+export const isTotpRequiredRole = (role: AdminRole) => TOTP_REQUIRED_ROLES.includes(role);
+
+export async function isAdminTotpRequired(handle?: any): Promise<boolean> {
+  const db = handle ?? await getDb();
+  if (!db) return false;
+  const row = (await db.select({ required: tikisPlatformSettings.adminTotpRequired }).from(tikisPlatformSettings).where(eq(tikisPlatformSettings.id, 1)).limit(1))[0];
+  return Boolean(row?.required);
+}
+
+function parseRecoveryHashes(stored: string | null): string[] {
+  if (!stored) return [];
+  try {
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Vérifie un second facteur — code TOTP ou code de secours — et le consomme, sous verrou du compte : deux
+ * requêtes simultanées avec le même code ne passent jamais toutes les deux.
+ */
+async function consumeSecondFactor(tx: any, adminId: number, code: string): Promise<{ method: "totp" | "recovery_code"; remainingRecoveryCodes: number } | null> {
+  const account = (await tx.select().from(tikisAdminUsers).where(eq(tikisAdminUsers.id, adminId)).limit(1).for("update"))[0];
+  if (!account?.totpSecret || !account.totpEnabledAt) return null;
+  const hashes = parseRecoveryHashes(account.totpRecoveryCodes);
+  if (looksLikeRecoveryCode(code)) {
+    const hash = hashRecoveryCode(code);
+    if (!hashes.includes(hash)) return null;
+    const remaining = hashes.filter((value) => value !== hash);
+    await tx.update(tikisAdminUsers).set({ totpRecoveryCodes: JSON.stringify(remaining) }).where(eq(tikisAdminUsers.id, adminId));
+    return { method: "recovery_code", remainingRecoveryCodes: remaining.length };
+  }
+  const step = matchTotpStep(decryptTotpSecret(account.totpSecret), code, { lastUsedStep: account.totpLastUsedStep });
+  if (step === null) return null;
+  await tx.update(tikisAdminUsers).set({ totpLastUsedStep: step }).where(eq(tikisAdminUsers.id, adminId));
+  return { method: "totp", remainingRecoveryCodes: hashes.length };
+}
+
+export const TOTP_ATTEMPT_LIMIT = 5;
+
+/**
+ * Seconde étape de connexion. La session « en attente » est révoquée et remplacée par une session neuve :
+ * le jeton émis avant le second facteur ne devient jamais, à lui seul, une session complète.
+ * 5 codes faux en 15 minutes sur un compte révoquent la tentative : il faut repasser par le mot de passe.
+ */
+export async function completeTotpLogin(input: { token: string | undefined; code: string; ipAddress?: string; userAgent?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("La console d’administration est temporairement indisponible.");
+  if (!input.token) throw new Error("Session de connexion expirée. Reconnectez-vous.");
+  const pending = (await db.select({ sessionId: tikisAdminSessions.id, stage: tikisAdminSessions.stage, expiresAt: tikisAdminSessions.expiresAt, revokedAt: tikisAdminSessions.revokedAt, adminId: tikisAdminUsers.id, email: tikisAdminUsers.email, fullName: tikisAdminUsers.fullName, role: tikisAdminUsers.role, active: tikisAdminUsers.active })
+    .from(tikisAdminSessions).innerJoin(tikisAdminUsers, eq(tikisAdminSessions.adminId, tikisAdminUsers.id))
+    .where(eq(tikisAdminSessions.tokenHash, hashAdminSessionToken(input.token))).limit(1))[0];
+  if (!pending || pending.stage !== "pending_totp" || pending.revokedAt || pending.expiresAt.getTime() <= Date.now() || !pending.active) {
+    throw new Error("Session de connexion expirée. Reconnectez-vous.");
+  }
+  const attemptsKey = `admin-totp:${pending.adminId}:${Math.floor(Date.now() / ADMIN_LOGIN_WINDOW_MS)}`;
+  const attempts = (await db.select({ count: tikisRateLimits.count }).from(tikisRateLimits).where(eq(tikisRateLimits.rateLimitKey, attemptsKey)).limit(1))[0]?.count ?? 0;
+  if (attempts >= TOTP_ATTEMPT_LIMIT) {
+    await db.update(tikisAdminSessions).set({ revokedAt: new Date() }).where(eq(tikisAdminSessions.id, pending.sessionId));
+    throw new Error("Trop de codes erronés. Reconnectez-vous dans quelques minutes.");
+  }
+  return db.transaction(async (tx) => {
+    const factor = await consumeSecondFactor(tx, pending.adminId, input.code);
+    if (!factor) {
+      // Compté hors de la transaction qui échoue : l'échec doit rester enregistré.
+      await db.insert(tikisRateLimits).values({ rateLimitKey: attemptsKey, count: 1 }).onDuplicateKeyUpdate({ set: { count: sql`${tikisRateLimits.count} + 1` } });
+      throw new Error("Code invalide.");
+    }
+    await tx.update(tikisAdminSessions).set({ revokedAt: new Date() }).where(eq(tikisAdminSessions.id, pending.sessionId));
+    const session = await createAdminSession({ adminId: pending.adminId, ipAddress: input.ipAddress, userAgent: input.userAgent }, tx);
+    await tx.update(tikisAdminUsers).set({ lastLoginAt: new Date() }).where(eq(tikisAdminUsers.id, pending.adminId));
+    return { session, factor, admin: { id: pending.adminId, email: pending.email, fullName: pending.fullName, role: pending.role } };
+  });
+}
+
+/** Premier temps de l'enrôlement : un secret neuf, pas encore actif tant qu'un code n'a pas été confirmé. */
+export async function beginTotpEnrollment(input: { adminId: number; email: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("La console d’administration est temporairement indisponible.");
+  const account = (await db.select({ totpEnabledAt: tikisAdminUsers.totpEnabledAt }).from(tikisAdminUsers).where(eq(tikisAdminUsers.id, input.adminId)).limit(1))[0];
+  if (!account) throw new Error("Compte admin introuvable.");
+  if (account.totpEnabledAt) throw new Error("La double authentification est déjà activée sur ce compte.");
+  const secret = generateTotpSecret();
+  await db.update(tikisAdminUsers).set({ totpPendingSecret: encryptTotpSecret(secret) }).where(eq(tikisAdminUsers.id, input.adminId));
+  const uri = otpauthUri(input.email, secret);
+  return { secret, otpauthUri: uri, qrSvg: await otpauthQrSvg(uri) };
+}
+
+/**
+ * Second temps : le premier code prouve que l'application est bien configurée. Les codes de secours sont
+ * rendus en clair cette seule fois ; seule leur empreinte est gardée.
+ */
+export async function confirmTotpEnrollment(input: { adminId: number; code: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("La console d’administration est temporairement indisponible.");
+  return db.transaction(async (tx) => {
+    const account = (await tx.select().from(tikisAdminUsers).where(eq(tikisAdminUsers.id, input.adminId)).limit(1).for("update"))[0];
+    if (!account) throw new Error("Compte admin introuvable.");
+    if (account.totpEnabledAt) throw new Error("La double authentification est déjà activée sur ce compte.");
+    if (!account.totpPendingSecret) throw new Error("Commencez par afficher le QR code d’enrôlement.");
+    const step = matchTotpStep(decryptTotpSecret(account.totpPendingSecret), input.code);
+    if (step === null) throw new Error("Code invalide. Vérifiez l’heure de votre téléphone et saisissez le code affiché.");
+    const recoveryCodes = generateRecoveryCodes();
+    await tx.update(tikisAdminUsers).set({
+      totpSecret: account.totpPendingSecret, totpPendingSecret: null, totpEnabledAt: new Date(), totpLastUsedStep: step,
+      totpRecoveryCodes: JSON.stringify(recoveryCodes.map(hashRecoveryCode)),
+    }).where(eq(tikisAdminUsers.id, input.adminId));
+    return { recoveryCodes };
+  });
+}
+
+function clearedTotp() {
+  return { totpSecret: null, totpPendingSecret: null, totpEnabledAt: null, totpLastUsedStep: null, totpRecoveryCodes: null };
+}
+
+/** Désactivation par le titulaire, avec un code valide, et seulement si son rôle n'y est pas obligé. */
+export async function disableOwnTotp(input: { adminId: number; role: AdminRole; code: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("La console d’administration est temporairement indisponible.");
+  if (isTotpRequiredRole(input.role) && await isAdminTotpRequired(db)) throw new Error("La double authentification est obligatoire pour votre rôle : elle ne peut pas être désactivée.");
+  await db.transaction(async (tx) => {
+    const factor = await consumeSecondFactor(tx, input.adminId, input.code);
+    if (!factor) throw new Error("Code invalide.");
+    await tx.update(tikisAdminUsers).set(clearedTotp()).where(eq(tikisAdminUsers.id, input.adminId));
+  });
+}
+
+/**
+ * Téléphone perdu : un super-admin retire la double authentification d'un autre compte, qui devra se
+ * réenrôler. Ses sessions sont coupées. Jamais sur son propre compte (il passerait outre son propre facteur).
+ */
+export async function resetAdminTotp(input: { actorAdminId: number; adminId: number }) {
+  if (input.actorAdminId === input.adminId) throw new Error("Vous ne pouvez pas réinitialiser votre propre double authentification. Utilisez un code de secours, ou demandez à un autre super-admin.");
+  const db = await getDb();
+  if (!db) throw new Error("La console d’administration est temporairement indisponible.");
+  await db.transaction(async (tx) => {
+    const target = (await tx.select({ id: tikisAdminUsers.id }).from(tikisAdminUsers).where(eq(tikisAdminUsers.id, input.adminId)).limit(1).for("update"))[0];
+    if (!target) throw new Error("Compte admin introuvable.");
+    await tx.update(tikisAdminUsers).set(clearedTotp()).where(eq(tikisAdminUsers.id, input.adminId));
+    await revokeAllAdminSessions(input.adminId, tx);
+  });
+}
+
+/**
+ * Rendre la double authentification obligatoire pour super_admin et finance. Refusé tant qu'un de ces
+ * comptes actifs n'est pas enrôlé — l'auteur de la décision compris : personne ne se retrouve bloqué.
+ * (Un compte créé ensuite par le script serveur n'est pas bloqué non plus : il n'accède qu'à son enrôlement.)
+ */
+export async function setAdminTotpRequired(input: { actorAdminId: number; required: boolean }) {
+  const db = await getDb();
+  if (!db) throw new Error("La console d’administration est temporairement indisponible.");
+  if (input.required) {
+    const missing = await db.select({ email: tikisAdminUsers.email }).from(tikisAdminUsers)
+      .where(and(eq(tikisAdminUsers.active, true), inArray(tikisAdminUsers.role, [...TOTP_REQUIRED_ROLES]), isNull(tikisAdminUsers.totpEnabledAt)));
+    if (missing.length > 0) throw new Error(`Impossible d’exiger la double authentification : ${missing.length} compte(s) super-admin ou finance ne l’ont pas encore activée (${missing.map((row) => row.email).join(", ")}).`);
+  }
+  await db.insert(tikisPlatformSettings).values({ id: 1, adminTotpRequired: input.required }).onDuplicateKeyUpdate({ set: { adminTotpRequired: input.required } });
+  return { required: input.required };
 }
 
 // ————————————————————————————————————————————————————————————————————————

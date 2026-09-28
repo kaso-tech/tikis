@@ -11,6 +11,23 @@ La déconnexion ou la suspension du compte révoque la session côté serveur. U
 
 `TIKIS_ADMIN_SESSION_SECRET` n'est plus lu et peut être retiré du `.env`.
 
+### Double authentification (TOTP)
+
+Chaque admin peut l'activer depuis « Mon compte » (QR code à scanner avec Google Authenticator,
+Microsoft Authenticator, 1Password…). Elle exige une clé de chiffrement côté serveur, qui protège les
+secrets TOTP stockés en base :
+
+```
+TIKIS_ADMIN_TOTP_KEY=<chaîne aléatoire d'au moins 32 caractères, distincte des autres secrets>
+```
+
+Générez-la par exemple avec `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+Conservez-la précieusement : la perdre ou la changer oblige tous les admins à se réenrôler (un super-admin
+réinitialise leur double authentification depuis « Équipe admin »).
+
+Migration : `drizzle/manual/0045_admin_totp.sql`. Un super-admin peut ensuite la rendre obligatoire pour
+les rôles super-admin et finance depuis « Équipe admin », une fois tous ces comptes enrôlés.
+
 Si la console est servie depuis un autre sous-domaine que l'API (par ex. `admin.tikis.app`), cette origine
 doit figurer dans `TIKIS_ALLOWED_ORIGINS` : le serveur n'accepte le cookie qu'accompagné de l'en-tête
 `X-Tikis-Admin: 1`, qu'un navigateur n'envoie qu'aux origines autorisées par CORS.
@@ -20,6 +37,7 @@ doit figurer dans `TIKIS_ALLOWED_ORIGINS` : le serveur n'accepte le cookie qu'ac
 ```
 mysql -u <user> -p <database> < drizzle/manual/0020_admin_console.sql
 mysql -u <user> -p <database> < drizzle/manual/0044_admin_sessions.sql
+mysql -u <user> -p <database> < drizzle/manual/0045_admin_totp.sql
 ```
 
 (ou régénérez proprement via `pnpm drizzle-kit generate` une fois la connexion DB disponible — ce fichier manuel sert de référence immédiate.)

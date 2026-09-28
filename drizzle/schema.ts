@@ -1,4 +1,4 @@
-import { boolean, decimal, index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
+import { bigint, boolean, decimal, index, int, mysqlEnum, mysqlTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/mysql-core";
 
 /** Core Manus user table kept for the template OAuth layer. */
 export const users = mysqlTable("users", {
@@ -177,6 +177,8 @@ export const tikisPlatformSettings = mysqlTable("tikis_platform_settings", {
   pricingConfig: text("pricingConfig"),
   maintenanceEnabled: boolean("maintenanceEnabled").notNull().default(false),
   maintenanceMessage: varchar("maintenanceMessage", { length: 500 }),
+  /** Double authentification exigée pour les rôles super_admin et finance. */
+  adminTotpRequired: boolean("adminTotpRequired").notNull().default(false),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
@@ -278,6 +280,15 @@ export const tikisAdminUsers = mysqlTable("tikis_admin_users", {
   fullName: varchar("fullName", { length: 120 }).notNull(),
   role: mysqlEnum("role", ["super_admin", "support", "finance"]).notNull().default("support"),
   active: boolean("active").notNull().default(true),
+  /** Double authentification (server/admin-totp.ts). Secret chiffré AES-256-GCM, jamais en clair. */
+  totpSecret: varchar("totpSecret", { length: 255 }),
+  /** Secret proposé à l'enrôlement, pas encore confirmé par un premier code. */
+  totpPendingSecret: varchar("totpPendingSecret", { length: 255 }),
+  totpEnabledAt: timestamp("totpEnabledAt"),
+  /** Dernier pas TOTP accepté : un code ne sert qu'une fois. */
+  totpLastUsedStep: bigint("totpLastUsedStep", { mode: "number" }),
+  /** Empreintes SHA-256 (JSON) des codes de secours restants. */
+  totpRecoveryCodes: text("totpRecoveryCodes"),
   lastLoginAt: timestamp("lastLoginAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -298,6 +309,8 @@ export const tikisAdminSessions = mysqlTable("tikis_admin_sessions", {
   lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
   expiresAt: timestamp("expiresAt").notNull(),
   revokedAt: timestamp("revokedAt"),
+  /** `pending_totp` : mot de passe vérifié, code de double authentification attendu (5 min au plus). */
+  stage: mysqlEnum("stage", ["pending_totp", "active"]).notNull().default("active"),
 }, (table) => [
   index("tikis_admin_sessions_admin_index").on(table.adminId, table.revokedAt),
 ]);

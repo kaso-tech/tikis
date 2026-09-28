@@ -20,8 +20,9 @@ import MaintenancePage from "./pages/MaintenancePage";
 import AuditLogPage from "./pages/AuditLogPage";
 import LoyaltyPage from "./pages/LoyaltyPage";
 import LoyaltyGrantsPage from "./pages/LoyaltyGrantsPage";
+import AccountPage from "./pages/AccountPage";
 
-type PageKey = "dashboard" | "map" | "reports" | "disputes" | "deliveries" | "users" | "kyc" | "referrals" | "finance" | "pricing" | "commission" | "countries" | "maintenance" | "settings" | "admins" | "auditLog" | "loyalty" | "loyaltyGrants";
+type PageKey = "dashboard" | "map" | "reports" | "disputes" | "deliveries" | "users" | "kyc" | "referrals" | "finance" | "pricing" | "commission" | "countries" | "maintenance" | "settings" | "admins" | "auditLog" | "loyalty" | "loyaltyGrants" | "account";
 type GroupKey = "ops" | "people" | "trust" | "finance" | "system";
 
 const NAV: { key: PageKey; label: string; href: string; icon: string; group: GroupKey; roles?: Array<"super_admin" | "support" | "finance"> }[] = [
@@ -42,6 +43,7 @@ const NAV: { key: PageKey; label: string; href: string; icon: string; group: Gro
   { key: "admins", label: "Équipe admin", href: "/admin/admins", icon: "★", group: "system", roles: ["super_admin"] },
   { key: "auditLog", label: "Journal d'audit", href: "/admin/audit", icon: "▤", group: "system", roles: ["super_admin"] },
   { key: "loyalty", label: "Fidélité", href: "/admin/loyalty", icon: "♛", group: "finance", roles: ["super_admin", "finance"] },
+  { key: "account", label: "Mon compte", href: "/admin/account", icon: "✱", group: "system" },
   { key: "loyaltyGrants", label: "Octrois fidélité", href: "/admin/loyalty-grants", icon: "⚇", group: "finance", roles: ["super_admin", "finance"] },
 ];
 
@@ -90,14 +92,19 @@ function Shell() {
   }, []);
   if (!admin) return null;
 
-  const visibleNav = NAV.filter((item) => !item.roles || item.roles.includes(admin.role));
+  // Double authentification exigée et pas encore activée : le serveur refuse tout le reste, la console
+  // ne montre que « Mon compte ».
+  const visibleNav = admin.mustEnrollTotp
+    ? NAV.filter((item) => item.key === "account")
+    : NAV.filter((item) => !item.roles || item.roles.includes(admin.role));
+  const activePage: PageKey = admin.mustEnrollTotp ? "account" : page;
   const grouped = visibleNav.reduce<Record<GroupKey, typeof visibleNav>>((acc, item) => {
     (acc[item.group] ??= []).push(item);
     return acc;
   }, { ops: [], people: [], trust: [], finance: [], system: [] });
 
-  const currentLabel = visibleNav.find((item) => item.key === page)?.label ?? "Console";
-  const currentGroup = visibleNav.find((item) => item.key === page)?.group ?? "ops";
+  const currentLabel = visibleNav.find((item) => item.key === activePage)?.label ?? "Console";
+  const currentGroup = visibleNav.find((item) => item.key === activePage)?.group ?? "ops";
 
   return (
     <div className="app-shell">
@@ -119,7 +126,7 @@ function Shell() {
                 {items.map((item) => (
                   <button
                     key={item.key}
-                    className={`sidebar-link ${page === item.key ? "active" : ""}`}
+                    className={`sidebar-link ${activePage === item.key ? "active" : ""}`}
                     onClick={() => setPage(item.key)}
                   >
                     <NavIcon glyph={item.icon} />
@@ -165,6 +172,8 @@ function Shell() {
           </div>
         </header>
         <main className="main">
+          {activePage === "account" ? <AccountPage /> : null}
+          {admin.mustEnrollTotp ? null : <>
           {page === "dashboard" ? <DashboardPage search={search} /> : null}
           {page === "map" ? <LiveMapPage /> : null}
           {page === "deliveries" ? <DeliveriesPage /> : null}
@@ -183,6 +192,7 @@ function Shell() {
           {page === "auditLog" ? <AuditLogPage /> : null}
           {page === "loyalty" ? <LoyaltyPage /> : null}
           {page === "loyaltyGrants" ? <LoyaltyGrantsPage /> : null}
+          </>}
         </main>
       </div>
     </div>

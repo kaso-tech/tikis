@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, publicProcedure, tikisAdminProcedure, requireTikisAdminRole, invalidateTikisProfileCache } from "./_core/trpc";
+import { router, publicProcedure, tikisAdminProcedure, tikisAdminEnrollmentProcedure, requireTikisAdminRole, invalidateTikisProfileCache } from "./_core/trpc";
 import { clientIp } from "./_core/security";
 import { verifyAdminPasswordOrDecoy } from "./admin-auth";
 import { clearAdminSessionCookie, setAdminSessionCookie } from "./_core/cookies";
@@ -11,6 +11,11 @@ import { publishDeliveryStatusBroadcast } from "./supabase-realtime";
 async function audit(ctx: { tikisAdmin?: { adminId: number; email: string } | null; req: { ip?: string; socket?: { remoteAddress?: string } } }, action: string, targetType: string, targetId: string, details?: unknown) {
   if (!ctx.tikisAdmin) return;
   await adminDb.writeAdminAuditLog({ adminId: ctx.tikisAdmin.adminId, adminEmail: ctx.tikisAdmin.email, action, targetType, targetId, details, ipAddress: clientIp(ctx.req) });
+}
+
+function requestUserAgent(req: { headers: Record<string, string | string[] | undefined> }) {
+  const value = req.headers["user-agent"];
+  return Array.isArray(value) ? value[0] : value;
 }
 
 export const tikisAdminRouter = router({
@@ -26,13 +31,27 @@ export const tikisAdminRouter = router({
         throw new Error("Identifiants invalides.");
       }
       await adminDb.recordAdminLoginSuccess(input.email, ip);
+      const userAgent = requestUserAgent(ctx.req);
+      if (admin.totpEnabledAt) {
+        // Mot de passe correct, mais ce n'est que la moitié : une session « en attente » de 5 minutes, qui
+        // n'ouvre rien d'autre que la saisie du code (auth.verifyTotp).
+        const pending = await adminDb.createAdminSession({ adminId: admin.id, ipAddress: ip, userAgent, stage: "pending_totp" });
+        setAdminSessionCookie(ctx.res, ctx.req, pending.token, pending.expiresAt);
+        return { status: "totp_required" as const };
+      }
       await adminDb.touchAdminLastLogin(admin.id);
-      const userAgent = ctx.req.headers["user-agent"];
-      const session = await adminDb.createAdminSession({ adminId: admin.id, ipAddress: ip, userAgent: Array.isArray(userAgent) ? userAgent[0] : userAgent });
+      const session = await adminDb.createAdminSession({ adminId: admin.id, ipAddress: ip, userAgent });
       await adminDb.writeAdminAuditLog({ adminId: admin.id, adminEmail: admin.email, action: "login", targetType: "admin_session", targetId: String(admin.id), ipAddress: ip });
       // Le jeton ne quitte le serveur que dans un cookie httpOnly : aucun script de la page ne le voit.
       setAdminSessionCookie(ctx.res, ctx.req, session.token, session.expiresAt);
-      return { admin: { id: admin.id, email: admin.email, fullName: admin.fullName, role: admin.role } };
+      return { status: "ok" as const, admin: { id: admin.id, email: admin.email, fullName: admin.fullName, role: admin.role } };
+    }),
+    verifyTotp: publicProcedure.input(z.object({ code: z.string().trim().min(6).max(20) })).mutation(async ({ input, ctx }) => {
+      const ip = clientIp(ctx.req);
+      const result = await adminDb.completeTotpLogin({ token: pickAdminSessionToken(ctx), code: input.code, ipAddress: ip, userAgent: requestUserAgent(ctx.req) });
+      setAdminSessionCookie(ctx.res, ctx.req, result.session.token, result.session.expiresAt);
+      await adminDb.writeAdminAuditLog({ adminId: result.admin.id, adminEmail: result.admin.email, action: result.factor.method === "recovery_code" ? "login_recovery_code" : "login", targetType: "admin_session", targetId: String(result.admin.id), details: result.factor.method === "recovery_code" ? { remainingRecoveryCodes: result.factor.remainingRecoveryCodes } : { secondFactor: "totp" }, ipAddress: ip });
+      return { status: "ok" as const, admin: result.admin, remainingRecoveryCodes: result.factor.method === "recovery_code" ? result.factor.remainingRecoveryCodes : undefined };
     }),
     logout: publicProcedure.mutation(async ({ ctx }) => {
       await adminDb.revokeAdminSession(pickAdminSessionToken(ctx));
@@ -43,6 +62,20 @@ export const tikisAdminRouter = router({
     // Public : la console l'appelle au chargement pour savoir si une session existe (le cookie httpOnly
     // n'est pas lisible par la page). Sans session, `null` plutôt qu'une erreur.
     me: publicProcedure.query(({ ctx }) => ctx.tikisAdmin ?? null),
+    // Enrôlement accessible même quand la double authentification est exigée et pas encore faite.
+    totp: router({
+      begin: tikisAdminEnrollmentProcedure.mutation(async ({ ctx }) => adminDb.beginTotpEnrollment({ adminId: ctx.tikisAdmin.adminId, email: ctx.tikisAdmin.email })),
+      confirm: tikisAdminEnrollmentProcedure.input(z.object({ code: z.string().trim().min(6).max(10) })).mutation(async ({ ctx, input }) => {
+        const result = await adminDb.confirmTotpEnrollment({ adminId: ctx.tikisAdmin.adminId, code: input.code });
+        await audit(ctx, "totp_enabled", "admin_user", String(ctx.tikisAdmin.adminId));
+        return result;
+      }),
+      disable: tikisAdminProcedure.input(z.object({ code: z.string().trim().min(6).max(20) })).mutation(async ({ ctx, input }) => {
+        await adminDb.disableOwnTotp({ adminId: ctx.tikisAdmin.adminId, role: ctx.tikisAdmin.role, code: input.code });
+        await audit(ctx, "totp_disabled", "admin_user", String(ctx.tikisAdmin.adminId));
+        return { success: true } as const;
+      }),
+    }),
   }),
 
   dashboard: router({
@@ -257,6 +290,20 @@ export const tikisAdminRouter = router({
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
       await adminDb.setAdminUserActive({ actorAdminId: ctx.tikisAdmin.adminId, adminId: input.adminId, active: input.active });
       await audit(ctx, input.active ? "admin_reactivated" : "admin_suspended", "admin_user", String(input.adminId));
+      return { success: true } as const;
+    }),
+  }),
+
+  security: router({
+    get: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).query(async () => ({ totpRequired: await adminDb.isAdminTotpRequired(), totpRequiredRoles: adminDb.TOTP_REQUIRED_ROLES })),
+    setTotpRequired: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ required: z.boolean() })).mutation(async ({ ctx, input }) => {
+      const result = await adminDb.setAdminTotpRequired({ actorAdminId: ctx.tikisAdmin.adminId, required: input.required });
+      await audit(ctx, "totp_policy_changed", "platform_settings", "adminTotpRequired", { required: input.required });
+      return result;
+    }),
+    resetTotp: tikisAdminProcedure.use(requireTikisAdminRole("super_admin")).input(z.object({ adminId: z.number().int() })).mutation(async ({ ctx, input }) => {
+      await adminDb.resetAdminTotp({ actorAdminId: ctx.tikisAdmin.adminId, adminId: input.adminId });
+      await audit(ctx, "totp_reset", "admin_user", String(input.adminId));
       return { success: true } as const;
     }),
   }),

@@ -153,3 +153,54 @@ describe("lot 2 — la console ne manipule plus aucun jeton de session", () => {
     expect(migration).not.toMatch(/`token` /);
   });
 });
+
+describe("lot 3 — double authentification dans la console", () => {
+  it("la connexion enchaîne mot de passe puis code, codes de secours acceptés", () => {
+    const login = read("admin/src/pages/LoginPage.tsx");
+    expect(login).toContain('if (outcome === "totp_required")');
+    expect(login).toContain('autoComplete="one-time-code"');
+    expect(read("admin/src/lib/auth.tsx")).toContain("trpc.adminConsole.auth.verifyTotp.mutate({ code })");
+  });
+
+  it("un compte qui doit s'enrôler ne voit que « Mon compte »", () => {
+    const app = read("admin/src/App.tsx");
+    expect(app).toContain('NAV.filter((item) => item.key === "account")');
+    expect(app).toContain('const activePage: PageKey = admin.mustEnrollTotp ? "account" : page;');
+  });
+
+  it("les codes de secours restent affichés jusqu'à ce que l'admin confirme les avoir notés", () => {
+    const account = read("admin/src/pages/AccountPage.tsx");
+    expect(account).toContain("setRecoveryCodes(result.recoveryCodes);");
+    expect(account).toContain("J’ai noté mes codes");
+  });
+
+  it("le serveur ferme toute la console tant que l'enrôlement obligatoire n'est pas fait", () => {
+    const trpcCore = read("server/_core/trpc.ts");
+    expect(trpcCore).toContain("if (opts.ctx.tikisAdmin.mustEnrollTotp) {");
+    const router = read("server/admin-router.ts");
+    expect(router).toContain("begin: tikisAdminEnrollmentProcedure");
+    expect(router).toContain("confirm: tikisAdminEnrollmentProcedure");
+    // La désactivation, elle, reste derrière la procédure complète.
+    expect(router).toContain("disable: tikisAdminProcedure");
+  });
+
+  it("la liste des rôles soumis à l'obligation est la même côté écran et côté serveur", async () => {
+    const page = read("admin/src/pages/AdminsPage.tsx");
+    const declared = /const TOTP_REQUIRED_ROLES = (\[[^\]]*\]);/.exec(page)?.[1];
+    const { TOTP_REQUIRED_ROLES } = await import("../server/admin-db");
+    expect(JSON.parse(declared ?? "[]")).toEqual([...TOTP_REQUIRED_ROLES]);
+  });
+
+  it("la migration ajoute le secret chiffré, l'étape de session et la politique", () => {
+    const migration = read("drizzle/manual/0045_admin_totp.sql");
+    expect(migration).toContain("ADD COLUMN IF NOT EXISTS `totpSecret` varchar(255)");
+    expect(migration).toContain("ADD COLUMN IF NOT EXISTS `stage` enum('pending_totp','active') NOT NULL DEFAULT 'active'");
+    expect(migration).toContain("ADD COLUMN IF NOT EXISTS `adminTotpRequired` boolean NOT NULL DEFAULT false");
+  });
+
+  it("qrcode est une dépendance d'exécution : le serveur de production le charge (esbuild --packages=external)", () => {
+    const pkg = JSON.parse(read("package.json"));
+    expect(pkg.dependencies.qrcode).toBeDefined();
+    expect(pkg.devDependencies?.qrcode).toBeUndefined();
+  });
+});
