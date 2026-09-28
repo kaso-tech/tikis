@@ -2,7 +2,7 @@ import type { CreateExpressContextOptions } from "@trpc/server/adapters/express"
 import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
 import { verifyTikisProfileSession } from "../tikis-session";
-import { type AdminRole } from "../admin-auth";
+import { ADMIN_CONSOLE_HEADER, ADMIN_SESSION_COOKIE, type AdminRole } from "../admin-auth";
 import { authenticateAdminSession } from "../admin-db";
 import { TIKIS_PROFILE_COOKIE } from "./cookies";
 
@@ -53,21 +53,36 @@ export function shouldAuthenticateManusRequest(headers: Record<string, string | 
   return typeof cookieValue === "string" && /(?:^|;\s*)app_session_id=/.test(cookieValue);
 }
 
-function pickTikisSessionToken(opts: CreateExpressContextOptions): string | undefined {
-  const headerToken = getTikisSessionTokenFromHeaders(opts.req.headers);
-  if (headerToken) return headerToken;
+function requestCookies(opts: CreateExpressContextOptions): Record<string, string> {
   const reqWithCookies = opts.req as { cookies?: Record<string, string> };
   if (!reqWithCookies.cookies) {
     reqWithCookies.cookies = parseCookies(opts.req.headers.cookie);
   }
-  return reqWithCookies.cookies[TIKIS_PROFILE_COOKIE];
+  return reqWithCookies.cookies;
+}
+
+function pickTikisSessionToken(opts: CreateExpressContextOptions): string | undefined {
+  const headerToken = getTikisSessionTokenFromHeaders(opts.req.headers);
+  if (headerToken) return headerToken;
+  return requestCookies(opts)[TIKIS_PROFILE_COOKIE];
+}
+
+/**
+ * Jeton de session admin : uniquement le cookie httpOnly, et seulement si la requête porte l'en-tête de la
+ * console. Un site tiers peut amener le navigateur à envoyer un cookie ; il ne peut pas ajouter cet en-tête
+ * sans pré-vérification CORS, que seules les origines autorisées passent. L'ancien en-tête portant le jeton
+ * lui-même (lu depuis localStorage) n'est plus accepté.
+ */
+export function pickAdminSessionToken(opts: Pick<CreateExpressContextOptions, "req">): string | undefined {
+  const marker = opts.req.headers[ADMIN_CONSOLE_HEADER];
+  if ((Array.isArray(marker) ? marker[0] : marker) !== "1") return undefined;
+  return requestCookies(opts as CreateExpressContextOptions)[ADMIN_SESSION_COOKIE];
 }
 
 export async function createContext(opts: CreateExpressContextOptions): Promise<TrpcContext> {
   let user: User | null = null;
   const sessionToken = pickTikisSessionToken(opts);
-  const adminSessionHeader = opts.req.headers["x-tikis-admin-session"];
-  const adminSessionToken = Array.isArray(adminSessionHeader) ? adminSessionHeader[0] : adminSessionHeader;
+  const adminSessionToken = pickAdminSessionToken(opts);
 
   if (shouldAuthenticateManusRequest(opts.req.headers)) {
     try {

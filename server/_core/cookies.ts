@@ -1,5 +1,6 @@
 import type { CookieOptions, Request, Response } from "express";
 import { TIKIS_SESSION_TTL_SECONDS } from "../tikis-session";
+import { ADMIN_SESSION_COOKIE } from "../admin-auth";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -79,4 +80,25 @@ export function setTikisProfileCookie(res: Pick<Response, "cookie" | "clearCooki
 export function clearTikisProfileCookie(res: Pick<Response, "cookie" | "clearCookie">, req: Request) {
   if (!res || typeof (res as { cookie?: unknown }).cookie !== "function") return;
   res.clearCookie(TIKIS_PROFILE_COOKIE, getSessionCookieOptions(req));
+}
+
+/**
+ * Cookie de session de la console d'administration. Plus strict que celui des profils :
+ *  - pas de domaine : le cookie ne vaut que pour l'hôte de l'API, jamais pour ses sous-domaines voisins ;
+ *  - SameSite=Strict : aucune requête partie d'un autre site ne le transporte ;
+ *  - chemin /api : les pages statiques ne le reçoivent pas.
+ * Toujours httpOnly : aucun script de la page ne peut le lire, contrairement à l'ancien jeton en localStorage.
+ */
+function adminSessionCookieOptions(req: Request): CookieOptions {
+  return { httpOnly: true, sameSite: "strict", path: "/api", secure: req.secure };
+}
+
+export function setAdminSessionCookie(res: Pick<Response, "cookie" | "clearCookie">, req: Request, token: string, expiresAt: Date) {
+  if (!res || typeof (res as { cookie?: unknown }).cookie !== "function") return;
+  res.cookie(ADMIN_SESSION_COOKIE, token, { ...adminSessionCookieOptions(req), expires: expiresAt });
+}
+
+export function clearAdminSessionCookie(res: Pick<Response, "cookie" | "clearCookie">, req: Request) {
+  if (!res || typeof (res as { cookie?: unknown }).cookie !== "function") return;
+  res.clearCookie(ADMIN_SESSION_COOKIE, adminSessionCookieOptions(req));
 }

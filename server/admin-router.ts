@@ -1,34 +1,48 @@
 import { z } from "zod";
 import { router, publicProcedure, tikisAdminProcedure, requireTikisAdminRole, invalidateTikisProfileCache } from "./_core/trpc";
 import { clientIp } from "./_core/security";
-import { assertLoginAllowed, createAdminSession, recordLoginFailure, recordLoginSuccess, verifyAdminPassword } from "./admin-auth";
+import { verifyAdminPasswordOrDecoy } from "./admin-auth";
+import { clearAdminSessionCookie, setAdminSessionCookie } from "./_core/cookies";
+import { pickAdminSessionToken } from "./_core/context";
 import * as adminDb from "./admin-db";
 import * as db from "./db";
 import { publishDeliveryStatusBroadcast } from "./supabase-realtime";
 
-async function audit(ctx: { tikisAdmin: { adminId: number; email: string } | null; req: { ip?: string; socket?: { remoteAddress?: string } } }, action: string, targetType: string, targetId: string, details?: unknown) {
+async function audit(ctx: { tikisAdmin?: { adminId: number; email: string } | null; req: { ip?: string; socket?: { remoteAddress?: string } } }, action: string, targetType: string, targetId: string, details?: unknown) {
   if (!ctx.tikisAdmin) return;
   await adminDb.writeAdminAuditLog({ adminId: ctx.tikisAdmin.adminId, adminEmail: ctx.tikisAdmin.email, action, targetType, targetId, details, ipAddress: clientIp(ctx.req) });
 }
 
 export const tikisAdminRouter = router({
   auth: router({
-    login: publicProcedure.input(z.object({ email: z.string().email(), password: z.string().min(1) })).mutation(async ({ input, ctx }) => {
-      const key = `${clientIp(ctx.req)}:${input.email.toLowerCase()}`;
-      assertLoginAllowed(key);
+    login: publicProcedure.input(z.object({ email: z.string().email().max(180), password: z.string().min(1).max(200) })).mutation(async ({ input, ctx }) => {
+      const ip = clientIp(ctx.req);
+      await adminDb.assertAdminLoginAllowed(input.email, ip);
       const admin = await adminDb.getAdminByEmail(input.email);
-      const valid = admin ? await verifyAdminPassword(input.password, admin.passwordHash) : false;
+      // Même calcul scrypt que l'email existe ou non : le temps de réponse ne révèle plus les comptes.
+      const valid = await verifyAdminPasswordOrDecoy(input.password, admin?.passwordHash);
       if (!admin || !valid || !admin.active) {
-        recordLoginFailure(key);
+        await adminDb.recordAdminLoginFailure(input.email, ip);
         throw new Error("Identifiants invalides.");
       }
-      recordLoginSuccess(key);
+      await adminDb.recordAdminLoginSuccess(input.email, ip);
       await adminDb.touchAdminLastLogin(admin.id);
-      await adminDb.writeAdminAuditLog({ adminId: admin.id, adminEmail: admin.email, action: "login", targetType: "admin_session", targetId: String(admin.id), ipAddress: clientIp(ctx.req) });
-      const sessionToken = await createAdminSession(admin.id, admin.email, admin.role);
-      return { sessionToken, admin: { id: admin.id, email: admin.email, fullName: admin.fullName, role: admin.role } };
+      const userAgent = ctx.req.headers["user-agent"];
+      const session = await adminDb.createAdminSession({ adminId: admin.id, ipAddress: ip, userAgent: Array.isArray(userAgent) ? userAgent[0] : userAgent });
+      await adminDb.writeAdminAuditLog({ adminId: admin.id, adminEmail: admin.email, action: "login", targetType: "admin_session", targetId: String(admin.id), ipAddress: ip });
+      // Le jeton ne quitte le serveur que dans un cookie httpOnly : aucun script de la page ne le voit.
+      setAdminSessionCookie(ctx.res, ctx.req, session.token, session.expiresAt);
+      return { admin: { id: admin.id, email: admin.email, fullName: admin.fullName, role: admin.role } };
     }),
-    me: tikisAdminProcedure.query(({ ctx }) => ctx.tikisAdmin),
+    logout: publicProcedure.mutation(async ({ ctx }) => {
+      await adminDb.revokeAdminSession(pickAdminSessionToken(ctx));
+      clearAdminSessionCookie(ctx.res, ctx.req);
+      await audit(ctx, "logout", "admin_session", String(ctx.tikisAdmin?.adminId ?? ""));
+      return { success: true } as const;
+    }),
+    // Public : la console l'appelle au chargement pour savoir si une session existe (le cookie httpOnly
+    // n'est pas lisible par la page). Sans session, `null` plutôt qu'une erreur.
+    me: publicProcedure.query(({ ctx }) => ctx.tikisAdmin ?? null),
   }),
 
   dashboard: router({
@@ -125,7 +139,8 @@ export const tikisAdminRouter = router({
       });
       return result;
     }),
-    liveLocations: tikisAdminProcedure.input(z.object({
+    // Positions GPS en direct des livreurs : utiles au support pour suivre une course, pas à la finance.
+    liveLocations: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({
       maxAgeSeconds: z.number().int().min(10).max(3600).default(120),
     })).query(({ input }) => adminDb.adminListLiveLocations(input)),
   }),

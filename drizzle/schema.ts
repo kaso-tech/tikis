@@ -283,6 +283,25 @@ export const tikisAdminUsers = mysqlTable("tikis_admin_users", {
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
+/**
+ * Sessions de la console d'administration. Le navigateur ne détient qu'un jeton aléatoire opaque, dans un
+ * cookie httpOnly ; la base n'en garde que l'empreinte SHA-256. Une session se révoque à la déconnexion,
+ * à la suspension du compte, ou expire au bout de 8 h.
+ */
+export const tikisAdminSessions = mysqlTable("tikis_admin_sessions", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  adminId: int("adminId").notNull(),
+  tokenHash: varchar("tokenHash", { length: 64 }).notNull().unique(),
+  ipAddress: varchar("ipAddress", { length: 64 }),
+  userAgent: varchar("userAgent", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  lastSeenAt: timestamp("lastSeenAt").defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt").notNull(),
+  revokedAt: timestamp("revokedAt"),
+}, (table) => [
+  index("tikis_admin_sessions_admin_index").on(table.adminId, table.revokedAt),
+]);
+
 /** Journal d'audit immuable de toute action d'administration (CAS N°10 — décisions tracées). */
 export const tikisAdminAuditLog = mysqlTable("tikis_admin_audit_log", {
   id: varchar("id", { length: 40 }).primaryKey(),
@@ -301,6 +320,7 @@ export const tikisAdminAuditLog = mysqlTable("tikis_admin_audit_log", {
 
 export type TikisDeliveryReport = typeof tikisDeliveryReports.$inferSelect;
 export type TikisAdminUser = typeof tikisAdminUsers.$inferSelect;
+export type TikisAdminSession = typeof tikisAdminSessions.$inferSelect;
 export type TikisAdminAuditLog = typeof tikisAdminAuditLog.$inferSelect;
 
 export type User = typeof users.$inferSelect;

@@ -1,11 +1,12 @@
 import { randomUUID } from "crypto";
-import { and, count, desc, eq, gte, inArray, like, lte, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, like, lte, or, sql } from "drizzle-orm";
 import { countryDraftIssue, countryPlanWarning } from "../shared/iso-countries";
-import { verifyAdminSession, type AdminRole } from "./admin-auth";
+import { ADMIN_SESSION_TTL_SECONDS, hashAdminSessionToken, newAdminSessionToken, type AdminRole } from "./admin-auth";
 import { getDb } from "./db";
 import * as db from "./db";
 import {
   tikisAdminAuditLog,
+  tikisAdminSessions,
   tikisAdminUsers,
   tikisDeliveries,
   tikisDeliveryCandidates,
@@ -18,6 +19,7 @@ import {
   tikisPaymentTransactions,
   tikisPlatformSettings,
   tikisProfiles,
+  tikisRateLimits,
   tikisReferrals,
   tikisSupportedCountries,
   tikisWalletLedger,
@@ -77,24 +79,112 @@ export async function setAdminUserActive(input: { actorAdminId: number; adminId:
       }
     }
     await tx.update(tikisAdminUsers).set({ active: input.active }).where(eq(tikisAdminUsers.id, input.adminId));
+    // Le compte inactif suffit déjà à refuser ses sessions ; les révoquer en plus garantit qu'une
+    // réactivation ultérieure ne ressuscite pas une session ouverte avant la suspension.
+    if (!input.active) await revokeAllAdminSessions(input.adminId, tx);
   });
 }
 
+/** Ouvre une session : le jeton part dans le cookie, la base n'en garde que l'empreinte. */
+export async function createAdminSession(input: { adminId: number; ipAddress?: string; userAgent?: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("La console d’administration est temporairement indisponible.");
+  const token = newAdminSessionToken();
+  const expiresAt = new Date(Date.now() + ADMIN_SESSION_TTL_SECONDS * 1000);
+  await db.insert(tikisAdminSessions).values({
+    id: randomUUID(), adminId: input.adminId, tokenHash: hashAdminSessionToken(token),
+    ipAddress: input.ipAddress?.slice(0, 64) ?? null, userAgent: input.userAgent?.slice(0, 255) ?? null, expiresAt,
+  });
+  return { token, expiresAt };
+}
+
+const LAST_SEEN_REFRESH_MS = 5 * 60_000;
+
 /**
- * Identité admin effective d'une requête. Le jeton signé prouve qui s'est connecté ; il ne dit rien de
- * l'état du compte depuis. Sans cette relecture, un admin suspendu gardait tous ses droits jusqu'à
- * l'expiration de son jeton (8 h), et un rôle retiré restait appliqué tant que le jeton vivait. La
- * console a peu de trafic : une lecture par clé primaire à chaque requête ne coûte rien. Sans base,
- * aucune session n'est acceptée — rien n'y fonctionnerait de toute façon.
+ * Identité admin effective d'une requête. La session doit exister, ne pas être révoquée ni expirée, et le
+ * compte doit être actif ; le rôle appliqué est celui du compte à cet instant. Sans base, aucune session
+ * n'est acceptée — rien n'y fonctionnerait de toute façon.
  */
 export async function authenticateAdminSession(token: string | undefined): Promise<{ adminId: number; email: string; role: AdminRole } | null> {
-  const session = await verifyAdminSession(token);
-  if (!session) return null;
+  if (!token || token.length > 200) return null;
   const db = await getDb();
   if (!db) return null;
-  const account = (await db.select({ id: tikisAdminUsers.id, email: tikisAdminUsers.email, role: tikisAdminUsers.role, active: tikisAdminUsers.active }).from(tikisAdminUsers).where(eq(tikisAdminUsers.id, session.adminId)).limit(1))[0];
-  if (!account?.active) return null;
-  return { adminId: account.id, email: account.email, role: account.role };
+  const row = (await db.select({
+    sessionId: tikisAdminSessions.id, expiresAt: tikisAdminSessions.expiresAt, revokedAt: tikisAdminSessions.revokedAt, lastSeenAt: tikisAdminSessions.lastSeenAt,
+    id: tikisAdminUsers.id, email: tikisAdminUsers.email, role: tikisAdminUsers.role, active: tikisAdminUsers.active,
+  }).from(tikisAdminSessions).innerJoin(tikisAdminUsers, eq(tikisAdminSessions.adminId, tikisAdminUsers.id))
+    .where(eq(tikisAdminSessions.tokenHash, hashAdminSessionToken(token))).limit(1))[0];
+  if (!row || row.revokedAt || row.expiresAt.getTime() <= Date.now() || !row.active) return null;
+  if (Date.now() - row.lastSeenAt.getTime() > LAST_SEEN_REFRESH_MS) {
+    void db.update(tikisAdminSessions).set({ lastSeenAt: new Date() }).where(eq(tikisAdminSessions.id, row.sessionId)).catch(() => {});
+  }
+  return { adminId: row.id, email: row.email, role: row.role };
+}
+
+/** Déconnexion : la session ne vaut plus rien, même si quelqu'un a copié le cookie. */
+export async function revokeAdminSession(token: string | undefined) {
+  if (!token) return;
+  const db = await getDb();
+  if (!db) return;
+  await db.update(tikisAdminSessions).set({ revokedAt: new Date() }).where(and(eq(tikisAdminSessions.tokenHash, hashAdminSessionToken(token)), isNull(tikisAdminSessions.revokedAt)));
+}
+
+export async function revokeAllAdminSessions(adminId: number, tx?: any) {
+  const handle = tx ?? await getDb();
+  if (!handle) return;
+  await handle.update(tikisAdminSessions).set({ revokedAt: new Date() }).where(and(eq(tikisAdminSessions.adminId, adminId), isNull(tikisAdminSessions.revokedAt)));
+}
+
+// ————————————————————————————————————————————————————————————————————————
+// Limiteur de connexion admin, partagé entre instances (tikis_rate_limits)
+// ————————————————————————————————————————————————————————————————————————
+
+/**
+ * Échecs de connexion tolérés par fenêtre de 15 minutes. Trois compteurs, parce qu'un seul ne suffit pas :
+ *  - email + IP : l'essai de mots de passe classique, bloqué vite ;
+ *  - email seul : le même compte attaqué depuis de nombreuses IP (l'ancien limiteur, clé IP + email, se
+ *    contournait en changeant d'IP) ;
+ *  - IP seule : une même machine qui essaie de nombreux emails.
+ * Stocké en base et non plus dans la mémoire du processus : un redémarrage ne remet plus les compteurs à
+ * zéro, et plusieurs instances partagent les mêmes.
+ */
+export const ADMIN_LOGIN_WINDOW_MS = 15 * 60_000;
+export const ADMIN_LOGIN_LIMITS = { emailIp: 5, email: 20, ip: 30 } as const;
+
+function adminLoginKeys(email: string, ip: string, now = Date.now()) {
+  const bucket = Math.floor(now / ADMIN_LOGIN_WINDOW_MS);
+  const normalizedEmail = email.trim().toLowerCase();
+  return {
+    emailIp: `admin-login:email-ip:${normalizedEmail}:${ip}:${bucket}`.slice(0, 191),
+    email: `admin-login:email:${normalizedEmail}:${bucket}`.slice(0, 191),
+    ip: `admin-login:ip:${ip}:${bucket}`.slice(0, 191),
+  };
+}
+
+export async function assertAdminLoginAllowed(email: string, ip: string) {
+  const db = await getDb();
+  if (!db) throw new Error("La console d’administration est temporairement indisponible.");
+  const keys = adminLoginKeys(email, ip);
+  const rows = await db.select().from(tikisRateLimits).where(inArray(tikisRateLimits.rateLimitKey, Object.values(keys)));
+  const failures = (key: string) => rows.find((row) => row.rateLimitKey === key)?.count ?? 0;
+  if (failures(keys.emailIp) >= ADMIN_LOGIN_LIMITS.emailIp || failures(keys.email) >= ADMIN_LOGIN_LIMITS.email || failures(keys.ip) >= ADMIN_LOGIN_LIMITS.ip) {
+    throw new Error("Trop de tentatives de connexion. Réessayez dans quelques minutes.");
+  }
+}
+
+export async function recordAdminLoginFailure(email: string, ip: string) {
+  const db = await getDb();
+  if (!db) return;
+  for (const rateLimitKey of Object.values(adminLoginKeys(email, ip))) {
+    await db.insert(tikisRateLimits).values({ rateLimitKey, count: 1 }).onDuplicateKeyUpdate({ set: { count: sql`${tikisRateLimits.count} + 1` } });
+  }
+}
+
+/** Une connexion réussie efface les échecs de ce couple email + IP, pas les compteurs globaux. */
+export async function recordAdminLoginSuccess(email: string, ip: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(tikisRateLimits).where(eq(tikisRateLimits.rateLimitKey, adminLoginKeys(email, ip).emailIp));
 }
 
 // ————————————————————————————————————————————————————————————————————————

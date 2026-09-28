@@ -2,23 +2,24 @@
 
 Application web séparée (React + Vite), servie par le même serveur Express que l'API Tikis, sous `/admin`. Elle ne fait pas partie du bundle mobile Expo.
 
-## 1. Variable d'environnement requise
+## 1. Sessions de la console
 
-Ajoutez dans le `.env` du serveur (racine du projet, à côté de `DATABASE_URL`) :
+Aucune variable d'environnement n'est nécessaire pour les sessions admin. Depuis la migration
+`drizzle/manual/0044_admin_sessions.sql`, la console reçoit à la connexion un jeton aléatoire dans un cookie
+httpOnly (`tikis_admin_session`, SameSite=Strict, chemin `/api`). La base n'en garde que l'empreinte SHA-256.
+La déconnexion ou la suspension du compte révoque la session côté serveur. Une session dure 8 h au plus.
 
-```
-TIKIS_ADMIN_SESSION_SECRET=<chaîne aléatoire d'au moins 24 caractères, distincte de TIKIS_SESSION_SECRET et JWT_SECRET>
-```
+`TIKIS_ADMIN_SESSION_SECRET` n'est plus lu et peut être retiré du `.env`.
 
-Générez-la par exemple avec :
-```
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
+Si la console est servie depuis un autre sous-domaine que l'API (par ex. `admin.tikis.app`), cette origine
+doit figurer dans `TIKIS_ALLOWED_ORIGINS` : le serveur n'accepte le cookie qu'accompagné de l'en-tête
+`X-Tikis-Admin: 1`, qu'un navigateur n'envoie qu'aux origines autorisées par CORS.
 
 ## 2. Appliquer la migration base de données
 
 ```
 mysql -u <user> -p <database> < drizzle/manual/0020_admin_console.sql
+mysql -u <user> -p <database> < drizzle/manual/0044_admin_sessions.sql
 ```
 
 (ou régénérez proprement via `pnpm drizzle-kit generate` une fois la connexion DB disponible — ce fichier manuel sert de référence immédiate.)

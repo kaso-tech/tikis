@@ -1,16 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { createAdminSession, verifyAdminSession } from "../server/admin-auth";
+import { hashAdminSessionToken, newAdminSessionToken, verifyAdminPasswordOrDecoy } from "../server/admin-auth";
 
-describe("signature de session administrateur", () => {
-  const checkConfiguredSecret = process.env.TIKIS_ADMIN_SESSION_SECRET ? it : it.skip;
+describe("jeton de session administrateur", () => {
+  it("est aléatoire, long, et seule son empreinte est comparable", () => {
+    const first = newAdminSessionToken();
+    const second = newAdminSessionToken();
+    expect(first).not.toBe(second);
+    expect(first.length).toBeGreaterThanOrEqual(43); // 32 octets en base64url
+    expect(hashAdminSessionToken(first)).toMatch(/^[0-9a-f]{64}$/);
+    expect(hashAdminSessionToken(first)).toBe(hashAdminSessionToken(first));
+    expect(hashAdminSessionToken(first)).not.toBe(first);
+  });
 
-  checkConfiguredSecret("signe puis vérifie une session avec le secret serveur configuré", async () => {
-    expect(process.env.TIKIS_ADMIN_SESSION_SECRET?.length ?? 0).toBeGreaterThanOrEqual(24);
-
-    const token = await createAdminSession(42, "admin@example.com", "super_admin");
-    const session = await verifyAdminSession(token);
-
-    expect(session).toEqual({ adminId: 42, email: "admin@example.com", role: "super_admin" });
+  it("un email inconnu coûte le même calcul qu'un vrai compte, et échoue toujours", async () => {
+    await expect(verifyAdminPasswordOrDecoy("n'importe quoi", undefined)).resolves.toBe(false);
   });
 
   const checkBootstrapPassword = process.env.TIKIS_ADMIN_BOOTSTRAP_PASSWORD ? it : it.skip;

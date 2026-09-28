@@ -26,7 +26,7 @@ type GroupKey = "ops" | "people" | "trust" | "finance" | "system";
 
 const NAV: { key: PageKey; label: string; href: string; icon: string; group: GroupKey; roles?: Array<"super_admin" | "support" | "finance"> }[] = [
   { key: "dashboard", label: "Vue d'ensemble", href: "/admin", icon: "▦", group: "ops" },
-  { key: "map", label: "Carte temps réel", href: "/admin/map", icon: "◎", group: "ops" },
+  { key: "map", label: "Carte temps réel", href: "/admin/map", icon: "◎", group: "ops", roles: ["super_admin", "support"] },
   { key: "deliveries", label: "Livraisons", href: "/admin/deliveries", icon: "▣", group: "ops" },
   { key: "reports", label: "Signalements", href: "/admin/reports", icon: "⚐", group: "ops" },
   { key: "disputes", label: "Litiges", href: "/admin/disputes", icon: "⚖", group: "trust" },
@@ -136,7 +136,7 @@ function Shell() {
             <div className="sidebar-user-email" title={admin.email}>{admin.email}</div>
             <div className="sidebar-user-role">{admin.role.replace("_", " ")}</div>
           </div>
-          <button className="sidebar-logout" onClick={logout} title="Se déconnecter">⏻</button>
+          <button className="sidebar-logout" onClick={() => void logout()} title="Se déconnecter">⏻</button>
         </div>
       </aside>
       <div className="main-wrap">

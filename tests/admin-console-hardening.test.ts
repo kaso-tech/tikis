@@ -113,3 +113,43 @@ describe("lot 1 — décisions financières encadrées dans les écrans", () => 
     expect(read("drizzle/schema.ts")).toContain('payoutReference: varchar("payoutReference", { length: 80 }).unique()');
   });
 });
+
+describe("lot 2 — la console ne manipule plus aucun jeton de session", () => {
+  const trpcClient = read("admin/src/lib/trpc.ts");
+  const auth = read("admin/src/lib/auth.tsx");
+
+  it("aucun jeton n'est lu ni écrit dans localStorage ; l'ancien est effacé", () => {
+    expect(trpcClient).not.toContain("localStorage.getItem");
+    expect(trpcClient).not.toContain("localStorage.setItem");
+    expect(trpcClient).toContain("localStorage.removeItem(LEGACY_SESSION_KEY)");
+    expect(trpcClient).not.toContain("x-tikis-admin-session");
+  });
+
+  it("chaque requête porte l'en-tête de la console et le cookie", () => {
+    expect(trpcClient).toContain('headers: () => ({ "x-tikis-admin": "1" })');
+    expect(trpcClient).toContain('credentials: "include"');
+  });
+
+  it("se déconnecter révoque la session côté serveur", () => {
+    expect(auth).toContain("await trpc.adminConsole.auth.logout.mutate();");
+  });
+
+  it("le serveur n'accepte plus le jeton en en-tête, et CORS n'autorise plus cet en-tête", () => {
+    expect(read("server/_core/context.ts")).not.toContain('headers["x-tikis-admin-session"]');
+    const security = read("server/_core/security.ts");
+    expect(security).not.toContain("X-Tikis-Admin-Session");
+    expect(security).toContain("X-Tikis-Admin,");
+  });
+
+  it("la carte en direct n'apparaît qu'aux rôles qui y ont droit", () => {
+    expect(read("admin/src/App.tsx")).toContain('{ key: "map", label: "Carte temps réel", href: "/admin/map", icon: "◎", group: "ops", roles: ["super_admin", "support"] }');
+    expect(read("server/admin-router.ts")).toContain('liveLocations: tikisAdminProcedure.use(requireTikisAdminRole("super_admin", "support"))');
+  });
+
+  it("la migration crée la table des sessions, sans jamais y stocker le jeton en clair", () => {
+    const migration = read("drizzle/manual/0044_admin_sessions.sql");
+    expect(migration).toContain("CREATE TABLE IF NOT EXISTS `tikis_admin_sessions`");
+    expect(migration).toContain("`tokenHash` varchar(64) NOT NULL");
+    expect(migration).not.toMatch(/`token` /);
+  });
+});

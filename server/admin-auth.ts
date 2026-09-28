@@ -1,22 +1,30 @@
-import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
 import { promisify } from "node:util";
-import { SignJWT, jwtVerify } from "jose";
 
 const scrypt = promisify(scryptCallback);
 
-const ADMIN_SESSION_ISSUER = "tikis-admin";
-const ADMIN_SESSION_AUDIENCE = "tikis-admin-console";
 export const ADMIN_SESSION_TTL_SECONDS = 8 * 60 * 60; // 8h : une console d'admin garde une session courte, contrairement à l'app mobile.
+export const ADMIN_SESSION_COOKIE = "tikis_admin_session";
+/**
+ * En-tête que la console envoie avec chaque requête. Le cookie seul ne suffit pas à authentifier : un site
+ * tiers peut faire envoyer un cookie par le navigateur, pas ajouter un en-tête personnalisé sans une
+ * pré-vérification CORS que seules les origines autorisées passent (défense CSRF en plus de SameSite).
+ */
+export const ADMIN_CONSOLE_HEADER = "x-tikis-admin";
 
 /**
  * Authentification admin totalement séparée de celle des Senders/Livreurs (server/tikis-session.ts).
  * Aucune route de simulation ici : mot de passe hashé (scrypt, natif Node, aucune dépendance
- * supplémentaire à installer) + session JWT signée avec sa propre clé.
+ * supplémentaire à installer) + session opaque stockée en base (server/admin-db.ts, tikis_admin_sessions).
  */
-function adminSigningKey() {
-  const value = process.env.TIKIS_ADMIN_SESSION_SECRET;
-  if (!value || value.length < 24) throw new Error("La signature de session admin est indisponible : configurez TIKIS_ADMIN_SESSION_SECRET (24+ caractères, distinct des autres secrets).");
-  return new TextEncoder().encode(value);
+
+/** Jeton de session : 256 bits aléatoires. Seul le navigateur le détient ; la base garde son empreinte. */
+export function newAdminSessionToken() {
+  return randomBytes(32).toString("base64url");
+}
+
+export function hashAdminSessionToken(token: string) {
+  return createHash("sha256").update(token, "utf8").digest("hex");
 }
 
 export async function hashAdminPassword(password: string): Promise<string> {
@@ -38,53 +46,14 @@ export async function verifyAdminPassword(password: string, storedHash: string):
 
 export type AdminRole = "super_admin" | "support" | "finance";
 
-export async function createAdminSession(adminId: number, email: string, role: AdminRole) {
-  return new SignJWT({ scope: "tikis:admin", email, role })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuer(ADMIN_SESSION_ISSUER)
-    .setAudience(ADMIN_SESSION_AUDIENCE)
-    .setSubject(String(adminId))
-    .setIssuedAt()
-    .setExpirationTime(`${ADMIN_SESSION_TTL_SECONDS}s`)
-    .sign(adminSigningKey());
-}
+// Empreinte d'un mot de passe que personne ne connaît, calculée une fois. Quand l'email est inconnu, on
+// vérifie quand même le mot de passe contre elle : sans ça, la réponse arrivait sans calcul scrypt,
+// nettement plus vite, et le temps de réponse révélait quels emails ont un compte admin.
+let decoyHash: Promise<string> | null = null;
 
-export async function verifyAdminSession(token: string | undefined) {
-  if (!token || token.length > 4096) return null;
-  try {
-    const { payload } = await jwtVerify(token, adminSigningKey(), { issuer: ADMIN_SESSION_ISSUER, audience: ADMIN_SESSION_AUDIENCE });
-    if (payload.scope !== "tikis:admin" || typeof payload.sub !== "string" || typeof payload.email !== "string" || typeof payload.role !== "string") return null;
-    const adminId = Number(payload.sub);
-    if (!Number.isInteger(adminId)) return null;
-    return { adminId, email: payload.email, role: payload.role as AdminRole };
-  } catch {
-    return null;
-  }
-}
-
-/** Limiteur de tentatives en mémoire (par processus). Suffisant pour une première protection ;
- *  à remplacer par un stockage partagé (Redis) si l'admin tourne sur plusieurs instances. */
-const loginAttempts = new Map<string, { count: number; blockedUntil?: number }>();
-const MAX_ATTEMPTS = 5;
-const BLOCK_DURATION_MS = 15 * 60_000;
-
-export function assertLoginAllowed(key: string) {
-  const entry = loginAttempts.get(key);
-  if (entry?.blockedUntil && entry.blockedUntil > Date.now()) {
-    throw new Error("Trop de tentatives de connexion. Réessayez dans quelques minutes.");
-  }
-}
-
-export function recordLoginFailure(key: string) {
-  const entry = loginAttempts.get(key) ?? { count: 0 };
-  entry.count += 1;
-  if (entry.count >= MAX_ATTEMPTS) {
-    entry.blockedUntil = Date.now() + BLOCK_DURATION_MS;
-    entry.count = 0;
-  }
-  loginAttempts.set(key, entry);
-}
-
-export function recordLoginSuccess(key: string) {
-  loginAttempts.delete(key);
+export async function verifyAdminPasswordOrDecoy(password: string, storedHash: string | null | undefined): Promise<boolean> {
+  if (storedHash) return verifyAdminPassword(password, storedHash);
+  decoyHash ??= hashAdminPassword(randomBytes(24).toString("hex"));
+  await verifyAdminPassword(password, await decoyHash);
+  return false;
 }

@@ -13,7 +13,6 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 const TEST_DB = process.env.TIKIS_TEST_DATABASE_URL;
 if (TEST_DB) process.env.DATABASE_URL = TEST_DB;
-process.env.TIKIS_ADMIN_SESSION_SECRET ??= "admin-audit-test-secret-0123456789";
 
 type Db = typeof import("../server/db");
 let db: Db;
@@ -107,7 +106,7 @@ describe.skipIf(!TEST_DB)("session admin — l'état du compte fait foi, pas le 
 
   it("un admin suspendu perd l'accès immédiatement, sans attendre l'expiration du jeton", async () => {
     const admin = await newAdmin("support");
-    const token = await adminAuth.createAdminSession(admin.id, admin.email, admin.role);
+    const { token } = await adminDb.createAdminSession({ adminId: admin.id });
     expect(await adminDb.authenticateAdminSession(token)).toMatchObject({ adminId: admin.id, role: "support" });
 
     await adminDb.setAdminUserActive({ actorAdminId: -1, adminId: admin.id, active: false });
@@ -117,7 +116,7 @@ describe.skipIf(!TEST_DB)("session admin — l'état du compte fait foi, pas le 
 
   it("le rôle appliqué est celui du compte, pas celui figé dans le jeton", async () => {
     const admin = await newAdmin("super_admin");
-    const token = await adminAuth.createAdminSession(admin.id, admin.email, admin.role);
+    const { token } = await adminDb.createAdminSession({ adminId: admin.id });
     const handle = (await db.getDb())!;
     const { eq } = await import("drizzle-orm");
     await handle.update(schema.tikisAdminUsers).set({ role: "support" }).where(eq(schema.tikisAdminUsers.id, admin.id));
@@ -127,7 +126,7 @@ describe.skipIf(!TEST_DB)("session admin — l'état du compte fait foi, pas le 
 
   it("un compte supprimé ne s'authentifie plus", async () => {
     const admin = await newAdmin("finance");
-    const token = await adminAuth.createAdminSession(admin.id, admin.email, admin.role);
+    const { token } = await adminDb.createAdminSession({ adminId: admin.id });
     const handle = (await db.getDb())!;
     const { eq } = await import("drizzle-orm");
     await handle.delete(schema.tikisAdminUsers).where(eq(schema.tikisAdminUsers.id, admin.id));
@@ -345,5 +344,115 @@ describe.skipIf(!TEST_DB)("validation manuelle d'un retrait — jamais sans preu
     const { id, phone } = await pendingWithdrawal();
     await db.adminSettlePaymentTransaction({ paymentId: id, outcome: "failed", adminId: 1, notes: "Numéro invalide" });
     expect(await wallet(phone)).toEqual({ available: 5000, held: 0 });
+  });
+});
+
+describe.skipIf(!TEST_DB)("lot 2 — session admin révocable, en cookie", () => {
+  async function newAdmin(role: "super_admin" | "support" | "finance" = "support", password = "mot-de-passe-audit") {
+    const email = `lot2-${randomUUID()}@tikis.test`;
+    return (await adminDb.createAdminUser({ email, passwordHash: await adminAuth.hashAdminPassword(password), fullName: "Audit", role }))!;
+  }
+
+  /** Appelle le vrai routeur admin avec une requête Express minimale, et capture les cookies posés. */
+  async function caller(options: { ip?: string; cookie?: string; consoleHeader?: boolean } = {}) {
+    const { tikisAdminRouter } = await import("../server/admin-router");
+    const { createContext } = await import("../server/_core/context");
+    const cookies: Array<{ name: string; value: string; options: Record<string, unknown> }> = [];
+    const cleared: string[] = [];
+    const headers: Record<string, string> = {};
+    if (options.cookie) headers.cookie = options.cookie;
+    if (options.consoleHeader !== false) headers["x-tikis-admin"] = "1";
+    const req = { headers, ip: options.ip ?? "203.0.113.7", secure: true, socket: {} } as never;
+    const res = {
+      cookie: (name: string, value: string, cookieOptions: Record<string, unknown>) => { cookies.push({ name, value, options: cookieOptions }); },
+      clearCookie: (name: string) => { cleared.push(name); },
+    } as never;
+    const ctx = await createContext({ req, res, info: {} as never });
+    return { api: tikisAdminRouter.createCaller(ctx), cookies, cleared };
+  }
+
+  it("la connexion pose un cookie httpOnly strict et ne renvoie aucun jeton à la page", async () => {
+    const admin = await newAdmin();
+    const { api, cookies } = await caller();
+    const result = await api.auth.login({ email: admin.email, password: "mot-de-passe-audit" });
+    expect(JSON.stringify(result)).not.toMatch(/token/i);
+    expect(cookies).toHaveLength(1);
+    expect(cookies[0]).toMatchObject({ name: "tikis_admin_session", options: { httpOnly: true, sameSite: "strict", path: "/api", secure: true } });
+    expect(cookies[0].options.domain).toBeUndefined();
+  });
+
+  it("le cookie authentifie avec l'en-tête de la console, et seulement avec lui", async () => {
+    const admin = await newAdmin();
+    const { token } = await adminDb.createAdminSession({ adminId: admin.id });
+    const withHeader = await caller({ cookie: `tikis_admin_session=${token}` });
+    expect(await withHeader.api.auth.me()).toMatchObject({ adminId: admin.id });
+    // Une requête forgée par un autre site porterait le cookie, jamais l'en-tête.
+    const forged = await caller({ cookie: `tikis_admin_session=${token}`, consoleHeader: false });
+    expect(await forged.api.auth.me()).toBeNull();
+  });
+
+  it("la déconnexion révoque la session côté serveur : le cookie copié ne vaut plus rien", async () => {
+    const admin = await newAdmin();
+    const { token } = await adminDb.createAdminSession({ adminId: admin.id });
+    const session = await caller({ cookie: `tikis_admin_session=${token}` });
+    await session.api.auth.logout();
+    expect(session.cleared).toContain("tikis_admin_session");
+    expect(await adminDb.authenticateAdminSession(token)).toBeNull();
+  });
+
+  it("une session expirée est refusée", async () => {
+    const admin = await newAdmin();
+    const { token } = await adminDb.createAdminSession({ adminId: admin.id });
+    const handle = (await db.getDb())!;
+    const { eq } = await import("drizzle-orm");
+    await handle.update(schema.tikisAdminSessions).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(schema.tikisAdminSessions.adminId, admin.id));
+    expect(await adminDb.authenticateAdminSession(token)).toBeNull();
+  });
+
+  it("réactiver un admin suspendu ne ressuscite pas ses anciennes sessions", async () => {
+    const admin = await newAdmin();
+    const { token } = await adminDb.createAdminSession({ adminId: admin.id });
+    await adminDb.setAdminUserActive({ actorAdminId: -1, adminId: admin.id, active: false });
+    await adminDb.setAdminUserActive({ actorAdminId: -1, adminId: admin.id, active: true });
+    expect(await adminDb.authenticateAdminSession(token)).toBeNull();
+  });
+
+  it("5 échecs depuis la même IP bloquent ce compte depuis cette IP, même avec le bon mot de passe", async () => {
+    const admin = await newAdmin();
+    const ip = `198.51.100.${Math.floor(Math.random() * 200)}`;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await expect((await caller({ ip })).api.auth.login({ email: admin.email, password: "mauvais-mot-de-passe" })).rejects.toThrow(/Identifiants invalides/);
+    }
+    await expect((await caller({ ip })).api.auth.login({ email: admin.email, password: "mot-de-passe-audit" })).rejects.toThrow(/Trop de tentatives/);
+  });
+
+  it("changer d'IP ne contourne plus la limite : 20 échecs sur un même compte le bloquent partout", async () => {
+    const admin = await newAdmin();
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await expect((await caller({ ip: `192.0.2.${attempt}` })).api.auth.login({ email: admin.email, password: "mauvais-mot-de-passe" })).rejects.toThrow(/Identifiants invalides/);
+    }
+    // Avant correction : clé IP + email seulement — chaque nouvelle IP repartait de zéro.
+    await expect((await caller({ ip: "192.0.2.250" })).api.auth.login({ email: admin.email, password: "mot-de-passe-audit" })).rejects.toThrow(/Trop de tentatives/);
+  });
+
+  it("les compteurs vivent en base : ils survivent à un redémarrage du processus", async () => {
+    const admin = await newAdmin();
+    const ip = "198.51.100.250";
+    await adminDb.recordAdminLoginFailure(admin.email, ip);
+    const handle = (await db.getDb())!;
+    const { like } = await import("drizzle-orm");
+    const rows = await handle.select().from(schema.tikisRateLimits).where(like(schema.tikisRateLimits.rateLimitKey, `admin-login:%${admin.email}%`));
+    expect(rows.length).toBe(2);
+  });
+
+  it("un email inconnu donne la même erreur qu'un mauvais mot de passe", async () => {
+    await expect((await caller({ ip: "198.51.100.251" })).api.auth.login({ email: `inconnu-${randomUUID()}@tikis.test`, password: "peu importe" })).rejects.toThrow(/^Identifiants invalides\.$/);
+  });
+
+  it("la carte en direct est refusée au rôle Finance", async () => {
+    const admin = await newAdmin("finance");
+    const { token } = await adminDb.createAdminSession({ adminId: admin.id });
+    const { api } = await caller({ cookie: `tikis_admin_session=${token}` });
+    await expect(api.deliveriesOps.liveLocations({ maxAgeSeconds: 120 })).rejects.toThrow(/rôle/);
   });
 });
