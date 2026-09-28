@@ -27,12 +27,17 @@ describe("configuration YengaPay", () => {
     });
   });
 
-  it("ne bascule jamais en mode distant sans le triplet complet", () => {
+  it("reste en mode live quand un identifiant manque, et ne retombe jamais en mode test", () => {
+    // Ce test exigeait l'inverse : un mode live incomplet basculait en silence en mode test, où le
+    // règlement simulé permet à n'importe quel utilisateur de créditer son Wallet sans payer. Un mode
+    // live incomplet doit échouer à chaque appel, pas se transformer en guichet ouvert.
     vi.stubEnv("YENGAPAY_MODE", "live");
     vi.stubEnv("YENGAPAY_API_KEY", "key");
     vi.stubEnv("YENGAPAY_ORG_ID", "");
     vi.stubEnv("YENGAPAY_PROJECT_ID", "project");
 
-    expect(readYengapayConfig().mode).toBe("test");
+    const config = readYengapayConfig();
+    expect(config.mode).toBe("live");
+    expect(config.orgId).toBeNull();
   });
 });

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readYengapayConfig, asNonEmptyString } from "./yengapay";
+import { assertSimulatedSettlementAllowed, readYengapayConfig, asNonEmptyString, yengapayNotConfiguredError, yengapayProviderError } from "./yengapay";
 import * as db from "./db";
 import { buildUssdCode, type YengapayOperatorCode } from "../shared/yengapay-ussd";
 
@@ -88,7 +88,7 @@ function directPath(config: ReturnType<typeof readYengapayConfig>, suffix: strin
 
 async function callDirect(config: ReturnType<typeof readYengapayConfig>, suffix: string, body: Record<string, unknown>) {
   if (!config.apiKey || !config.orgId || !config.projectId || (config.mode !== "sandbox" && config.mode !== "live")) {
-    throw new Error("YengaPay externe requiert un mode sandbox/live et les identifiants du projet.");
+    throw yengapayNotConfiguredError();
   }
   const response = await fetch(directPath(config, suffix), {
     method: "POST",
@@ -103,13 +103,13 @@ async function callDirect(config: ReturnType<typeof readYengapayConfig>, suffix:
   } catch {
     data = {};
   }
-  if (!response.ok) throw new Error(`YengaPay ${response.status} : ${text.slice(0, 1200)}`);
+  if (!response.ok) throw yengapayProviderError(`paiement direct ${suffix}`, response.status, text);
   return data;
 }
 
 async function callDirectGet(config: ReturnType<typeof readYengapayConfig>, providerReference: string) {
   if (!config.apiKey || !config.orgId || !config.projectId || (config.mode !== "sandbox" && config.mode !== "live")) {
-    throw new Error("YengaPay externe requiert un mode sandbox/live et les identifiants du projet.");
+    throw yengapayNotConfiguredError();
   }
   const url = `${config.baseUrl.replace(/\/$/, "")}/groups/${encodeURIComponent(config.orgId)}/payment-intent/project/${encodeURIComponent(config.projectId)}/intent/${encodeURIComponent(providerReference)}`;
   const response = await fetch(url, { method: "GET", headers: { "x-api-key": config.apiKey }, signal: AbortSignal.timeout(15_000) });
@@ -226,14 +226,19 @@ export async function getYengapayDirectDepositStatus(input: { profilePhone: stri
   const config = readYengapayConfig();
   const stored = await db.getDirectDepositIntent(input.transactionId, input.profilePhone);
   if (!stored) throw new Error("Transaction de dépôt introuvable ou expirée.");
-  if (stored.status === "pending" && new Date(stored.expiresAt).getTime() <= Date.now()) {
-    const expired = await db.cancelTikisWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status: "expired" });
-    return viewFromStored(expired, config.mode);
-  }
-  if (config.mode === "test" || stored.status !== "pending") return viewFromStored(stored, config.mode);
+  const pastDeadline = stored.status === "pending" && new Date(stored.expiresAt).getTime() <= Date.now();
+  const expireLocally = async () => viewFromStored(await db.cancelTikisWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status: "expired" }), config.mode);
+  if (stored.status !== "pending") return viewFromStored(stored, config.mode);
+  if (config.mode === "test") return pastDeadline ? expireLocally() : viewFromStored(stored, config.mode);
+  // Passé le délai, on demande d'abord à YengaPay : le client a pu valider son code à la dernière
+  // minute. Le déclarer expiré sans le vérifier affichait un échec pour un paiement réussi.
   const data = await callDirectGet(config, stored.providerReference);
-  if (!data) return viewFromStored(stored, config.mode);
-  const status = remoteStatus(data.paymentStatus ?? data.transactionStatus ?? data.status);
+  if (!data) return pastDeadline ? expireLocally() : viewFromStored(stored, config.mode);
+  // Sur une intention, seuls `paymentStatus`/`transactionStatus` disent l'état du paiement (docs/yengapay-
+  // integration-notes.md). Un `status` générique n'est pas lu : s'il désignait l'enveloppe de la réponse
+  // (« requête réussie »), un paiement jamais effectué aurait été crédité. À défaut, le webhook tranche.
+  const status = remoteStatus(data.paymentStatus ?? data.transactionStatus);
+  if (status === "pending" && pastDeadline) return expireLocally();
   if (status === "succeeded") await db.settleTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
   else if (status === "failed") await db.refuseTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
   else if (status === "cancelled" || status === "expired") await db.cancelTikisWalletDirectDeposit({ profilePhone: input.profilePhone, transactionId: input.transactionId, status });
@@ -247,7 +252,10 @@ export async function cancelYengapayDirectDeposit(input: { profilePhone: string;
 }
 
 export async function settleYengapayDirectDepositTest(input: { profilePhone: string; transactionId: string; outcome: "succeeded" | "failed" }): Promise<YengapayDirectDeposit> {
-  if (readYengapayConfig().mode !== "test") throw new Error("La simulation d'un dépôt direct est disponible uniquement en mode test.");
+  const stored = await db.getDirectDepositIntent(input.transactionId, input.profilePhone);
+  if (!stored) throw new Error("Transaction de dépôt introuvable ou expirée.");
+  // Le mode du serveur ne suffit pas : c'est la transaction qui doit être née en mode test.
+  assertSimulatedSettlementAllowed(`yengapay_direct_${stored.mode}`);
   if (input.outcome === "succeeded") await db.settleTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
   else await db.refuseTikisWalletDepositRequest({ profilePhone: input.profilePhone, transactionId: input.transactionId });
   return getYengapayDirectDepositStatus({ profilePhone: input.profilePhone, transactionId: input.transactionId });

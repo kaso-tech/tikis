@@ -200,6 +200,21 @@ async function enforceGeographyRateLimit(profilePhone: string) {
   }
 }
 
+/**
+ * Limites du paiement Mobile Money, par profil et par quart d'heure.
+ *
+ * Chaque demande de dépôt peut faire partir un SMS vers le numéro saisi — n'importe lequel, pas forcément
+ * celui du compte —, le renvoi d'OTP aussi, et la saisie du code se prête aux essais en série. Sans limite,
+ * un compte pouvait arroser de SMS le numéro d'un tiers, ou tenter des codes à la chaîne.
+ */
+const PAYMENT_RATE_LIMIT_WINDOW_MS = 15 * 60_000;
+const PAYMENT_RATE_LIMITS = { request: 6, resendOtp: 3, submitOtp: 8, checkout: 10 } as const;
+
+async function enforcePaymentRateLimit(action: keyof typeof PAYMENT_RATE_LIMITS, profilePhone: string) {
+  const withinLimit = await db.checkDistributedRateLimit(`payment:${action}`, profilePhone, PAYMENT_RATE_LIMIT_WINDOW_MS, PAYMENT_RATE_LIMITS[action]);
+  if (!withinLimit) throw new Error("Trop de tentatives de paiement en peu de temps. Réessayez dans quelques minutes.");
+}
+
 const protectedGeographyProcedure = tikisProtectedProcedure.use(async ({ ctx, next }) => {
   await enforceGeographyRateLimit(ctx.tikisProfilePhone);
   return next();
@@ -818,11 +833,14 @@ export const appRouter = router({
     initiateYengaPayTest: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000), idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{16,96}$/) })).mutation(async ({ ctx, input }) => {
       if (input.type === "withdrawal") throw new Error("Les retraits ne sont plus proposés : le Wallet sert uniquement à recharger votre compte pour effectuer des livraisons.");
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      // Alias de `initiateYengaPay` (même fonction, conservée pour les anciens clients) : même limite.
+      await enforcePaymentRateLimit("checkout", profile.phone);
       return db.initiateYengaPayTestPayment({ ...input, profilePhone: profile.phone });
     }),
     initiateYengaPay: tikisProtectedProcedure.input(z.object({ type: z.enum(["deposit", "withdrawal"]), amount: z.number().int().min(100).max(10_000_000), idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{16,96}$/) })).mutation(async ({ ctx, input }) => {
       if (input.type === "withdrawal") throw new Error("Les retraits ne sont plus proposés : le Wallet sert uniquement à recharger votre compte pour effectuer des livraisons.");
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      await enforcePaymentRateLimit("checkout", profile.phone);
       return db.initiateYengaPayPayment({ ...input, profilePhone: profile.phone });
     }),
     settleYengaPayTest: tikisProtectedProcedure.input(z.object({ paymentId: z.string().uuid(), outcome: z.enum(["succeeded", "failed"]) })).mutation(async ({ ctx, input }) => {
@@ -838,6 +856,7 @@ export const appRouter = router({
       idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{16,48}$/),
     })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      await enforcePaymentRateLimit("request", profile.phone);
       const country = COUNTRIES.find((c) => c.id === input.countryCode);
       if (!country) throw new Error("Pays non supporté.");
       if (input.phoneLocal.length !== country.digits) throw new Error(`Le numéro doit contenir ${country.digits} chiffres pour ${country.name}.`);
@@ -859,11 +878,13 @@ export const appRouter = router({
     }),
     payDirectDeposit: tikisProtectedProcedure.input(z.object({ transactionId: z.string().uuid(), otp: z.string().regex(/^[0-9]{4,12}$/) })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      await enforcePaymentRateLimit("submitOtp", profile.phone);
       const { payYengapayDirectDeposit } = await import("./yengapay-direct");
       return payYengapayDirectDeposit({ profilePhone: profile.phone, transactionId: input.transactionId, otp: input.otp });
     }),
     resendDirectDepositOtp: tikisProtectedProcedure.input(z.object({ transactionId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisProfile(ctx.tikisProfilePhone);
+      await enforcePaymentRateLimit("resendOtp", profile.phone);
       const { resendYengapayDirectOtp } = await import("./yengapay-direct");
       return resendYengapayDirectOtp({ profilePhone: profile.phone, transactionId: input.transactionId });
     }),

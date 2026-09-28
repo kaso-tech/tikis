@@ -54,10 +54,19 @@ describe("le démarrage refuse un déploiement live sans secret de webhook", () 
   });
 
   it("ne bloque pas le mode test, même sans secret", () => {
+    // Le mode test est désormais déclaré : ce test obtenait le mode test en vidant les identifiants d'un
+    // mode live, qui retombait alors en silence en mode test — le repli que readYengapayConfig a retiré.
+    vi.stubEnv("YENGAPAY_MODE", "test");
     vi.stubEnv("YENGAPAY_API_KEY", "");
     vi.stubEnv("YENGAPAY_ORG_ID", "");
     vi.stubEnv("YENGAPAY_PROJECT_ID", "");
     expect(() => assertYengapayWebhookSecretConfigured()).not.toThrow();
+  });
+
+  it("refuse de démarrer en production, mode live, avec des identifiants incomplets", () => {
+    vi.stubEnv("YENGAPAY_WEBHOOK_SECRET", "un-secret-de-webhook-suffisamment-long");
+    vi.stubEnv("YENGAPAY_ORG_ID", "");
+    expect(() => assertYengapayWebhookSecretConfigured()).toThrow(/YENGAPAY_ORG_ID/);
   });
 
   it("ne bloque pas hors production, même en mode live sans secret", () => {

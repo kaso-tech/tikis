@@ -21,7 +21,7 @@ POST https://<host>/api/webhooks/yengapay
 
 L'endpoint :
 - Vérifie la signature HMAC-SHA256 (secret dans `YENGAPAY_WEBHOOK_SECRET`).
-- Est **idempotent** : un event dupliqué (même `providerEventId`) renvoie 200 sans re-settlement.
+- Est **idempotent** : un event déjà **traité** (même `providerEventId` et même statut) renvoie 200 sans re-settlement ; un event dont le traitement avait échoué est retraité à sa relivraison.
 - Renvoie 503 si `YENGAPAY_MODE=test` (aucun PSP distant, donc rien à recevoir).
 - Renvoie 400 si la signature est invalide ou le payload non parsable.
 - Renvoie 202 `willRetry: true` si le settle échoue (race condition, DB down transitoire).
@@ -76,11 +76,22 @@ Status normalisés :
 
 ## Idempotence
 
-- Chaque event YengaPay possède un `providerEventId` unique.
-- Le handler loggue l'event dans `tikis_yengapay_webhook_events` avec une contrainte unique
-  `(provider, providerEventId)`. Un duplicate renvoie `{ ok: true, duplicate: true }` sans settle.
-- Le settle lui-même est idempotent : `settleYengapayLivePayment` vérifie `payment.status !== "pending"`
-  et ne crédite pas deux fois.
+- `providerEventId` n'est pas toujours propre à un événement : sans `transId`, il retombe sur
+  `paymentIntentId`, commun à « en attente » et « réussi » d'un même paiement. La clé enregistrée est donc
+  `providerEventId:eventType` (`webhookEventKey`, empreinte SHA-256 au-delà de 120 caractères) : un succès
+  n'est jamais pris pour le doublon de l'attente qui l'a précédé.
+- Le handler loggue l'event dans `tikis_yengapay_webhook_events` (contrainte unique
+  `(provider, providerEventId)`), puis le clôt : `processed` après un settle réussi, `ignored` pour un
+  `payment.pending`, `failed` (avec `failureReason`) quand le settle échoue.
+- Seul un event `processed` ou `ignored` est un doublon (`{ ok: true, duplicate: true }`, sans settle).
+  Un event `failed` — transaction pas encore enregistrée, base indisponible — est retraité à la relivraison
+  que la réponse 202 `willRetry` réclame. Avant, toute relivraison était un doublon : le paiement n'était
+  jamais crédité.
+- Le settle lui-même est idempotent : un succès crédite une transaction qui n'est pas déjà `succeeded`
+  (y compris `expired`/`cancelled` localement — l'argent a quitté le compte du client), sous verrou de ligne
+  et avec la clé de journal `<id>:settled`, commune au webhook et au suivi côté app. Un échec ou une
+  annulation ne touchent qu'une transaction encore `pending`, et ne reprennent jamais un dépôt crédité.
+- Scénarios exercés contre une vraie base : `tests/payment-direct-audit.db.test.ts`.
 
 ## Notifications push (paiements directs uniquement)
 

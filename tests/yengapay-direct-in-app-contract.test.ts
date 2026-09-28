@@ -62,7 +62,9 @@ describe("paiement direct YengaPay dans Tikis", () => {
     expect(router).toContain("cancelDirectDeposit");
     expect(direct).toContain("cancelYengapayDirectDeposit");
     expect(direct).toContain('status: "expired"');
-    expect(direct).toContain("readYengapayConfig().mode !== \"test\"");
+    // La simulation est refusée au niveau de la transaction elle-même, plus seulement du mode du serveur
+    // (tests/payment-direct-audit.db.test.ts l'exerce contre une vraie base).
+    expect(direct).toContain("assertSimulatedSettlementAllowed(`yengapay_direct_${stored.mode}`);");
     expect(database).toContain("cancelTikisWalletDirectDeposit");
     expect(database).toContain('"expired"');
   });

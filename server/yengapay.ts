@@ -53,6 +53,9 @@ function isRemoteMode(mode: YengapayMode): mode is "sandbox" | "live" {
   return mode === "sandbox" || mode === "live";
 }
 
+/** Une configuration distante incomplète ne se signale qu'une fois : cette fonction est lue à chaque requête. */
+let warnedIncompleteRemoteConfig = false;
+
 export function readYengapayConfig(): YengapayProviderConfig {
   const explicitMode = (process.env.YENGAPAY_MODE ?? "test").trim().toLowerCase();
   const apiKey = configuredValue(process.env.YENGAPAY_API_KEY);
@@ -61,17 +64,75 @@ export function readYengapayConfig(): YengapayProviderConfig {
   const webhookSecret = configuredValue(process.env.YENGAPAY_WEBHOOK_SECRET);
   const credentialsReady = Boolean(apiKey && orgId && projectId);
   const requestedMode: YengapayMode = explicitMode === "sandbox" ? "sandbox" : explicitMode === "live" ? "live" : "test";
-  const mode = requestedMode === "test" || !credentialsReady ? "test" : requestedMode;
+  // Un mode sandbox/live demandé reste ce mode, même quand un identifiant manque : chaque appel à YengaPay
+  // échoue alors, et le webhook refuse toute signature. Retomber en mode test, comme avant, activait en
+  // silence le règlement simulé — n'importe quel utilisateur pouvait créditer son Wallet sans payer.
+  const mode = requestedMode;
+  if (requestedMode !== "test" && !credentialsReady && !warnedIncompleteRemoteConfig) {
+    warnedIncompleteRemoteConfig = true;
+    console.error(`[yengapay] YENGAPAY_MODE=${requestedMode} sans YENGAPAY_API_KEY, YENGAPAY_ORG_ID et YENGAPAY_PROJECT_ID : les paiements sont refusés tant que la configuration est incomplète.`);
+  }
   const defaultBaseUrl = mode === "sandbox" ? DEFAULT_SANDBOX_BASE_URL : DEFAULT_LIVE_BASE_URL;
   const baseUrl = configuredValue(process.env.YENGAPAY_BASE_URL) ?? defaultBaseUrl;
   return { mode, apiKey, orgId, projectId, baseUrl, webhookSecret };
+}
+
+/**
+ * Ce qu'on dit au client d'une réponse d'erreur de YengaPay.
+ *
+ * Le corps brut de la réponse — jusqu'à 1 200 caractères — remontait tel quel jusqu'à l'écran : détails
+ * internes du prestataire, identifiants de projet, traces éventuelles. Il reste dans les journaux du
+ * serveur. Le client reçoit le message court de YengaPay pour une erreur de sa part (4xx : code OTP
+ * invalide, solde insuffisant…), qui l'aide à corriger, et un message générique sinon.
+ */
+export function yengapayProviderError(service: string, status: number, body: string): Error {
+  console.error(`[yengapay] ${service} a répondu ${status}`, body.slice(0, 2000));
+  let providerMessage: string | undefined;
+  try {
+    const parsed = JSON.parse(body) as { message?: unknown; error?: unknown };
+    const candidate = typeof parsed.message === "string" ? parsed.message : typeof parsed.error === "string" ? parsed.error : undefined;
+    providerMessage = candidate?.replace(/\s+/g, " ").trim().slice(0, 160) || undefined;
+  } catch { /* corps non JSON : rien d'exploitable pour l'utilisateur */ }
+  if (status >= 400 && status < 500 && providerMessage) return new Error(`Paiement refusé par l'opérateur : ${providerMessage}`);
+  return new Error("Le paiement Mobile Money est momentanément indisponible. Réessayez dans quelques instants.");
+}
+
+/** Configuration incomplète : le détail pour les journaux, un message neutre pour le client. */
+export function yengapayNotConfiguredError(): Error {
+  console.error("[yengapay] appel refusé : il faut YENGAPAY_MODE=sandbox|live et YENGAPAY_API_KEY, YENGAPAY_ORG_ID, YENGAPAY_PROJECT_ID.");
+  return new Error("Le paiement Mobile Money est momentanément indisponible. Réessayez dans quelques instants.");
+}
+
+/** Fournisseurs créés en mode test : les seuls qu'un règlement simulé puisse jamais toucher. */
+export const YENGAPAY_TEST_PROVIDERS = ["yengapay_test", "yengapay_direct_test", "ligdi_simulated"] as const;
+
+/**
+ * Le règlement simulé — « ce dépôt a réussi », décidé par l'utilisateur lui-même — n'existe que pour
+ * tester sans YengaPay. Il suppose donc le mode test, et en production un mode test DÉCLARÉ : un
+ * déploiement qui aurait simplement oublié YENGAPAY_MODE ne doit pas offrir du crédit à qui le demande.
+ */
+export function assertSimulatedSettlementAllowed(provider: string): void {
+  if (!(YENGAPAY_TEST_PROVIDERS as readonly string[]).includes(provider)) {
+    throw new Error("Cette transaction passe par YengaPay : seul YengaPay peut en confirmer le paiement.");
+  }
+  if (readYengapayConfig().mode !== "test") throw new Error("La simulation de paiement est disponible uniquement en mode test.");
+  const declaredTest = (process.env.YENGAPAY_MODE ?? "").trim().toLowerCase() === "test";
+  if (process.env.NODE_ENV === "production" && !declaredTest) {
+    throw new Error("La simulation de paiement est désactivée en production sans YENGAPAY_MODE=test déclaré.");
+  }
 }
 
 /** Un déploiement Live ne démarre jamais sans vérification HMAC des webhooks. */
 export function assertYengapayWebhookSecretConfigured(): void {
   if (process.env.NODE_ENV !== "production") return;
   const config = readYengapayConfig();
-  if (config.mode !== "live" || config.webhookSecret) return;
+  if (config.mode !== "live") return;
+  // Un mode live incomplet ne retombe plus en mode test (voir readYengapayConfig) : il refuserait chaque
+  // paiement sans bruit. Mieux vaut qu'il refuse de démarrer, comme pour le secret de webhook.
+  if (!config.apiKey || !config.orgId || !config.projectId) {
+    throw new Error("YENGAPAY_MODE=live en production sans YENGAPAY_API_KEY, YENGAPAY_ORG_ID et YENGAPAY_PROJECT_ID. Complétez la configuration avant de redémarrer.");
+  }
+  if (config.webhookSecret) return;
   throw new Error("YENGAPAY_MODE=live en production sans YENGAPAY_WEBHOOK_SECRET. Configurez le secret avant de redémarrer.");
 }
 
@@ -90,7 +151,7 @@ function asPositiveAmount(value: unknown) {
 
 async function callYengapay<T>(config: YengapayProviderConfig, path: string, init: RequestInit): Promise<T> {
   if (!config.apiKey || !config.orgId || !config.projectId || !isRemoteMode(config.mode)) {
-    throw new Error("YengaPay externe requiert un mode sandbox/live et YENGAPAY_API_KEY, YENGAPAY_ORG_ID, YENGAPAY_PROJECT_ID.");
+    throw yengapayNotConfiguredError();
   }
   const url = `${config.baseUrl.replace(/\/$/, "")}/groups/${encodeURIComponent(config.orgId)}${path}`;
   const response = await fetch(url, {
@@ -100,7 +161,7 @@ async function callYengapay<T>(config: YengapayProviderConfig, path: string, ini
   });
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`YengaPay ${response.status} : ${text.slice(0, 1200)}`);
+    throw yengapayProviderError(`YengaPay ${path}`, response.status, text);
   }
   return await response.json() as T;
 }
@@ -177,7 +238,8 @@ export async function verifyYengapayPayment(input: VerifyCheckoutInput): Promise
   const data = await callYengapay<Record<string, unknown>>(config, `/payment-intent/project/${encodeURIComponent(config.projectId!)}/intent/${encodeURIComponent(input.providerReference)}`, { method: "GET" });
   return {
     providerReference: input.providerReference,
-    status: normalizeRemoteStatus(data.paymentStatus ?? data.transactionStatus ?? data.status),
+    // Même règle que le suivi du paiement direct : pas de `status` générique sur une intention.
+    status: normalizeRemoteStatus(data.paymentStatus ?? data.transactionStatus),
     amount: asPositiveAmount(data.paymentAmount ?? data.amount),
   };
 }

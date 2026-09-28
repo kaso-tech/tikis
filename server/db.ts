@@ -1,10 +1,10 @@
 import { isoCountry } from "../shared/iso-countries";
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, TikisDriverPreferences, tikisDriverPreferences, tikisFavoritePlaces, tikisKycSubmissions, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisPushTokens, tikisRateLimits, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, tikisYengapayWebhookEvents, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
-import { createYengapayPaymentIntent, readYengapayConfig, verifyYengapayPayment } from "./yengapay";
+import { assertSimulatedSettlementAllowed, createYengapayPaymentIntent, readYengapayConfig, verifyYengapayPayment } from "./yengapay";
 import { publishWalletBroadcast } from "./supabase-realtime";
 import { sendPushToTokens, type PushMessage } from "./push";
 import { isValidExpoPushTokenShape } from "./_test-helpers/push-token-shape";
@@ -1139,6 +1139,26 @@ export async function listPendingDirectDeposits(profilePhone: string): Promise<D
   return records.map(paymentTransactionToDirectDeposit);
 }
 
+/**
+ * Un dépôt que YengaPay déclare réussi est crédité, quel que soit son statut local — sauf s'il l'est déjà.
+ *
+ * L'argent a quitté le compte Mobile Money du client : c'est cette confirmation qui fait foi, pas une
+ * expiration décidée par notre horloge ni une annulation tapée dans l'app. Seul un statut `pending` était
+ * accepté ; un paiement confirmé après 15 minutes, ou après un « Annuler » pendant que l'opérateur
+ * traitait encore le code, était perdu pour le client.
+ */
+export function mayCreditConfirmedDeposit(status: string): boolean {
+  return status !== "succeeded";
+}
+
+/**
+ * Clé du crédit d'un dépôt, commune au webhook et au suivi côté app : quel que soit le chemin qui confirme
+ * le premier, le second retrouve cette clé dans le journal et ne crédite pas une seconde fois.
+ */
+function depositCreditKey(paymentId: string) {
+  return `${paymentId}:settled`;
+}
+
 /** Crédite le Wallet suite à un dépôt direct réussi. */
 export async function settleTikisWalletDepositRequest(input: { profilePhone: string; transactionId: string }) {
   const db = await getDb();
@@ -1146,8 +1166,8 @@ export async function settleTikisWalletDepositRequest(input: { profilePhone: str
   return db.transaction(async (tx) => {
     const payment = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, input.transactionId)).limit(1).for("update"))[0];
     if (!payment) throw new Error("Transaction de dépôt direct introuvable.");
-    if (payment.status !== "pending") return; // déjà settled (race avec webhook)
     if (payment.profilePhone !== input.profilePhone) throw new Error("Cette transaction n'appartient pas à ce profil.");
+    if (!mayCreditConfirmedDeposit(payment.status)) return; // déjà crédité (le webhook est passé avant)
     await applyWalletMovement(tx, {
       profilePhone: payment.profilePhone,
       operation: "credit",
@@ -1155,7 +1175,7 @@ export async function settleTikisWalletDepositRequest(input: { profilePhone: str
       availableDelta: payment.amount,
       heldDelta: 0,
       reason: "Dépôt Mobile Money direct confirmé",
-      idempotencyKey: `${payment.id}:direct:settled`,
+      idempotencyKey: depositCreditKey(payment.id),
     });
     await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
   });
@@ -1226,7 +1246,7 @@ export async function initiateYengaPayPayment(input: { profilePhone: string; typ
         checkoutUrl = intent.checkoutUrl ?? null;
         providerName = config.mode === "sandbox" ? "yengapay_sandbox" : "yengapay_live";
       } catch (cause) {
-        throw new Error(`YengaPay (${config.mode}) indisponible : ${cause instanceof Error ? cause.message : "erreur inconnue"}`);
+        throw cause instanceof Error ? cause : new Error("Le paiement Mobile Money est momentanément indisponible. Réessayez dans quelques instants.");
       }
     }
     await tx.insert(tikisPaymentTransactions).values({ id, profilePhone: input.profilePhone, type: input.type, provider: providerName, amount: input.amount, status: "pending", providerReference, checkoutUrl, idempotencyKey: input.idempotencyKey });
@@ -1247,6 +1267,9 @@ export async function settleYengaPayTestPayment(input: { profilePhone: string; p
   return db.transaction(async (tx) => {
     const payment = (await tx.select().from(tikisPaymentTransactions).where(and(eq(tikisPaymentTransactions.id, input.paymentId), eq(tikisPaymentTransactions.profilePhone, input.profilePhone))).limit(1).for("update"))[0];
     if (!payment) throw new Error("Transaction YengaPay introuvable.");
+    // Sans ce contrôle, n'importe quel utilisateur créait une transaction live — jamais payée — puis la
+    // déclarait « réussie » ici : son Wallet était crédité du montant demandé, jusqu'à 10 000 000 FCFA.
+    assertSimulatedSettlementAllowed(payment.provider);
     if (payment.status !== "pending") {
       const wallet = await ensureTikisWallet(tx, payment.profilePhone);
       return { payment: yengaPayTestPaymentToView(payment), wallet: walletSnapshotFromRecord(wallet) } satisfies YengaPayTestPaymentSettlement;
@@ -1951,14 +1974,54 @@ export async function listTikisDeliveryReviewsForProfile(profilePhone: string, r
 }
 
 /** YengaPay : enregistrement idempotent d'un événement webhook. */
+/**
+ * Enregistre un événement webhook et dit s'il reste à traiter.
+ *
+ * Deux défauts faisaient perdre des paiements confirmés :
+ * - la clé ne tenait pas compte du statut. Les webhooks sans `transId` prennent `paymentIntentId` comme
+ *   identifiant d'événement : « en attente » puis « réussi » pour un même paiement portaient le même, et
+ *   le succès était jeté comme doublon ;
+ * - tout événement déjà vu était un doublon, même si son règlement avait échoué. Le serveur répondait
+ *   pourtant « réessaie plus tard » (202) : la relivraison était ignorée, le paiement jamais crédité.
+ * Un événement n'est donc plus considéré comme traité qu'une fois marqué `processed`.
+ */
+export function webhookEventKey(providerEventId: string, eventType: string) {
+  const key = `${providerEventId}:${eventType}`;
+  // La colonne fait 120 caractères : au-delà, une empreinte stable plutôt qu'une troncature qui
+  // pourrait confondre deux événements.
+  return key.length <= 120 ? key : createHash("sha256").update(key).digest("hex");
+}
+
 export async function recordYengapayWebhookEvent(input: { provider: "yengapay_sandbox" | "yengapay_live" | "yengapay_direct_sandbox" | "yengapay_direct_live"; providerEventId: string; eventType: string; paymentTransactionId: string | null; payload: string; signature: string | null }) {
   const db = await getDb();
   if (!db) throw new Error("Le paiement est temporairement indisponible.");
-  const existing = (await db.select().from(tikisYengapayWebhookEvents).where(and(eq(tikisYengapayWebhookEvents.provider, input.provider), eq(tikisYengapayWebhookEvents.providerEventId, input.providerEventId))).limit(1))[0];
-  if (existing) return { duplicate: true, id: existing.id };
+  const providerEventId = webhookEventKey(input.providerEventId, input.eventType);
+  const find = async () => (await db.select().from(tikisYengapayWebhookEvents).where(and(eq(tikisYengapayWebhookEvents.provider, input.provider), eq(tikisYengapayWebhookEvents.providerEventId, providerEventId))).limit(1))[0];
+  const existing = await find();
+  if (existing) return { duplicate: true, alreadyProcessed: existing.status === "processed" || existing.status === "ignored", id: existing.id };
   const id = randomUUID();
-  await db.insert(tikisYengapayWebhookEvents).values({ id, provider: input.provider, providerEventId: input.providerEventId, eventType: input.eventType, paymentTransactionId: input.paymentTransactionId, payload: input.payload, signature: input.signature, status: "received" });
-  return { duplicate: false, id };
+  try {
+    await db.insert(tikisYengapayWebhookEvents).values({ id, provider: input.provider, providerEventId, eventType: input.eventType, paymentTransactionId: input.paymentTransactionId, payload: input.payload, signature: input.signature, status: "received" });
+  } catch (cause) {
+    // Deux livraisons simultanées du même événement : la seconde bute sur l'index unique. Le règlement
+    // est lui-même idempotent, on la laisse donc poursuivre comme un doublon non encore traité.
+    const concurrent = await find();
+    if (!concurrent) throw cause;
+    return { duplicate: true, alreadyProcessed: concurrent.status === "processed" || concurrent.status === "ignored", id: concurrent.id };
+  }
+  return { duplicate: false, alreadyProcessed: false, id };
+}
+
+/** Clôt un événement webhook : `processed`/`ignored` ne seront plus retraités, `failed` le sera à la relivraison. */
+export async function markYengapayWebhookEvent(id: string, status: "processed" | "ignored" | "failed", details: { paymentTransactionId?: string | null; failureReason?: string } = {}) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(tikisYengapayWebhookEvents).set({
+    status,
+    processedAt: status === "failed" ? null : new Date(),
+    failureReason: details.failureReason ? details.failureReason.slice(0, 500) : null,
+    ...(details.paymentTransactionId ? { paymentTransactionId: details.paymentTransactionId } : {}),
+  }).where(eq(tikisYengapayWebhookEvents.id, id));
 }
 
 /** YengaPay : lookup rapide par providerReference pour le webhook handler. Renvoie le `provider`
@@ -1973,20 +2036,29 @@ export async function lookupTikisPaymentByProviderReference(providerReference: s
 }
 
 /** YengaPay : applique un événement de paiement sur le wallet (succeeded / failed / cancelled). */
-export async function settleYengapayLivePayment(input: { providerReference: string; outcome: "succeeded" | "failed" | "cancelled" }) {
+export async function settleYengapayLivePayment(input: { providerReference: string; outcome: "succeeded" | "failed" | "cancelled"; reportedAmount?: number }) {
   const db = await getDb();
   if (!db) throw new Error("Le paiement est temporairement indisponible.");
   return db.transaction(async (tx) => {
     const payment = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.providerReference, input.providerReference)).limit(1).for("update"))[0];
     if (!payment) throw new Error(`Transaction YengaPay introuvable pour la référence ${input.providerReference}.`);
-    if (payment.status !== "pending") {
+    // Un succès crédite même une transaction expirée ou annulée localement (voir `mayCreditConfirmedDeposit`) ;
+    // un échec ou une annulation, eux, ne touchent qu'une transaction encore en attente — jamais un dépôt
+    // déjà crédité, qu'ils ne reprennent pas.
+    const settles = input.outcome === "succeeded" ? mayCreditConfirmedDeposit(payment.status) : payment.status === "pending";
+    if (!settles) {
       const wallet = await ensureTikisWallet(tx, payment.profilePhone);
       return { payment: yengaPayTestPaymentToView(payment), wallet: walletSnapshotFromRecord(wallet) } satisfies YengaPayTestPaymentSettlement;
+    }
+    // On crédite le montant enregistré à la création de l'intention, jamais celui du webhook ; un écart
+    // est signalé pour vérification, sans bloquer un paiement que YengaPay a confirmé.
+    if (input.outcome === "succeeded" && input.reportedAmount && input.reportedAmount !== payment.amount) {
+      console.error("[yengapay] montant confirmé différent du montant de l'intention", { paymentId: payment.id, attendu: payment.amount, confirme: input.reportedAmount });
     }
     if (input.outcome === "failed" || input.outcome === "cancelled") {
       await tx.update(tikisPaymentTransactions).set({ status: input.outcome, settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
     } else if (payment.type === "deposit") {
-      await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "credit", amount: payment.amount, availableDelta: payment.amount, heldDelta: 0, reason: "Dépôt YengaPay live confirmé", idempotencyKey: `${payment.id}:settled` });
+      await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "credit", amount: payment.amount, availableDelta: payment.amount, heldDelta: 0, reason: "Dépôt YengaPay live confirmé", idempotencyKey: depositCreditKey(payment.id) });
       await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
     } else {
       await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "debit", amount: payment.amount, availableDelta: -payment.amount, heldDelta: 0, reason: "Retrait YengaPay live confirmé", idempotencyKey: `${payment.id}:settled` });

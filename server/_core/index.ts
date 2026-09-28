@@ -17,7 +17,8 @@ import { expireLoyaltyGrants } from "../loyalty";
 import { publishDeliveryStatusBroadcast } from "../supabase-realtime";
 import { corsMiddleware, securityHeadersMiddleware, publicApiRateLimit } from "./security";
 import { initSentry, reportException } from "./sentry";
-import { assertYengapayWebhookSecretConfigured, parseYengapayWebhookEvent, readYengapayConfig, verifyYengapayWebhookSignature } from "../yengapay";
+import { assertYengapayWebhookSecretConfigured } from "../yengapay";
+import { processYengapayWebhook } from "../yengapay-webhook";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -152,75 +153,12 @@ async function startServer() {
   // notification push au client : sans elle, un paiement confirmé alors que l'app est fermée
   // ne serait visible qu'au retour sur le wallet (polling raté).
   app.post("/api/webhooks/yengapay", async (req, res) => {
-    const config = readYengapayConfig();
-    if (config.mode === "test") return res.status(503).json({ error: "YengaPay externe est désactivé." });
-    const rawBody = (req as { rawBody?: string }).rawBody ?? JSON.stringify(req.body ?? {});
-    const signature = (req.headers["x-webhook-hash"] as string | undefined) ?? (req.headers["x-yengapay-signature"] as string | undefined) ?? null;
-    if (!verifyYengapayWebhookSignature(rawBody, signature, config.webhookSecret)) {
-      return res.status(400).json({ error: "Signature invalide" });
-    }
-    try {
-      const headerEvent = (req.headers["x-yengapay-event"] as string | undefined) ?? null;
-      const event = parseYengapayWebhookEvent(rawBody, signature, headerEvent);
-      // Le provider exact (sandbox/live + checkout/direct) est déterminé par la transaction
-      // déjà enregistrée en base : on lit d'abord son provider pour logguer et router la notif
-      // correctement. Si la transaction n'existe pas encore (race : webhook arrive avant que
-      // l'appel API n'ait commité la ligne), on retombe sur le provider par défaut du mode
-      // courant et le settle échouera avec un message clair — le webhook réessayé plus tard
-      // trouvera la transaction.
-      const preLookup = await db.lookupTikisPaymentByProviderReference(event.providerReference);
-      const isDirect = preLookup?.provider.startsWith("yengapay_direct_") ?? false;
-      const provider = isDirect
-        ? (config.mode === "sandbox" ? "yengapay_direct_sandbox" : "yengapay_direct_live")
-        : (config.mode === "sandbox" ? "yengapay_sandbox" : "yengapay_live");
-      const recorded = await db.recordYengapayWebhookEvent({ provider, providerEventId: event.providerEventId, eventType: event.eventType, paymentTransactionId: preLookup?.id ?? null, payload: rawBody, signature });
-      if (recorded.duplicate) {
-        return res.status(200).json({ ok: true, duplicate: true });
-      }
-      if (event.eventType.endsWith("pending")) {
-        return res.status(202).json({ ok: true, pending: true });
-      }
-      const outcome: "succeeded" | "failed" | "cancelled" = event.eventType.endsWith("succeeded") ? "succeeded" : event.eventType.endsWith("cancelled") ? "cancelled" : "failed";
-      try {
-        const settled = await db.settleYengapayLivePayment({ providerReference: event.providerReference, outcome });
-        // Notif push : paiement direct + succès ou échec → l'utilisateur est prévenu même
-        // app fermée. Pour les paiements checkout (redirection web), la notif est redondante
-        // puisque l'utilisateur voit déjà l'écran de confirmation dans le navigateur YengaPay.
-        if (isDirect && preLookup?.profilePhone && settled?.payment?.id) {
-          const phone = preLookup.profilePhone;
-          if (outcome === "succeeded") {
-            void db.enqueuePushToPhone({
-              phone,
-              title: "Dépôt Mobile Money confirmé",
-              body: `${settled.payment.amount.toLocaleString("fr-FR")} FCFA crédités sur votre Wallet Tikis.`,
-              data: { kind: "wallet_direct_deposit_succeeded", transactionId: settled.payment.id },
-              channelId: "tikis-wallet",
-            }).catch((pushError) => {
-              console.error("[webhook:yengapay] push failed", pushError);
-            });
-          } else if (outcome === "failed" || outcome === "cancelled") {
-            void db.enqueuePushToPhone({
-              phone,
-              title: "Dépôt Mobile Money échoué",
-              body: "Le paiement n'a pas été confirmé par votre opérateur. Le solde de votre Wallet est inchangé.",
-              data: { kind: "wallet_direct_deposit_failed", transactionId: settled.payment.id },
-              channelId: "tikis-wallet",
-            }).catch((pushError) => {
-              console.error("[webhook:yengapay] push failed", pushError);
-            });
-          }
-        }
-        return res.status(200).json({ ok: true });
-      } catch (settleError) {
-        const reason = settleError instanceof Error ? settleError.message : "Erreur inconnue";
-        console.error("[webhook:yengapay] settle failed", settleError);
-        return res.status(202).json({ ok: false, error: reason, willRetry: true });
-      }
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Erreur inconnue";
-      console.error("[webhook:yengapay] parse failed", cause);
-      return res.status(400).json({ error: message });
-    }
+    const result = await processYengapayWebhook({
+      rawBody: (req as { rawBody?: string }).rawBody ?? JSON.stringify(req.body ?? {}),
+      signature: (req.headers["x-webhook-hash"] as string | undefined) ?? (req.headers["x-yengapay-signature"] as string | undefined) ?? null,
+      headerEvent: (req.headers["x-yengapay-event"] as string | undefined) ?? null,
+    });
+    return res.status(result.status).json(result.body);
   });
 
   // Console d'administration Tikis : SPA statique compilée séparément (voir admin/README.md),
