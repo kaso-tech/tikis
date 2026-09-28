@@ -25,7 +25,7 @@ const WEBHOOK_LABEL: Record<WebhookStatus, string> = { received: "Reçu", proces
 const WEBHOOK_PILL: Record<WebhookStatus, string> = { received: "pill-warning", processed: "pill-success", failed: "pill-error", ignored: "pill-neutral" };
 const OPERATION_LABEL: Record<string, string> = {
   credit: "Crédits (dépôts, remboursements)", debit: "Débits (retraits)", commission_debit: "Commissions prélevées", compensation: "Commissions rendues",
-  block: "Réserves de commission", unblock: "Réserves libérées", bonus: "Bonus", penalty: "Pénalités", refund: "Remboursements",
+  block: "Réserves de commission", unblock: "Réserves libérées", bonus: "Bonus", penalty: "Pénalités", refund: "Dédommagements (litiges)",
   deposit_request: "Demandes de dépôt", withdrawal_request: "Demandes de retrait",
 };
 // Même liste que YENGAPAY_TEST_PROVIDERS (server/yengapay.ts).

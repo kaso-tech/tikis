@@ -1767,6 +1767,50 @@ export async function unselectTikisDeliveryCandidateFromSender(deliveryId: strin
   return getTikisDeliveryById(deliveryId);
 }
 
+/** Commission réellement prélevée à ce livreur pour cette livraison, moins ce qui lui a déjà été rendu. */
+export async function netCommissionPaid(tx: any, deliveryId: string, driverPhone: string) {
+  const rows = await tx.select({ operation: tikisWalletLedger.operation, amount: tikisWalletLedger.amount }).from(tikisWalletLedger)
+    .where(and(eq(tikisWalletLedger.deliveryId, deliveryId), eq(tikisWalletLedger.profilePhone, driverPhone), inArray(tikisWalletLedger.operation, ["commission_debit", "compensation"]))).for("update");
+  return rows.reduce((total: number, row: { operation: string; amount: number }) => total + (row.operation === "commission_debit" ? Number(row.amount) : -Number(row.amount)), 0);
+}
+
+/**
+ * Litige : l'administration retire le livreur d'une livraison attribuée ou en cours, qui redevient ouverte
+ * pour que l'expéditeur en choisisse un autre parmi les candidats. Le livreur retiré retrouve sa commission :
+ * débloquée s'il n'avait pas encore confirmé, remboursée s'il l'avait déjà payée.
+ */
+export async function adminRemoveDriverFromDelivery(input: { deliveryId: string; reason: string }) {
+  const db = await getDb();
+  if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
+  const outcome = await db.transaction(async (tx) => {
+    const delivery = (await tx.select().from(tikisDeliveries).where(eq(tikisDeliveries.id, input.deliveryId)).limit(1).for("update"))[0];
+    if (!delivery || !delivery.driverPhone || (delivery.status !== "pending_confirmation" && delivery.status !== "active")) {
+      throw new Error("Seule une livraison attribuée ou en cours a un livreur à retirer.");
+    }
+    const driverPhone = delivery.driverPhone;
+    const candidate = (await tx.select().from(tikisDeliveryCandidates).where(and(eq(tikisDeliveryCandidates.deliveryId, input.deliveryId), eq(tikisDeliveryCandidates.driverPhone, driverPhone), inArray(tikisDeliveryCandidates.status, ["selected", "confirmed"]))).limit(1).for("update"))[0];
+    let released = 0;
+    let refunded = 0;
+    if (candidate?.status === "selected") {
+      released = candidate.commissionBlocked;
+      await releaseCandidateCommission(tx, candidate, "Commission libérée : retiré de la livraison par l’administration", `admin-removed:${candidate.updatedAt.getTime()}`);
+    } else {
+      refunded = await netCommissionPaid(tx, input.deliveryId, driverPhone);
+      if (refunded > 0) {
+        await applyWalletMovement(tx, { profilePhone: driverPhone, deliveryId: input.deliveryId, operation: "compensation", amount: refunded, availableDelta: refunded, heldDelta: 0, reason: "Commission remboursée : retiré de la livraison par l’administration", idempotencyKey: `admin-removed-refund:${candidate?.id ?? driverPhone}:${candidate?.updatedAt.getTime() ?? 0}` });
+      }
+    }
+    if (candidate) await tx.update(tikisDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(eq(tikisDeliveryCandidates.id, candidate.id));
+    await tx.update(tikisDeliveries).set({ status: "open", driverPhone: null, previousDriverPhone: driverPhone, accruedCommission: null, selectedAt: null, confirmedAt: null, updatedAt: new Date() }).where(eq(tikisDeliveries.id, input.deliveryId));
+    const stamp = Date.now();
+    const money = released > 0 ? ` Votre commission de ${released} FCFA a été débloquée.` : refunded > 0 ? ` Votre commission de ${refunded} FCFA vous a été remboursée.` : "";
+    await appendDeliveryEvent(tx, { deliveryId: input.deliveryId, eventType: "admin_driver_removed", status: "open", recipientPhone: driverPhone, title: "Retiré de la livraison", body: `L’équipe Tikis vous a retiré de cette livraison : ${input.reason}.${money}`, tone: "warning", idempotencyKey: `${input.deliveryId}:admin-removed-driver:${stamp}` });
+    await appendDeliveryEvent(tx, { deliveryId: input.deliveryId, eventType: "admin_driver_removed", status: "open", recipientPhone: delivery.senderPhone, title: "Choisissez un autre livreur", body: `L’équipe Tikis a retiré le livreur de votre livraison : ${input.reason}. Elle est de nouveau ouverte aux candidatures.`, tone: "warning", idempotencyKey: `${input.deliveryId}:admin-removed-sender:${stamp}` });
+    return { driverPhone, released, refunded };
+  });
+  return outcome;
+}
+
 export async function confirmTikisDeliveryWithEvents(deliveryId: string, driverPhone: string) {
   const db = await getDb();
   if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
@@ -1829,18 +1873,26 @@ async function qualifyReferralIfEligible(tx: any, phone: string | null, delivery
   await tx.update(tikisReferrals).set({ status: "qualified", qualifiedAt: new Date(), qualifyingDeliveryId: deliveryId }).where(eq(tikisReferrals.id, referral.id));
 }
 
-export async function completeTikisDeliveryWithEvents(deliveryId: string, profilePhone: string) {
+/**
+ * Clôture d'une livraison active : par le Sender ou le livreur (`profilePhone`), ou par l'administration
+ * (`admin`) quand la course a été faite mais que personne ne l'a marquée comme livrée. Mêmes effets dans
+ * les deux cas (parrainage, fidélité) ; seuls l'auteur et les messages changent.
+ */
+export async function completeTikisDeliveryWithEvents(deliveryId: string, profilePhone: string | null, admin?: { reason: string }) {
   const db = await getDb();
   if (!db) throw new Error("Les livraisons sont temporairement indisponibles.");
   const completedDelivery = await db.transaction(async (tx) => {
-    const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.status, "active"), or(eq(tikisDeliveries.senderPhone, profilePhone), eq(tikisDeliveries.driverPhone, profilePhone)))).limit(1).for("update"))[0];
-    if (!delivery || !delivery.driverPhone) throw new Error("Cette livraison ne peut pas être terminée.");
+    const byParticipant = profilePhone ? or(eq(tikisDeliveries.senderPhone, profilePhone), eq(tikisDeliveries.driverPhone, profilePhone)) : undefined;
+    if (!byParticipant && !admin) throw new Error("Cette livraison ne peut pas être terminée.");
+    const delivery = (await tx.select().from(tikisDeliveries).where(and(eq(tikisDeliveries.id, deliveryId), eq(tikisDeliveries.status, "active"), byParticipant)).limit(1).for("update"))[0];
+    if (!delivery || !delivery.driverPhone) throw new Error(admin ? "Seule une livraison en cours, livreur confirmé, peut être clôturée." : "Cette livraison ne peut pas être terminée.");
     // Le paiement de la course est effectué directement entre le Sender et le livreur, hors application (cf. spec
     // Partie 2 — introduction). Tikis ne gère jamais ce paiement : aucun crédit n'est appliqué au Wallet du livreur
     // ici. Le Wallet ne sert qu'à réserver/débiter la commission Tikis ; il n'est jamais crédité par une livraison.
     await tx.update(tikisDeliveries).set({ status: "completed", completedAt: new Date(), updatedAt: new Date() }).where(eq(tikisDeliveries.id, deliveryId));
-    await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_completed", status: "completed", actorPhone: profilePhone, recipientPhone: delivery.senderPhone, title: "Livraison terminée", body: "Votre livraison est terminée. Vous pouvez maintenant évaluer le livreur.", tone: "success", idempotencyKey: `${deliveryId}:completed-sender` });
-    await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_completed", status: "completed", actorPhone: profilePhone, recipientPhone: delivery.driverPhone, title: "Course terminée", body: "La course est ajoutée à votre historique.", tone: "success", idempotencyKey: `${deliveryId}:completed-driver` });
+    const adminNote = admin ? ` Clôturée par l’équipe Tikis : ${admin.reason}` : "";
+    await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_completed", status: "completed", actorPhone: profilePhone ?? undefined, recipientPhone: delivery.senderPhone, title: "Livraison terminée", body: `Votre livraison est terminée. Vous pouvez maintenant évaluer le livreur.${adminNote}`, tone: "success", idempotencyKey: `${deliveryId}:completed-sender` });
+    await appendDeliveryEvent(tx, { deliveryId, eventType: "delivery_completed", status: "completed", actorPhone: profilePhone ?? undefined, recipientPhone: delivery.driverPhone, title: "Course terminée", body: `La course est ajoutée à votre historique.${adminNote}`, tone: "success", idempotencyKey: `${deliveryId}:completed-driver` });
     await qualifyReferralIfEligible(tx, delivery.driverPhone, deliveryId);
     await qualifyReferralIfEligible(tx, delivery.senderPhone, deliveryId);
     const wallet = walletSnapshotFromRecord(await ensureTikisWallet(tx, delivery.driverPhone));
@@ -1865,7 +1917,8 @@ export async function listTikisDeliveryCandidates(deliveryId: string): Promise<D
   const rows = await db.select({ candidate: tikisDeliveryCandidates, profile: tikisProfiles }).from(tikisDeliveryCandidates).innerJoin(tikisProfiles, eq(tikisDeliveryCandidates.driverPhone, tikisProfiles.phone)).where(eq(tikisDeliveryCandidates.deliveryId, deliveryId)).orderBy(desc(tikisDeliveryCandidates.createdAt));
   if (rows.length === 0) return [];
   const driverPhones = Array.from(new Set(rows.map((r) => r.candidate.driverPhone)));
-  const reviewRows = await db.select({ driverPhone: tikisDeliveryReviews.driverPhone, rating: tikisDeliveryReviews.rating }).from(tikisDeliveryReviews).where(inArray(tikisDeliveryReviews.driverPhone, driverPhones));
+  // Les avis masqués par la modération ne comptent plus dans la note (lot C, modération des avis).
+  const reviewRows = await db.select({ driverPhone: tikisDeliveryReviews.driverPhone, rating: tikisDeliveryReviews.rating }).from(tikisDeliveryReviews).where(and(inArray(tikisDeliveryReviews.driverPhone, driverPhones), isNull(tikisDeliveryReviews.hiddenAt)));
   const completedRows = await db.select({ driverPhone: tikisDeliveries.driverPhone }).from(tikisDeliveries).where(and(eq(tikisDeliveries.status, "completed"), inArray(tikisDeliveries.driverPhone, driverPhones)));
   const ratingByDriver = new Map<string, { sum: number; count: number }>();
   for (const r of reviewRows) {
@@ -1970,7 +2023,7 @@ export async function getTikisDriverStats(driverPhone: string): Promise<{ rating
   if (!db) return { rating: 0, completedDeliveries: 0, reviewsCount: 0 };
   const [ratingRow] = await db.select({ sum: sql<number>`COALESCE(SUM(${tikisDeliveryReviews.rating}), 0)`, count: sql<number>`COUNT(*)` })
     .from(tikisDeliveryReviews)
-    .where(eq(tikisDeliveryReviews.driverPhone, driverPhone));
+    .where(and(eq(tikisDeliveryReviews.driverPhone, driverPhone), isNull(tikisDeliveryReviews.hiddenAt)));
   const [completedRow] = await db.select({ count: sql<number>`COUNT(*)` })
     .from(tikisDeliveries)
     .where(and(eq(tikisDeliveries.driverPhone, driverPhone), eq(tikisDeliveries.status, "completed")));
@@ -2017,7 +2070,8 @@ export async function deliveryReviewToView(review: NonNullable<Awaited<ReturnTyp
 export async function listTikisDeliveryReviewsForProfile(profilePhone: string, role: "sender" | "driver") {
   const db = await getDb();
   if (!db) return [];
-  const condition = role === "sender" ? eq(tikisDeliveryReviews.reviewerPhone, profilePhone) : eq(tikisDeliveryReviews.driverPhone, profilePhone);
+  // L'auteur retrouve toujours ses propres avis ; un avis masqué par la modération n'apparaît plus côté livreur.
+  const condition = role === "sender" ? eq(tikisDeliveryReviews.reviewerPhone, profilePhone) : and(eq(tikisDeliveryReviews.driverPhone, profilePhone), isNull(tikisDeliveryReviews.hiddenAt));
   const reviews = await db.select().from(tikisDeliveryReviews).where(condition).orderBy(desc(tikisDeliveryReviews.createdAt));
   return Promise.all(reviews.map((review) => deliveryReviewToView(review)));
 }

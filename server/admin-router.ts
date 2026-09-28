@@ -12,7 +12,8 @@ import * as approvals from "./admin-approvals";
 import { ADMIN_ROLES } from "../shared/admin-roles";
 import { replayYengapayWebhookEvent } from "./yengapay-webhook";
 import * as db from "./db";
-import { publishDeliveryStatusBroadcast } from "./supabase-realtime";
+import { publishDeliveryStatusBroadcast, syncDeliveryRealtimeMembers } from "./supabase-realtime";
+import * as disputes from "./admin-disputes";
 
 /**
  * Détail d'une action, écrit après qu'elle a réussi. Ne fait jamais échouer la requête : l'action est faite,
@@ -190,7 +191,52 @@ export const tikisAdminRouter = router({
     timeline: adminProcedure.input(z.object({ deliveryId: z.string().uuid() })).query(async ({ ctx, input }) => {
       const timeline = await adminDb.adminGetDeliveryTimeline(input.deliveryId);
       await audit(ctx, "delivery_timeline_viewed", "delivery", input.deliveryId);
-      return timeline;
+      return timeline ? { ...timeline, refundableCommissions: await disputes.refundableCommissions(input.deliveryId) } : null;
+    }),
+    // Dédommagement (geste commercial) rattaché à la livraison. Au-delà du seuil, un second admin valide.
+    refund: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ deliveryId: z.string().uuid(), phone: z.string().min(4).max(32), amount: z.number().int().positive().max(disputes.DISPUTE_REFUND_MAX), reason: z.string().trim().min(3).max(300), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
+      if (await approvals.requiresApproval(input.amount)) {
+        const request = await approvals.requestDeliveryRefund({ adminId: ctx.tikisAdmin.adminId, email: ctx.tikisAdmin.email }, input);
+        await audit(ctx, "approval_requested", "admin_approval", request.approvalId, { action: "delivery_refund", deliveryId: input.deliveryId, phone: input.phone, amount: input.amount, reason: input.reason });
+        return request;
+      }
+      const result = await disputes.adminDisputeRefund(input);
+      await audit(ctx, "dispute_refund_credited", "delivery", input.deliveryId, { phone: input.phone, amount: input.amount, reason: input.reason });
+      return { approvalRequired: false as const, ...result };
+    }),
+    // Rendre au livreur la commission payée pour cette livraison, ni plus ni deux fois.
+    refundCommission: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ deliveryId: z.string().uuid(), driverPhone: z.string().min(4).max(32), reason: z.string().trim().min(3).max(300) })).mutation(async ({ ctx, input }) => {
+      const result = await disputes.adminRefundDriverCommission(input);
+      await audit(ctx, "dispute_commission_refunded", "delivery", input.deliveryId, { driverPhone: input.driverPhone, amount: result.amount, reason: input.reason });
+      return result;
+    }),
+    // Retirer le livreur (injoignable, comportement signalé…) : la livraison est rouverte aux candidatures.
+    removeDriver: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ deliveryId: z.string().uuid(), reason: z.string().trim().min(3).max(300) })).mutation(async ({ ctx, input }) => {
+      const result = await db.adminRemoveDriverFromDelivery(input);
+      await audit(ctx, "delivery_driver_removed", "delivery", input.deliveryId, { before: result.driverPhone, after: null, reason: input.reason, released: result.released, refunded: result.refunded });
+      // Le livreur retiré perd l'accès au suivi en temps réel de la livraison.
+      const delivery = await db.getTikisDeliveryById(input.deliveryId);
+      const sender = delivery?.senderPhone ? await db.getTikisProfileByPhone(delivery.senderPhone) : undefined;
+      void syncDeliveryRealtimeMembers(input.deliveryId, sender?.supabaseUserId ? [{ userId: sender.supabaseUserId, role: "sender" }] : []);
+      void publishDeliveryStatusBroadcast({ deliveryId: input.deliveryId, status: "open", title: "Livreur retiré par l’équipe Tikis", body: "La livraison est de nouveau ouverte aux candidatures.", occurredAt: new Date().toISOString() });
+      return result;
+    }),
+    // Clore une livraison livrée que personne n'a déclarée terminée dans l'application.
+    complete: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ deliveryId: z.string().uuid(), reason: z.string().trim().min(3).max(300) })).mutation(async ({ ctx, input }) => {
+      const result = await db.completeTikisDeliveryWithEvents(input.deliveryId, null, { reason: input.reason });
+      await audit(ctx, "delivery_completed_by_admin", "delivery", input.deliveryId, { before: "active", after: "completed", reason: input.reason });
+      void publishDeliveryStatusBroadcast({ deliveryId: input.deliveryId, status: "completed", title: "Livraison terminée", body: "La livraison a été clôturée par l’équipe Tikis.", occurredAt: new Date().toISOString() });
+      return { deliveryId: input.deliveryId, status: result.delivery?.status ?? "completed" };
+    }),
+  }),
+
+  // Modération des avis laissés sur les livreurs.
+  reviews: router({
+    list: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ filter: z.enum(["all", "low", "commented", "hidden"]).optional(), query: z.string().max(40).optional(), limit: z.number().int().min(1).max(200).optional(), offset: z.number().int().min(0).max(100_000).optional() })).query(({ input }) => disputes.adminListReviews(input)),
+    setHidden: adminProcedure.use(requireTikisAdminRole("super_admin", "support")).input(z.object({ reviewId: z.string().min(1).max(64), hidden: z.boolean(), reason: z.string().trim().max(300).optional() })).mutation(async ({ ctx, input }) => {
+      const result = await disputes.adminSetReviewHidden({ ...input, adminId: ctx.tikisAdmin.adminId });
+      await audit(ctx, input.hidden ? "review_hidden" : "review_restored", "delivery_review", input.reviewId, { before: result.before, after: result.after, reason: input.reason, driverPhone: result.driverPhone, rating: result.rating });
+      return { reviewId: input.reviewId, hidden: input.hidden };
     }),
   }),
 

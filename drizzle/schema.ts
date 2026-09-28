@@ -148,6 +148,10 @@ export const tikisDeliveryReviews = mysqlTable("tikis_delivery_reviews", {
   driverPhone: varchar("driverPhone", { length: 20 }).notNull(),
   rating: int("rating").notNull(),
   comment: varchar("comment", { length: 500 }),
+  /** Avis masqué par la modération : il ne s'affiche plus et ne compte plus dans la note du livreur. */
+  hiddenAt: timestamp("hiddenAt"),
+  hiddenReason: varchar("hiddenReason", { length: 300 }),
+  hiddenByAdminId: int("hiddenByAdminId"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
   uniqueIndex("tikis_delivery_reviews_delivery_reviewer_unique").on(table.deliveryId, table.reviewerPhone),
@@ -328,7 +332,7 @@ export const tikisAdminSessions = mysqlTable("tikis_admin_sessions", {
  */
 export const tikisAdminApprovals = mysqlTable("tikis_admin_approvals", {
   id: varchar("id", { length: 40 }).primaryKey(),
-  action: mysqlEnum("action", ["wallet_bonus", "wallet_penalty", "withdrawal_settle"]).notNull(),
+  action: mysqlEnum("action", ["wallet_bonus", "wallet_penalty", "withdrawal_settle", "delivery_refund"]).notNull(),
   amount: int("amount").notNull(),
   targetPhone: varchar("targetPhone", { length: 20 }).notNull(),
   /** Ce que la demande vise précisément (transaction de retrait, identifiant d'opération) : une seule demande en attente par cible. */

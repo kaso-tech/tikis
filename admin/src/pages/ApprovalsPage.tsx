@@ -5,12 +5,12 @@ import { trpc } from "../lib/trpc";
 
 type ApprovalStatus = "pending" | "approved" | "executed" | "failed" | "rejected" | "cancelled";
 type Approval = {
-  id: string; action: "wallet_bonus" | "wallet_penalty" | "withdrawal_settle"; amount: number; targetPhone: string; payload: Record<string, unknown>;
+  id: string; action: "wallet_bonus" | "wallet_penalty" | "withdrawal_settle" | "delivery_refund"; amount: number; targetPhone: string; payload: Record<string, unknown>;
   status: ApprovalStatus; requestedByAdminId: number; requestedByEmail: string; decidedByEmail: string | null; decisionNote: string | null; failureReason: string | null;
   createdAt: Date | string; decidedAt: Date | string | null;
 };
 
-const ACTION_LABEL: Record<Approval["action"], string> = { wallet_bonus: "Bonus", wallet_penalty: "Pénalité", withdrawal_settle: "Validation de retrait" };
+const ACTION_LABEL: Record<Approval["action"], string> = { wallet_bonus: "Bonus", wallet_penalty: "Pénalité", withdrawal_settle: "Validation de retrait", delivery_refund: "Dédommagement (litige)" };
 const STATUS_LABEL: Record<ApprovalStatus, string> = { pending: "En attente", approved: "En cours d’exécution", executed: "Exécutée", failed: "Échec", rejected: "Refusée", cancelled: "Retirée" };
 const STATUS_PILL: Record<ApprovalStatus, string> = { pending: "pill-warning", approved: "pill-info", executed: "pill-success", failed: "pill-error", rejected: "pill-neutral", cancelled: "pill-neutral" };
 
@@ -21,11 +21,12 @@ function formatMoney(amount: number) {
 function detail(approval: Approval) {
   const payload = approval.payload;
   if (approval.action === "withdrawal_settle") return `Versement ${String(payload.payoutReference ?? "")} — ${String(payload.notes ?? "")}`;
+  if (approval.action === "delivery_refund") return `Livraison ${String(payload.deliveryId ?? "").slice(0, 8)} — ${String(payload.reason ?? "")}`;
   return String(payload.reason ?? "");
 }
 
 /**
- * Double validation : les bonus, pénalités et validations de retrait au-delà du seuil attendent ici
+ * Double validation : les bonus, pénalités, dédommagements et validations de retrait au-delà du seuil attendent ici
  * qu'un second admin les valide. Le demandeur ne peut que retirer sa propre demande.
  */
 export default function ApprovalsPage() {

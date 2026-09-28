@@ -23,8 +23,9 @@ import LoyaltyGrantsPage from "./pages/LoyaltyGrantsPage";
 import AccountPage from "./pages/AccountPage";
 import FinanceControlPage from "./pages/FinanceControlPage";
 import ApprovalsPage from "./pages/ApprovalsPage";
+import ReviewsPage from "./pages/ReviewsPage";
 
-type PageKey = "dashboard" | "map" | "reports" | "disputes" | "deliveries" | "users" | "kyc" | "referrals" | "finance" | "pricing" | "commission" | "countries" | "maintenance" | "settings" | "admins" | "auditLog" | "loyalty" | "loyaltyGrants" | "account" | "control" | "approvals";
+type PageKey = "dashboard" | "map" | "reports" | "disputes" | "deliveries" | "users" | "kyc" | "referrals" | "finance" | "pricing" | "commission" | "countries" | "maintenance" | "settings" | "admins" | "auditLog" | "loyalty" | "loyaltyGrants" | "account" | "control" | "approvals" | "reviews";
 type GroupKey = "ops" | "people" | "trust" | "finance" | "system";
 
 const NAV: { key: PageKey; label: string; href: string; icon: string; group: GroupKey; roles?: AdminRole[] }[] = [
@@ -33,6 +34,7 @@ const NAV: { key: PageKey; label: string; href: string; icon: string; group: Gro
   { key: "deliveries", label: "Livraisons", href: "/admin/deliveries", icon: "▣", group: "ops" },
   { key: "reports", label: "Signalements", href: "/admin/reports", icon: "⚐", group: "ops" },
   { key: "disputes", label: "Litiges", href: "/admin/disputes", icon: "⚖", group: "trust" },
+  { key: "reviews", label: "Avis", href: "/admin/reviews", icon: "☆", group: "trust", roles: ["super_admin", "support"] },
   { key: "users", label: "Utilisateurs", href: "/admin/users", icon: "◉", group: "people" },
   { key: "kyc", label: "Validations KYC", href: "/admin/kyc", icon: "✓", group: "people" },
   { key: "referrals", label: "Parrainage", href: "/admin/referrals", icon: "◈", group: "people" },
@@ -189,6 +191,7 @@ function Shell() {
           {activePage === "deliveries" ? <DeliveriesPage /> : null}
           {activePage === "reports" ? <ReportsPage /> : null}
           {activePage === "disputes" ? <DisputesPage /> : null}
+          {activePage === "reviews" ? <ReviewsPage /> : null}
           {activePage === "users" ? <UsersPage search={search} /> : null}
           {activePage === "kyc" ? <KycPage /> : null}
           {activePage === "referrals" ? <ReferralsPage /> : null}

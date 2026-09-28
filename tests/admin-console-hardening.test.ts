@@ -384,3 +384,32 @@ describe("lot B — gouvernance", () => {
     expect(migration).toContain("ADD COLUMN IF NOT EXISTS `adminApprovalThreshold` int NOT NULL DEFAULT 100000");
   });
 });
+
+describe("lot C — litiges et avis", () => {
+  it("dédommagements : rattachés à la livraison, soumis au seuil, idempotents", () => {
+    const router = read("server/admin-router.ts");
+    expect(router).toContain("approvals.requestDeliveryRefund(");
+    expect(router).toMatch(/refund: adminProcedure\.use\(requireTikisAdminRole\("super_admin", "finance"\)\)/);
+    expect(router).toMatch(/refundCommission: adminProcedure\.use\(requireTikisAdminRole\("super_admin", "finance"\)\)/);
+    expect(router).toMatch(/removeDriver: adminProcedure\.use\(requireTikisAdminRole\("super_admin", "support"\)\)/);
+    expect(router).toMatch(/complete: adminProcedure\.use\(requireTikisAdminRole\("super_admin", "support"\)\)/);
+    const disputes = read("server/admin-disputes.ts");
+    expect(disputes).toContain('operation: "refund"');
+    expect(disputes).toContain("await assertParticipant(tx, input.deliveryId, input.phone);");
+    expect(read("server/admin-approvals.ts")).toContain('if (approval.action === "delivery_refund") return adminDisputeRefund(');
+    expect(read("admin/src/pages/DisputeActions.tsx")).toContain("result.approvalRequired");
+  });
+
+  it("un avis masqué ne compte ni dans la note ni dans l'affichage côté livreur", () => {
+    const db = read("server/db.ts");
+    expect(db.match(/isNull\(tikisDeliveryReviews\.hiddenAt\)/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(read("server/admin-disputes.ts")).toContain("Indiquez pourquoi cet avis est masqué.");
+  });
+
+  it("la migration ajoute la modération et la nouvelle action à valider", () => {
+    const migration = read("drizzle/manual/0048_disputes_and_reviews.sql");
+    expect(migration).toContain("`hiddenAt`");
+    expect(migration).toContain("'delivery_refund'");
+    expect(read("admin/src/pages/ApprovalsPage.tsx")).toContain('delivery_refund: "Dédommagement (litige)"');
+  });
+});

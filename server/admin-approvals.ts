@@ -1,8 +1,8 @@
 /**
  * Double validation (quatre yeux) des mouvements d'argent décidés depuis la console.
  *
- * Au-delà du seuil (100 000 FCFA par défaut, réglable par un super-admin), un bonus, une pénalité ou la
- * validation d'un retrait n'est pas exécuté par l'admin qui le demande : il devient une demande en
+ * Au-delà du seuil (100 000 FCFA par défaut, réglable par un super-admin), un bonus, une pénalité, un
+ * dédommagement après litige ou la validation d'un retrait n'est pas exécuté par l'admin qui le demande : il devient une demande en
  * attente, qu'un autre admin (super-admin ou finance) valide ou refuse. La validation exécute l'action à
  * ce moment-là, avec les mêmes garde-fous que l'action directe (idempotence, référence de versement…).
  *
@@ -14,6 +14,7 @@ import { randomUUID } from "node:crypto";
 import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { tikisAdminApprovals, tikisPaymentTransactions, tikisPlatformSettings, type TikisAdminApproval } from "../drizzle/schema";
 import { adminPenalizeWallet, adminRewardWallet } from "./admin-db";
+import { adminDisputeRefund, validateDisputeRefund } from "./admin-disputes";
 import * as db from "./db";
 
 export const DEFAULT_APPROVAL_THRESHOLD = 100_000;
@@ -22,6 +23,7 @@ export const MIN_APPROVAL_THRESHOLD = 1_000;
 export type ApprovalAction = TikisAdminApproval["action"];
 type WalletPayload = { phone: string; amount: number; reason: string; requestId: string };
 type WithdrawalPayload = { paymentId: string; payoutReference: string; notes: string };
+type DeliveryRefundPayload = WalletPayload & { deliveryId: string };
 
 async function database() {
   const handle = await db.getDb();
@@ -48,7 +50,7 @@ export async function requiresApproval(amount: number) {
 
 type Requester = { adminId: number; email: string };
 
-async function createRequest(requester: Requester, request: { action: ApprovalAction; amount: number; targetPhone: string; targetRef: string; payload: WalletPayload | WithdrawalPayload }) {
+async function createRequest(requester: Requester, request: { action: ApprovalAction; amount: number; targetPhone: string; targetRef: string; payload: WalletPayload | WithdrawalPayload | DeliveryRefundPayload }) {
   const handle = await database();
   const id = randomUUID();
   await handle.transaction(async (tx) => {
@@ -71,6 +73,15 @@ export function requestWalletAdjustment(requester: Requester, input: WalletPaylo
     action: direction === "bonus" ? "wallet_bonus" : "wallet_penalty", amount: input.amount, targetPhone: input.phone,
     // L'identifiant d'opération tiré par l'écran : un double envoi retombe sur la même demande.
     targetRef: `${direction}:${input.phone}:${input.requestId}`.slice(0, 80), payload,
+  });
+}
+
+/** Dédommagement après litige au-delà du seuil. Participant, montant et motif sont vérifiés dès la demande. */
+export async function requestDeliveryRefund(requester: Requester, input: DeliveryRefundPayload) {
+  await validateDisputeRefund(input);
+  return createRequest(requester, {
+    action: "delivery_refund", amount: input.amount, targetPhone: input.phone,
+    targetRef: `refund:${input.deliveryId}:${input.phone}:${input.requestId}`.slice(0, 80), payload: { ...input, reason: input.reason.trim() },
   });
 }
 
@@ -98,9 +109,10 @@ export async function listApprovals(input: { status?: "open" | "closed"; limit?:
 }
 
 async function execute(approval: TikisAdminApproval, approver: Requester) {
-  const payload = JSON.parse(approval.payload) as WalletPayload & WithdrawalPayload;
+  const payload = JSON.parse(approval.payload) as DeliveryRefundPayload & WithdrawalPayload;
   if (approval.action === "wallet_bonus") return adminRewardWallet({ phone: payload.phone, amount: payload.amount, reason: payload.reason, adminId: approver.adminId, requestId: payload.requestId });
   if (approval.action === "wallet_penalty") return adminPenalizeWallet({ phone: payload.phone, amount: payload.amount, reason: payload.reason, adminId: approver.adminId, requestId: payload.requestId });
+  if (approval.action === "delivery_refund") return adminDisputeRefund({ deliveryId: payload.deliveryId, phone: payload.phone, amount: payload.amount, reason: payload.reason, requestId: payload.requestId });
   const result = await db.adminSettlePaymentTransaction({ paymentId: payload.paymentId, outcome: "succeeded", adminId: approver.adminId, notes: payload.notes, payoutReference: payload.payoutReference });
   // Déjà réglé entre-temps (par YengaPay, ou rejeté) : rien n'a été fait, la demande ne doit pas passer pour exécutée.
   if (result.payment.status !== "succeeded") throw new Error(`Le retrait n’est plus en attente (statut : ${result.payment.status}).`);

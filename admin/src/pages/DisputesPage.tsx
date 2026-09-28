@@ -1,13 +1,16 @@
 import { useState } from "react";
 import { trpc } from "../lib/trpc";
+import { useAdminAuth } from "../lib/auth";
+import DisputeActions from "./DisputeActions";
 
-type Delivery = { id: string; title: string; status: string; senderPhone: string; driverPhone: string | null; estimatedPrice: number; offeredPrice: number | null };
+type Delivery = { id: string; title: string; status: string; senderPhone: string; driverPhone: string | null; previousDriverPhone?: string | null; estimatedPrice: number; offeredPrice: number | null };
 type Timeline = {
   delivery: Delivery;
   candidates: Array<{ id: string; driverPhone: string; status: string; commissionBlocked: number; offerPrice: number | null; createdAt: Date; updatedAt: Date }>;
   events: Array<{ id: string; eventType: string; title: string; body: string; recipientPhone: string; createdAt: Date }>;
   ledgerEntries: Array<{ id: string; profilePhone: string; operation: string; amount: number; availableBefore: number; availableAfter: number; heldBefore: number; heldAfter: number; reason: string; createdAt: Date }>;
   reports: Array<{ id: string; reason: string; status: string; createdAt: Date }>;
+  refundableCommissions: Array<{ driverPhone: string; amount: number }>;
 };
 
 const STATUS_PILL: Record<string, string> = {
@@ -20,6 +23,8 @@ function formatMoney(amount: number) {
 }
 
 export default function DisputesPage() {
+  const { admin } = useAdminAuth();
+  const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Delivery[]>([]);
   const [timeline, setTimeline] = useState<Timeline | null>(null);
@@ -42,7 +47,7 @@ export default function DisputesPage() {
   }
 
   async function openTimeline(deliveryId: string) {
-    setError("");
+    setError(""); setNotice("");
     try {
       const data = await trpc.adminConsole.disputes.timeline.query({ deliveryId });
       setTimeline(data as Timeline);
@@ -68,6 +73,19 @@ export default function DisputesPage() {
               {" · "}Livreur {timeline.delivery.driverPhone ?? "—"}
             </div>
           </div>
+
+          {notice ? <div className="banner-ok">{notice}</div> : null}
+          {error ? <div className="banner-error">{error}</div> : null}
+          {admin ? (
+            <DisputeActions
+              key={timeline.delivery.id + timeline.delivery.status}
+              role={admin.role}
+              delivery={timeline.delivery}
+              candidates={timeline.candidates}
+              refundableCommissions={timeline.refundableCommissions}
+              onChanged={async (message) => { await openTimeline(timeline.delivery.id); setNotice(message); }}
+            />
+          ) : null}
 
           <div className="card">
             <div className="card-head">
