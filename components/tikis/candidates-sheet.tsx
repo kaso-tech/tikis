@@ -47,7 +47,7 @@ type Props = {
  *    palier vit dans un `state` — comme dans la feuille de suivi — et le
  *    défilement n'est de toute façon jamais coupé, le geste de glissement étant
  *    confiné à la poignée ;
- *  - sur Android elle passait *sous* la feuille d'accueil, `elevation` décidant
+ *  - sur Android elle passait sous la feuille d'accueil, le z-index contrôlant la superposition
  *    seul de l'ordre de peinture entre frères. Elle est maintenant rendue dans
  *    un `Modal`, c'est-à-dire dans sa propre fenêtre : aucun frère ne peut
  *    passer devant.

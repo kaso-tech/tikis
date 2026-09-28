@@ -12,7 +12,7 @@ const sheet = read("components/tikis/candidates-sheet.tsx");
 
 /**
  * La feuille des candidatures passait *sous* la feuille d'accueil sur Android :
- * entre frères, `elevation` décide seul de l'ordre de peinture, et le bouton
+ * la superposition native décidait seule de l'ordre de peinture, et le bouton
  * « Candidats » paraissait donc sans effet. Le correctif d'alors ajustait les
  * rangs de profondeur ; celui-ci rend la feuille dans sa propre fenêtre, où
  * aucun frère ne peut passer devant.
