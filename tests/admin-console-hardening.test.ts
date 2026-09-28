@@ -69,3 +69,18 @@ describe("bonus et pénalités depuis la fiche utilisateur", () => {
     expect(adminDb).toContain("idempotencyKey: `admin-penalty:${input.phone}:${input.requestId}`");
   });
 });
+
+describe("dépôts YengaPay dans l'écran Finance", () => {
+  it("la liste des fournisseurs simulés est la même que côté serveur", async () => {
+    const { YENGAPAY_TEST_PROVIDERS } = await import("../server/yengapay");
+    const page = read("admin/src/pages/FinancePage.tsx");
+    const declared = /const SIMULATED_PROVIDERS = (\[[^\]]*\]);/.exec(page)?.[1];
+    expect(JSON.parse(declared ?? "[]")).toEqual([...YENGAPAY_TEST_PROVIDERS]);
+  });
+
+  it("un vrai dépôt YengaPay se vérifie auprès de YengaPay, il ne se valide pas à la main", () => {
+    const page = read("admin/src/pages/FinancePage.tsx");
+    expect(page).toContain("isRealYengapayDeposit(t)");
+    expect(page).toContain("finance.reconcileYengapayPayment.mutate({ providerReference: t.providerReference })");
+  });
+});

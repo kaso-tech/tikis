@@ -8,6 +8,11 @@ type Transaction = { id: string; profilePhone: string; type: "deposit" | "withdr
 const STATUS_LABEL: Record<string, string> = { pending: "En attente", succeeded: "Validée", failed: "Échouée", cancelled: "Annulée" };
 const STATUS_PILL: Record<string, string> = { pending: "pill-warning", succeeded: "pill-success", failed: "pill-error", cancelled: "pill-neutral" };
 
+// Même liste que YENGAPAY_TEST_PROVIDERS (server/yengapay.ts) : tout autre fournisseur est un vrai
+// paiement YengaPay, que seul YengaPay peut confirmer — le serveur refuse de le valider à la main.
+const SIMULATED_PROVIDERS = ["yengapay_test", "yengapay_direct_test", "ligdi_simulated"];
+const isRealYengapayDeposit = (t: Transaction) => t.type === "deposit" && !SIMULATED_PROVIDERS.includes(t.provider);
+
 function formatMoney(amount: number) {
   return `${new Intl.NumberFormat("fr-FR").format(amount)} FCFA`;
 }
@@ -51,6 +56,20 @@ export default function FinancePage() {
       loadTransactions(tab === "deposits" ? "deposit" : "withdrawal");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Action impossible.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function reconcile(t: Transaction) {
+    setBusyId(t.id);
+    setError(""); setSuccess("");
+    try {
+      const result = await trpc.adminConsole.finance.reconcileYengapayPayment.mutate({ providerReference: t.providerReference });
+      setSuccess("pending" in result ? "YengaPay indique que ce paiement est toujours en attente : rien n'a été crédité." : "Transaction mise à jour selon la réponse de YengaPay.");
+      loadTransactions("deposit");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Vérification impossible.");
     } finally {
       setBusyId(null);
     }
@@ -134,7 +153,9 @@ export default function FinancePage() {
                     <td style={{ fontSize: 11.5, color: "var(--muted)" }}>{new Date(t.createdAt).toLocaleString("fr-FR")}</td>
                     <td style={{ textAlign: "right", display: "flex", gap: 6, justifyContent: "flex-end" }}>
                       {canEdit ? <>
-                        <button className="btn btn-sm btn-primary" disabled={busyId === t.id} onClick={() => void settle(t.id, "succeeded")}>Valider</button>
+                        {isRealYengapayDeposit(t)
+                          ? <button className="btn btn-sm btn-primary" disabled={busyId === t.id} onClick={() => void reconcile(t)}>Vérifier auprès de YengaPay</button>
+                          : <button className="btn btn-sm btn-primary" disabled={busyId === t.id} onClick={() => void settle(t.id, "succeeded")}>Valider</button>}
                         <button className="btn btn-sm btn-danger" disabled={busyId === t.id} onClick={() => void settle(t.id, "failed")}>Rejeter</button>
                       </> : null}
                     </td>

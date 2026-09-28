@@ -171,3 +171,38 @@ describe.skipIf(!TEST_DB)("bonus et pénalités admin — un identifiant d'opér
     expect(await wallet(second)).toEqual({ available: 1000, held: 0 });
   });
 });
+
+describe.skipIf(!TEST_DB)("validation manuelle d'un dépôt — jamais sans preuve de paiement YengaPay", () => {
+  async function pendingDeposit(provider: "yengapay_live" | "yengapay_direct_live" | "yengapay_test", amount = 5000) {
+    const handle = (await db.getDb())!;
+    const phone = newPhone();
+    const id = randomUUID();
+    await handle.insert(schema.tikisPaymentTransactions).values({
+      id, profilePhone: phone, type: "deposit", provider, amount, status: "pending", providerReference: `pi_admin_${id}`,
+      checkoutUrl: null, idempotencyKey: `admin-audit:${id}`,
+      ...(provider === "yengapay_direct_live" ? { phoneE164: phone, operatorCode: "orange_money", countryCode: "BF", ussdCode: "*144#", expiresAt: new Date(Date.now() + 15 * 60_000) } : {}),
+    });
+    return { id, phone };
+  }
+
+  for (const provider of ["yengapay_live", "yengapay_direct_live"] as const) {
+    it(`refuse de créditer à la main un dépôt ${provider} en attente`, async () => {
+      const { id, phone } = await pendingDeposit(provider);
+      await expect(db.adminSettlePaymentTransaction({ paymentId: id, outcome: "succeeded", adminId: 1 })).rejects.toThrow(/seul YengaPay/);
+      expect(await wallet(phone)).toEqual({ available: 0, held: 0 });
+    });
+  }
+
+  it("un rejet manuel reste possible, et n'empêche pas le crédit si YengaPay confirme ensuite", async () => {
+    const { id, phone } = await pendingDeposit("yengapay_live");
+    await db.adminSettlePaymentTransaction({ paymentId: id, outcome: "failed", adminId: 1 });
+    await db.settleYengapayLivePayment({ providerReference: `pi_admin_${id}`, outcome: "succeeded" });
+    expect(await wallet(phone)).toEqual({ available: 5000, held: 0 });
+  });
+
+  it("un dépôt simulé se valide toujours à la main", async () => {
+    const { id, phone } = await pendingDeposit("yengapay_test");
+    await db.adminSettlePaymentTransaction({ paymentId: id, outcome: "succeeded", adminId: 1 });
+    expect(await wallet(phone)).toEqual({ available: 5000, held: 0 });
+  });
+});

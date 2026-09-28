@@ -4,7 +4,7 @@ import { and, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or,
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertTikisDelivery, InsertTikisPlace, InsertUser, TikisAdminAuditLog, TikisAdminUser, TikisDelivery, TikisDeliveryCandidate, TikisDeliveryReport, TikisPlace, tikisAdminAuditLog, tikisAdminUsers, tikisDeliveries, tikisDeliveryCandidates, tikisDeliveryEvents, tikisDeliveryLiveLocations, tikisDeliveryReports, tikisDeliveryReviews, TikisDriverPreferences, tikisDriverPreferences, tikisFavoritePlaces, tikisKycSubmissions, tikisPaymentTransactions, tikisPlaces, tikisPlatformSettings, tikisProfiles, tikisPushTokens, tikisRateLimits, tikisReferrals, tikisSupportedCountries, tikisWalletLedger, tikisWallets, tikisYengapayWebhookEvents, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
-import { assertSimulatedSettlementAllowed, createYengapayPaymentIntent, readYengapayConfig, verifyYengapayPayment } from "./yengapay";
+import { assertSimulatedSettlementAllowed, createYengapayPaymentIntent, readYengapayConfig, verifyYengapayPayment, YENGAPAY_TEST_PROVIDERS } from "./yengapay";
 import { publishWalletBroadcast } from "./supabase-realtime";
 import { sendPushToTokens, type PushMessage } from "./push";
 import { isValidExpoPushTokenShape } from "./_test-helpers/push-token-shape";
@@ -1334,6 +1334,13 @@ export async function adminSettlePaymentTransaction(input: { paymentId: string; 
     if (input.outcome === "failed") {
       await tx.update(tikisPaymentTransactions).set({ status: "failed", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
     } else if (payment.type === "deposit") {
+      // Un dépôt YengaPay réel n'est crédité que sur la parole de YengaPay (webhook ou réconciliation).
+      // Un clic « Valider » sur une intention restée en attente — l'utilisateur a pu ne jamais payer —
+      // créditait sans aucune preuve de paiement. Le rejet, lui, reste permis : si YengaPay confirme
+      // plus tard, le dépôt est crédité quand même (`mayCreditConfirmedDeposit`).
+      if (!(YENGAPAY_TEST_PROVIDERS as readonly string[]).includes(payment.provider)) {
+        throw new Error("Ce dépôt passe par YengaPay : seul YengaPay peut en confirmer le paiement. Utilisez « Vérifier auprès de YengaPay ».");
+      }
       await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "credit", amount: payment.amount, availableDelta: payment.amount, heldDelta: 0, reason: "Dépôt validé manuellement par l’administration", idempotencyKey: `${payment.id}:admin-settled` });
       await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
     } else {
