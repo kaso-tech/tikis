@@ -1,11 +1,19 @@
 import type { Express } from "express";
 import { ENV } from "./env";
+import { isPrivateStorageKey } from "../storage";
 
 export function registerStorageProxy(app: Express) {
   app.get("/manus-storage/*", async (req, res) => {
     const key = (req.params as Record<string, string>)[0];
     if (!key) {
       res.status(400).send("Missing storage key");
+      return;
+    }
+    // Pièces d'identité KYC et pièces jointes de signalement : jamais par ce proxy public, qui sert quiconque
+    // connaît le chemin. Elles passent par /api/admin/documents (session admin, rôle vérifié, accès journalisé).
+    // 404 plutôt que 403 : ne pas confirmer qu'un fichier existe à ce chemin.
+    if (isPrivateStorageKey(key)) {
+      res.status(404).send("Not found");
       return;
     }
 

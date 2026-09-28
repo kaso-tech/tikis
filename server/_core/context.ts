@@ -73,6 +73,15 @@ function pickTikisSessionToken(opts: CreateExpressContextOptions): string | unde
  * sans pré-vérification CORS, que seules les origines autorisées passent. L'ancien en-tête portant le jeton
  * lui-même (lu depuis localStorage) n'est plus accepté.
  */
+/**
+ * Cookie de session admin seul, sans l'en-tête de la console : réservé aux GET d'images (pièces KYC), qu'une
+ * balise <img> charge sans pouvoir ajouter d'en-tête. Sans risque CSRF pour une lecture : SameSite=Strict
+ * empêche un autre site de faire envoyer le cookie, et une page d'un autre domaine ne peut pas lire l'image.
+ */
+export function adminSessionCookieValue(req: Pick<CreateExpressContextOptions["req"], "headers">): string | undefined {
+  return requestCookies({ req } as CreateExpressContextOptions)[ADMIN_SESSION_COOKIE];
+}
+
 export function pickAdminSessionToken(opts: Pick<CreateExpressContextOptions, "req">): string | undefined {
   const marker = opts.req.headers[ADMIN_CONSOLE_HEADER];
   if ((Array.isArray(marker) ? marker[0] : marker) !== "1") return undefined;

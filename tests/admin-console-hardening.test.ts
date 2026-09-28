@@ -204,3 +204,24 @@ describe("lot 3 — double authentification dans la console", () => {
     expect(pkg.devDependencies?.qrcode).toBeUndefined();
   });
 });
+
+describe("lot 4 — pièces justificatives servies par la route admin", () => {
+  it("la console ne charge plus aucune pièce par le proxy public", () => {
+    const kyc = read("admin/src/pages/KycPage.tsx");
+    expect(kyc).not.toContain("/manus-storage/");
+    expect(kyc).toContain("/api/admin/documents/kyc/");
+    expect(read("admin/src/pages/ReportsPage.tsx")).toContain("/api/admin/documents/report/");
+  });
+
+  it("les rôles qui voient les pièces sont les mêmes côté écran et côté serveur", async () => {
+    const { ADMIN_DOCUMENT_ROLES } = await import("../server/admin-documents");
+    expect([...ADMIN_DOCUMENT_ROLES]).toEqual(["super_admin", "support"]);
+    expect(read("admin/src/pages/KycPage.tsx")).toContain('const canReview = admin?.role === "super_admin" || admin?.role === "support";');
+  });
+
+  it("le proxy public filtre avant toute autre étape, et la route admin est montée", () => {
+    const proxy = read("server/_core/storageProxy.ts");
+    expect(proxy.indexOf("isPrivateStorageKey(key)")).toBeLessThan(proxy.indexOf("ENV.forgeApiUrl"));
+    expect(read("server/_core/index.ts")).toContain("registerAdminDocumentRoutes(app);");
+  });
+});

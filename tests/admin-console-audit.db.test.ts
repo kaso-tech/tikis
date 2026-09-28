@@ -641,3 +641,104 @@ describe.skipIf(!TEST_DB)("lot 3 — double authentification TOTP", () => {
     await expect(api.security.resetTotp({ adminId: boss.id })).rejects.toThrow(/propre/);
   });
 });
+
+describe.skipIf(!TEST_DB)("lot 4 — pièces KYC et pièces jointes, réservées à la console", () => {
+  const IMAGE = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+  const reads: string[] = [];
+  const fakeRead = async (key: string) => { reads.push(key); return { body: IMAGE, contentType: "image/jpeg" }; };
+
+  async function sessionFor(role: "super_admin" | "support" | "finance") {
+    const admin = (await adminDb.createAdminUser({ email: `lot4-${randomUUID()}@tikis.test`, passwordHash: await adminAuth.hashAdminPassword("mot-de-passe-lot4"), fullName: "Audit", role }))!;
+    return { admin, token: (await adminDb.createAdminSession({ adminId: admin.id })).token };
+  }
+
+  async function submission() {
+    const phone = newPhone();
+    const { id } = await db.createKycSubmission({ driverPhone: phone, idFrontKey: `tikis-kyc/${phone}/front.jpg`, idBackKey: `tikis-kyc/${phone}/back.jpg`, selfieKey: `tikis-kyc/${phone}/selfie.jpg` });
+    return { id, phone };
+  }
+
+  it("le support voit la pièce demandée, lue d'après la base, et la consultation est journalisée", async () => {
+    const documents = await import("../server/admin-documents");
+    const { admin, token } = await sessionFor("support");
+    const { id, phone } = await submission();
+    const result = await documents.resolveAdminDocument({ sessionToken: token, request: { kind: "kyc", submissionId: id, side: "selfie" } }, fakeRead);
+    expect(result).toMatchObject({ status: 200, contentType: "image/jpeg" });
+    expect(reads.at(-1)).toBe(`tikis-kyc/${phone}/selfie.jpg`);
+    const log = await adminDb.listAdminAuditLog({ targetType: "kyc_submission", targetId: id });
+    expect(log.rows[0]).toMatchObject({ adminId: admin.id, action: "kyc_document_viewed" });
+  });
+
+  it("sans session : 401, et le stockage n'est jamais lu", async () => {
+    const documents = await import("../server/admin-documents");
+    const { id } = await submission();
+    const before = reads.length;
+    expect(await documents.resolveAdminDocument({ sessionToken: undefined, request: { kind: "kyc", submissionId: id, side: "id-front" } }, fakeRead)).toMatchObject({ status: 401 });
+    expect(reads.length).toBe(before);
+  });
+
+  it("le rôle Finance n'a pas accès aux pièces d'identité", async () => {
+    const documents = await import("../server/admin-documents");
+    const { token } = await sessionFor("finance");
+    const { id } = await submission();
+    expect(await documents.resolveAdminDocument({ sessionToken: token, request: { kind: "kyc", submissionId: id, side: "id-front" } }, fakeRead)).toMatchObject({ status: 403 });
+  });
+
+  it("une session en attente du code de double authentification n'ouvre pas les pièces", async () => {
+    const documents = await import("../server/admin-documents");
+    const { admin } = await sessionFor("support");
+    const pending = await adminDb.createAdminSession({ adminId: admin.id, stage: "pending_totp" });
+    const { id } = await submission();
+    expect(await documents.resolveAdminDocument({ sessionToken: pending.token, request: { kind: "kyc", submissionId: id, side: "id-front" } }, fakeRead)).toMatchObject({ status: 401 });
+  });
+
+  it("un côté inconnu ou un dossier inexistant : 404 — la route ne sert que les clés rangées en base", async () => {
+    const documents = await import("../server/admin-documents");
+    const { token } = await sessionFor("super_admin");
+    const { id } = await submission();
+    expect(await documents.resolveAdminDocument({ sessionToken: token, request: { kind: "kyc", submissionId: id, side: "idFrontKey" } }, fakeRead)).toMatchObject({ status: 404 });
+    expect(await documents.resolveAdminDocument({ sessionToken: token, request: { kind: "kyc", submissionId: id, side: "__proto__" } }, fakeRead)).toMatchObject({ status: 404 });
+    expect(await documents.resolveAdminDocument({ sessionToken: token, request: { kind: "kyc", submissionId: randomUUID(), side: "selfie" } }, fakeRead)).toMatchObject({ status: 404 });
+  });
+
+  it("un type de fichier inattendu n'est jamais servi comme contenu interprétable", async () => {
+    const documents = await import("../server/admin-documents");
+    const { token } = await sessionFor("support");
+    const { id } = await submission();
+    const result = await documents.resolveAdminDocument({ sessionToken: token, request: { kind: "kyc", submissionId: id, side: "id-back" } }, async () => ({ body: Buffer.from("<script>"), contentType: "text/html" }));
+    expect(result).toMatchObject({ status: 200, contentType: "application/octet-stream" });
+  });
+
+  it("la route HTTP réelle : cookie de session exigé, en-têtes anti-cache", async () => {
+    const express = (await import("express")).default;
+    const { registerAdminDocumentRoutes } = await import("../server/admin-documents");
+    const app = express();
+    registerAdminDocumentRoutes(app);
+    const server = app.listen(0);
+    await new Promise((resolve) => server.once("listening", resolve));
+    try {
+      const port = (server.address() as import("node:net").AddressInfo).port;
+      const { id } = await submission();
+      const { token } = await sessionFor("support");
+      const anonymous = await fetch(`http://127.0.0.1:${port}/api/admin/documents/kyc/${id}/selfie`);
+      expect(anonymous.status).toBe(401);
+      expect(anonymous.headers.get("cache-control")).toBe("no-store, private");
+      // Avec session : la lecture réelle du stockage échoue ici (aucun stockage configuré en test) → 502,
+      // preuve que l'authentification et la recherche en base sont passées.
+      const authed = await fetch(`http://127.0.0.1:${port}/api/admin/documents/kyc/${id}/selfie`, { headers: { cookie: `tikis_admin_session=${token}` } });
+      expect(authed.status).toBe(502);
+    } finally {
+      server.close();
+    }
+  });
+
+  it("pièce jointe de signalement : servie au support", async () => {
+    const documents = await import("../server/admin-documents");
+    const { token } = await sessionFor("support");
+    const handle = (await db.getDb())!;
+    const reportId = randomUUID();
+    await handle.insert(schema.tikisDeliveryReports).values({ id: reportId, deliveryId: randomUUID(), reporterPhone: newPhone(), reporterRole: "sender", reason: "damaged", description: "Colis abîmé", attachmentKey: "tikis-reports/x/photo.png" });
+    expect(await documents.resolveAdminDocument({ sessionToken: token, request: { kind: "report", reportId } }, fakeRead)).toMatchObject({ status: 200 });
+    expect(reads.at(-1)).toBe("tikis-reports/x/photo.png");
+  });
+});

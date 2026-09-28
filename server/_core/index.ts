@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
+import { registerAdminDocumentRoutes } from "../admin-documents";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { sdk } from "./sdk";
@@ -80,6 +81,7 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "2mb", extended: true }));
 
   registerStorageProxy(app);
+  registerAdminDocumentRoutes(app);
   registerOAuthRoutes(app);
 
   app.get("/api/health", (_req, res) => {

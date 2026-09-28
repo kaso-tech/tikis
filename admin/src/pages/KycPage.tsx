@@ -12,8 +12,13 @@ type Row = { submission: Submission; driverName: string };
 const STATUS_LABEL: Record<string, string> = { submitted: "À examiner", approved: "Approuvé", rejected: "Refusé" };
 const STATUS_PILL: Record<string, string> = { submitted: "pill-warning", approved: "pill-success", rejected: "pill-error" };
 
-function assetUrl(key: string) {
-  return `/manus-storage/${key}`;
+/**
+ * Les pièces passent par la route admin authentifiée (server/admin-documents.ts) : le cookie de session
+ * accompagne la requête de l'image, le serveur vérifie le rôle et journalise la consultation. Le proxy
+ * public /manus-storage refuse désormais ces fichiers.
+ */
+function documentUrl(submissionId: string, side: "id-front" | "id-back" | "selfie") {
+  return `/api/admin/documents/kyc/${encodeURIComponent(submissionId)}/${side}`;
 }
 
 export default function KycPage() {
@@ -62,20 +67,24 @@ export default function KycPage() {
         </div>
         {error ? <div className="banner-error">{error}</div> : null}
         <div className="card">
-          <div className="grid grid-3">
-            <div>
-              <div className="field-label">Recto pièce d’identité</div>
-              <img src={assetUrl(selected.submission.idFrontKey)} alt="Recto" style={{ width: "100%", borderRadius: 10, border: "1px solid var(--border)" }} />
+          {canReview ? (
+            <div className="grid grid-3">
+              <div>
+                <div className="field-label">Recto pièce d’identité</div>
+                <img src={documentUrl(selected.submission.id, "id-front")} alt="Recto" style={{ width: "100%", borderRadius: 10, border: "1px solid var(--border)" }} />
+              </div>
+              <div>
+                <div className="field-label">Verso pièce d’identité</div>
+                <img src={documentUrl(selected.submission.id, "id-back")} alt="Verso" style={{ width: "100%", borderRadius: 10, border: "1px solid var(--border)" }} />
+              </div>
+              <div>
+                <div className="field-label">Selfie</div>
+                <img src={documentUrl(selected.submission.id, "selfie")} alt="Selfie" style={{ width: "100%", borderRadius: 10, border: "1px solid var(--border)" }} />
+              </div>
             </div>
-            <div>
-              <div className="field-label">Verso pièce d’identité</div>
-              <img src={assetUrl(selected.submission.idBackKey)} alt="Verso" style={{ width: "100%", borderRadius: 10, border: "1px solid var(--border)" }} />
-            </div>
-            <div>
-              <div className="field-label">Selfie</div>
-              <img src={assetUrl(selected.submission.selfieKey)} alt="Selfie" style={{ width: "100%", borderRadius: 10, border: "1px solid var(--border)" }} />
-            </div>
-          </div>
+          ) : (
+            <p className="muted" style={{ margin: 0, fontSize: 13 }}>Les pièces d’identité ne sont visibles que par le support et les super-admins.</p>
+          )}
         </div>
         {canReview && selected.submission.status === "submitted" ? (
           <div className="card" style={{ maxWidth: 480 }}>

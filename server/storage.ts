@@ -95,3 +95,30 @@ export async function storageGetSignedUrl(relKey: string): Promise<string> {
   const { url } = (await resp.json()) as { url: string };
   return url;
 }
+
+/**
+ * Préfixes des fichiers qui ne doivent jamais être servis par le proxy public `/manus-storage/*` :
+ * pièces d'identité et selfies KYC, pièces jointes des signalements. Ils ne sortent que par la route
+ * admin authentifiée (server/admin-documents.ts), qui retrouve la clé en base au lieu de la lire dans l'URL.
+ */
+export const PRIVATE_STORAGE_PREFIXES = ["tikis-kyc/", "tikis-reports/"] as const;
+
+/**
+ * Faut-il refuser cette clé au proxy public ? Normalise d'abord comme le ferait le stockage (barres initiales,
+ * segments « . », barres doublées) : « //tikis-kyc/… » ou « ./tikis-kyc/… » ne doivent pas passer. Toute
+ * remontée « .. » est refusée d'office.
+ */
+export function isPrivateStorageKey(rawKey: string): boolean {
+  const segments = rawKey.replace(/\\/g, "/").split("/");
+  if (segments.includes("..")) return true;
+  const normalized = segments.filter((segment) => segment !== "" && segment !== ".").join("/").toLowerCase();
+  return PRIVATE_STORAGE_PREFIXES.some((prefix) => normalized.startsWith(prefix) || normalized === prefix.slice(0, -1));
+}
+
+/** Lit un fichier du stockage côté serveur : l'URL signée ne quitte jamais le serveur. */
+export async function storageReadObject(relKey: string): Promise<{ body: Buffer; contentType: string }> {
+  const url = await storageGetSignedUrl(relKey);
+  const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+  if (!response.ok) throw new Error(`Storage read failed (${response.status})`);
+  return { body: Buffer.from(await response.arrayBuffer()), contentType: response.headers.get("content-type") ?? "application/octet-stream" };
+}

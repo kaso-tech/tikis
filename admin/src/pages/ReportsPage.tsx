@@ -7,7 +7,7 @@ type ReportRow = {
   report: {
     id: string; deliveryId: string; reporterPhone: string; reporterRole: "sender" | "driver";
     reason: string; description: string; status: "open" | "reviewing" | "resolved" | "dismissed";
-    resolutionNotes: string | null; createdAt: Date;
+    resolutionNotes: string | null; attachmentKey: string | null; createdAt: Date;
   };
   delivery: { id: string; title: string; status: string; senderPhone: string; driverPhone: string | null };
 };
@@ -72,6 +72,14 @@ export default function ReportsPage() {
             <div>
               <span className="field-label">Description</span>
               <p style={{ fontSize: 13, lineHeight: 1.5, margin: 0 }}>{selected.report.description}</p>
+              {selected.report.attachmentKey ? (
+                canResolve ? (
+                  // Servie par la route admin authentifiée, jamais par le proxy public (server/admin-documents.ts).
+                  <a href={`/api/admin/documents/report/${encodeURIComponent(selected.report.id)}`} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginTop: 10 }}>
+                    <img src={`/api/admin/documents/report/${encodeURIComponent(selected.report.id)}`} alt="Pièce jointe du signalement" style={{ maxWidth: 320, maxHeight: 240, borderRadius: 8, border: "1px solid var(--border)" }} />
+                  </a>
+                ) : <p className="muted" style={{ fontSize: 12, margin: "8px 0 0" }}>Une photo est jointe (visible par le support).</p>
+              ) : null}
             </div>
             <div>
               <label className="field-label" htmlFor="notes">Notes de résolution</label>
