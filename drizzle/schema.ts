@@ -224,6 +224,8 @@ export const tikisPaymentTransactions = mysqlTable("tikis_payment_transactions",
   /** Note laissée par l'admin qui a tranché la transaction à la main. */
   adminNotes: varchar("adminNotes", { length: 300 }),
   settledByAdminId: int("settledByAdminId"),
+  /** Montant annoncé par YengaPay à la confirmation. Un écart avec `amount` est listé dans la console. */
+  providerReportedAmount: int("providerReportedAmount"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => [
   index("tikis_payment_transactions_profile_created_index").on(table.profilePhone, table.createdAt),

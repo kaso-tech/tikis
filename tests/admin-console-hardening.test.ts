@@ -281,3 +281,43 @@ describe("lot 5 — traçabilité et pilotage", () => {
     expect(page).toContain('expired: "Expirée"');
   });
 });
+
+describe("lot A — contrôle financier", () => {
+  const page = read("admin/src/pages/FinanceControlPage.tsx");
+
+  it("l'écran n'apparaît qu'à super-admin et finance, comme les routes", () => {
+    expect(read("admin/src/App.tsx")).toContain('{ key: "control", label: "Contrôle financier", href: "/admin/control", icon: "⊜", group: "finance", roles: ["super_admin", "finance"] }');
+    const router = read("server/admin-router.ts");
+    const control = router.slice(router.indexOf("control: router({"), router.indexOf("sendBonus:"));
+    expect(control.match(/adminProcedure\.use\(requireTikisAdminRole\("super_admin", "finance"\)\)/g)).toHaveLength(5);
+  });
+
+  it("les fournisseurs simulés sont les mêmes que côté serveur", async () => {
+    const { YENGAPAY_TEST_PROVIDERS } = await import("../server/yengapay");
+    const declared = /const SIMULATED_PROVIDERS = (\[[^\]]*\]);/.exec(page)?.[1];
+    expect(JSON.parse(declared ?? "[]")).toEqual([...YENGAPAY_TEST_PROVIDERS]);
+  });
+
+  it("une relance passe par une confirmation, l'export passe par le CSV neutralisé", () => {
+    expect(page).toContain("onClick={() => setPendingReplay(row)}>Relancer</button>");
+    expect(page).toContain("const csv = rowsToCsv([");
+  });
+
+  it("la réception et la relance d'un webhook partagent le même règlement", () => {
+    const handler = read("server/yengapay-webhook.ts");
+    expect(handler.match(/settleRecordedEvent\(event, /g)).toHaveLength(2);
+  });
+
+  it("la migration ajoute le montant annoncé par YengaPay", () => {
+    expect(read("drizzle/manual/0046_payment_reported_amount.sql")).toContain("ADD COLUMN IF NOT EXISTS `providerReportedAmount` int DEFAULT NULL");
+  });
+});
+
+describe("tableaux défilants", () => {
+  it("un tableau dans un conteneur défilant n'a pas son en-tête décalé sur les premières lignes", () => {
+    expect(read("admin/src/styles.css")).toContain(".table-scroll .table th { top: 0; }");
+    for (const page of ["admin/src/pages/FinanceControlPage.tsx", "admin/src/pages/FinancePage.tsx"]) {
+      expect(read(page), page).not.toContain('style={{ overflowX: "auto" }}');
+    }
+  });
+});

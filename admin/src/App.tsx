@@ -21,8 +21,9 @@ import AuditLogPage from "./pages/AuditLogPage";
 import LoyaltyPage from "./pages/LoyaltyPage";
 import LoyaltyGrantsPage from "./pages/LoyaltyGrantsPage";
 import AccountPage from "./pages/AccountPage";
+import FinanceControlPage from "./pages/FinanceControlPage";
 
-type PageKey = "dashboard" | "map" | "reports" | "disputes" | "deliveries" | "users" | "kyc" | "referrals" | "finance" | "pricing" | "commission" | "countries" | "maintenance" | "settings" | "admins" | "auditLog" | "loyalty" | "loyaltyGrants" | "account";
+type PageKey = "dashboard" | "map" | "reports" | "disputes" | "deliveries" | "users" | "kyc" | "referrals" | "finance" | "pricing" | "commission" | "countries" | "maintenance" | "settings" | "admins" | "auditLog" | "loyalty" | "loyaltyGrants" | "account" | "control";
 type GroupKey = "ops" | "people" | "trust" | "finance" | "system";
 
 const NAV: { key: PageKey; label: string; href: string; icon: string; group: GroupKey; roles?: Array<"super_admin" | "support" | "finance"> }[] = [
@@ -35,6 +36,7 @@ const NAV: { key: PageKey; label: string; href: string; icon: string; group: Gro
   { key: "kyc", label: "Validations KYC", href: "/admin/kyc", icon: "✓", group: "people" },
   { key: "referrals", label: "Parrainage", href: "/admin/referrals", icon: "◈", group: "people" },
   { key: "finance", label: "Finance", href: "/admin/finance", icon: "$", group: "finance", roles: ["super_admin", "finance"] },
+  { key: "control", label: "Contrôle financier", href: "/admin/control", icon: "⊜", group: "finance", roles: ["super_admin", "finance"] },
   { key: "commission", label: "Commission", href: "/admin/commission", icon: "₣", group: "finance", roles: ["super_admin", "finance"] },
   { key: "pricing", label: "Estimation intelligente", href: "/admin/pricing", icon: "≈", group: "finance", roles: ["super_admin", "finance"] },
   { key: "countries", label: "Pays", href: "/admin/countries", icon: "◍", group: "system", roles: ["super_admin"] },
@@ -183,6 +185,7 @@ function Shell() {
           {page === "kyc" ? <KycPage /> : null}
           {page === "referrals" ? <ReferralsPage /> : null}
           {page === "finance" ? <FinancePage /> : null}
+          {page === "control" ? <FinanceControlPage /> : null}
           {page === "pricing" ? <PricingPage /> : null}
           {page === "commission" ? <CommissionPage /> : null}
           {page === "countries" ? <CountriesPage /> : null}

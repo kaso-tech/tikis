@@ -2061,6 +2061,12 @@ export async function recordYengapayWebhookEvent(input: { provider: "yengapay_sa
   return { duplicate: false, alreadyProcessed: false, id };
 }
 
+export async function getYengapayWebhookEvent(id: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Le paiement est temporairement indisponible.");
+  return (await db.select().from(tikisYengapayWebhookEvents).where(eq(tikisYengapayWebhookEvents.id, id)).limit(1))[0];
+}
+
 /** Clôt un événement webhook : `processed`/`ignored` ne seront plus retraités, `failed` le sera à la relivraison. */
 export async function markYengapayWebhookEvent(id: string, status: "processed" | "ignored" | "failed", details: { paymentTransactionId?: string | null; failureReason?: string } = {}) {
   const db = await getDb();
@@ -2100,18 +2106,21 @@ export async function settleYengapayLivePayment(input: { providerReference: stri
       return { payment: yengaPayTestPaymentToView(payment), wallet: walletSnapshotFromRecord(wallet) } satisfies YengaPayTestPaymentSettlement;
     }
     // On crédite le montant enregistré à la création de l'intention, jamais celui du webhook ; un écart
-    // est signalé pour vérification, sans bloquer un paiement que YengaPay a confirmé.
+    // est signalé pour vérification, sans bloquer un paiement que YengaPay a confirmé. Le montant annoncé
+    // par YengaPay est conservé sur la transaction : la console liste les écarts (Contrôle financier),
+    // qui n'apparaissaient jusqu'ici que dans les journaux du serveur.
     if (input.outcome === "succeeded" && input.reportedAmount && input.reportedAmount !== payment.amount) {
       console.error("[yengapay] montant confirmé différent du montant de l'intention", { paymentId: payment.id, attendu: payment.amount, confirme: input.reportedAmount });
     }
+    const reported = input.outcome === "succeeded" && input.reportedAmount ? { providerReportedAmount: input.reportedAmount } : {};
     if (input.outcome === "failed" || input.outcome === "cancelled") {
       await tx.update(tikisPaymentTransactions).set({ status: input.outcome, settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
     } else if (payment.type === "deposit") {
       await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "credit", amount: payment.amount, availableDelta: payment.amount, heldDelta: 0, reason: "Dépôt YengaPay live confirmé", idempotencyKey: depositCreditKey(payment.id) });
-      await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
+      await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date(), ...reported }).where(eq(tikisPaymentTransactions.id, payment.id));
     } else {
       await applyWalletMovement(tx, { profilePhone: payment.profilePhone, operation: "debit", amount: payment.amount, availableDelta: -payment.amount, heldDelta: 0, reason: "Retrait YengaPay live confirmé", idempotencyKey: `${payment.id}:settled` });
-      await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date() }).where(eq(tikisPaymentTransactions.id, payment.id));
+      await tx.update(tikisPaymentTransactions).set({ status: "succeeded", settledAt: new Date(), ...reported }).where(eq(tikisPaymentTransactions.id, payment.id));
     }
     const settled = (await tx.select().from(tikisPaymentTransactions).where(eq(tikisPaymentTransactions.id, payment.id)).limit(1))[0];
     if (!settled) throw new Error("La transaction n’a pas pu être finalisée.");
@@ -2126,7 +2135,7 @@ export async function reconcileYengapayPayment(providerReference: string) {
   if (config.mode === "test") throw new Error("La réconciliation YengaPay nécessite le mode sandbox ou live.");
   const remote = await verifyYengapayPayment({ providerReference });
   if (remote.status === "pending") return { pending: true, providerReference };
-  return settleYengapayLivePayment({ providerReference, outcome: remote.status });
+  return settleYengapayLivePayment({ providerReference, outcome: remote.status, reportedAmount: remote.amount > 0 ? remote.amount : undefined });
 }
 
 /** Push tokens Expo : enregistrement idempotent. Met à jour lastSeenAt si le token existe déjà. */

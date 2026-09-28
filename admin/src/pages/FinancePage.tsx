@@ -201,7 +201,7 @@ export default function FinancePage() {
             <button className="btn btn-primary" type="submit">Rechercher</button>
           </form>
           {history.rows.length === 0 ? <div className="empty-state">Aucune transaction ne correspond.</div> : (
-            <div style={{ overflowX: "auto" }}>
+            <div className="table-scroll">
               <table className="table">
                 <thead><tr><th>Date</th><th>Profil</th><th>Type</th><th>Montant</th><th>Statut</th><th>Fournisseur</th><th>Référence</th><th>Décision manuelle</th></tr></thead>
                 <tbody>

@@ -338,6 +338,10 @@ a:hover { text-decoration: underline; }
   position: sticky; top: var(--topbar-h);
 }
 .table tbody tr:hover td { background: var(--surface-2); }
+/* Tableau large, défilant horizontalement sur petit écran. Le conteneur devient la référence de
+   l'en-tête collant : décalé de la hauteur de la barre du haut, il recouvrait les premières lignes. */
+.table-scroll { overflow-x: auto; }
+.table-scroll .table th { top: 0; }
 .table tbody tr:last-child td { border-bottom: 0; }
 
 /* ---------- PILLS / STATUS ---------- */

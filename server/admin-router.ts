@@ -6,6 +6,8 @@ import { verifyAdminPasswordOrDecoy } from "./admin-auth";
 import { clearAdminSessionCookie, setAdminSessionCookie } from "./_core/cookies";
 import { pickAdminSessionToken } from "./_core/context";
 import * as adminDb from "./admin-db";
+import * as financeControl from "./admin-finance-control";
+import { replayYengapayWebhookEvent } from "./yengapay-webhook";
 import * as db from "./db";
 import { publishDeliveryStatusBroadcast } from "./supabase-realtime";
 
@@ -274,6 +276,29 @@ export const tikisAdminRouter = router({
       const result = await db.reconcileYengapayPayment(input.providerReference);
       await audit(ctx, "yengapay_payment_reconciled", "payment_transaction", input.providerReference, { result });
       return result;
+    }),
+    // Contrôle financier (server/admin-finance-control.ts) : réservé à qui répond de l'argent.
+    control: router({
+      webhooks: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({
+        status: z.enum(["received", "processed", "failed", "ignored"]).optional(),
+        query: z.string().trim().max(120).optional(),
+        limit: z.number().int().min(1).max(200).optional(),
+        offset: z.number().int().min(0).max(100_000).optional(),
+      })).query(({ input }) => financeControl.adminListWebhookEvents(input)),
+      replayWebhook: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ eventId: z.string().min(1).max(40) })).mutation(async ({ ctx, input }) => {
+        const before = (await db.getYengapayWebhookEvent(input.eventId))?.status ?? null;
+        const result = await replayYengapayWebhookEvent(input.eventId);
+        await audit(ctx, "yengapay_webhook_replayed", "yengapay_webhook_event", input.eventId, { before, after: result.status, failureReason: result.failureReason });
+        return result;
+      }),
+      anomalies: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).query(() => financeControl.adminPaymentAnomalies()),
+      walletCheck: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).query(() => financeControl.adminWalletCheck()),
+      accounting: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/) })).query(async ({ ctx, input }) => {
+        const statement = await financeControl.adminAccountingMonth(input.month);
+        // Données financières de tous les utilisateurs : chaque consultation ou export est tracé.
+        await audit(ctx, "accounting_statement_viewed", "accounting", input.month, { movements: statement.rows.length, truncated: statement.truncated });
+        return statement;
+      }),
     }),
     sendBonus: adminProcedure.use(requireTikisAdminRole("super_admin", "finance")).input(z.object({ phone: z.string(), amount: z.number().int().positive().max(1000000), reason: z.string().max(300), requestId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       if (!ctx.tikisAdmin) throw new Error("Session invalide.");
