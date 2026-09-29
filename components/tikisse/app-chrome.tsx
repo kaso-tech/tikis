@@ -108,11 +108,11 @@ export function TikisseDrawer() {
           <View style={styles.drawerTop}>
             <Text style={[styles.drawerEyebrow, isDark && styles.drawerEyebrowDark]}>MENU</Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Fermer le menu" onPress={closeDrawer} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
-              <MaterialIcons name="close" size={21} color={isDark ? "#FBF7F0" : "#111111"} />
+              <MaterialIcons name="close" size={21} color={isDark ? "#FFF9F2" : "#241510"} />
             </Pressable>
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir mon profil" onPress={() => navigate("/(tabs)/profile")} style={({ pressed }) => [styles.profileBlock, isDark && styles.profileBlockDark, pressed && styles.pressed]}>
-            <Avatar initials={initials} color={isDark ? "#FBF7F0" : "#111111"} />
+            <Avatar initials={initials} color={isDark ? "#FFF9F2" : "#241510"} />
             <View style={styles.profileText}>
               <Text style={[styles.profileName, isDark && styles.profileNameDark]} numberOfLines={1}>{name}</Text>
               <View style={styles.rolePill}>
@@ -120,7 +120,7 @@ export function TikisseDrawer() {
                 <Text style={[styles.roleLabel, isDark && styles.roleLabelDark]}>{role === "sender" ? "Expéditeur vérifié" : "Livreur vérifié"}</Text>
               </View>
             </View>
-            <MaterialIcons name="chevron-right" size={18} color={isDark ? "#C8BCAA" : "#9B9B9B"} />
+            <MaterialIcons name="chevron-right" size={18} color={isDark ? "#D7B79C" : "#9B8478"} />
           </Pressable>
 
           <View style={[styles.themeRow, isDark && styles.themeRowDark]}>
@@ -132,8 +132,8 @@ export function TikisseDrawer() {
               accessibilityLabel="Activer le mode sombre"
               value={isDark}
               onValueChange={toggleDarkMode}
-              trackColor={{ false: "#E3E3E3", true: "#9A6201" }}
-              thumbColor={isDark ? "#FBF7F0" : "#FFFFFF"}
+              trackColor={{ false: "#E7D9CF", true: "#A95000" }}
+              thumbColor={isDark ? "#FFF9F2" : "#FFFFFF"}
             />
           </View>
 
@@ -151,11 +151,11 @@ export function TikisseDrawer() {
           </View>
           <View style={styles.drawerFooter}>
             <View style={styles.securityRow}>
-              <MaterialIcons name="verified-user" size={16} color="#667085" />
+              <MaterialIcons name="verified-user" size={16} color="#76665E" />
               <Text style={[styles.securityText, isDark && styles.securityTextDark]}>Compte sécurisé par Tikisse</Text>
             </View>
             <Pressable accessibilityRole="button" accessibilityLabel="Se déconnecter" onPress={openLogoutConfirmation} style={({ pressed }) => [styles.signOut, isDark && styles.signOutDark, pressed && styles.pressed]}>
-              <MaterialIcons name="logout" size={18} color={isDark ? "#F28B93" : "#A43740"} />
+              <MaterialIcons name="logout" size={18} color={isDark ? "#F09286" : "#A43F32"} />
               <Text style={[styles.signOutText, isDark && styles.signOutTextDark]}>Se déconnecter</Text>
             </Pressable>
           </View>
@@ -169,7 +169,7 @@ function DrawerRow({ item, active, onPress, isDark }: { item: DrawerItem; active
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.menuRow, active && styles.menuRowActive, isDark && styles.menuRowDark, active && isDark && styles.menuRowActiveDark, pressed && styles.pressed]}>
       <View style={[styles.menuIcon, active && styles.menuIconActive, isDark && !active && styles.menuIconDark]}>
-        <MaterialIcons name={item.icon} size={18} color={active ? "#FFFFFF" : "#667085"} />
+        <MaterialIcons name={item.icon} size={18} color={active ? "#FFFFFF" : "#76665E"} />
       </View>
       <View style={styles.menuText}>
         <Text style={[styles.menuTitle, active && styles.menuTitleActive, active && isDark && styles.menuTitleActiveDark, isDark && !active && styles.menuTitleDark]} numberOfLines={1}>{item.label}</Text>
@@ -180,7 +180,7 @@ function DrawerRow({ item, active, onPress, isDark }: { item: DrawerItem; active
       {item.badge && item.badge > 0 ? (
         <View style={styles.menuBadge}><Text style={styles.menuBadgeText}>{unreadLabel(item.badge)}</Text></View>
       ) : (
-        <MaterialIcons name="chevron-right" size={18} color={active ? "#C9C9C9" : (isDark ? "#667085" : "#BBBBBB")} />
+        <MaterialIcons name="chevron-right" size={18} color={active ? "#D7C3B8" : (isDark ? "#76665E" : "#C9B6AA")} />
       )}
     </Pressable>
   );
@@ -188,67 +188,67 @@ function DrawerRow({ item, active, onPress, isDark }: { item: DrawerItem; active
 
 const styles = StyleSheet.create({
   header: { backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingBottom: 6, flexDirection: "row", alignItems: "center" },
-  headerIcon: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#F0F3F8" },
+  headerIcon: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
   brand: { flex: 1, flexDirection: "row", alignItems: "center", paddingLeft: 11, gap: 8 },
   brandLogo: { width: 30, height: 30, borderRadius: 7 },
-  brandName: { color: "#111111", fontSize: 19, fontWeight: "700", letterSpacing: -0.4 },
-  headerBadge: { position: "absolute", right: 3, top: 3, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: "#A43740", alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
+  brandName: { color: "#241510", fontSize: 19, fontWeight: "700", letterSpacing: -0.4 },
+  headerBadge: { position: "absolute", right: 3, top: 3, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: "#A43F32", alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
   headerBadgeText: { color: "#FFFFFF", fontWeight: "600", fontSize: 9 },
   drawerRoot: { flex: 1, flexDirection: "row" },
   scrim: { position: "absolute", top: 0, bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.42)" },
-  drawerPanel: { position: "absolute", top: 0, bottom: 0, left: 0, width: DRAWER_WIDTH, maxWidth: "85%", backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingBottom: 14, borderRightWidth: 1, borderRightColor: "#E3E3E3" },
-  drawerPanelDark: { backgroundColor: "#171108", borderRightColor: "#4A3823" },
+  drawerPanel: { position: "absolute", top: 0, bottom: 0, left: 0, width: DRAWER_WIDTH, maxWidth: "85%", backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingBottom: 14, borderRightWidth: 1, borderRightColor: "#E7D9CF" },
+  drawerPanelDark: { backgroundColor: "#401000", borderRightColor: "#7A4A2D" },
   drawerTop: { height: 40, alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
-  drawerEyebrow: { color: "#667085", fontSize: 10, fontWeight: "600", letterSpacing: 0.9 },
-  drawerEyebrowDark: { color: "#C8BCAA" },
-  closeButton: { width: 34, height: 34, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#F0F3F8" },
-  profileBlock: { flexDirection: "row", alignItems: "center", gap: 9, paddingTop: 12, paddingBottom: 11, backgroundColor: "#F0F3F8", borderRadius: 10, paddingHorizontal: 10 },
-  profileBlockDark: { backgroundColor: "#231A10" },
+  drawerEyebrow: { color: "#76665E", fontSize: 10, fontWeight: "600", letterSpacing: 0.9 },
+  drawerEyebrowDark: { color: "#D7B79C" },
+  closeButton: { width: 34, height: 34, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
+  profileBlock: { flexDirection: "row", alignItems: "center", gap: 9, paddingTop: 12, paddingBottom: 11, backgroundColor: "#EEEDF3", borderRadius: 10, paddingHorizontal: 10 },
+  profileBlockDark: { backgroundColor: "#581E08" },
   profileText: { flex: 1 },
-  profileName: { color: "#111111", fontSize: 15, fontWeight: "600" },
-  profileNameDark: { color: "#FBF7F0" },
+  profileName: { color: "#241510", fontSize: 15, fontWeight: "600" },
+  profileNameDark: { color: "#FFF9F2" },
   rolePill: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 3 },
-  roleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#9A6201" },
-  roleDotDark: { backgroundColor: "#D7A447" },
-  roleLabel: { color: "#667085", fontSize: 11, fontWeight: "500" },
-  roleLabelDark: { color: "#C8BCAA" },
+  roleDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#A95000" },
+  roleDotDark: { backgroundColor: "#F8A008" },
+  roleLabel: { color: "#76665E", fontSize: 11, fontWeight: "500" },
+  roleLabelDark: { color: "#D7B79C" },
   themeRow: { marginTop: 14, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", gap: 10 },
-  themeRowDark: { backgroundColor: "#231A10" },
+  themeRowDark: { backgroundColor: "#581E08" },
   themeText: { flex: 1 },
-  themeTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },
-  themeTitleDark: { color: "#FBF7F0" },
-  themeSub: { color: "#667085", fontSize: 11, marginTop: 2 },
-  themeSubDark: { color: "#C8BCAA" },
-  menuLabel: { color: "#667085", fontSize: 10, fontWeight: "600", letterSpacing: 0.9, marginTop: 16, marginBottom: 6 },
-  menuLabelDark: { color: "#C8BCAA" },
+  themeTitle: { color: "#241510", fontSize: 13, fontWeight: "600" },
+  themeTitleDark: { color: "#FFF9F2" },
+  themeSub: { color: "#76665E", fontSize: 11, marginTop: 2 },
+  themeSubDark: { color: "#D7B79C" },
+  menuLabel: { color: "#76665E", fontSize: 10, fontWeight: "600", letterSpacing: 0.9, marginTop: 16, marginBottom: 6 },
+  menuLabelDark: { color: "#D7B79C" },
   menu: { gap: 2 },
   menuRow: { minHeight: 48, borderRadius: 8, paddingHorizontal: 9, flexDirection: "row", alignItems: "center", gap: 9 },
-  menuRowActive: { backgroundColor: "#111111" },
+  menuRowActive: { backgroundColor: "#241510" },
   menuRowDark: { backgroundColor: "transparent" },
-  menuRowActiveDark: { backgroundColor: "#D7A447" },
-  menuIcon: { width: 32, height: 32, borderRadius: 7, alignItems: "center", justifyContent: "center", backgroundColor: "#F0F3F8" },
-  menuIconActive: { backgroundColor: "#9A6201" },
-  menuIconDark: { backgroundColor: "#231A10" },
+  menuRowActiveDark: { backgroundColor: "#F8A008" },
+  menuIcon: { width: 32, height: 32, borderRadius: 7, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
+  menuIconActive: { backgroundColor: "#A95000" },
+  menuIconDark: { backgroundColor: "#581E08" },
   menuText: { flex: 1 },
-  menuTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },
+  menuTitle: { color: "#241510", fontSize: 13, fontWeight: "600" },
   menuTitleActive: { color: "#FFFFFF" },
   // La rangée active est noire en clair, dorée en sombre : son libellé ne peut pas être le même.
-  // #FFFFFF donne 18,88:1 sur le noir mais 2,26:1 sur l'or ; #111111 y donne 8,35:1.
-  menuTitleActiveDark: { color: "#111111" },
-  menuTitleDark: { color: "#FBF7F0" },
-  menuCaption: { color: "#667085", fontSize: 11, marginTop: 1 },
-  menuCaptionActive: { color: "#C9C9C9" },
-  menuCaptionActiveDark: { color: "#3A2B1A" },
-  menuCaptionDark: { color: "#C8BCAA" },
-  menuBadge: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: "#A43740", paddingHorizontal: 5, alignItems: "center", justifyContent: "center" },
+  // #FFFFFF donne 18,88:1 sur le noir mais 2,26:1 sur l'or ; #241510 y donne 8,35:1.
+  menuTitleActiveDark: { color: "#241510" },
+  menuTitleDark: { color: "#FFF9F2" },
+  menuCaption: { color: "#76665E", fontSize: 11, marginTop: 1 },
+  menuCaptionActive: { color: "#D7C3B8" },
+  menuCaptionActiveDark: { color: "#4A1C0B" },
+  menuCaptionDark: { color: "#D7B79C" },
+  menuBadge: { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: "#A43F32", paddingHorizontal: 5, alignItems: "center", justifyContent: "center" },
   menuBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "600" },
   drawerFooter: { marginTop: "auto", paddingTop: 12 },
   securityRow: { flexDirection: "row", alignItems: "center", gap: 7, marginBottom: 10 },
-  securityText: { color: "#667085", fontSize: 11, fontWeight: "500" },
-  securityTextDark: { color: "#C8BCAA" },
+  securityText: { color: "#76665E", fontSize: 11, fontWeight: "500" },
+  securityTextDark: { color: "#D7B79C" },
   signOut: { height: 42, borderRadius: 8, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", gap: 7, flexDirection: "row" },
-  signOutDark: { backgroundColor: "#171108" },
-  signOutText: { color: "#A43740", fontSize: 12, fontWeight: "600" },
-  signOutTextDark: { color: "#F28B93" },
+  signOutDark: { backgroundColor: "#401000" },
+  signOutText: { color: "#A43F32", fontSize: 12, fontWeight: "600" },
+  signOutTextDark: { color: "#F09286" },
   pressed: { opacity: 0.67 },
 });

@@ -195,7 +195,7 @@ export default function ProfileScreen() {
                 <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
               )}
               <View style={styles.avatarEdit}>
-                <MaterialIcons name="photo-camera" size={12} color="#667085" />
+                <MaterialIcons name="photo-camera" size={12} color="#76665E" />
               </View>
             </Pressable>
             <View style={styles.headerIdentity}>
@@ -203,7 +203,7 @@ export default function ProfileScreen() {
               <Text style={styles.roleLine} numberOfLines={1}>{roleLine}</Text>
             </View>
             <Pressable onPress={openEditor} style={({ pressed }) => [styles.editBtn, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Modifier mon profil">
-              <MaterialIcons name="edit" size={16} color="#667085" />
+              <MaterialIcons name="edit" size={16} color="#76665E" />
             </Pressable>
           </View>
 
@@ -410,7 +410,7 @@ export default function ProfileScreen() {
             {locationError ? <Text style={styles.error}>{locationError}</Text> : null}
             <ScrollView style={{ maxHeight: 380, marginTop: 8 }}>
               {(countriesQuery.data ?? []).map((c) => (
-                <Pressable key={c.id} onPress={() => void selectCountry(c.id)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, c.id === profile?.country && { borderColor: theme.primary, backgroundColor: isDark ? theme.pressed : "#F0F3F8" }, pressed && { opacity: 0.8 }]}>
+                <Pressable key={c.id} onPress={() => void selectCountry(c.id)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, c.id === profile?.country && { borderColor: theme.primary, backgroundColor: isDark ? theme.pressed : "#EEEDF3" }, pressed && { opacity: 0.8 }]}>
                   <Text style={styles.countryRowFlag}>{countryFlagEmoji(c.id)}</Text>
                   <Text style={[styles.countryOptionText, { color: theme.foreground, flex: 1 }, c.id === profile?.country && { color: theme.primary, fontWeight: "800" }]}>{c.name}</Text>
                   {locationSaving === "country" ? null : c.id === profile?.country ? <MaterialIcons name="check-circle" size={20} color={theme.primary} /> : null}
@@ -457,7 +457,7 @@ export default function ProfileScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => !requestDeletionMutation.isPending && setDeleteConfirmOpen(false)} />
           <View style={[styles.sheet, isDark && { backgroundColor: theme.surface }]}>
             <View style={styles.sheetGrip} />
-            <View style={styles.deleteIconWrap}><MaterialIcons name="delete-forever" size={26} color="#A43740" /></View>
+            <View style={styles.deleteIconWrap}><MaterialIcons name="delete-forever" size={26} color="#A43F32" /></View>
             <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Supprimer votre compte ?</Text>
             <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>
               Vous aurez 30 jours pour changer d’avis. Pendant ce délai, votre compte sera bloqué et vous pourrez annuler la suppression à tout moment. Passé ce délai, vos données personnelles seront définitivement supprimées.
@@ -479,13 +479,13 @@ export default function ProfileScreen() {
             <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Modifier mon profil</Text>
             <Pressable onPress={() => void pickPhoto()} style={({ pressed }) => [styles.photoPicker, pressed && styles.pressed]}>
               <View style={styles.photoPickerIcon}>
-                <MaterialIcons name="add-a-photo" size={22} color="#667085" />
+                <MaterialIcons name="add-a-photo" size={22} color="#76665E" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.photoPickerText}>{photoBase64 || photoUri ? "Changer la photo" : "Ajouter une photo"}</Text>
                 <Text style={styles.photoPickerSub}>Format carré, JPEG/PNG/WebP</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={16} color="#667085" />
+              <MaterialIcons name="chevron-right" size={16} color="#76665E" />
             </Pressable>
             <Text style={[styles.fieldLabel, isDark && { color: theme.muted }]}>NOM COMPLET</Text>
             <TextInput
@@ -508,8 +508,8 @@ export default function ProfileScreen() {
 
 const VERIFY_TONE = {
   verified: { color: "#145C45", background: "#E7F2EC", icon: "verified-user" },
-  pending: { color: "#6B4600", background: "#FBEEDD", icon: "hourglass-empty" },
-  blocked: { color: "#8C2F37", background: "#F7EAEB", icon: "error-outline" },
+  pending: { color: "#7A3000", background: "#FFF0D8", icon: "hourglass-empty" },
+  blocked: { color: "#8D362B", background: "#F8E7E3", icon: "error-outline" },
 } as const satisfies Record<string, { color: string; background: string; icon: React.ComponentProps<typeof MaterialIcons>["name"] }>;
 
 /** Un chiffre que le rôle a gagné, avec ce qu'il compte écrit dessous. */
@@ -517,7 +517,7 @@ function StatTile({ icon, value, label }: { icon: React.ComponentProps<typeof Ma
   return (
     <View style={styles.statTile}>
       <View style={styles.statHead}>
-        <MaterialIcons name={icon} size={14} color="#667085" />
+        <MaterialIcons name={icon} size={14} color="#76665E" />
         <Text style={styles.statValue} numberOfLines={1}>{value}</Text>
       </View>
       <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
@@ -544,13 +544,13 @@ function MenuRow({ icon, label, sub, tone = "default", onPress, last }: { icon: 
       style={({ pressed }) => [styles.menuRow, !last && styles.menuRowBorder, pressed && styles.pressed]}
     >
       <View style={[styles.menuIcon, danger && styles.menuIconDanger]}>
-        <MaterialIcons name={icon} size={15} color={danger ? "#A43740" : "#667085"} />
+        <MaterialIcons name={icon} size={15} color={danger ? "#A43F32" : "#76665E"} />
       </View>
       <View style={styles.menuBody}>
         <Text style={[styles.menuLabel, danger && styles.menuLabelDanger]} numberOfLines={1}>{label}</Text>
         {sub ? <Text style={styles.menuSub} numberOfLines={1}>{sub}</Text> : null}
       </View>
-      {danger ? null : <MaterialIcons name="chevron-right" size={16} color="#667085" />}
+      {danger ? null : <MaterialIcons name="chevron-right" size={16} color="#76665E" />}
     </Pressable>
   );
 }
@@ -559,72 +559,72 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   content: { paddingBottom: 32 },
 
-  header: { backgroundColor: "#FFFFFF", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#E8ECF2", paddingHorizontal: 16, paddingTop: 14, paddingBottom: 14, gap: 13 },
+  header: { backgroundColor: "#FFFFFF", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#F1E7E0", paddingHorizontal: 16, paddingTop: 14, paddingBottom: 14, gap: 13 },
   headerRow: { flexDirection: "row", alignItems: "center", gap: 13 },
   headerIdentity: { flex: 1, minWidth: 0 },
   avatarWrap: { position: "relative" },
-  avatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
+  avatar: { width: 58, height: 58, borderRadius: 29, backgroundColor: "#A95000", alignItems: "center", justifyContent: "center" },
   avatarImage: { width: 58, height: 58, borderRadius: 29 },
   avatarText: { color: "#FFFFFF", fontSize: 19, fontWeight: "700" },
-  avatarEdit: { position: "absolute", right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: "#FFFFFF", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", alignItems: "center", justifyContent: "center" },
-  name: { color: "#111111", fontSize: 18, fontWeight: "700", letterSpacing: -0.2 },
-  roleLine: { color: "#667085", fontSize: 12, marginTop: 3 },
-  editBtn: { width: 38, height: 38, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
+  avatarEdit: { position: "absolute", right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: "#FFFFFF", borderWidth: StyleSheet.hairlineWidth, borderColor: "#F1E7E0", alignItems: "center", justifyContent: "center" },
+  name: { color: "#241510", fontSize: 18, fontWeight: "700", letterSpacing: -0.2 },
+  roleLine: { color: "#76665E", fontSize: 12, marginTop: 3 },
+  editBtn: { width: 38, height: 38, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: "#F1E7E0", backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
 
   verifyBand: { flexDirection: "row", alignItems: "center", gap: 9, borderRadius: 10, paddingHorizontal: 11, paddingVertical: 9, minHeight: 44 },
   verifyBody: { flex: 1, minWidth: 0 },
   verifyTitle: { fontSize: 12.5, fontWeight: "700" },
-  verifyDetail: { color: "#5B6472", fontSize: 11, lineHeight: 15, marginTop: 2 },
+  verifyDetail: { color: "#705D53", fontSize: 11, lineHeight: 15, marginTop: 2 },
   verifyAction: { fontSize: 11.5, fontWeight: "700" },
 
   statRow: { flexDirection: "row", gap: 9 },
-  statTile: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", borderRadius: 11, paddingHorizontal: 12, paddingVertical: 10 },
+  statTile: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, borderWidth: StyleSheet.hairlineWidth, borderColor: "#F1E7E0", borderRadius: 11, paddingHorizontal: 12, paddingVertical: 10 },
   statHead: { flexDirection: "row", alignItems: "center", gap: 5 },
-  statValue: { color: "#111111", fontSize: 17, fontWeight: "800", flexShrink: 1 },
-  statLabel: { color: "#667085", fontSize: 11, marginTop: 2 },
+  statValue: { color: "#241510", fontSize: 17, fontWeight: "800", flexShrink: 1 },
+  statLabel: { color: "#76665E", fontSize: 11, marginTop: 2 },
 
   body: { paddingHorizontal: 16, paddingTop: 14, gap: 16 },
 
   section: { gap: 8 },
-  sectionTitle: { color: "#667085", fontSize: 10, fontWeight: "700", letterSpacing: 0.9, textTransform: "uppercase", paddingHorizontal: 2 },
-  sectionCard: { backgroundColor: "#FFFFFF", borderRadius: 14, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2" },
+  sectionTitle: { color: "#76665E", fontSize: 10, fontWeight: "700", letterSpacing: 0.9, textTransform: "uppercase", paddingHorizontal: 2 },
+  sectionCard: { backgroundColor: "#FFFFFF", borderRadius: 14, overflow: "hidden", borderWidth: StyleSheet.hairlineWidth, borderColor: "#F1E7E0" },
   menuRow: { flexDirection: "row", alignItems: "center", gap: 11, paddingHorizontal: 13, paddingVertical: 12, minHeight: 52 },
-  menuRowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#F0F3F8" },
-  menuIcon: { width: 28, height: 28, borderRadius: 9, backgroundColor: "#F0F3F8", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  menuIconDanger: { backgroundColor: "#F7EAEB" },
+  menuRowBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#EEEDF3" },
+  menuIcon: { width: 28, height: 28, borderRadius: 9, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  menuIconDanger: { backgroundColor: "#F8E7E3" },
   menuBody: { flex: 1, minWidth: 0 },
-  menuLabel: { color: "#111111", fontSize: 13.5, fontWeight: "600" },
-  menuLabelDanger: { color: "#A43740" },
-  menuSub: { color: "#667085", fontSize: 11, marginTop: 2 },
+  menuLabel: { color: "#241510", fontSize: 13.5, fontWeight: "600" },
+  menuLabelDanger: { color: "#A43F32" },
+  menuSub: { color: "#76665E", fontSize: 11, marginTop: 2 },
 
   deleteLink: { alignSelf: "flex-start", paddingHorizontal: 2, paddingVertical: 8 },
-  deleteLinkText: { color: "#98A2B3", fontSize: 12.5, fontWeight: "600", textDecorationLine: "underline" },
+  deleteLinkText: { color: "#9B8478", fontSize: 12.5, fontWeight: "600", textDecorationLine: "underline" },
 
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.42)" },
   sheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, paddingTop: 8, paddingBottom: 24 },
-  sheetGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#E3E3E3", alignSelf: "center", marginBottom: 14 },
-  sheetTitle: { color: "#111111", fontSize: 17, fontWeight: "600" },
-  sheetSubtitle: { color: "#667085", fontSize: 12, marginTop: 4 },
+  sheetGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#E7D9CF", alignSelf: "center", marginBottom: 14 },
+  sheetTitle: { color: "#241510", fontSize: 17, fontWeight: "600" },
+  sheetSubtitle: { color: "#76665E", fontSize: 12, marginTop: 4 },
 
   photoPicker: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, backgroundColor: "#FFFFFF", borderRadius: 10, marginTop: 14 },
   photoPickerIcon: { width: 48, height: 48, borderRadius: 12, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
-  photoPickerText: { color: "#111111", fontSize: 12, fontWeight: "600" },
-  photoPickerSub: { color: "#667085", fontSize: 10, marginTop: 2 },
+  photoPickerText: { color: "#241510", fontSize: 12, fontWeight: "600" },
+  photoPickerSub: { color: "#76665E", fontSize: 10, marginTop: 2 },
 
   vehiclesList: { gap: 2, marginTop: 12 },
   vehicleRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 12, borderWidth: 1, borderRadius: 10, marginBottom: 2 },
   vehicleCheckbox: { width: 22, height: 22, borderRadius: 5, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
   vehicleLabel: { fontSize: 14, fontWeight: "600", flex: 1 },
 
-  fieldLabel: { color: "#667085", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
-  input: { backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: 1, borderColor: "#E3E3E3", paddingHorizontal: 12, paddingVertical: 12, color: "#111111", fontSize: 13, fontWeight: "500" },
+  fieldLabel: { color: "#76665E", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase", marginTop: 16, marginBottom: 6 },
+  input: { backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: 1, borderColor: "#E7D9CF", paddingHorizontal: 12, paddingVertical: 12, color: "#241510", fontSize: 13, fontWeight: "500" },
   countryOptionText: { fontSize: 13, fontWeight: "600" },
   countryRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 10, borderWidth: 1, marginBottom: 8 },
   countryRowFlag: { fontSize: 20 },
   deleteIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", alignSelf: "center", marginBottom: 4 },
-  inputError: { borderWidth: 1, borderColor: "#A43740" },
-  helper: { color: "#667085", fontSize: 10, marginTop: 4 },
-  error: { color: "#A43740", fontSize: 11, fontWeight: "600", marginTop: 4 },
+  inputError: { borderWidth: 1, borderColor: "#A43F32" },
+  helper: { color: "#76665E", fontSize: 10, marginTop: 4 },
+  error: { color: "#A43F32", fontSize: 11, fontWeight: "600", marginTop: 4 },
   saveButton: { marginTop: 18 },
 
   pressed: { opacity: 0.7 },

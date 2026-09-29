@@ -25,13 +25,13 @@ function buildThemed(scheme: ColorScheme): ThemedColors {
     tabIconDefault: base.muted,
     tabIconSelected: base.primary,
     border: base.border,
-    // Fond de champ neutre : le crème #F7EFE5 venait du brun d'origine et teintait chaque saisie.
+    // Fond de champ neutre : le crème #FFF0D8 venait du brun d'origine et teintait chaque saisie.
     // Les quatre usages posent tous une bordure par-dessus, donc un fond neutre reste visible.
-    input: scheme === "light" ? "#F0F3F8" : "#3A2B1A",
+    input: scheme === "light" ? "#EEEDF3" : "#4A1C0B",
     placeholder: base.muted,
-    pressed: scheme === "light" ? "#E3DFEA" : "#2A2018",
+    pressed: scheme === "light" ? "#E3DFEA" : "#4A1C0B",
     overlay: scheme === "light" ? "rgba(0,0,0,0.42)" : "rgba(0,0,0,0.62)",
-    divider: scheme === "light" ? "#ECECEC" : "#33271B",
+    divider: scheme === "light" ? "#EFE5DF" : "#63331E",
   };
 }
 

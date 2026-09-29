@@ -21,7 +21,7 @@ describe("palette des champs et menus", () => {
   it("expose un fond de champ neutre, pas une teinte de la couleur de marque", () => {
     // Le crème #F7EFE5 venait du brun d'origine : chaque champ arrivait teinté. Les quatre écrans
     // qui lisent ce token posent tous une bordure par-dessus, donc un fond neutre reste visible.
-    expect(themeSource).toContain('input: scheme === "light" ? "#F0F3F8" : "#3A2B1A"');
+    expect(themeSource).toContain('input: scheme === "light" ? "#EEEDF3" : "#4A1C0B"');
   });
 
   it("rend en noir le texte que l'utilisateur tape, jamais dans la couleur de marque", () => {
@@ -30,7 +30,7 @@ describe("palette des champs et menus", () => {
     // fond blanc). La règle vaut pour n'importe quelle couleur de marque, pas seulement celle-là.
     for (const formSource of [createDeliverySource, contactSource, reviewSource, reportSource, profileSource, walletSource]) {
       expect(formSource).toMatch(/#FFFFFF|backgroundColor: theme\.input/);
-      expect(formSource).not.toMatch(/(input|textarea|comment)[a-zA-Z]*: \{[^}]*color: "#9A6201"/);
+      expect(formSource).not.toMatch(/(input|textarea|comment)[a-zA-Z]*: \{[^}]*color: "#A95000"/);
     }
   });
 
@@ -39,7 +39,7 @@ describe("palette des champs et menus", () => {
     expect(yangoSource).toContain("backgroundColor: theme.input");
     for (const pickerSource of [nativeHomeSource, webHomeSource]) {
       expect(pickerSource).toContain("#FFFFFF");
-      expect(pickerSource).toContain('searchInput: { flex: 1, color: "#111111"');
+      expect(pickerSource).toContain('searchInput: { flex: 1, color: "#241510"');
     }
   });
 
@@ -47,6 +47,6 @@ describe("palette des champs et menus", () => {
     // Un bouton par écran : accueil, numéro, code, rôle, engins, nom. Ils avaient leur propre palette
     // (fond orange, texte blanc, 2,16:1) ; ils prennent maintenant celle de tout le monde.
     expect((authSource.match(/<TikisseButton /g) ?? []).length).toBe(6);
-    expect(buttonSource).toContain('primary: { background: "#9A6201", foreground: "#FFFFFF"');
+    expect(buttonSource).toContain('primary: { background: "#A95000", foreground: "#FFFFFF"');
   });
 });

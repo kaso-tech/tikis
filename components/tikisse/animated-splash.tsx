@@ -28,12 +28,12 @@ import { useAppReady } from "@/lib/app-ready";
  * l'application est prête (lib/app-ready.ts), jamais avant la fin de la séquence, jamais plus tard
  * qu'un plafond de sécurité. « Réduire les animations » : un simple fondu.
  */
-export const SPLASH_BACKGROUND = "#2A1407";
+export const SPLASH_BACKGROUND = "#401000";
 export const SPLASH_LOGO_SIZE = 128;
 
-const AMBER = "#F2A32B";
-const AMBER_SOFT = "#E0A84A";
-const CREAM = "#FBF3E6";
+const AMBER = "#F8A008";
+const AMBER_SOFT = "#F6B83C";
+const CREAM = "#FFF7ED";
 const WORD = "Tikisse";
 
 // Durées (ms). Voir la maquette : la séquence complète dure 1,9 s avant la sortie.
@@ -161,9 +161,9 @@ export function AnimatedSplash() {
         <Svg width="100%" height="100%">
           <Defs>
             <RadialGradient id="splash-glow" cx="50%" cy="43%" rx="75%" ry="60%" fx="50%" fy="43%">
-              <Stop offset="0" stopColor="#6E3710" />
-              <Stop offset="0.42" stopColor="#3C1C08" />
-              <Stop offset="1" stopColor="#1C0D04" />
+              <Stop offset="0" stopColor="#7A3000" />
+              <Stop offset="0.42" stopColor="#4C1604" />
+              <Stop offset="1" stopColor="#240900" />
             </RadialGradient>
           </Defs>
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#splash-glow)" />
@@ -263,8 +263,8 @@ const styles = StyleSheet.create({
   ring: { position: "absolute", top: 10, left: 10, right: 10, bottom: 10, borderRadius: 30, borderWidth: 2, borderColor: AMBER },
   speed: { position: "absolute", right: SPLASH_LOGO_SIZE - 8, top: SPLASH_LOGO_SIZE / 2 - 16, gap: 9 },
   logoShadow: {
-    position: "absolute", top: 10, left: 10, right: 10, bottom: 10, borderRadius: 26, backgroundColor: "#3A1A07",
-    shadowColor: "#0A0400", shadowOpacity: 0.45, shadowRadius: 12, shadowOffset: { width: 0, height: 16 }, elevation: 14,
+    position: "absolute", top: 10, left: 10, right: 10, bottom: 10, borderRadius: 26, backgroundColor: "#481300",
+    shadowColor: "#1A0702", shadowOpacity: 0.45, shadowRadius: 12, shadowOffset: { width: 0, height: 16 }, elevation: 14,
   },
   logo: { width: SPLASH_LOGO_SIZE, height: SPLASH_LOGO_SIZE },
   wordmark: { position: "absolute", top: SPLASH_LOGO_SIZE + 22, width: 280, alignItems: "center" },

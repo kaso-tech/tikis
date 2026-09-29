@@ -156,14 +156,14 @@ export default function EarningsScreen() {
             <Text style={styles.balanceValue}>{isLoading ? "Chargement…" : formatMoney(totalEarnings)}</Text>
             {comparison.trend !== null ? (
               <View style={[styles.trendPill, comparison.trend < 0 && styles.trendPillDown]}>
-                <MaterialIcons name={comparison.trend >= 0 ? "trending-up" : "trending-down"} size={11} color={comparison.trend >= 0 ? "#48B889" : "#FBBF24"} />
+                <MaterialIcons name={comparison.trend >= 0 ? "trending-up" : "trending-down"} size={11} color={comparison.trend >= 0 ? "#4D9B72" : "#F8A008"} />
                 <Text style={[styles.trendText, comparison.trend < 0 && styles.trendTextDown]}>
                   {comparison.trend >= 0 ? "+" : ""}{comparison.trend}% vs 7 j
                 </Text>
               </View>
             ) : (
               <View style={styles.trendPill}>
-                <MaterialIcons name="schedule" size={11} color="#48B889" />
+                <MaterialIcons name="schedule" size={11} color="#4D9B72" />
                 <Text style={styles.trendText}>Comparaison 7 j</Text>
               </View>
             )}
@@ -201,7 +201,7 @@ export default function EarningsScreen() {
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={PERIOD_META[key].label}
               >
-                <MaterialIcons name={PERIOD_META[key].icon} size={14} color={active ? "#FFFFFF" : "#667085"} />
+                <MaterialIcons name={PERIOD_META[key].icon} size={14} color={active ? "#FFFFFF" : "#76665E"} />
                 <Text style={[styles.periodTabText, active && styles.periodTabTextActive]}>{PERIOD_META[key].label}</Text>
               </Pressable>
             );
@@ -343,22 +343,22 @@ function StatCard({ icon, value, label, tone }: { icon: React.ComponentProps<typ
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F0F3F8" },
+  safe: { flex: 1, backgroundColor: "#EEEDF3" },
   pressed: { opacity: 0.7 },
   scroll: { padding: 12, paddingBottom: 32, gap: 14 },
 
   // Le solde est une information, pas une action : il se lit sur une carte sombre, comme dans les applications
   // bancaires, et non sur un aplat de la couleur de marque — où le blanc ne donnait que 2,16:1 (et 1,51:1 pour les
   // libellés à 55 % d'opacité). Le voile de la couleur de marque conserve sa chaleur sans toucher à la lisibilité.
-  balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#111111", position: "relative", overflow: "hidden" },
-  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#9A6201", opacity: 0.18, borderRadius: 14 },
+  balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#241510", position: "relative", overflow: "hidden" },
+  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#A95000", opacity: 0.18, borderRadius: 14 },
   balanceEyebrow: { color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   balanceValueRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
   balanceValue: { color: "#FFFFFF", fontSize: 28, fontWeight: "700", lineHeight: 34, includeFontPadding: false },
   trendPill: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: "rgba(22,122,85,0.25)", borderRadius: 99 },
   trendPillDown: { backgroundColor: "rgba(180,35,45,0.25)" },
-  trendText: { color: "#48B889", fontSize: 10, fontWeight: "700" },
-  trendTextDown: { color: "#FBBF24" },
+  trendText: { color: "#4D9B72", fontSize: 10, fontWeight: "700" },
+  trendTextDown: { color: "#F8A008" },
   balanceDivider: { height: 1, backgroundColor: "rgba(255,255,255,0.18)" },
   balanceRows: { flexDirection: "row", gap: 12 },
   balanceCol: { flex: 1 },
@@ -367,16 +367,16 @@ const styles = StyleSheet.create({
 
   periodTabs: { flexDirection: "row", gap: 6, paddingHorizontal: 2 },
   periodTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 9, borderRadius: 9, borderWidth: 1 },
-  periodTabActive: { backgroundColor: "#9A6201", borderColor: "#9A6201" },
+  periodTabActive: { backgroundColor: "#A95000", borderColor: "#A95000" },
   periodTabText: { fontSize: 11, fontWeight: "600" },
   periodTabTextActive: { color: "#FFFFFF" },
 
   periodDescription: { fontSize: 11, lineHeight: 16, paddingHorizontal: 4 },
 
   flowTabs: { flexDirection: "row", gap: 6, paddingHorizontal: 2 },
-  flowTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 8, borderRadius: 9, borderWidth: 1, borderColor: "#E3E3E3", backgroundColor: "#FFFFFF" },
-  flowTabActive: { backgroundColor: "#9A6201", borderColor: "#9A6201" },
-  flowTabText: { fontSize: 11, fontWeight: "600", color: "#667085" },
+  flowTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 8, borderRadius: 9, borderWidth: 1, borderColor: "#E7D9CF", backgroundColor: "#FFFFFF" },
+  flowTabActive: { backgroundColor: "#A95000", borderColor: "#A95000" },
+  flowTabText: { fontSize: 11, fontWeight: "600", color: "#76665E" },
   flowTabTextActive: { color: "#FFFFFF" },
 
   bonusBanner: { flexDirection: "row", alignItems: "center", gap: 6, padding: 10, borderRadius: 9 },
@@ -394,8 +394,8 @@ const styles = StyleSheet.create({
 
   card: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, gap: 10 },
   cardHeader: { gap: 2 },
-  cardTitle: { color: "#111111", fontSize: 13, fontWeight: "700" },
-  cardSubtitle: { color: "#667085", fontSize: 11, lineHeight: 16 },
+  cardTitle: { color: "#241510", fontSize: 13, fontWeight: "700" },
+  cardSubtitle: { color: "#76665E", fontSize: 11, lineHeight: 16 },
 
   barRow: { gap: 6 },
   barRowDivider: { paddingBottom: 8, borderBottomWidth: 1, marginBottom: 8 },

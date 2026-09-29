@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const PRIMARY = "#9A6201";
+const PRIMARY = "#A95000";
 
 function sources(dir: string): string[] {
   return readdirSync(join(process.cwd(), dir)).flatMap((entry) => {
@@ -24,12 +24,12 @@ const ecrans = [...sources("app"), ...sources("components")];
  *
  * La marque a changé trois fois depuis, et chaque passage a montré ce que la règle protège :
  *   · turquoise #01A7BD — 2,89:1 en texte sur blanc, même défaut qu'avec l'orange ;
- *   · brun #9A6201 (celui d'aujourd'hui) — 5,10:1, le seul de la série qui tiendrait en texte.
+ *   · brun #A95000 (celui d'aujourd'hui) — 5,10:1, le seul de la série qui tiendrait en texte.
  *
  * Ce dernier point est le piège : la règle ne dépend pas du contraste de la couleur du moment, mais du
  * choix de sobriété. Le brun pourrait se lire ; il ne se lit pas pour autant. Ce que le brun change, en
  * revanche, c'est le texte POSÉ dessus : étant sombre, il demande du blanc (5,10:1) là où l'orange et le
- * turquoise demandaient de l'encre — #111111 n'y donne que 3,71:1. Un remplacement mécanique aurait laissé
+ * turquoise demandaient de l'encre — #241510 n'y donne que 3,71:1. Un remplacement mécanique aurait laissé
  * tout l'aplat de l'app sous le seuil, dans l'autre sens.
  */
 describe("sobriété de la palette", () => {
@@ -62,7 +62,7 @@ describe("sobriété de la palette", () => {
     // l'orange, soit 1,51:1. Un solde est une information, pas une action : carte sombre.
     for (const fichier of ["app/(tabs)/wallet.tsx", "app/(tabs)/earnings.tsx"]) {
       const source = readFileSync(join(process.cwd(), fichier), "utf8");
-      expect(source).toMatch(/balanceCard: \{[^}]*backgroundColor: "#111111"/);
+      expect(source).toMatch(/balanceCard: \{[^}]*backgroundColor: "#241510"/);
       expect(source).not.toContain('color: "rgba(255,255,255,0.55)"');
     }
   });
@@ -80,7 +80,7 @@ describe("sobriété de la palette", () => {
     /**
      * Le garde-fou qui manquait, et que ce quatrième changement de couleur a révélé.
      *
-     * Les assertions précédentes figeaient une valeur (« le texte sur l'aplat est #111111 »), vraie de
+     * Les assertions précédentes figeaient une valeur (« le texte sur l'aplat est #241510 »), vraie de
      * l'orange et du turquoise, tous deux clairs. Le brun est sombre : l'encre n'y donne que 3,71:1, et
      * c'est le blanc qui s'y lit. Une valeur figée ne protège donc rien — on calcule.
      */

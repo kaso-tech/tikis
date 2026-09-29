@@ -59,7 +59,7 @@ describe("parcours de connexion et d’inscription", () => {
 
   it("montre les points de progression restants", () => {
     // Ils étaient de la couleur exacte du fond.
-    expect(source).not.toContain('stepDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#F0F3F8" }');
+    expect(source).not.toContain('stepDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#EEEDF3" }');
   });
 
   it("signale le mode simulation comme un avertissement, pas comme une information", () => {

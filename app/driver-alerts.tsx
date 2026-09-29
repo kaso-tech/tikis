@@ -152,8 +152,8 @@ export default function DriverAlertsScreen() {
               value={preferences.opportunityPushEnabled}
               onValueChange={(next) => void togglePush(next)}
               disabled={saving}
-              trackColor={{ false: theme.border, true: "#C6A26A" }}
-              thumbColor={preferences.opportunityPushEnabled ? "#9A6201" : "#FFFFFF"}
+              trackColor={{ false: theme.border, true: "#E2A841" }}
+              thumbColor={preferences.opportunityPushEnabled ? "#A95000" : "#FFFFFF"}
             />
           </View>
           <Text style={styles.cardNote}>
@@ -185,7 +185,7 @@ export default function DriverAlertsScreen() {
 
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <View style={styles.cardIcon}><MaterialIcons name="my-location" size={17} color="#667085" /></View>
+            <View style={styles.cardIcon}><MaterialIcons name="my-location" size={17} color="#76665E" /></View>
             <Text style={styles.cardTitle}>Position de référence</Text>
           </View>
           <Text style={styles.cardText}>
@@ -196,9 +196,9 @@ export default function DriverAlertsScreen() {
             <MaterialIcons
               name={hasBasePosition ? "check-circle" : "error-outline"}
               size={15}
-              color={hasBasePosition ? "#167A55" : "#9A6200"}
+              color={hasBasePosition ? "#2E704E" : "#C65A00"}
             />
-            <Text style={[styles.baseStatusText, { color: hasBasePosition ? "#167A55" : "#9A6200" }]}>
+            <Text style={[styles.baseStatusText, { color: hasBasePosition ? "#2E704E" : "#C65A00" }]}>
               {hasBasePosition ? formatBaseAge(preferences.baseUpdatedAt) : "Position non enregistrée"}
             </Text>
           </View>
@@ -215,7 +215,7 @@ export default function DriverAlertsScreen() {
 
         {error ? (
           <View style={styles.feedbackError}>
-            <MaterialIcons name="error-outline" size={16} color="#B4232D" />
+            <MaterialIcons name="error-outline" size={16} color="#A43F32" />
             <View style={styles.feedbackCopy}>
               <Text style={styles.feedbackErrorText}>{error}</Text>
               {Platform.OS !== "web" && error.includes("bloquées") ? (
@@ -258,7 +258,7 @@ function RadiusSection({ styles, icon, title, description, value, cityName, disa
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <View style={styles.cardIcon}><MaterialIcons name={icon} size={17} color="#667085" /></View>
+        <View style={styles.cardIcon}><MaterialIcons name={icon} size={17} color="#76665E" /></View>
         <Text style={styles.cardTitle}>{title}</Text>
       </View>
       <Text style={styles.cardText}>{description}</Text>
@@ -299,23 +299,23 @@ function makeStyles(theme: ThemedColors) {
     cardTitle: { color: theme.foreground, fontSize: 14, fontWeight: "700" },
     cardText: { color: theme.muted, fontSize: 12.5, lineHeight: 18 },
     cardNote: { color: theme.muted, fontSize: 11.5, lineHeight: 17, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border, paddingTop: 9 },
-    cardCurrent: { color: "#111111", fontSize: 11.5, fontWeight: "700" },
+    cardCurrent: { color: "#241510", fontSize: 11.5, fontWeight: "700" },
     switchRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
     switchCopy: { flex: 1, gap: 4 },
     choices: { flexDirection: "row", flexWrap: "wrap", gap: 7, marginTop: 2 },
     choice: { paddingHorizontal: 12, minHeight: 38, justifyContent: "center", borderRadius: 9, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.background },
-    choiceSelected: { borderColor: "#9A6201", backgroundColor: "#F7EFE5" },
+    choiceSelected: { borderColor: "#A95000", backgroundColor: "#FFF0D8" },
     choiceText: { color: theme.foreground, fontSize: 12.5, fontWeight: "600" },
-    choiceTextSelected: { color: "#111111" },
+    choiceTextSelected: { color: "#241510" },
     baseStatus: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },
     baseStatusOk: { backgroundColor: "#E6F4ED" },
-    baseStatusMissing: { backgroundColor: "#FEF6E2" },
+    baseStatusMissing: { backgroundColor: "#FFF5E7" },
     baseStatusText: { fontSize: 11.5, fontWeight: "600", flex: 1 },
     baseButton: { minHeight: 44 },
-    feedbackError: { flexDirection: "row", gap: 8, backgroundColor: "#FDEBEC", borderRadius: 9, padding: 11 },
+    feedbackError: { flexDirection: "row", gap: 8, backgroundColor: "#FBE9E5", borderRadius: 9, padding: 11 },
     feedbackCopy: { flex: 1, gap: 5 },
-    feedbackErrorText: { color: "#B4232D", fontSize: 12, lineHeight: 17, fontWeight: "600" },
-    feedbackLink: { color: "#B4232D", fontSize: 12, fontWeight: "700", textDecorationLine: "underline" },
+    feedbackErrorText: { color: "#A43F32", fontSize: 12, lineHeight: 17, fontWeight: "600" },
+    feedbackLink: { color: "#A43F32", fontSize: 12, fontWeight: "700", textDecorationLine: "underline" },
     feedbackInfo: { color: theme.muted, fontSize: 12, lineHeight: 17, paddingHorizontal: 2 },
     centered: { flex: 1, alignItems: "center", justifyContent: "center", gap: 8, padding: 28 },
     emptyTitle: { color: theme.foreground, fontSize: 15, fontWeight: "700" },

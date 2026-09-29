@@ -20,11 +20,11 @@ import { StyleSheet, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 /** Couleur du point de collecte : le brun de la marque. */
-export const PICKUP_COLOR = "#9A6201";
+export const PICKUP_COLOR = "#A95000";
 /** Couleur de la destination : le rouge des états terminaux. */
-export const DROPOFF_COLOR = "#A43740";
+export const DROPOFF_COLOR = "#A43F32";
 /** Couleur du livreur : l'encre, pour qu'il ressorte des deux extrémités. */
-export const DRIVER_COLOR = "#111111";
+export const DRIVER_COLOR = "#241510";
 
 /**
  * Ancrage d'une épingle : la pointe, en bas, tombe sur la coordonnée.

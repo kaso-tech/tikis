@@ -53,12 +53,12 @@ export function TikisseLogoutProvider({ children }: { children: React.ReactNode 
         <View style={styles.overlay}>
           <Pressable disabled={loading} style={styles.scrim} onPress={() => setVisible(false)} />
           <View style={styles.dialog}>
-            <View style={styles.icon}><MaterialIcons name="logout" size={25} color="#B4232D" /></View>
+            <View style={styles.icon}><MaterialIcons name="logout" size={25} color="#A43F32" /></View>
             <Text style={styles.title}>Se déconnecter ?</Text>
             <Text style={styles.description}>Vous devrez ressaisir votre numéro et le code de vérification.</Text>
             {loading ? (
               <View style={styles.loading}>
-                <ActivityIndicator color="#B4232D" />
+                <ActivityIndicator color="#A43F32" />
                 <Text style={styles.loadingText}>Fermeture sécurisée de la session…</Text>
               </View>
             ) : (
@@ -88,16 +88,16 @@ export function useTikisseLogout() {
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: "center", padding: 24 },
   scrim: { ...StyleSheet.absoluteFill, backgroundColor: "rgba(8,22,42,0.56)" },
-  dialog: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 24, borderWidth: 1, borderColor: "#E3E3E3" },
-  icon: { width: 52, height: 52, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "#FFF1F1" },
+  dialog: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 24, borderWidth: 1, borderColor: "#E7D9CF" },
+  icon: { width: 52, height: 52, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "#FFF3F0" },
   title: { color: "#0B1F3A", fontSize: 22, fontWeight: "900", marginTop: 17 },
-  description: { color: "#697386", fontSize: 13, lineHeight: 20, marginTop: 7 },
+  description: { color: "#7B695E", fontSize: 13, lineHeight: 20, marginTop: 7 },
   actions: { flexDirection: "row", gap: 10, marginTop: 24 },
-  cancelButton: { flex: 1, minHeight: 48, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D7D5DE", alignItems: "center", justifyContent: "center", flexDirection: "row" },
-  cancelButtonText: { color: "#111111", fontSize: 14, fontWeight: "600" },
-  confirmButton: { flex: 1, minHeight: 48, borderRadius: 9, backgroundColor: "#B4232D", alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
+  cancelButton: { flex: 1, minHeight: 48, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#D8C2B5", alignItems: "center", justifyContent: "center", flexDirection: "row" },
+  cancelButtonText: { color: "#241510", fontSize: 14, fontWeight: "600" },
+  confirmButton: { flex: 1, minHeight: 48, borderRadius: 9, backgroundColor: "#A43F32", alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 6 },
   confirmButtonText: { color: "#FFFFFF", fontSize: 14, fontWeight: "600" },
   pressed: { opacity: 0.7 },
-  loading: { minHeight: 76, marginTop: 22, borderRadius: 16, backgroundColor: "#F3F8FA", alignItems: "center", justifyContent: "center", gap: 10 },
-  loadingText: { color: "#B4232D", fontSize: 12, fontWeight: "800" },
+  loading: { minHeight: 76, marginTop: 22, borderRadius: 16, backgroundColor: "#F8F3F0", alignItems: "center", justifyContent: "center", gap: 10 },
+  loadingText: { color: "#A43F32", fontSize: 12, fontWeight: "800" },
 });

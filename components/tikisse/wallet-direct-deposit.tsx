@@ -451,7 +451,7 @@ function InputStage(props: {
           </View>
         </View>
 
-        {submitError ? <Text style={[styles.errorText, { color: theme.error, backgroundColor: "#F8E8E9" }]}>{submitError}</Text> : null}
+        {submitError ? <Text style={[styles.errorText, { color: theme.error, backgroundColor: "#F9E8E4" }]}>{submitError}</Text> : null}
         <TikisseButton label="Valider les informations" icon="arrow-forward" loading={submitting} disabled={!canSubmit} onPress={onSubmit} style={styles.cta} />
       </ScrollView>
     </KeyboardAvoidingView>
@@ -496,7 +496,7 @@ function ConfirmationStage(props: {
           <RecapRow theme={theme} styles={styles} label="Numéro" value={deposit.phone} />
         </View>
 
-        {pollError ? <Text style={[styles.errorText, { color: theme.error, backgroundColor: "#F8E8E9" }]}>{pollError}</Text> : null}
+        {pollError ? <Text style={[styles.errorText, { color: theme.error, backgroundColor: "#F9E8E4" }]}>{pollError}</Text> : null}
 
         {requiresOtp ? (
           <View style={[styles.otpCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -509,7 +509,7 @@ function ConfirmationStage(props: {
           </View>
         ) : null}
 
-        {isTest ? <View style={[styles.devCard, { backgroundColor: "#F7EFE5", borderColor: theme.primary }]}><Text style={[styles.devLabel, { color: theme.primary }]}>MODE TEST (DEV uniquement)</Text><View style={styles.devActions}><TikisseButton label="Forcer succès" icon="check-circle" onPress={() => onDevSettle("succeeded")} loading={settling} style={styles.devBtn} /><TikisseButton label="Forcer échec" icon="cancel" variant="secondary" onPress={() => onDevSettle("failed")} loading={settling} style={styles.devBtn} /></View></View> : null}
+        {isTest ? <View style={[styles.devCard, { backgroundColor: "#FFF0D8", borderColor: theme.primary }]}><Text style={[styles.devLabel, { color: theme.primary }]}>MODE TEST (DEV uniquement)</Text><View style={styles.devActions}><TikisseButton label="Forcer succès" icon="check-circle" onPress={() => onDevSettle("succeeded")} loading={settling} style={styles.devBtn} /><TikisseButton label="Forcer échec" icon="cancel" variant="secondary" onPress={() => onDevSettle("failed")} loading={settling} style={styles.devBtn} /></View></View> : null}
         <View style={styles.confirmationActions}>
           <TikisseButton label="Modifier" icon="edit" compact variant="secondary" loading={modifying} disabled={modifying || cancelling || confirming} onPress={onModify} style={styles.actionButton} />
           <TikisseButton label="Annuler" icon="close" compact variant="ghost" loading={cancelling} disabled={modifying || cancelling || confirming} onPress={onCancel} style={styles.actionButton} />
@@ -553,9 +553,9 @@ function OtpCells(props: { theme: ReturnType<typeof useThemeColors>["colors"]; s
 function OperatorCard(props: { theme: ReturnType<typeof useThemeColors>["colors"]; styles: ReturnType<typeof makeStyles>; operator: Operator; active: boolean; disabled?: boolean; onPress: () => void }) {
   const { theme, styles, operator, active, disabled = false, onPress } = props;
   const isOM = operator === "orange_money";
-  const color = isOM ? "#FF7900" : "#0033A0";
+  const color = isOM ? "#C96900" : "#0033A0";
   return (
-    <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.operatorCard, { backgroundColor: active ? "#F7EFE5" : theme.surface, borderColor: active ? theme.primary : theme.border }, disabled && { opacity: 0.55 }, pressed && styles.pressed]} accessibilityRole="radio" accessibilityState={{ selected: active, disabled }}>
+    <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.operatorCard, { backgroundColor: active ? "#FFF0D8" : theme.surface, borderColor: active ? theme.primary : theme.border }, disabled && { opacity: 0.55 }, pressed && styles.pressed]} accessibilityRole="radio" accessibilityState={{ selected: active, disabled }}>
       <View style={[styles.operatorLogo, { backgroundColor: color }]}>
         <Text style={styles.operatorLogoText}>{isOM ? "OM" : "MV"}</Text>
       </View>

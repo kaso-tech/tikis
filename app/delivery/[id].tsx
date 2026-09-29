@@ -23,7 +23,7 @@ type SenderAction = "disable" | "reactivate" | "cancel" | "unselect" | null;
 function DetailRow({ icon, label, value }: { icon: ComponentProps<typeof MaterialIcons>["name"]; label: string; value: string }) {
   return (
     <View style={styles.detailsRow}>
-      <View style={styles.detailsIcon}><MaterialIcons name={icon} size={16} color="#667085" /></View>
+      <View style={styles.detailsIcon}><MaterialIcons name={icon} size={16} color="#76665E" /></View>
       <Text style={styles.detailsLabel}>{label}</Text>
       <Text style={styles.detailsValue} numberOfLines={1}>{value}</Text>
     </View>
@@ -112,7 +112,7 @@ export default function DeliveryDetailScreen() {
   }, [senderAction]);
 
   if (deliveryQuery.isLoading) {
-    return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.notFound}><ActivityIndicator color="#667085" /><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
+    return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.notFound}><ActivityIndicator color="#76665E" /><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
   }
 
   if (!delivery) {
@@ -196,10 +196,10 @@ export default function DeliveryDetailScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Retour">
-            <MaterialIcons name="arrow-back" size={20} color="#111111" />
+            <MaterialIcons name="arrow-back" size={20} color="#241510" />
           </Pressable>
           <Pressable onPress={() => router.push(`/report/${deliveryId}` as any)} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Signaler">
-            <MaterialIcons name="flag" size={18} color="#A43740" />
+            <MaterialIcons name="flag" size={18} color="#A43F32" />
           </Pressable>
         </View>
 
@@ -218,7 +218,7 @@ export default function DeliveryDetailScreen() {
           </View>
           {isRouteLoading ? (
             <View style={styles.heroMapRouteLoading} pointerEvents="none">
-              <ActivityIndicator size="small" color="#667085" />
+              <ActivityIndicator size="small" color="#76665E" />
               <Text style={styles.heroMapRouteLoadingText}>Calcul de l’itinéraire…</Text>
             </View>
           ) : null}
@@ -237,7 +237,7 @@ export default function DeliveryDetailScreen() {
             </>
           ) : null}
         </View>
-        {showsCountdown ? <View style={styles.countdown} accessibilityRole="text" accessibilityLabel={`${countdownLabel} ${countdown}`}><MaterialIcons name="schedule" size={15} color="#667085" /><Text style={styles.countdownLabel}>{countdownLabel}</Text><Text style={styles.countdownValue}>{countdown}</Text></View> : null}
+        {showsCountdown ? <View style={styles.countdown} accessibilityRole="text" accessibilityLabel={`${countdownLabel} ${countdown}`}><MaterialIcons name="schedule" size={15} color="#76665E" /><Text style={styles.countdownLabel}>{countdownLabel}</Text><Text style={styles.countdownValue}>{countdown}</Text></View> : null}
 
         <View style={styles.timelineCard}>
           <Text style={styles.eyebrowSmall}>SUIVI</Text>
@@ -304,22 +304,22 @@ export default function DeliveryDetailScreen() {
             <View style={styles.driverAvatar}>
               <Text style={styles.driverAvatarText}>{(delivery.driverName ?? "?").split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}</Text>
               <View style={styles.driverVerifiedBadge}>
-                <MaterialIcons name="check" size={10} color="#176C52" />
+                <MaterialIcons name="check" size={10} color="#367552" />
               </View>
             </View>
             <View style={styles.driverInfo}>
               <View style={styles.driverNameRow}>
                 <Text style={styles.driverName} numberOfLines={1}>{role === "sender" ? delivery.driverName : delivery.senderName}</Text>
-                <MaterialIcons name="verified" size={14} color="#176C52" />
+                <MaterialIcons name="verified" size={14} color="#367552" />
               </View>
               <Text style={styles.driverMeta}>{role === "sender" ? "Livreur confirmé" : "Expéditeur"}</Text>
             </View>
             <View style={styles.driverActions}>
               <Pressable onPress={() => void Linking.openURL(`tel:${role === "sender" ? delivery.driverPhone : delivery.senderPhone}`)} style={({ pressed }) => [styles.driverActionBtn, pressed && styles.pressed]} accessibilityLabel="Appeler">
-                <MaterialIcons name="phone" size={16} color="#111111" />
+                <MaterialIcons name="phone" size={16} color="#241510" />
               </Pressable>
               <Pressable style={({ pressed }) => [styles.driverActionBtn, pressed && styles.pressed]} accessibilityLabel="Message">
-                <MaterialIcons name="chat" size={16} color="#111111" />
+                <MaterialIcons name="chat" size={16} color="#241510" />
               </Pressable>
             </View>
           </View>
@@ -328,14 +328,14 @@ export default function DeliveryDetailScreen() {
         {showCandidates ? (
           <Pressable onPress={() => setCandidatesOpen(true)} style={({ pressed }) => [styles.candidatesTrigger, isActive && styles.candidatesTriggerActive, pressed && styles.pressed]}>
             <View style={[styles.candidatesIcon, isActive && styles.candidatesIconActive]}>
-              <MaterialIcons name="group" size={18} color="#667085" />
+              <MaterialIcons name="group" size={18} color="#76665E" />
             </View>
             <View style={styles.candidatesBody}>
               <Text style={styles.candidatesTitle}>{isActive ? "Changer de livreur" : "Livreurs candidats"}</Text>
               <Text style={styles.candidatesMeta}>{isActive ? "Voir les autres candidatures reçues" : `${candidates.length} livreur${candidates.length > 1 ? "s" : ""} ont proposé leur service`}</Text>
             </View>
             {candidates.length > 0 ? <View style={styles.candidatesCount}><Text style={styles.candidatesCountText}>{candidates.length}</Text></View> : null}
-            <MaterialIcons name="chevron-right" size={18} color="#667085" />
+            <MaterialIcons name="chevron-right" size={18} color="#76665E" />
           </Pressable>
         ) : null}
 
@@ -352,7 +352,7 @@ export default function DeliveryDetailScreen() {
 
         {role === "sender" && (isActive || delivery.status === "pending_confirmation") ? (
           <Pressable onPress={() => router.push(`/delivery/${deliveryId}/map` as any)} style={({ pressed }) => [styles.trackButton, pressed && styles.pressed]}>
-            <MaterialIcons name="my-location" size={16} color="#667085" />
+            <MaterialIcons name="my-location" size={16} color="#76665E" />
             <Text style={styles.trackButtonText}>Suivre en direct</Text>
           </Pressable>
         ) : null}
@@ -370,7 +370,7 @@ export default function DeliveryDetailScreen() {
                 accessibilityLabel="Annuler la livraison"
                 style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed, senderProcessing && styles.cancelButtonDisabled]}
               >
-                <MaterialIcons name="cancel" size={16} color={senderProcessing ? "#A0A0A0" : "#A43740"} />
+                <MaterialIcons name="cancel" size={16} color={senderProcessing ? "#A48B7B" : "#A43F32"} />
                 <Text style={[styles.cancelButtonText, senderProcessing && styles.cancelButtonTextDisabled]} numberOfLines={1}>Annuler</Text>
               </Pressable>
             ) : null}
@@ -399,7 +399,7 @@ function TimelineStep({ label, done }: { label: string; done: boolean }) {
   return (
     <View style={styles.timelineStep}>
       <View style={[styles.timelineDot, done && styles.timelineDotDone]}>
-        {done ? <MaterialIcons name="check" size={11} color="#FFFFFF" /> : <MaterialIcons name="radio-button-unchecked" size={9} color="#667085" />}
+        {done ? <MaterialIcons name="check" size={11} color="#FFFFFF" /> : <MaterialIcons name="radio-button-unchecked" size={9} color="#76665E" />}
       </View>
       <Text style={[styles.timelineLabel, done && styles.timelineLabelDone]}>{label}</Text>
     </View>
@@ -411,8 +411,8 @@ function TimelineLine({ done }: { done: boolean }) {
 }
 
 function DeliveryActionConfirmationModal({ visible, title, description, confirmLabel, tone, loading, onCancel, onConfirm }: { visible: boolean; title: string; description: string; confirmLabel: string; tone: "success" | "warning" | "danger"; loading: boolean; onCancel: () => void; onConfirm: () => void }) {
-  const color = tone === "danger" ? "#A43740" : tone === "warning" ? "#A65300" : "#176C52";
-  const background = tone === "danger" ? "#FFFFFF" : tone === "warning" ? "#FFFFFF" : "#E3E3E3";
+  const color = tone === "danger" ? "#A43F32" : tone === "warning" ? "#C65A00" : "#367552";
+  const background = tone === "danger" ? "#FFFFFF" : tone === "warning" ? "#FFFFFF" : "#E7D9CF";
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}><View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={onCancel} /><View style={styles.actionSheet}><View style={styles.actionHandle} /><View style={[styles.actionIcon, { backgroundColor: background }]}><MaterialIcons name={tone === "danger" ? "warning-amber" : tone === "warning" ? "pause-circle" : "play-circle"} size={24} color={color} /></View><Text style={styles.actionTitle}>{title}</Text><Text style={styles.actionDescription}>{description}</Text><TikisseButton label={confirmLabel} variant={tone === "danger" ? "danger" : tone === "warning" ? "secondary" : "primary"} onPress={onConfirm} loading={loading} style={styles.actionConfirm} /><TikisseButton label="Conserver la livraison" variant="ghost" onPress={onCancel} disabled={loading} style={styles.actionCancel} /></View></View></Modal>;
 }
 
@@ -424,129 +424,129 @@ function DriverActions({ deliveryStatus, ownCandidateStatus, loading, onApply, o
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F0F3F8" },
+  safe: { flex: 1, backgroundColor: "#EEEDF3" },
   content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32, gap: 10 },
 
   topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4 },
   iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", boxShadow: "0px 1px 3px rgba(0,0,0,0.08)" },
 
-  heroMap: { height: 200, borderRadius: 12, backgroundColor: "#F0F3F8", position: "relative", overflow: "hidden", marginTop: 8 },
-  heroMapInner: { ...StyleSheet.absoluteFill, backgroundColor: "#F0F3F8" },
-  heroMapBlock: { position: "absolute", backgroundColor: "#DCDEE3", borderRadius: 5 },
+  heroMap: { height: 200, borderRadius: 12, backgroundColor: "#EEEDF3", position: "relative", overflow: "hidden", marginTop: 8 },
+  heroMapInner: { ...StyleSheet.absoluteFill, backgroundColor: "#EEEDF3" },
+  heroMapBlock: { position: "absolute", backgroundColor: "#E2D3CC", borderRadius: 5 },
   heroMapRoad: { position: "absolute", backgroundColor: "#FFFFFF", borderRadius: 99 },
   heroMapMarker: { position: "absolute", width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: "#FFFFFF", boxShadow: "0px 2px 4px rgba(0,0,0,0.20)" },
-  heroMapMarkerStart: { top: "30%", left: "18%", backgroundColor: "#9A6201" },
-  heroMapMarkerEnd: { top: "60%", right: "22%", backgroundColor: "#FFFFFF", borderColor: "#A43740" },
+  heroMapMarkerStart: { top: "30%", left: "18%", backgroundColor: "#A95000" },
+  heroMapMarkerEnd: { top: "60%", right: "22%", backgroundColor: "#FFFFFF", borderColor: "#A43F32" },
   heroMapStatus: { position: "absolute", top: 12, left: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 7 },
   heroMapRouteLoading: { position: "absolute", top: 12, right: 12, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 7 },
-  heroMapRouteLoadingText: { color: "#555555", fontSize: 10, fontWeight: "600" },
+  heroMapRouteLoadingText: { color: "#4C342B", fontSize: 10, fontWeight: "600" },
   heroMapDot: { width: 7, height: 7, borderRadius: 4 },
-  heroMapStatusText: { color: "#111111", fontSize: 10, fontWeight: "600" },
+  heroMapStatusText: { color: "#241510", fontSize: 10, fontWeight: "600" },
 
-  eyebrow: { color: "#667085", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", marginTop: 4 },
-  eyebrowSmall: { color: "#667085", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
-  title: { color: "#111111", fontSize: 22, fontWeight: "700", lineHeight: 28, marginTop: 4, includeFontPadding: false },
+  eyebrow: { color: "#76665E", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase", marginTop: 4 },
+  eyebrowSmall: { color: "#76665E", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
+  title: { color: "#241510", fontSize: 22, fontWeight: "700", lineHeight: 28, marginTop: 4, includeFontPadding: false },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
-  metaText: { color: "#667085", fontSize: 11 },
-  metaDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: "#667085" },
+  metaText: { color: "#76665E", fontSize: 11 },
+  metaDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: "#76665E" },
   countdown: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 6, paddingHorizontal: 9, paddingVertical: 6, backgroundColor: "#FFFFFF", borderRadius: 7 },
-  countdownLabel: { color: "#667085", fontSize: 10, fontWeight: "600" },
-  countdownValue: { color: "#111111", fontSize: 11, fontWeight: "700", fontVariant: ["tabular-nums"] },
+  countdownLabel: { color: "#76665E", fontSize: 10, fontWeight: "600" },
+  countdownValue: { color: "#241510", fontSize: 11, fontWeight: "700", fontVariant: ["tabular-nums"] },
 
   timelineCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, marginTop: 4 },
   timeline: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", marginTop: 10 },
   timelineStep: { alignItems: "center", width: 70 },
-  timelineDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#F0F3F8", alignItems: "center", justifyContent: "center" },
-  timelineDotDone: { backgroundColor: "#9A6201" },
-  timelineLine: { flex: 1, height: 1.5, backgroundColor: "#E3E3E3", marginTop: 11 },
-  timelineLineDone: { backgroundColor: "#9A6201" },
-  timelineLabel: { color: "#667085", fontSize: 9, fontWeight: "600", textAlign: "center", marginTop: 6 },
-  timelineLabelDone: { color: "#111111" },
+  timelineDot: { width: 22, height: 22, borderRadius: 11, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
+  timelineDotDone: { backgroundColor: "#A95000" },
+  timelineLine: { flex: 1, height: 1.5, backgroundColor: "#E7D9CF", marginTop: 11 },
+  timelineLineDone: { backgroundColor: "#A95000" },
+  timelineLabel: { color: "#76665E", fontSize: 9, fontWeight: "600", textAlign: "center", marginTop: 6 },
+  timelineLabelDone: { color: "#241510" },
 
   routeCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14, flexDirection: "row", alignItems: "stretch", gap: 10 },
   routeCol: { alignItems: "center", width: 14 },
   routePin: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
-  routePinFrom: { backgroundColor: "#9A6201" },
-  routePinTo: { backgroundColor: "#A43740" },
-  routeLine: { width: 1.5, flex: 1, backgroundColor: "#E3E3E3", marginVertical: 4 },
+  routePinFrom: { backgroundColor: "#A95000" },
+  routePinTo: { backgroundColor: "#A43F32" },
+  routeLine: { width: 1.5, flex: 1, backgroundColor: "#E7D9CF", marginVertical: 4 },
   routeInfoWrap: { flex: 1, minWidth: 0 },
   routeInfo: { paddingVertical: 2 },
-  routeLabel: { color: "#667085", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
-  routeValue: { color: "#111111", fontSize: 12, fontWeight: "600", marginTop: 2 },
-  routeMeta: { color: "#667085", fontSize: 10, marginTop: 1 },
+  routeLabel: { color: "#76665E", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
+  routeValue: { color: "#241510", fontSize: 12, fontWeight: "600", marginTop: 2 },
+  routeMeta: { color: "#76665E", fontSize: 10, marginTop: 1 },
 
   pricingCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 14 },
   pricingRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  pricingLabel: { color: "#111111", fontSize: 12, fontWeight: "600" },
-  pricingValue: { color: "#111111", fontSize: 18, fontWeight: "700" },
-  pricingRef: { color: "#667085", fontSize: 10, marginTop: 1 },
-  pricingCounterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#E3E3E3" },
-  pricingCounterLabel: { color: "#667085", fontSize: 11, fontWeight: "500" },
-  pricingCounterValue: { color: "#111111", fontSize: 13, fontWeight: "700" },
-  pricingNote: { color: "#667085", fontSize: 11, lineHeight: 16, marginTop: 8 },
+  pricingLabel: { color: "#241510", fontSize: 12, fontWeight: "600" },
+  pricingValue: { color: "#241510", fontSize: 18, fontWeight: "700" },
+  pricingRef: { color: "#76665E", fontSize: 10, marginTop: 1 },
+  pricingCounterRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#E7D9CF" },
+  pricingCounterLabel: { color: "#76665E", fontSize: 11, fontWeight: "500" },
+  pricingCounterValue: { color: "#241510", fontSize: 13, fontWeight: "700" },
+  pricingNote: { color: "#76665E", fontSize: 11, lineHeight: 16, marginTop: 8 },
 
   driverCard: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
   driverAvatar: { width: 40, height: 40, borderRadius: 10, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", position: "relative", flexShrink: 0 },
-  driverAvatarText: { color: "#111111", fontSize: 13, fontWeight: "700" },
+  driverAvatarText: { color: "#241510", fontSize: 13, fontWeight: "700" },
   driverVerifiedBadge: { position: "absolute", bottom: -2, right: -2, width: 14, height: 14, borderRadius: 7, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
   driverInfo: { flex: 1, minWidth: 0 },
   driverNameRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  driverName: { color: "#111111", fontSize: 13, fontWeight: "600", flexShrink: 1 },
-  driverMeta: { color: "#667085", fontSize: 11, marginTop: 2 },
+  driverName: { color: "#241510", fontSize: 13, fontWeight: "600", flexShrink: 1 },
+  driverMeta: { color: "#76665E", fontSize: 11, marginTop: 2 },
   driverActions: { flexDirection: "row", gap: 6 },
-  driverActionBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#F0F3F8", alignItems: "center", justifyContent: "center" },
+  driverActionBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
 
   candidatesTrigger: { backgroundColor: "#FFFFFF", borderRadius: 12, padding: 12, flexDirection: "row", alignItems: "center", gap: 10 },
-  candidatesTriggerActive: { borderWidth: 1, borderColor: "#9A6201", borderStyle: "dashed" },
+  candidatesTriggerActive: { borderWidth: 1, borderColor: "#A95000", borderStyle: "dashed" },
   candidatesIcon: { width: 36, height: 36, borderRadius: 9, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
   candidatesIconActive: { backgroundColor: "#FFFFFF" },
   candidatesBody: { flex: 1, minWidth: 0 },
-  candidatesTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },
-  candidatesMeta: { color: "#667085", fontSize: 11, marginTop: 2 },
-  candidatesCount: { backgroundColor: "#111111", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 99 },
+  candidatesTitle: { color: "#241510", fontSize: 13, fontWeight: "600" },
+  candidatesMeta: { color: "#76665E", fontSize: 11, marginTop: 2 },
+  candidatesCount: { backgroundColor: "#241510", paddingHorizontal: 7, paddingVertical: 3, borderRadius: 99 },
   candidatesCountText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700" },
 
   detailsCard: { backgroundColor: "#FFFFFF", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 2 },
-  detailsRow: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 9, borderBottomWidth: 1, borderBottomColor: "#E3E3E3" },
+  detailsRow: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 9, borderBottomWidth: 1, borderBottomColor: "#E7D9CF" },
   detailsIcon: { width: 26, height: 26, borderRadius: 8, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
-  detailsLabel: { color: "#667085", fontSize: 11, flexShrink: 0 },
-  detailsValue: { color: "#111111", fontSize: 12, fontWeight: "600", flex: 1, textAlign: "right" },
-  detailsLast: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: "#E3E3E3", marginTop: 2 },
-  detailsDescription: { color: "#667085", fontSize: 12, lineHeight: 18 },
+  detailsLabel: { color: "#76665E", fontSize: 11, flexShrink: 0 },
+  detailsValue: { color: "#241510", fontSize: 12, fontWeight: "600", flex: 1, textAlign: "right" },
+  detailsLast: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: "#E7D9CF", marginTop: 2 },
+  detailsDescription: { color: "#76665E", fontSize: 12, lineHeight: 18 },
 
-  trackButton: { backgroundColor: "#FFFFFF", borderRadius: 10, borderWidth: 1, borderColor: "#E3E3E3", paddingVertical: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
-  trackButtonText: { color: "#111111", fontSize: 13, fontWeight: "600" },
+  trackButton: { backgroundColor: "#FFFFFF", borderRadius: 10, borderWidth: 1, borderColor: "#E7D9CF", paddingVertical: 13, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  trackButtonText: { color: "#241510", fontSize: 13, fontWeight: "600" },
 
   senderActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
   senderActionBtn: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 104 },
-  cancelButton: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 104, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, minHeight: 44, paddingHorizontal: 10, borderRadius: 9, borderWidth: 1, borderColor: "#A43740", backgroundColor: "#FFFFFF" },
-  cancelButtonDisabled: { borderColor: "#E3E3E3" },
-  cancelButtonText: { color: "#A43740", fontSize: 13.5, fontWeight: "600" },
-  cancelButtonTextDisabled: { color: "#A0A0A0" },
+  cancelButton: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 104, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, minHeight: 44, paddingHorizontal: 10, borderRadius: 9, borderWidth: 1, borderColor: "#A43F32", backgroundColor: "#FFFFFF" },
+  cancelButtonDisabled: { borderColor: "#E7D9CF" },
+  cancelButtonText: { color: "#A43F32", fontSize: 13.5, fontWeight: "600" },
+  cancelButtonTextDisabled: { color: "#A48B7B" },
 
   driverAction: { marginTop: 16 },
   secondaryDriverAction: { marginTop: 8 },
-  driverHint: { color: "#667085", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 10, paddingHorizontal: 12 },
+  driverHint: { color: "#76665E", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 10, paddingHorizontal: 12 },
 
   actionOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.42)" },
   actionSheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 14, borderTopRightRadius: 14, padding: 16, paddingTop: 8, paddingBottom: 20 },
-  actionHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#E3E3E3", alignSelf: "center", marginBottom: 14 },
+  actionHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#E7D9CF", alignSelf: "center", marginBottom: 14 },
   actionIcon: { width: 44, height: 44, borderRadius: 9, alignItems: "center", justifyContent: "center", marginBottom: 12, alignSelf: "center" },
-  actionTitle: { color: "#111111", fontSize: 17, fontWeight: "600", textAlign: "center" },
-  actionDescription: { color: "#667085", fontSize: 13, lineHeight: 19, marginTop: 6, textAlign: "center" },
+  actionTitle: { color: "#241510", fontSize: 17, fontWeight: "600", textAlign: "center" },
+  actionDescription: { color: "#76665E", fontSize: 13, lineHeight: 19, marginTop: 6, textAlign: "center" },
   actionConfirm: { marginTop: 18 },
   actionCancel: { marginTop: 6 },
 
-  message: { color: "#A43740", textAlign: "center", fontSize: 13, fontWeight: "600", marginTop: 8 },
+  message: { color: "#A43F32", textAlign: "center", fontSize: 13, fontWeight: "600", marginTop: 8 },
 
   reviewDone: { flexDirection: "row", gap: 10, alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 10, padding: 12, marginTop: 14 },
   reviewDoneInfo: { flex: 1 },
-  reviewDoneTitle: { color: "#111111", fontSize: 13, fontWeight: "600" },
-  reviewDoneText: { color: "#667085", fontSize: 12, lineHeight: 17, marginTop: 2 },
+  reviewDoneTitle: { color: "#241510", fontSize: 13, fontWeight: "600" },
+  reviewDoneText: { color: "#76665E", fontSize: 12, lineHeight: 17, marginTop: 2 },
   rateButton: { marginTop: 14 },
 
   notFound: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 12 },
-  notFoundTitle: { color: "#111111", fontSize: 16, fontWeight: "600" },
+  notFoundTitle: { color: "#241510", fontSize: 16, fontWeight: "600" },
 
   pressed: { opacity: 0.7 },
 });

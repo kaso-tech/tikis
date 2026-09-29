@@ -16,17 +16,17 @@ type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 type ButtonPalette = { background: string; foreground: string; border?: string };
 
 /** Ce que porte un bouton qu'on ne peut pas actionner : un gris franc, pas une transparence. */
-const DISABLED_PALETTE: ButtonPalette = { background: "#EEF1F6", foreground: "#7A8699", border: "#DDE3EC" };
+const DISABLED_PALETTE: ButtonPalette = { background: "#F2E9E3", foreground: "#7B695E", border: "#E2D0C5" };
 
 const buttonColors: Record<ButtonVariant, ButtonPalette> = {
   // L'action principale est le seul endroit de l'interface où la couleur de marque remplit une surface :
   // ailleurs elle se contente de border ou de marquer. Le texte posé dessus est sombre, jamais blanc —
-  // Le brun est sombre : c'est donc le blanc qui s'y lit (5,10:1), pas l'encre (#111111, 3,71:1).
+  // Le brun est sombre : c'est donc le blanc qui s'y lit (5,10:1), pas l'encre (#241510, 3,71:1).
   // L'inverse exact de l'orange et du turquoise qui l'ont précédé — d'où le sens de ce couple.
-  primary: { background: "#9A6201", foreground: "#FFFFFF", border: "#9A6201" },
-  secondary: { background: "#FFFFFF", foreground: "#111111", border: "#E3E3E3" },
-  ghost: { background: "#F0F3F8", foreground: "#111111", border: "#E3E3E3" },
-  danger: { background: "#FFFFFF", foreground: "#A43740", border: "#E3E3E3" },
+  primary: { background: "#A95000", foreground: "#FFFFFF", border: "#A95000" },
+  secondary: { background: "#FFFFFF", foreground: "#241510", border: "#E7D9CF" },
+  ghost: { background: "#EEEDF3", foreground: "#241510", border: "#E7D9CF" },
+  danger: { background: "#FFFFFF", foreground: "#A43F32", border: "#E7D9CF" },
 };
 
 export function TikisseButton({
@@ -67,7 +67,7 @@ export function TikisseButton({
   </Pressable>;
 }
 
-export function TikisseIconButton({ icon, label, onPress, accent = "#111111" }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; label: string; onPress: () => void; accent?: string }) {
+export function TikisseIconButton({ icon, label, onPress, accent = "#241510" }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; label: string; onPress: () => void; accent?: string }) {
   return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => { haptic.light(); onPress(); }} style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}><MaterialIcons name={icon} size={21} color={accent} /></Pressable>;
 }
 
@@ -83,18 +83,18 @@ export function StatusBadge({ label, color, background }: { label: string; color
   return <View style={[styles.statusBadge, { backgroundColor: background }]}><View style={[styles.statusDot, { backgroundColor: color }]} /><Text style={[styles.statusText, { color }]}>{label}</Text></View>;
 }
 
-export function Avatar({ initials, color = "#111111", size = 44 }: { initials: string; color?: string; size?: number }) {
+export function Avatar({ initials, color = "#241510", size = 44 }: { initials: string; color?: string; size?: number }) {
   return <View style={[styles.avatar, { backgroundColor: color, width: size, height: size, borderRadius: size / 2 }]}><Text style={[styles.avatarText, { fontSize: Math.max(12, size * 0.34) }]}>{initials}</Text></View>;
 }
 
 export const tikisseStyles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F0F3F8" },
+  screen: { flex: 1, backgroundColor: "#EEEDF3" },
   screenContent: { paddingHorizontal: 16, paddingBottom: 104 },
-  eyebrow: { color: "#667085", fontSize: 12, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },
-  title: { color: "#111111", fontSize: 26, lineHeight: 32, fontWeight: "600", letterSpacing: -0.35 },
-  subtitle: { color: "#667085", fontSize: 14, lineHeight: 20 },
-  body: { color: "#111111", fontSize: 14, lineHeight: 20 },
-  muted: { color: "#667085", fontSize: 12, lineHeight: 18 },
+  eyebrow: { color: "#76665E", fontSize: 12, fontWeight: "600", letterSpacing: 0.5, textTransform: "uppercase" },
+  title: { color: "#241510", fontSize: 26, lineHeight: 32, fontWeight: "600", letterSpacing: -0.35 },
+  subtitle: { color: "#76665E", fontSize: 14, lineHeight: 20 },
+  body: { color: "#241510", fontSize: 14, lineHeight: 20 },
+  muted: { color: "#76665E", fontSize: 12, lineHeight: 18 },
 });
 
 const styles = StyleSheet.create({
@@ -103,12 +103,12 @@ const styles = StyleSheet.create({
   buttonCompact: { minHeight: 44, paddingHorizontal: 10, gap: 5 },
   buttonText: { fontSize: 15, fontWeight: "600" },
   buttonTextCompact: { fontSize: 13.5 },
-  iconButton: { width: 40, height: 40, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3" },
+  iconButton: { width: 40, height: 40, borderRadius: 9, alignItems: "center", justifyContent: "center", backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7D9CF" },
   iconButtonPressed: { opacity: 0.68 },
-  card: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 13, borderWidth: 1, borderColor: "#E3E3E3" },
+  card: { backgroundColor: "#FFFFFF", borderRadius: 10, padding: 13, borderWidth: 1, borderColor: "#E7D9CF" },
   sectionHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  sectionTitle: { fontSize: 17, fontWeight: "600", color: "#111111", letterSpacing: -0.15 },
-  sectionAction: { color: "#111111", fontSize: 13, fontWeight: "600" },
+  sectionTitle: { fontSize: 17, fontWeight: "600", color: "#241510", letterSpacing: -0.15 },
+  sectionAction: { color: "#241510", fontSize: 13, fontWeight: "600" },
   statusBadge: { alignSelf: "flex-start", paddingHorizontal: 8, height: 24, borderRadius: 6, flexDirection: "row", alignItems: "center", gap: 5 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: { fontSize: 11, fontWeight: "600" },

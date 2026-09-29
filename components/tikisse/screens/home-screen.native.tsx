@@ -37,11 +37,11 @@ const PICKUP_TOOLTIP_DURATION_MS = 3_000;
 /** Le ton renvoyé par `deliveryCardTone`, traduit en couleur. La couleur reste
  *  ici : la logique de carte dit l'état, elle ne peint pas. */
 const TONE_COLOR: Record<ReturnType<typeof deliveryCardTone>, string> = {
-  open: "#9A6201",
-  assigned: "#A65300",
-  active: "#176C52",
-  done: "#667085",
-  idle: "#667085",
+  open: "#A95000",
+  assigned: "#C65A00",
+  active: "#367552",
+  done: "#76665E",
+  idle: "#76665E",
 };
 
 
@@ -531,26 +531,26 @@ export function HomeScreen() {
                   setIsManualRefreshing(false);
                 }
               }}
-              tintColor="#9A6201"
-              colors={["#9A6201"]}
+              tintColor="#A95000"
+              colors={["#A95000"]}
               progressBackgroundColor="#FFFFFF"
             />
           }
         >
           {isDriver && !profile?.photoUrl ? (
             <Pressable onPress={() => router.push("/(tabs)/profile" as any)} style={({ pressed }) => [styles.kycBanner, pressed && styles.pressed]} accessibilityLabel="Vérifier mon profil">
-              <MaterialIcons name="verified-user" size={18} color="#667085" />
+              <MaterialIcons name="verified-user" size={18} color="#76665E" />
               <View style={styles.kycBannerCopy}>
                 <Text style={styles.kycBannerTitle}>Profil à vérifier</Text>
                 <Text style={styles.kycBannerText}>Ajoutez votre photo et vos documents pour pouvoir candidater aux livraisons.</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={18} color="#667085" />
+              <MaterialIcons name="chevron-right" size={18} color="#76665E" />
             </Pressable>
           ) : null}
 
           <View style={styles.searchRow}>
             <View style={styles.searchPill}>
-              <MaterialIcons name="search" size={16} color="#667085" />
+              <MaterialIcons name="search" size={16} color="#76665E" />
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -562,7 +562,7 @@ export function HomeScreen() {
               />
               {searchQuery.length > 0 ? (
                 <Pressable onPress={() => setSearchQuery("")} hitSlop={8} accessibilityLabel="Effacer la recherche">
-                  <MaterialIcons name="close" size={16} color="#667085" />
+                  <MaterialIcons name="close" size={16} color="#76665E" />
                 </Pressable>
               ) : null}
             </View>
@@ -582,13 +582,13 @@ export function HomeScreen() {
           <Animated.View style={[styles.tabContent, { opacity: filterTransition, transform: [{ translateY: filterTranslateY }] }]}>
           {!hasInitialData && deliveriesQuery.isLoading ? (
             <View style={styles.loadingState}>
-              <ActivityIndicator color="#667085" />
+              <ActivityIndicator color="#76665E" />
               <Text style={styles.loadingText}>Chargement de vos livraisons…</Text>
             </View>
           ) : !selected ? (
             <View style={styles.empty}>
               <View style={styles.emptyIcon}>
-                <MaterialIcons name={isDriver ? "local-shipping" : "add"} size={26} color="#667085" />
+                <MaterialIcons name={isDriver ? "local-shipping" : "add"} size={26} color="#76665E" />
               </View>
                 <Text style={styles.emptyTitle}>{filter === "completed" ? isDriver ? "Aucune livraison terminée aujourd’hui" : "Aucune livraison terminée récemment" : isDriver ? "Aucune opportunité disponible" : "Aucune livraison disponible"}</Text>
                 <Text style={styles.emptyText}>
@@ -644,7 +644,7 @@ export function HomeScreen() {
       </Animated.View>
       {isDriver && showScrollTop ? (
         <Pressable onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })} style={({ pressed }) => [styles.scrollTopButton, pressed && styles.pressed]} accessibilityLabel="Revenir en haut">
-          <MaterialIcons name="keyboard-arrow-up" size={20} color="#111111" />
+          <MaterialIcons name="keyboard-arrow-up" size={20} color="#241510" />
         </Pressable>
       ) : null}
       <CandidatesSheet visible={Boolean(candidatesDeliveryId)} deliveryId={candidatesDeliveryId} onClose={() => setCandidatesDeliveryId(null)} />
@@ -802,8 +802,8 @@ function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeadin
         ) : null}
         {selected ? (
           <>
-            {approachCoordinates.length > 1 ? <Polyline key="approach-line" coordinates={approachCoordinates} strokeColor="#176C52" strokeWidth={4} lineCap="round" zIndex={MAP_Z.approach} /> : null}
-            {routeCoordinates.length > 1 ? <Polyline key="route-line" coordinates={routeCoordinates} strokeColor="#9A6201" strokeWidth={4} lineCap="round" zIndex={MAP_Z.route} /> : null}
+            {approachCoordinates.length > 1 ? <Polyline key="approach-line" coordinates={approachCoordinates} strokeColor="#367552" strokeWidth={4} lineCap="round" zIndex={MAP_Z.approach} /> : null}
+            {routeCoordinates.length > 1 ? <Polyline key="route-line" coordinates={routeCoordinates} strokeColor="#A95000" strokeWidth={4} lineCap="round" zIndex={MAP_Z.route} /> : null}
             <TrackedMarker key={`pickup-${selected.id}`} coordinate={{ latitude: selected.pickup.latitude, longitude: selected.pickup.longitude }} anchor={PIN_ANCHOR} zIndex={MAP_Z.pin}>
               <PickupMarker />
             </TrackedMarker>
@@ -825,7 +825,7 @@ function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeadin
           accessibilityLabel="Recentrer la carte sur la course"
           style={({ pressed }) => [styles.fab, { bottom: sheetSnap + 20 }, pressed && styles.pressed]}
         >
-          <MaterialIcons name="my-location" size={20} color="#111111" />
+          <MaterialIcons name="my-location" size={20} color="#241510" />
         </Pressable>
       ) : null}
     </View>
@@ -919,7 +919,7 @@ function DeliveryRow({
               accessibilityLabel={`Afficher les lieux : collecte ${pickupPlace.title}, ${pickupPlace.subtitle} ; destination ${dropoffPlace.title}, ${dropoffPlace.subtitle}`}
               style={({ pressed }) => [pressed && styles.pressed]}
             >
-              <MaterialIcons accessible={false} name="navigation" size={15} color="#667085" style={{ transform: [{ rotate: `${compassRotation}deg` }] }} />
+              <MaterialIcons accessible={false} name="navigation" size={15} color="#76665E" style={{ transform: [{ rotate: `${compassRotation}deg` }] }} />
             </Pressable>
             <Text style={styles.compactDistanceText} numberOfLines={1}>à {driverDistText} de vous</Text>
             {showPickupTooltip ? (
@@ -946,7 +946,7 @@ function DeliveryRow({
               accessibilityLabel={`${driverAction} — ${delivery.title}`}
               style={({ pressed }) => [applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
             >
-              {applying ? <ActivityIndicator size="small" color="#667085" /> : <Text style={styles.compactAction}>{driverAction}</Text>}
+              {applying ? <ActivityIndicator size="small" color="#76665E" /> : <Text style={styles.compactAction}>{driverAction}</Text>}
             </Pressable>
           ) : null}
           {/* « Ouvrir » ne s'affichait qu'à défaut d'action, c'est-à-dire sur
@@ -1022,7 +1022,7 @@ function DeliveryRow({
             accessibilityLabel={`Annuler — ${delivery.title}`}
             style={({ pressed }) => [styles.tripCtaQuiet, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
           >
-            {applying ? <ActivityIndicator size="small" color="#A43740" /> : <Text style={styles.tripCtaQuietText}>Annuler</Text>}
+            {applying ? <ActivityIndicator size="small" color="#A43F32" /> : <Text style={styles.tripCtaQuietText}>Annuler</Text>}
           </Pressable>
         ) : senderLabel ? (
           <Pressable
@@ -1032,7 +1032,7 @@ function DeliveryRow({
             accessibilityLabel={`${senderLabel} — ${delivery.title}`}
             style={({ pressed }) => [styles.tripCta, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
           >
-            {applying ? <ActivityIndicator size="small" color="#667085" /> : <Text style={styles.tripCtaText}>{senderLabel}</Text>}
+            {applying ? <ActivityIndicator size="small" color="#76665E" /> : <Text style={styles.tripCtaText}>{senderLabel}</Text>}
           </Pressable>
         ) : null}
       </View>
@@ -1041,53 +1041,53 @@ function DeliveryRow({
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F0F3F8" },
+  safe: { flex: 1, backgroundColor: "#EEEDF3" },
 
-  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#F0F3F8", zIndex: 0 },
+  mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#EEEDF3", zIndex: 0 },
   mapCanvas: { zIndex: 0 },
 
   userMarkerHalo: { width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(154,98,1,0.18)", alignItems: "center", justifyContent: "center" },
-  userMarkerDot: { width: 13, height: 13, borderRadius: 7, backgroundColor: "#9A6201", borderWidth: 2.5, borderColor: "#FFFFFF" },
+  userMarkerDot: { width: 13, height: 13, borderRadius: 7, backgroundColor: "#A95000", borderWidth: 2.5, borderColor: "#FFFFFF" },
 
-  fab: { position: "absolute", right: 14, width: 50, height: 50, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E3E3E3", zIndex: 10 },
-  sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
+  fab: { position: "absolute", right: 14, width: 50, height: 50, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#E7D9CF", zIndex: 10 },
+  sheetFab: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#A95000", alignItems: "center", justifyContent: "center" },
 
   sheet: { position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden", zIndex: 2, boxShadow: "0px 2px 6px rgba(0,0,0,0.10)" },
   sheetHeader: { paddingTop: 10, paddingBottom: 8 },
   sheetDragHandle: { alignSelf: "stretch", minHeight: 28, alignItems: "center", justifyContent: "center" },
-  sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#E3E3E3", marginBottom: 10 },
+  sheetGrip: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#E7D9CF", marginBottom: 10 },
   sheetTop: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14 },
   greetingBlock: { flex: 1, minWidth: 0 },
   driverGainsRow: { flexDirection: "row", alignItems: "baseline", gap: 6, flexWrap: "wrap" },
-  driverGainsValue: { color: "#111111", fontSize: 14, fontWeight: "700" },
-  sheetTitle: { color: "#111111", fontSize: 14, fontWeight: "700", lineHeight: 18 },
-  sheetSubtitle: { color: "#667085", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
+  driverGainsValue: { color: "#241510", fontSize: 14, fontWeight: "700" },
+  sheetTitle: { color: "#241510", fontSize: 14, fontWeight: "700", lineHeight: 18 },
+  sheetSubtitle: { color: "#76665E", fontSize: 10.5, marginTop: 1, fontWeight: "500" },
 
-  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#F0F3F8", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E3E3E3" },
-  servicePillOffline: { backgroundColor: "#F0F3F8", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3" },
-  servicePillNeutral: { backgroundColor: "#F0F3F8" },
-  serviceText: { color: "#667085", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
-  serviceTextOffline: { color: "#111111" },
-  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#9A6201" },
-  onlineDotOffline: { backgroundColor: "#667085" },
+  servicePill: { paddingHorizontal: 12, height: 38, borderRadius: 11, backgroundColor: "#EEEDF3", flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: "#E7D9CF" },
+  servicePillOffline: { backgroundColor: "#EEEDF3", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E7D9CF" },
+  servicePillNeutral: { backgroundColor: "#EEEDF3" },
+  serviceText: { color: "#76665E", fontSize: 11, fontWeight: "700", letterSpacing: 0.4 },
+  serviceTextOffline: { color: "#241510" },
+  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#A95000" },
+  onlineDotOffline: { backgroundColor: "#76665E" },
 
   searchRow: { paddingTop: 10, paddingBottom: 6 },
-  kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: "#F0F3F8", borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3" },
+  kycBanner: { flexDirection: "row", alignItems: "center", gap: 10, marginHorizontal: 14, marginTop: 6, padding: 11, backgroundColor: "#EEEDF3", borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E7D9CF" },
   kycBannerCopy: { flex: 1 },
-  kycBannerTitle: { color: "#111111", fontSize: 12, fontWeight: "700" },
-  kycBannerText: { color: "#667085", fontSize: 11, marginTop: 2, lineHeight: 16 },
-  searchPill: { height: 40, backgroundColor: "#F0F3F8", borderRadius: 11, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
-  searchInput: { flex: 1, color: "#111111", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
+  kycBannerTitle: { color: "#241510", fontSize: 12, fontWeight: "700" },
+  kycBannerText: { color: "#76665E", fontSize: 11, marginTop: 2, lineHeight: 16 },
+  searchPill: { height: 40, backgroundColor: "#EEEDF3", borderRadius: 11, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E7D9CF", flexDirection: "row", alignItems: "center", paddingHorizontal: 12, gap: 8 },
+  searchInput: { flex: 1, color: "#241510", fontSize: 13, paddingVertical: 0, paddingHorizontal: 0 },
 
 
   filterRow: { flexDirection: "row", gap: 6, paddingBottom: 10, alignItems: "center" },
   filterScroll: { flexGrow: 0 },
-  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#F0F3F8", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3", flexDirection: "row", alignItems: "center", gap: 6 },
-  chipActive: { backgroundColor: "#9A620114", borderColor: "#9A6201", borderWidth: 1 },
-  chipText: { color: "#667085", fontSize: 11, fontWeight: "600" },
-  chipTextActive: { color: "#111111" },
-  chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center" },
-  chipCountActive: { backgroundColor: "#9A6201" },
+  chip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, backgroundColor: "#EEEDF3", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E7D9CF", flexDirection: "row", alignItems: "center", gap: 6 },
+  chipActive: { backgroundColor: "#A9500014", borderColor: "#A95000", borderWidth: 1 },
+  chipText: { color: "#76665E", fontSize: 11, fontWeight: "600" },
+  chipTextActive: { color: "#241510" },
+  chipCount: { minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: "#A95000", alignItems: "center", justifyContent: "center" },
+  chipCountActive: { backgroundColor: "#A95000" },
   chipCountText: { color: "#FFFFFF", fontSize: 10, fontWeight: "700", lineHeight: 12 },
   tabContent: { minHeight: 1 },
 
@@ -1097,67 +1097,67 @@ const styles = StyleSheet.create({
 
   // ---------- Carte « Trajet » (expéditeur) et « Registre » (livreur) ----------
   card: {
-    position: "relative", overflow: "hidden", backgroundColor: "#F0F3F8",
-    borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E3E3E3",
+    position: "relative", overflow: "hidden", backgroundColor: "#EEEDF3",
+    borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E7D9CF",
   },
-  cardPressed: { backgroundColor: "#E7ECF4" },
+  cardPressed: { backgroundColor: "#F0E5DE" },
   // La sélection cerne la carte au lieu de la repeindre : la liste ne change plus
   // de couleur autour de l'élément choisi.
-  cardSelected: { borderColor: "#9A6201", borderWidth: 1.5 },
+  cardSelected: { borderColor: "#A95000", borderWidth: 1.5 },
   cardRail: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3 },
 
   cardTrip: { paddingVertical: 13, paddingLeft: 17, paddingRight: 14, gap: 11 },
   tripHead: { flexDirection: "row", alignItems: "flex-start", gap: 11 },
   tripRail: { width: 12, alignItems: "center", paddingTop: 5, alignSelf: "stretch" },
-  tripDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 2.5, borderColor: "#9A6201" },
-  tripLine: { flex: 1, width: 1.5, minHeight: 16, backgroundColor: "#E3E3E3", marginVertical: 2 },
-  tripPin: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#A43740" },
+  tripDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 2.5, borderColor: "#A95000" },
+  tripLine: { flex: 1, width: 1.5, minHeight: 16, backgroundColor: "#E7D9CF", marginVertical: 2 },
+  tripPin: { width: 9, height: 9, borderRadius: 5, backgroundColor: "#A43F32" },
   tripStops: { flex: 1, minWidth: 0, gap: 10 },
-  tripStop: { fontSize: 14.5, fontWeight: "600", lineHeight: 17, color: "#111111" },
+  tripStop: { fontSize: 14.5, fontWeight: "600", lineHeight: 17, color: "#241510" },
   tripFigures: { flexShrink: 0, alignItems: "flex-end", gap: 10 },
-  tripPrice: { fontSize: 16, fontWeight: "800", lineHeight: 17, color: "#111111", fontVariant: ["tabular-nums"] },
-  tripTrip: { fontSize: 11.5, lineHeight: 14, color: "#667085", fontVariant: ["tabular-nums"] },
+  tripPrice: { fontSize: 16, fontWeight: "800", lineHeight: 17, color: "#241510", fontVariant: ["tabular-nums"] },
+  tripTrip: { fontSize: 11.5, lineHeight: 14, color: "#76665E", fontVariant: ["tabular-nums"] },
   tripSignal: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 9 },
   tripSignalText: { flex: 1, fontSize: 12, fontWeight: "600" },
-  tripMeta: { fontSize: 11.5, color: "#667085" },
+  tripMeta: { fontSize: 11.5, color: "#76665E" },
   tripState: { fontWeight: "700" },
-  tripFoot: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#E3E3E3" },
-  tripGhost: { fontSize: 12.5, fontWeight: "600", color: "#667085" },
-  tripCta: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#9A6201", minWidth: 96, alignItems: "center" },
-  tripCtaText: { fontSize: 12.5, fontWeight: "700", color: "#111111" },
-  tripCtaQuiet: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#A43740", minWidth: 96, alignItems: "center" },
-  tripCtaQuietText: { fontSize: 12.5, fontWeight: "700", color: "#A43740" },
+  tripFoot: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#E7D9CF" },
+  tripGhost: { fontSize: 12.5, fontWeight: "600", color: "#76665E" },
+  tripCta: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#A95000", minWidth: 96, alignItems: "center" },
+  tripCtaText: { fontSize: 12.5, fontWeight: "700", color: "#241510" },
+  tripCtaQuiet: { marginLeft: "auto", paddingHorizontal: 14, paddingVertical: 8, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#A43F32", minWidth: 96, alignItems: "center" },
+  tripCtaQuietText: { fontSize: 12.5, fontWeight: "700", color: "#A43F32" },
 
   cardCompact: { flexDirection: "row", alignItems: "center", gap: 11, paddingVertical: 11, paddingLeft: 15, paddingRight: 12 },
   compactBody: { flex: 1, minWidth: 0, gap: 3 },
   compactRoute: { flexDirection: "row", alignItems: "baseline", gap: 6 },
-  compactFrom: { flexShrink: 1, minWidth: 0, fontSize: 13.5, fontWeight: "600", color: "#111111" },
-  compactArrow: { flexShrink: 0, fontSize: 13.5, color: "#667085" },
-  compactTo: { flexShrink: 1, minWidth: 0, fontSize: 13.5, fontWeight: "600", color: "#111111" },
-  compactMeta: { fontSize: 11.5, color: "#667085" },
+  compactFrom: { flexShrink: 1, minWidth: 0, fontSize: 13.5, fontWeight: "600", color: "#241510" },
+  compactArrow: { flexShrink: 0, fontSize: 13.5, color: "#76665E" },
+  compactTo: { flexShrink: 1, minWidth: 0, fontSize: 13.5, fontWeight: "600", color: "#241510" },
+  compactMeta: { fontSize: 11.5, color: "#76665E" },
   compactDistance: { flexDirection: "row", alignItems: "center", gap: 5, position: "relative" },
-  compactDistanceText: { fontSize: 11.5, fontWeight: "700", color: "#667085" },
+  compactDistanceText: { fontSize: 11.5, fontWeight: "700", color: "#76665E" },
   compactRight: { flexShrink: 0, alignItems: "flex-end", gap: 6 },
-  compactPrice: { fontSize: 14.5, fontWeight: "800", color: "#111111", fontVariant: ["tabular-nums"] },
-  compactAction: { fontSize: 11.5, fontWeight: "700", color: "#111111" },
-  compactGhost: { fontSize: 11.5, fontWeight: "600", color: "#667085" },
+  compactPrice: { fontSize: 14.5, fontWeight: "800", color: "#241510", fontVariant: ["tabular-nums"] },
+  compactAction: { fontSize: 11.5, fontWeight: "700", color: "#241510" },
+  compactGhost: { fontSize: 11.5, fontWeight: "600", color: "#76665E" },
 
   listSection: { marginTop: 4, gap: 8 },
   // Le sheet est blanc : une carte blanche y disparaîtrait. Les cartes sont
   // en retrait, et ce qu'elles contiennent repasse en blanc.
-  pickupTooltip: { position: "absolute", right: 0, top: 28, minWidth: 168, maxWidth: 236, backgroundColor: "#111111", borderRadius: 7, paddingHorizontal: 9, paddingVertical: 7, zIndex: 20 },
+  pickupTooltip: { position: "absolute", right: 0, top: 28, minWidth: 168, maxWidth: 236, backgroundColor: "#241510", borderRadius: 7, paddingHorizontal: 9, paddingVertical: 7, zIndex: 20 },
   pickupTooltipLabel: { color: "rgba(255,255,255,0.64)", fontSize: 8, fontWeight: "700", letterSpacing: 0.55 },
   pickupTooltipText: { color: "#FFFFFF", fontSize: 11, fontWeight: "600", marginTop: 2 },
   pickupTooltipDistrict: { color: "rgba(255,255,255,0.68)", fontSize: 10, marginTop: 1 },
   pickupTooltipDivider: { height: 1, backgroundColor: "rgba(255,255,255,0.16)", marginVertical: 6 },
 
   loadingState: { alignItems: "center", paddingVertical: 32, gap: 8 },
-  loadingText: { color: "#667085", fontSize: 12 },
+  loadingText: { color: "#76665E", fontSize: 12 },
   empty: { alignItems: "center", paddingHorizontal: 24, paddingVertical: 24 },
-  emptyIcon: { width: 60, height: 60, borderRadius: 14, backgroundColor: "#F0F3F8", alignItems: "center", justifyContent: "center", marginBottom: 12 },
-  emptyTitle: { color: "#111111", fontSize: 14, fontWeight: "600", marginBottom: 4 },
-  emptyText: { color: "#667085", fontSize: 12, textAlign: "center", lineHeight: 18 },
+  emptyIcon: { width: 60, height: 60, borderRadius: 14, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center", marginBottom: 12 },
+  emptyTitle: { color: "#241510", fontSize: 14, fontWeight: "600", marginBottom: 4 },
+  emptyText: { color: "#76665E", fontSize: 12, textAlign: "center", lineHeight: 18 },
 
   pressed: { opacity: 0.7 },
-  scrollTopButton: { position: "absolute", right: 16, bottom: 24, width: 38, height: 38, borderRadius: 10, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E3E3E3", alignItems: "center", justifyContent: "center" },
+  scrollTopButton: { position: "absolute", right: 16, bottom: 24, width: 38, height: 38, borderRadius: 10, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7D9CF", alignItems: "center", justifyContent: "center" },
 });

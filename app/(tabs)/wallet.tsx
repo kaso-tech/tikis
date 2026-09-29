@@ -29,11 +29,11 @@ const operationMeta: Record<WalletOperation, { label: string; icon: React.Compon
 };
 
 const TONE_COLOR: Record<Tone, string> = {
-  primary: "#9A6201",
-  success: "#176C52",
-  warning: "#9A6201",
-  error: "#A43740",
-  neutral: "#667085",
+  primary: "#A95000",
+  success: "#367552",
+  warning: "#A95000",
+  error: "#A43F32",
+  neutral: "#76665E",
 };
 
 export default function WalletScreen() {
@@ -131,7 +131,7 @@ export default function WalletScreen() {
             <Text style={styles.balanceValue}>{displayWalletAmount(available)}</Text>
             {isDriver ? (
               <View style={styles.trendPill}>
-                <MaterialIcons name="verified" size={11} color="#48B889" />
+                <MaterialIcons name="verified" size={11} color="#4D9B72" />
                 <Text style={styles.trendText}>Disponible</Text>
               </View>
             ) : (
@@ -234,7 +234,7 @@ export default function WalletScreen() {
           <View style={[styles.listCard, { backgroundColor: theme.surface }]}><Text style={[styles.emptyText, { color: theme.muted }]}>Le journal financier est momentanément indisponible.</Text></View>
         ) : recentJournal.length === 0 ? (
           <View style={styles.empty}>
-            <View style={styles.emptyIcon}><MaterialIcons name="savings" size={26} color="#667085" /></View>
+            <View style={styles.emptyIcon}><MaterialIcons name="savings" size={26} color="#76665E" /></View>
             <Text style={styles.emptyTitle}>Aucun mouvement enregistré</Text>
             <Text style={styles.emptySub}>Vos premières opérations apparaîtront ici après votre premier dépôt ou votre première course.</Text>
           </View>
@@ -274,7 +274,7 @@ export default function WalletScreen() {
             <View style={styles.sheetGrip} />
             {payment ? (
               <>
-                <View style={styles.modalIcon}><MaterialIcons name="verified-user" size={22} color="#667085" /></View>
+                <View style={styles.modalIcon}><MaterialIcons name="verified-user" size={22} color="#76665E" /></View>
                 <Text style={styles.modalTitle}>{payment.mode === "test" ? "Validation YengaPay" : "Paiement YengaPay Sandbox"}</Text>
                 <Text style={styles.modalSub}>{payment.mode === "test" ? `Mode test : confirmez le résultat de votre paiement de ${formatMoney(payment.amount)}. Votre Wallet ne changera qu’après cette confirmation serveur.` : `Ouvrez la page YengaPay pour finaliser votre dépôt de ${formatMoney(payment.amount)}. Votre Wallet sera crédité uniquement après la notification sécurisée de YengaPay.`}</Text>
                 <View style={styles.referenceCard}>
@@ -289,7 +289,7 @@ export default function WalletScreen() {
               </>
             ) : (
               <>
-                <View style={styles.modalIcon}><MaterialIcons name={requestType === "deposit" ? "add-card" : "account-balance-wallet"} size={22} color="#667085" /></View>
+                <View style={styles.modalIcon}><MaterialIcons name={requestType === "deposit" ? "add-card" : "account-balance-wallet"} size={22} color="#76665E" /></View>
                 <Text style={styles.modalTitle}>Recharger mon compte</Text>
                 <Text style={styles.modalSub}>{requestType === "deposit" ? "Initialisez un dépôt de test. Le solde ne sera crédité qu'après la confirmation suivante." : "Initialisez un retrait de test. Le solde ne sera débité qu'après la confirmation suivante."}</Text>
                 <View style={styles.amountWrap}>
@@ -330,7 +330,7 @@ function iconBgForTone(tone: Tone, theme: any) {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F0F3F8" },
+  safe: { flex: 1, backgroundColor: "#EEEDF3" },
 
   pressed: { opacity: 0.7 },
 
@@ -339,16 +339,16 @@ const styles = StyleSheet.create({
   // Le solde est une information, pas une action : il se lit sur une carte sombre, comme dans les applications
   // bancaires, et non sur un aplat de la couleur de marque — où le blanc ne donnait que 2,16:1 (et 1,51:1 pour les
   // libellés à 55 % d'opacité). Le voile de la couleur de marque conserve sa chaleur sans toucher à la lisibilité.
-  balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#111111", position: "relative", overflow: "hidden" },
-  balanceCardDriver: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#111111", borderWidth: 0, overflow: "hidden" },
-  balanceCardSender: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#111111", borderWidth: 0, overflow: "hidden" },
-  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#9A6201", opacity: 0.18, borderRadius: 14 },
+  balanceCard: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#241510", position: "relative", overflow: "hidden" },
+  balanceCardDriver: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#241510", borderWidth: 0, overflow: "hidden" },
+  balanceCardSender: { padding: 18, borderRadius: 14, gap: 10, backgroundColor: "#241510", borderWidth: 0, overflow: "hidden" },
+  balanceGradient: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#A95000", opacity: 0.18, borderRadius: 14 },
   balanceEyebrow: { color: "rgba(255,255,255,0.6)", fontSize: 10, fontWeight: "700", letterSpacing: 0.5, textTransform: "uppercase" },
   balanceEyebrowLight: { color: "rgba(255,255,255,0.7)" },
   balanceValueRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between" },
   balanceValue: { color: "#FFFFFF", fontSize: 28, fontWeight: "700", lineHeight: 34, includeFontPadding: false },
   trendPill: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: "rgba(22,122,85,0.25)", borderRadius: 99 },
-  trendText: { color: "#48B889", fontSize: 10, fontWeight: "700" },
+  trendText: { color: "#4D9B72", fontSize: 10, fontWeight: "700" },
   trendPillLight: { flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: 8, paddingVertical: 3, backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 99 },
   trendTextLight: { color: "#FFFFFF", fontSize: 10, fontWeight: "700" },
   balanceDivider: { height: 1, backgroundColor: "rgba(255,255,255,0.12)" },
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
   balanceLabel: { color: "rgba(255,255,255,0.7)", fontSize: 10, fontWeight: "600" },
   balanceLabelLight: { color: "rgba(255,255,255,0.7)" },
   balanceSub: { color: "#FFFFFF", fontSize: 12, fontWeight: "600", marginTop: 2 },
-  balanceSubPending: { color: "#FBBF24" },
+  balanceSubPending: { color: "#F8A008" },
 
   actionsRow: { flexDirection: "row", gap: 8, paddingHorizontal: 8, marginTop: 6 },
   actionCard: { flex: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1 },
@@ -373,14 +373,14 @@ const styles = StyleSheet.create({
   quickStat: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 10, paddingVertical: 10, alignItems: "center", gap: 4 },
   quickStatIcon: { width: 28, height: 28, borderRadius: 8, alignItems: "center", justifyContent: "center" },
   quickStatIconPrimary: { backgroundColor: "#FFFFFF" },
-  quickStatIconSuccess: { backgroundColor: "#F0F3F8" },
+  quickStatIconSuccess: { backgroundColor: "#EEEDF3" },
   quickStatIconAmber: { backgroundColor: "#FFFFFF" },
-  quickStatValue: { color: "#111111", fontSize: 13, fontWeight: "700" },
-  quickStatLabel: { color: "#667085", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
+  quickStatValue: { color: "#241510", fontSize: 13, fontWeight: "700" },
+  quickStatLabel: { color: "#76665E", fontSize: 9, fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" },
 
   senderInfo: { marginHorizontal: 8, padding: 12, backgroundColor: "#FFFFFF", borderRadius: 10, flexDirection: "row", gap: 10, alignItems: "center" },
-  senderInfoIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#9A6201", alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  senderInfoText: { flex: 1, color: "#667085", fontSize: 11, lineHeight: 16 },
+  senderInfoIcon: { width: 32, height: 32, borderRadius: 8, backgroundColor: "#A95000", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  senderInfoText: { flex: 1, color: "#76665E", fontSize: 11, lineHeight: 16 },
   senderInfoTextBold: { fontWeight: "700" },
 
   // Bannière "dépôt Mobile Money en attente" — sert à la reprise quand l'utilisateur a
@@ -393,8 +393,8 @@ const styles = StyleSheet.create({
   pendingDirectSub: { fontSize: 11, lineHeight: 15, marginTop: 2 },
 
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 10, marginTop: 6 },
-  sectionTitle: { color: "#667085", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
-  sectionAction: { color: "#111111", fontSize: 11, fontWeight: "600" },
+  sectionTitle: { color: "#76665E", fontSize: 10, fontWeight: "700", letterSpacing: 0.6, textTransform: "uppercase" },
+  sectionAction: { color: "#241510", fontSize: 11, fontWeight: "600" },
 
   listCard: { borderRadius: 12, overflow: "hidden" },
   txRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 12 },
@@ -417,24 +417,24 @@ const styles = StyleSheet.create({
 
   empty: { alignItems: "center", paddingVertical: 30, paddingHorizontal: 24, gap: 8 },
   emptyIcon: { width: 56, height: 56, borderRadius: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
-  emptyTitle: { color: "#111111", fontSize: 14, fontWeight: "600" },
-  emptySub: { color: "#667085", fontSize: 12, textAlign: "center", lineHeight: 18, maxWidth: 240 },
-  emptyText: { color: "#667085", fontSize: 12, textAlign: "center", padding: 24 },
+  emptyTitle: { color: "#241510", fontSize: 14, fontWeight: "600" },
+  emptySub: { color: "#76665E", fontSize: 12, textAlign: "center", lineHeight: 18, maxWidth: 240 },
+  emptyText: { color: "#76665E", fontSize: 12, textAlign: "center", padding: 24 },
 
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.42)" },
   modalSheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, paddingTop: 8, paddingBottom: 24 },
-  sheetGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#E3E3E3", alignSelf: "center", marginBottom: 14 },
+  sheetGrip: { width: 40, height: 4, borderRadius: 2, backgroundColor: "#E7D9CF", alignSelf: "center", marginBottom: 14 },
   modalIcon: { width: 44, height: 44, borderRadius: 9, backgroundColor: "#FFFFFF", alignSelf: "center", alignItems: "center", justifyContent: "center", marginBottom: 12 },
-  modalTitle: { color: "#111111", fontSize: 17, fontWeight: "600", textAlign: "center" },
-  modalSub: { color: "#667085", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 },
-  modalHint: { color: "#667085", fontSize: 10, lineHeight: 14, textAlign: "center", marginTop: 6 },
-  referenceCard: { backgroundColor: "#F0F3F8", borderRadius: 9, padding: 12, marginTop: 14 },
-  referenceLabel: { color: "#667085", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textAlign: "center" },
-  referenceValue: { color: "#111111", fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4, letterSpacing: 0.3 },
-  requestError: { color: "#A43740", fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: 6 },
-  amountWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: 1, borderColor: "#E3E3E3", paddingHorizontal: 12, marginTop: 14 },
-  amountInput: { flex: 1, color: "#111111", fontSize: 15, fontWeight: "500", minHeight: 46 },
-  amountCurrency: { color: "#667085", fontSize: 11, fontWeight: "600" },
+  modalTitle: { color: "#241510", fontSize: 17, fontWeight: "600", textAlign: "center" },
+  modalSub: { color: "#76665E", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 4 },
+  modalHint: { color: "#76665E", fontSize: 10, lineHeight: 14, textAlign: "center", marginTop: 6 },
+  referenceCard: { backgroundColor: "#EEEDF3", borderRadius: 9, padding: 12, marginTop: 14 },
+  referenceLabel: { color: "#76665E", fontSize: 9, fontWeight: "700", letterSpacing: 0.5, textAlign: "center" },
+  referenceValue: { color: "#241510", fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4, letterSpacing: 0.3 },
+  requestError: { color: "#A43F32", fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: 6 },
+  amountWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: 1, borderColor: "#E7D9CF", paddingHorizontal: 12, marginTop: 14 },
+  amountInput: { flex: 1, color: "#241510", fontSize: 15, fontWeight: "500", minHeight: 46 },
+  amountCurrency: { color: "#76665E", fontSize: 11, fontWeight: "600" },
   modalActions: { flexDirection: "row", gap: 8, marginTop: 16 },
   modalAction: { flex: 1, minHeight: 42 },
 });

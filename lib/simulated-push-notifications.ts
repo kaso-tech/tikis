@@ -34,7 +34,7 @@ export async function configureSimulatedPushNotifications() {
       name: "Suivi de livraison Tikisse",
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 180, 100, 180],
-      lightColor: "#9A6201",
+      lightColor: "#A95000",
     });
   }
 
@@ -56,7 +56,7 @@ export async function presentSimulatedTrackingPush(event: TrackingEvent, deliver
         body: event.body,
         data: { deliveryId, event: event.type, url: `/delivery/${deliveryId}/map` },
         sound: false,
-        color: "#9A6201",
+        color: "#A95000",
       },
       trigger: null,
     });
@@ -73,7 +73,7 @@ export async function presentDeliveryStatusPush(event: { deliveryId: string; sta
     const granted = await configureSimulatedPushNotifications();
     if (!granted) return false;
     await Notifications.scheduleNotificationAsync({
-      content: { title: event.title, body: event.body, data: { deliveryId: event.deliveryId, status: event.status, url: `/delivery/${event.deliveryId}/map` }, sound: false, color: "#9A6201" },
+      content: { title: event.title, body: event.body, data: { deliveryId: event.deliveryId, status: event.status, url: `/delivery/${event.deliveryId}/map` }, sound: false, color: "#A95000" },
       trigger: null,
     });
     return true;

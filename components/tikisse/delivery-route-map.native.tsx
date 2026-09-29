@@ -137,7 +137,7 @@ export function DeliveryRouteMap({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F0F3F8" },
+  container: { flex: 1, backgroundColor: "#EEEDF3" },
   map: { ...StyleSheet.absoluteFill },
   recenter: { position: "absolute", right: 14, width: 44, height: 44, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, alignItems: "center", justifyContent: "center" },
 });

@@ -323,11 +323,11 @@ export default function CreateDeliveryScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
       <View style={styles.topBar}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Retour">
-          <MaterialIcons name="arrow-back" size={20} color="#111111" />
+          <MaterialIcons name="arrow-back" size={20} color="#241510" />
         </Pressable>
         <Text style={styles.topTitle} numberOfLines={1}>{isEditing ? "Modifier la livraison" : "Nouvelle livraison"}</Text>
         <Pressable onPress={() => router.push("/delivery-drafts" as any)} hitSlop={6} accessibilityRole="button" style={({ pressed }) => [styles.draftsLink, pressed && styles.pressed]}>
-          <MaterialIcons name="folder-open" size={14} color="#667085" />
+          <MaterialIcons name="folder-open" size={14} color="#76665E" />
           <Text style={styles.draftsLinkText}>Brouillons</Text>
         </Pressable>
       </View>
@@ -350,7 +350,7 @@ export default function CreateDeliveryScreen() {
               </Text>
               {pickup || dropoff ? (
                 <Pressable onPress={swapPlaces} hitSlop={8} accessibilityRole="button" accessibilityLabel="Inverser la récupération et la destination" style={({ pressed }) => [styles.swapBtn, pressed && styles.pressed]}>
-                  <MaterialIcons name="swap-vert" size={18} color="#111111" />
+                  <MaterialIcons name="swap-vert" size={18} color="#241510" />
                 </Pressable>
               ) : null}
             </View>
@@ -359,7 +359,7 @@ export default function CreateDeliveryScreen() {
           {routeMessage ? <Text style={[styles.routeMessage, !route?.precise && styles.routeWarning]}>{routeMessage}</Text> : null}
           {pickup && dropoff && (!route || !route.precise) ? (
             <Pressable accessibilityRole="button" onPress={retryRoute} style={({ pressed }) => [styles.retryRoute, pressed && styles.pressed]}>
-              <MaterialIcons name="refresh" size={14} color="#667085" />
+              <MaterialIcons name="refresh" size={14} color="#76665E" />
               <Text style={styles.retryRouteText}>{route ? "Recalculer avec Routes API" : "Réessayer le calcul d’itinéraire"}</Text>
             </Pressable>
           ) : null}
@@ -378,7 +378,7 @@ export default function CreateDeliveryScreen() {
                     accessibilityLabel={`${item.label} — ${item.sub}`}
                     style={({ pressed }) => [styles.pill, active && styles.pillActive, pressed && styles.pressed]}
                   >
-                    <MaterialIcons name={item.icon} size={15} color={active ? "#9A6201" : "#667085"} />
+                    <MaterialIcons name={item.icon} size={15} color={active ? "#A95000" : "#76665E"} />
                     <Text style={[styles.pillLabel, active && styles.pillLabelActive]} numberOfLines={1}>{item.label}</Text>
                   </Pressable>
                 );
@@ -421,7 +421,7 @@ export default function CreateDeliveryScreen() {
                     accessibilityLabel={item}
                     style={({ pressed }) => [styles.vehiclePill, active && styles.pillActive, pressed && styles.pressed]}
                   >
-                    <MaterialIcons name={VEHICLE_ICON[item]} size={17} color={active ? "#9A6201" : "#667085"} />
+                    <MaterialIcons name={VEHICLE_ICON[item]} size={17} color={active ? "#A95000" : "#76665E"} />
                     <Text style={[styles.vehicleLabel, active && styles.pillLabelActive]} numberOfLines={1}>{item}</Text>
                   </Pressable>
                 );
@@ -442,7 +442,7 @@ export default function CreateDeliveryScreen() {
               // n'affichait qu'un tiret au-dessus d'un champ vide : un écran de
               // haut pour ne rien dire, entre les adresses et le colis.
               <View style={styles.offerWaiting}>
-                <MaterialIcons name="schedule" size={16} color="#667085" />
+                <MaterialIcons name="schedule" size={16} color="#76665E" />
                 <Text style={styles.offerWaitingText}>L’estimation s’affiche dès que les deux adresses sont choisies.</Text>
               </View>
             ) : (
@@ -461,7 +461,7 @@ export default function CreateDeliveryScreen() {
                     keyboardType="number-pad"
                     maxLength={8}
                     placeholder="0"
-                    placeholderTextColor="#C4CBD6"
+                    placeholderTextColor="#CBB8AB"
                     accessibilityLabel="Prix que vous proposez, en francs CFA"
                     style={styles.offerInput}
                   />
@@ -550,7 +550,7 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
           l'intérieur, et le web en ferait un <button> dans un <button>. */}
       <Pressable onPress={onPress} accessibilityLabel={value ? `${label} : ${locationTitle(value)}. Changer` : `Choisir le lieu de ${isPickup ? "récupération" : "destination"}`} style={({ pressed }) => [styles.routeInput, pressed && styles.pressed]}>
         <View style={[styles.routeInputIcon, isPickup ? styles.routeInputIconFrom : styles.routeInputIconTo]}>
-          <MaterialIcons name={isPickup ? "inventory-2" : "sports-score"} size={14} color={isPickup ? "#9A6201" : "#A43740"} />
+          <MaterialIcons name={isPickup ? "inventory-2" : "sports-score"} size={14} color={isPickup ? "#A95000" : "#A43F32"} />
         </View>
         <View style={styles.routeInputContent}>
           <Text style={[styles.routeInputLabel, invalid && styles.routeInputLabelInvalid]}>{label}</Text>
@@ -571,10 +571,10 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
             accessibilityRole="button"
             accessibilityLabel="Ajouter aux favoris"
           >
-            <MaterialIcons name={showFavoriteInput ? "close" : "star-outline"} size={17} color="#667085" />
+            <MaterialIcons name={showFavoriteInput ? "close" : "star-outline"} size={17} color="#76665E" />
           </Pressable>
         ) : null}
-        <MaterialIcons name="chevron-right" size={18} color="#667085" />
+        <MaterialIcons name="chevron-right" size={18} color="#76665E" />
       </Pressable>
       {showFavoriteInput && value ? (
         <View style={styles.favoriteInputRow}>
@@ -595,7 +595,7 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
 
 function Field({ label, icon, keyboardType, error, ...props }: { label: string; icon?: React.ComponentProps<typeof MaterialIcons>["name"]; keyboardType?: "default" | "number-pad" | "decimal-pad"; value: string; onChangeText: (value: string) => void; onBlur?: () => void; placeholder: string; multiline?: boolean; error?: string }) {
   const { colors: theme } = useThemeColors();
-  return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#A43740" : "#667085"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor={theme.placeholder} /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>;
+  return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#A43F32" : "#76665E"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor={theme.placeholder} /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>;
 }
 
 function MiniNumber({ value, onChangeText, placeholder }: { value: string; onChangeText: (value: string) => void; placeholder: string }) {
@@ -608,100 +608,100 @@ const styles = StyleSheet.create({
   keyboard: { flex: 1 },
   content: { padding: 16, paddingBottom: 24, gap: 18 },
 
-  topBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 9, gap: 10, backgroundColor: "#FFFFFF", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#E8ECF2" },
-  iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#F0F3F8", alignItems: "center", justifyContent: "center" },
-  topTitle: { flex: 1, color: "#111111", fontSize: 15, fontWeight: "700" },
+  topBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 9, gap: 10, backgroundColor: "#FFFFFF", borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: "#F1E7E0" },
+  iconBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: "#EEEDF3", alignItems: "center", justifyContent: "center" },
+  topTitle: { flex: 1, color: "#241510", fontSize: 15, fontWeight: "700" },
   draftsLink: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 4, paddingVertical: 8 },
-  draftsLinkText: { color: "#111111", fontSize: 12, fontWeight: "700" },
+  draftsLinkText: { color: "#241510", fontSize: 12, fontWeight: "700" },
 
-  mapStrip: { borderRadius: 14, overflow: "hidden", backgroundColor: "#E9EEF4" },
+  mapStrip: { borderRadius: 14, overflow: "hidden", backgroundColor: "#F2E7E0" },
 
   section: { gap: 10 },
   sectionHeadRow: { flexDirection: "row", alignItems: "baseline", gap: 8 },
-  sectionTitle: { color: "#111111", fontSize: 16, fontWeight: "700" },
-  sectionHint: { color: "#667085", fontSize: 11.5 },
+  sectionTitle: { color: "#241510", fontSize: 16, fontWeight: "700" },
+  sectionHint: { color: "#76665E", fontSize: 11.5 },
 
-  routeCard: { backgroundColor: "#FFFFFF", borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", paddingVertical: 4 },
+  routeCard: { backgroundColor: "#FFFFFF", borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: "#F1E7E0", paddingVertical: 4 },
   routeInput: { flexDirection: "row", alignItems: "center", gap: 11, paddingHorizontal: 12, paddingVertical: 11 },
   routeInputIcon: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
-  routeInputIconFrom: { backgroundColor: "#F7EFE5" },
-  routeInputIconTo: { backgroundColor: "#F7EAEB" },
+  routeInputIconFrom: { backgroundColor: "#FFF0D8" },
+  routeInputIconTo: { backgroundColor: "#F8E7E3" },
   routeInputContent: { flex: 1, minWidth: 0 },
-  routeInputLabel: { color: "#667085", fontSize: 9.5, fontWeight: "700", letterSpacing: 0.7 },
-  routeInputLabelInvalid: { color: "#A43740" },
-  routeInputValue: { color: "#111111", fontSize: 14, fontWeight: "600", marginTop: 2 },
-  routeInputMeta: { color: "#667085", fontSize: 11.5, marginTop: 1 },
-  routeInputPlaceholder: { color: "#667085", fontSize: 13.5, fontWeight: "600", marginTop: 3 },
-  routeFavoriteBtn: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", alignItems: "center", justifyContent: "center" },
+  routeInputLabel: { color: "#76665E", fontSize: 9.5, fontWeight: "700", letterSpacing: 0.7 },
+  routeInputLabelInvalid: { color: "#A43F32" },
+  routeInputValue: { color: "#241510", fontSize: 14, fontWeight: "600", marginTop: 2 },
+  routeInputMeta: { color: "#76665E", fontSize: 11.5, marginTop: 1 },
+  routeInputPlaceholder: { color: "#76665E", fontSize: 13.5, fontWeight: "600", marginTop: 3 },
+  routeFavoriteBtn: { width: 32, height: 32, borderRadius: 9, backgroundColor: "#FFFFFF", borderWidth: StyleSheet.hairlineWidth, borderColor: "#F1E7E0", alignItems: "center", justifyContent: "center" },
   favoriteInputRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 51, paddingRight: 12, paddingBottom: 8 },
-  favoriteInput: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", paddingHorizontal: 10, paddingVertical: 9, color: "#111111", fontSize: 12.5 },
-  favoriteSaveBtn: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 9, borderWidth: 1, borderColor: "#9A6201", backgroundColor: "#FFFFFF" },
-  favoriteSaveBtnText: { color: "#111111", fontSize: 12.5, fontWeight: "700" },
+  favoriteInput: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, borderColor: "#F1E7E0", paddingHorizontal: 10, paddingVertical: 9, color: "#241510", fontSize: 12.5 },
+  favoriteSaveBtn: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 9, borderWidth: 1, borderColor: "#A95000", backgroundColor: "#FFFFFF" },
+  favoriteSaveBtnText: { color: "#241510", fontSize: 12.5, fontWeight: "700" },
 
   routeConnector: { flexDirection: "row", alignItems: "center", gap: 9, paddingLeft: 25, paddingRight: 12 },
-  routeConnectorLine: { width: 1, height: 16, backgroundColor: "#E8ECF2" },
-  routeConnectorMeta: { flex: 1, color: "#667085", fontSize: 11, fontWeight: "600" },
-  swapBtn: { width: 32, height: 32, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
+  routeConnectorLine: { width: 1, height: 16, backgroundColor: "#F1E7E0" },
+  routeConnectorMeta: { flex: 1, color: "#76665E", fontSize: 11, fontWeight: "600" },
+  swapBtn: { width: 32, height: 32, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, borderColor: "#F1E7E0", backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center" },
 
-  routeMessage: { color: "#176C52", fontSize: 11.5, lineHeight: 16, marginTop: -10 },
-  routeWarning: { color: "#A65300" },
+  routeMessage: { color: "#367552", fontSize: 11.5, lineHeight: 16, marginTop: -10 },
+  routeWarning: { color: "#C65A00" },
   retryRoute: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: -10 },
-  retryRouteText: { color: "#111111", fontSize: 11.5, fontWeight: "600" },
+  retryRouteText: { color: "#241510", fontSize: 11.5, fontWeight: "600" },
 
-  offerWaiting: { flexDirection: "row", alignItems: "center", gap: 9, backgroundColor: "#FFFFFF", borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", paddingHorizontal: 13, paddingVertical: 13 },
-  offerWaitingText: { flex: 1, color: "#667085", fontSize: 12.5, lineHeight: 17 },
-  offerCard: { backgroundColor: "#FFFFFF", borderRadius: 15, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", overflow: "hidden" },
-  offerHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", backgroundColor: "#F7EFE5", paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
-  offerHeadLabel: { color: "#6B4600", fontSize: 11.5, fontWeight: "600", flex: 1 },
-  offerHeadValue: { color: "#6B4600", fontSize: 14, fontWeight: "800" },
+  offerWaiting: { flexDirection: "row", alignItems: "center", gap: 9, backgroundColor: "#FFFFFF", borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: "#F1E7E0", paddingHorizontal: 13, paddingVertical: 13 },
+  offerWaitingText: { flex: 1, color: "#76665E", fontSize: 12.5, lineHeight: 17 },
+  offerCard: { backgroundColor: "#FFFFFF", borderRadius: 15, borderWidth: StyleSheet.hairlineWidth, borderColor: "#F1E7E0", overflow: "hidden" },
+  offerHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", backgroundColor: "#FFF0D8", paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
+  offerHeadLabel: { color: "#7A3000", fontSize: 11.5, fontWeight: "600", flex: 1 },
+  offerHeadValue: { color: "#7A3000", fontSize: 14, fontWeight: "800" },
   offerBody: { padding: 14 },
-  offerLabel: { color: "#667085", fontSize: 11, fontWeight: "700", letterSpacing: 0.7 },
-  offerInputRow: { flexDirection: "row", alignItems: "baseline", gap: 8, marginTop: 8, paddingBottom: 8, borderBottomWidth: 2, borderBottomColor: "#111111" },
-  offerInputRowInvalid: { borderBottomColor: "#A43740" },
-  offerInput: { flex: 1, color: "#111111", fontSize: 28, fontWeight: "800", padding: 0 },
-  offerSuffix: { color: "#667085", fontSize: 14, fontWeight: "700" },
+  offerLabel: { color: "#76665E", fontSize: 11, fontWeight: "700", letterSpacing: 0.7 },
+  offerInputRow: { flexDirection: "row", alignItems: "baseline", gap: 8, marginTop: 8, paddingBottom: 8, borderBottomWidth: 2, borderBottomColor: "#241510" },
+  offerInputRowInvalid: { borderBottomColor: "#A43F32" },
+  offerInput: { flex: 1, color: "#241510", fontSize: 28, fontWeight: "800", padding: 0 },
+  offerSuffix: { color: "#76665E", fontSize: 14, fontWeight: "700" },
   suggestionRow: { flexDirection: "row", gap: 7, marginTop: 12 },
-  suggestion: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 44, borderRadius: 9, borderWidth: 1, borderColor: "#E8ECF2", backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", gap: 1, paddingHorizontal: 4 },
-  suggestionActive: { borderColor: "#9A6201", borderWidth: 1.5 },
-  suggestionAmount: { color: "#111111", fontSize: 13, fontWeight: "700" },
-  suggestionAmountActive: { color: "#111111", fontWeight: "800" },
-  suggestionNote: { color: "#667085", fontSize: 9.5 },
-  suggestionNoteActive: { color: "#111111", fontWeight: "600" },
-  offerNote: { color: "#667085", fontSize: 11.5, lineHeight: 17, marginTop: 11 },
-  offerError: { color: "#A43740", fontSize: 11.5, fontWeight: "600", lineHeight: 17, marginTop: 11 },
+  suggestion: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 44, borderRadius: 9, borderWidth: 1, borderColor: "#F1E7E0", backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", gap: 1, paddingHorizontal: 4 },
+  suggestionActive: { borderColor: "#A95000", borderWidth: 1.5 },
+  suggestionAmount: { color: "#241510", fontSize: 13, fontWeight: "700" },
+  suggestionAmountActive: { color: "#241510", fontWeight: "800" },
+  suggestionNote: { color: "#76665E", fontSize: 9.5 },
+  suggestionNoteActive: { color: "#241510", fontWeight: "600" },
+  offerNote: { color: "#76665E", fontSize: 11.5, lineHeight: 17, marginTop: 11 },
+  offerError: { color: "#A43F32", fontSize: 11.5, fontWeight: "600", lineHeight: 17, marginTop: 11 },
   // Ambre et non rouge : proposer moins que l'estimation reste un choix valide, pas une erreur.
-  offerWarning: { color: "#A65300", fontSize: 11.5, fontWeight: "600", lineHeight: 17, marginTop: 11 },
+  offerWarning: { color: "#C65A00", fontSize: 11.5, fontWeight: "600", lineHeight: 17, marginTop: 11 },
 
   pillRow: { flexDirection: "row", gap: 7 },
-  pill: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 6, borderRadius: 10, borderWidth: 1, borderColor: "#E8ECF2", backgroundColor: "#FFFFFF" },
-  pillActive: { borderColor: "#9A6201", borderWidth: 1.5, backgroundColor: "#F7EFE5" },
-  pillLabel: { color: "#344054", fontSize: 12.5, fontWeight: "600" },
-  pillLabelActive: { color: "#111111", fontWeight: "800" },
-  vehiclePill: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 46, alignItems: "center", justifyContent: "center", gap: 2, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1, borderColor: "#E8ECF2", backgroundColor: "#FFFFFF" },
-  vehicleLabel: { color: "#344054", fontSize: 10.5, fontWeight: "600" },
+  pill: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 44, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingHorizontal: 6, borderRadius: 10, borderWidth: 1, borderColor: "#F1E7E0", backgroundColor: "#FFFFFF" },
+  pillActive: { borderColor: "#A95000", borderWidth: 1.5, backgroundColor: "#FFF0D8" },
+  pillLabel: { color: "#4C342B", fontSize: 12.5, fontWeight: "600" },
+  pillLabelActive: { color: "#241510", fontWeight: "800" },
+  vehiclePill: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minHeight: 46, alignItems: "center", justifyContent: "center", gap: 2, paddingHorizontal: 4, borderRadius: 10, borderWidth: 1, borderColor: "#F1E7E0", backgroundColor: "#FFFFFF" },
+  vehicleLabel: { color: "#4C342B", fontSize: 10.5, fontWeight: "600" },
 
   fieldWrap: { gap: 5 },
-  fieldLabel: { color: "#344054", fontSize: 12, fontWeight: "600" },
-  fieldLabelInvalid: { color: "#A43740" },
-  field: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 11, paddingHorizontal: 13, paddingVertical: 11, gap: 8, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2" },
+  fieldLabel: { color: "#4C342B", fontSize: 12, fontWeight: "600" },
+  fieldLabelInvalid: { color: "#A43F32" },
+  field: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 11, paddingHorizontal: 13, paddingVertical: 11, gap: 8, borderWidth: StyleSheet.hairlineWidth, borderColor: "#F1E7E0" },
   fieldMultiline: { alignItems: "flex-start", paddingVertical: 12, minHeight: 74 },
-  fieldInvalid: { borderColor: "#A43740", borderWidth: 1 },
+  fieldInvalid: { borderColor: "#A43F32", borderWidth: 1 },
   fieldIcon: { marginRight: 2 },
-  input: { flex: 1, color: "#111111", fontSize: 14, fontWeight: "500" },
+  input: { flex: 1, color: "#241510", fontSize: 14, fontWeight: "500" },
   inputMultiline: { minHeight: 52, textAlignVertical: "top" },
-  fieldIssue: { color: "#A43740", fontSize: 11, fontWeight: "500" },
+  fieldIssue: { color: "#A43F32", fontSize: 11, fontWeight: "500" },
 
-  measureCard: { backgroundColor: "#FFFFFF", borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", padding: 13, gap: 10 },
-  measureTitle: { color: "#111111", fontSize: 12.5, fontWeight: "700" },
-  measureSubtitle: { color: "#667085", fontSize: 11.5, lineHeight: 16 },
+  measureCard: { backgroundColor: "#FFFFFF", borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: "#F1E7E0", padding: 13, gap: 10 },
+  measureTitle: { color: "#241510", fontSize: 12.5, fontWeight: "700" },
+  measureSubtitle: { color: "#76665E", fontSize: 11.5, lineHeight: 16 },
   dimensionRow: { flexDirection: "row", gap: 6 },
-  miniInput: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, borderColor: "#E8ECF2", paddingHorizontal: 10, paddingVertical: 11, color: "#111111", fontSize: 13, fontWeight: "600", textAlign: "center" },
+  miniInput: { flex: 1, backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: StyleSheet.hairlineWidth, borderColor: "#F1E7E0", paddingHorizontal: 10, paddingVertical: 11, color: "#241510", fontSize: 13, fontWeight: "600", textAlign: "center" },
 
-  publicationHint: { color: "#667085", fontSize: 12, textAlign: "center", fontWeight: "500", marginTop: -4 },
+  publicationHint: { color: "#76665E", fontSize: 12, textAlign: "center", fontWeight: "500", marginTop: -4 },
 
-  footer: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 18, backgroundColor: "#FFFFFF", borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#E8ECF2" },
+  footer: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 18, backgroundColor: "#FFFFFF", borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "#F1E7E0" },
   draftSave: { alignSelf: "center", paddingHorizontal: 8, paddingVertical: 8, marginTop: 4 },
-  draftSaveText: { color: "#667085", fontSize: 12.5, fontWeight: "600" },
+  draftSaveText: { color: "#76665E", fontSize: 12.5, fontWeight: "600" },
 
   pressed: { opacity: 0.7 },
 });

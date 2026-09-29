@@ -69,7 +69,7 @@ const config: ExpoConfig = {
   },
   android: {
     adaptiveIcon: {
-      backgroundColor: "#171108",
+      backgroundColor: "#401000",
       foregroundImage: "./assets/images/android-icon-foreground.png",
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
@@ -110,7 +110,7 @@ const config: ExpoConfig = {
     [
       "expo-notifications",
       {
-        color: "#9A6201",
+        color: "#A95000",
         defaultChannel: "tikisse-transactional",
       },
     ],
@@ -154,9 +154,9 @@ const config: ExpoConfig = {
         // en mode clair comme en mode sombre.
         imageWidth: 128,
         resizeMode: "contain",
-        backgroundColor: "#2A1407",
+        backgroundColor: "#401000",
         dark: {
-          backgroundColor: "#2A1407",
+          backgroundColor: "#401000",
         },
       },
     ],

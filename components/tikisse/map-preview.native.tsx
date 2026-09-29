@@ -46,7 +46,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate, 
             { latitude: pickup.latitude, longitude: pickup.longitude },
             { latitude: dropoff.latitude, longitude: dropoff.longitude },
           ]}
-          strokeColor="#9A6201"
+          strokeColor="#A95000"
           strokeWidth={3}
           lineCap="round"
         />
@@ -59,7 +59,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate, 
       </MapView>
       {approximate ? (
         <View style={styles.approximate}>
-          <MaterialIcons name="privacy-tip" size={11} color="#667085" />
+          <MaterialIcons name="privacy-tip" size={11} color="#76665E" />
           <Text style={styles.approximateText}>Aperçu indicatif</Text>
         </View>
       ) : null}
@@ -95,7 +95,7 @@ export { MapPreviewLeaflet as MapPreview };
 const styles = StyleSheet.create({
   frame: {
     borderRadius: 9,
-    backgroundColor: "#F0F3F8",
+    backgroundColor: "#EEEDF3",
     overflow: "hidden",
     position: "relative",
   },
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   approximateText: {
-    color: "#667085",
+    color: "#76665E",
     fontSize: 10,
     fontWeight: "600",
   },
@@ -135,29 +135,29 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#9A6201",
+    backgroundColor: "#A95000",
   },
   legendDotDropoff: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#A43740",
+    backgroundColor: "#A43F32",
   },
   legendLabel: {
-    color: "#111111",
+    color: "#241510",
     fontSize: 11,
     fontWeight: "600",
     flex: 1,
   },
   legendSub: {
-    color: "#667085",
+    color: "#76665E",
     fontSize: 10,
     lineHeight: 13,
     paddingLeft: 15,
   },
   legendDivider: {
     height: 1,
-    backgroundColor: "#E3E3E3",
+    backgroundColor: "#E7D9CF",
     marginVertical: 2,
   },
 });
