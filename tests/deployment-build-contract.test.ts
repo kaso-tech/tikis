@@ -10,15 +10,17 @@ describe("contrat de build WebDev backend", () => {
     expect(projectConfig.build_command).toBe("pnpm run build:deploy");
   });
 
-  it("installe la console admin avant de compiler l’API", () => {
+  it("produit les artefacts web, admin et API attendus en publication", () => {
     const command = packageJson.scripts?.["build:deploy"] ?? "";
+    expect(command).toContain("pnpm run build:web");
     expect(command).toContain("npm --prefix admin ci --ignore-scripts");
     expect(command).toContain("npm --prefix admin run build");
     expect(command).toContain("pnpm run build:server");
   });
 
-  it("n’exécute pas l’export Expo Web dans le service backend", () => {
-    expect(packageJson.scripts?.["build:deploy"] ?? "").not.toContain("build:web");
+  it("compile l’export Expo Web avant le serveur", () => {
+    const command = packageJson.scripts?.["build:deploy"] ?? "";
+    expect(command.indexOf("pnpm run build:web")).toBeLessThan(command.indexOf("pnpm run build:server"));
   });
 
   it("répond sainement à la racine lorsque le bundle Expo Web est absent", () => {
