@@ -10,8 +10,13 @@ describe("contrat de build WebDev backend", () => {
     expect(projectConfig.build_command).toBe("pnpm run build:deploy");
   });
 
+  it("redirige le build par défaut du conteneur vers le build de déploiement", () => {
+    expect(packageJson.scripts?.build).toBe("pnpm run build:deploy");
+  });
+
   it("produit les artefacts web, admin et API attendus en publication", () => {
     const command = packageJson.scripts?.["build:deploy"] ?? "";
+    expect(command).toContain("CI=1 EXPO_NO_INTERACTIVE=1");
     expect(command).toContain("pnpm run build:web");
     expect(command).toContain("npm --prefix admin ci --ignore-scripts");
     expect(command).toContain("npm --prefix admin run build");

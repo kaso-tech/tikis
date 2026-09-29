@@ -9,8 +9,8 @@ const metroConfig = readFileSync(join(root, "metro.config.js"), "utf8");
 
 describe("hébergement web public", () => {
   it("exporte Expo Web dans le build de production", () => {
-    expect(packageJson).toContain('"build:web": "NATIVEWIND_FORCE_WRITE_FILE_SYSTEM=false expo export --platform web --output-dir web-build --clear"');
-    expect(packageJson).toContain('"build": "pnpm build:web && pnpm build:admin && pnpm build:server"');
+    expect(packageJson).toContain('"build:web": "CI=1 EXPO_NO_INTERACTIVE=1 NATIVEWIND_FORCE_WRITE_FILE_SYSTEM=false expo export --platform web --output-dir web-build --clear"');
+    expect(packageJson).toContain('"build": "pnpm run build:deploy"');
     expect(metroConfig).toContain('process.env.NATIVEWIND_FORCE_WRITE_FILE_SYSTEM !== "false"');
   });
 
