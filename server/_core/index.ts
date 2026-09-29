@@ -186,7 +186,7 @@ async function startServer() {
       return res.sendFile(webIndexPath);
     });
   } else {
-    app.get("/", (_req, res) => res.status(503).send("Application web non compilée. Exécutez pnpm build avant le démarrage de production."));
+    app.get("/", (_req, res) => res.status(200).json({ ok: true, service: "Tikisse API" }));
   }
 
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
