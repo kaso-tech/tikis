@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { Platform } from "react-native";
+import * as SplashScreen from "expo-splash-screen";
 import "@/lib/_core/nativewind-pressable";
 // `defineTask` doit être appelé une seule fois, tôt, en dehors de tout composant — voir
 // lib/background-location-task.ts pour pourquoi ce module existe.
@@ -34,6 +35,11 @@ import { TikisseErrorBoundary } from "@/components/tikisse/error-boundary";
 import { OfflineBanner } from "@/components/tikisse/offline-banner";
 import { PushRegistrationHandler } from "@/components/tikisse/push-registration-handler";
 import { PushNotificationRuntime } from "@/components/tikisse/push-notification-runtime";
+import { AnimatedSplash } from "@/components/tikisse/animated-splash";
+
+// L'écran natif reste affiché jusqu'à ce que le splash animé, qui en reprend exactement l'image, soit
+// dessiné : c'est lui qui appelle `hideAsync` (components/tikisse/animated-splash.tsx).
+if (Platform.OS !== "web") void SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -51,6 +57,14 @@ export default function RootLayout() {
 
   useEffect(() => {
     initManusRuntime();
+  }, []);
+
+  // Filet de sécurité : si le splash animé n'était jamais dessiné, l'écran natif ne resterait pas
+  // affiché indéfiniment.
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const fallback = setTimeout(() => void SplashScreen.hideAsync().catch(() => {}), 3000);
+    return () => clearTimeout(fallback);
   }, []);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
@@ -109,6 +123,8 @@ export default function RootLayout() {
             </TikisseErrorBoundary>
             <StatusBar style="auto" />
           </TikisseLogoutProvider>
+          {/* Natif seulement : sur le web, chaque chargement complet de page le rejouerait. */}
+          {Platform.OS !== "web" ? <AnimatedSplash /> : null}
         </QueryClientProvider>
       </trpc.Provider>
     </GestureHandlerRootView>

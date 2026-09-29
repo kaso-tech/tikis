@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { BannedAccountScreen, DeletionPendingScreen, MaintenanceScreen } from "@/components/tikisse/account-status-screens";
 import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
+import { markAppReady } from "@/lib/app-ready";
 
 /**
  * Bloque toute l'application derrière l'écran adapté quand : le mode maintenance est actif,
@@ -26,6 +27,12 @@ export function AppStatusGate({ children }: { children: React.ReactNode }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusQuery.data]);
+
+  // Un écran de blocage est un écran final : le splash animé peut s'effacer pour le montrer.
+  const blocked = Boolean(maintenanceQuery.data?.enabled || profile?.accountStatus === "banned" || profile?.deletionRequestedAt);
+  useEffect(() => {
+    if (blocked) markAppReady();
+  }, [blocked]);
 
   if (maintenanceQuery.data?.enabled) {
     return <MaintenanceScreen message={maintenanceQuery.data.message} />;

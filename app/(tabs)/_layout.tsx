@@ -1,16 +1,23 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Redirect, Tabs } from "expo-router";
+import { useEffect } from "react";
 import { Platform, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TikisseHeader } from "@/components/tikisse/app-chrome";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { useTikisseStore } from "@/lib/tikisse-store";
+import { markAppReady } from "@/lib/app-ready";
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { profile } = useTikisseStore();
   const { colors: theme } = useThemeColors();
   const bottomPadding = Platform.OS === "web" ? 8 : Math.max(8, insets.bottom);
+
+  // Ouverture directe dans l'application (lien, notification) : le splash animé peut s'effacer.
+  useEffect(() => {
+    markAppReady();
+  }, []);
 
   if (!profile) return <Redirect href="/auth" />;
 

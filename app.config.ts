@@ -149,11 +149,14 @@ const config: ExpoConfig = {
       "expo-splash-screen",
       {
         image: "./assets/images/splash-icon.png",
-        imageWidth: 200,
+        // Doit rester identique au splash animé (components/tikisse/animated-splash.tsx :
+        // SPLASH_BACKGROUND, SPLASH_LOGO_SIZE) pour que le relais se fasse sans saut. Brun de l'icône
+        // en mode clair comme en mode sombre.
+        imageWidth: 128,
         resizeMode: "contain",
-        backgroundColor: "#EEEDF3",
+        backgroundColor: "#2A1407",
         dark: {
-          backgroundColor: "#171108",
+          backgroundColor: "#2A1407",
         },
       },
     ],
