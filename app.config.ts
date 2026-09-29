@@ -32,7 +32,7 @@ const env = {
   appSlug: "tikisse-mobile",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
   // Leave empty to use the default icon from assets/images/icon.png
-  logoUrl: "https://files.manuscdn.com/user_upload_by_module/session_file/310519663570163538/XYrGkePKhtJtWMnH.png",
+  logoUrl: "https://files.manuscdn.com/user_upload_by_module/session_file/310519663570163538/VeSDblGbqJsNHInf.png",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
@@ -151,7 +151,7 @@ const config: ExpoConfig = {
         image: "./assets/images/splash-icon.png",
         imageWidth: 200,
         resizeMode: "contain",
-        backgroundColor: "#F0F3F8",
+        backgroundColor: "#EEEDF3",
         dark: {
           backgroundColor: "#171108",
         },

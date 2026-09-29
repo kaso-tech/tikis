@@ -124,7 +124,7 @@ function Shell() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <div className="sidebar-brand-mark">T</div>
+          <img className="sidebar-brand-logo" src="/logo.png" alt="Logo Tikisse" />
           <div className="sidebar-brand-text">
             <div className="sidebar-brand-title">Tikisse Admin</div>
             <div className="sidebar-brand-sub">Console opérateur</div>

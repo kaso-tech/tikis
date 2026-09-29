@@ -1,4 +1,4 @@
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Image, StyleSheet, View } from "react-native";
 import { AuthFlow } from "@/components/tikisse/auth-flow";
 import { useSessionRestore } from "@/hooks/use-session-restore";
 import { useThemeColors } from "@/lib/use-theme-colors";
@@ -13,6 +13,7 @@ export default function IndexScreen() {
   if (restore !== "absent") {
     return (
       <View style={[styles.splash, { backgroundColor: theme.background }]}>
+        <Image accessibilityLabel="Logo Tikisse" source={require("../assets/images/icon.png")} style={styles.logo} />
         <ActivityIndicator color={theme.primary} />
       </View>
     );
@@ -23,4 +24,5 @@ export default function IndexScreen() {
 
 const styles = StyleSheet.create({
   splash: { flex: 1, alignItems: "center", justifyContent: "center" },
+  logo: { width: 112, height: 112, marginBottom: 18 },
 });

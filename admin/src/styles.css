@@ -83,6 +83,7 @@ a:hover { text-decoration: underline; }
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 14px;
 }
+.sidebar-brand-logo { width: 30px; height: 30px; border-radius: var(--radius-sm); object-fit: cover; flex-shrink: 0; }
 .sidebar-brand-text { display: flex; flex-direction: column; }
 .sidebar-brand-title { font-size: 14px; font-weight: 600; letter-spacing: -0.2px; color: var(--foreground); line-height: 1.2; }
 .sidebar-brand-sub { font-size: 11px; color: var(--muted); }
