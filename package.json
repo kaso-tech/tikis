@@ -9,6 +9,7 @@
     "dev:metro": "while true; do env -u CI -u EXPO_NO_INTERACTIVE EXPO_USE_METRO_WORKSPACE_ROOT=1 npx expo start --go --lan --port ${EXPO_PORT:-8081}; sleep 1; done",
     "dev:web": "env -u CI EXPO_USE_METRO_WORKSPACE_ROOT=1 EXPO_NO_INTERACTIVE=1 npx expo start --web --port ${EXPO_PORT:-8081}",
     "build": "pnpm build:web && pnpm build:admin && pnpm build:server",
+    "build:deploy": "npm --prefix admin ci --ignore-scripts && npm --prefix admin run build && pnpm run build:server",
     "build:web": "NATIVEWIND_FORCE_WRITE_FILE_SYSTEM=false expo export --platform web --output-dir web-build --clear",
     "build:admin": "npm --prefix admin run build",
     "build:server": "esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
