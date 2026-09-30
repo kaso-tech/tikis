@@ -26,9 +26,9 @@ describe("relais avec l'écran natif", () => {
   });
 
   it("même image que l'écran natif", () => {
-    expect(config).toContain('image: "./assets/images/splash-icon.png"');
-    expect(read("assets/images/splash-icon.png").length).toBe(read("assets/images/icon.png").length);
-    expect(splash).toContain('require("../../assets/images/icon.png")');
+    expect(config).toContain('image: "./assets/images/tikisse-logo.png"');
+    expect(read("assets/images/tikisse-logo.png").length).toBeGreaterThan(0);
+    expect(splash).toContain('require("../../assets/images/tikisse-logo.png")');
   });
 
   it("l'écran natif reste affiché jusqu'au premier dessin du splash animé, avec un filet de sécurité", () => {
@@ -59,4 +59,3 @@ describe("sortie du splash", () => {
     expect(splash).toContain("useReducedMotion()");
   });
 });
-

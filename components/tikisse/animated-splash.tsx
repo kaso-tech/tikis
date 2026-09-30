@@ -191,7 +191,7 @@ export function AnimatedSplash() {
           )}
           <Animated.View style={logoStyle}>
             <View style={styles.logoShadow} />
-            <Image source={require("../../assets/images/icon.png")} style={styles.logo} accessibilityLabel="Logo Tikisse" />
+            <Image source={require("../../assets/images/tikisse-logo.png")} style={styles.logo} accessibilityLabel="Logo Tikisse" />
           </Animated.View>
         </View>
 

@@ -36,13 +36,13 @@ describe("charte officielle Tikisse mobile", () => {
   });
 
   it("utilise le logo officiel pour les icônes, le splash et l’en-tête", () => {
-    for (const asset of ["icon.png", "splash-icon.png", "favicon.png", "android-icon-foreground.png"]) {
+    for (const asset of ["tikisse-logo.png", "android-icon-foreground.png"]) {
       expect(existsSync(join(process.cwd(), "assets/images", asset))).toBe(true);
     }
-    expect(read("app.config.ts")).toContain('icon: "./assets/images/icon.png"');
-    expect(read("app.config.ts")).toContain('image: "./assets/images/splash-icon.png"');
-    expect(read("components/tikisse/app-chrome.tsx")).toContain('source={require("../../assets/images/icon.png")}');
-    expect(read("components/tikisse/auth-flow.tsx")).toContain('source={require("@/assets/images/icon.png")}');
+    expect(read("app.config.ts")).toContain('icon: "./assets/images/tikisse-logo.png"');
+    expect(read("app.config.ts")).toContain('image: "./assets/images/tikisse-logo.png"');
+    expect(read("components/tikisse/app-chrome.tsx")).toContain('source={require("../../assets/images/tikisse-logo.png")}');
+    expect(read("components/tikisse/auth-flow.tsx")).toContain('source={require("@/assets/images/tikisse-logo.png")}');
   });
 
   it("aligne le splash et l’icône Android sur le brun profond du logo", () => {

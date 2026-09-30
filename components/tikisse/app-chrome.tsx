@@ -37,7 +37,7 @@ export function TikisseHeader() {
         <MaterialIcons name="menu" size={24} color={theme.foreground} />
       </Pressable>
       <View style={styles.brand}>
-        <Image accessibilityLabel="Logo Tikisse" source={require("../../assets/images/icon.png")} style={styles.brandLogo} />
+        <Image accessibilityLabel="Logo Tikisse" source={require("../../assets/images/tikisse-logo.png")} style={styles.brandLogo} />
         <Text style={[styles.brandName, { color: theme.foreground }]}>Tikisse</Text>
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir les notifications" onPress={() => { haptic.light(); router.push("/notifications" as any); }} style={({ pressed }) => [styles.headerIcon, { backgroundColor: theme.background }, pressed && styles.pressed]}>

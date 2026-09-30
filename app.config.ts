@@ -31,7 +31,7 @@ const env = {
   appName: "Tikisse",
   appSlug: "tikisse-mobile",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
-  // Leave empty to use the default icon from assets/images/icon.png
+  // Leave empty to use the default icon from assets/images/tikisse-logo.png
   logoUrl: "https://files.manuscdn.com/user_upload_by_module/session_file/310519663570163538/VeSDblGbqJsNHInf.png",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
@@ -46,7 +46,7 @@ const config: ExpoConfig = {
   slug: env.appSlug,
   version: "1.0.0",
   orientation: "portrait",
-  icon: "./assets/images/icon.png",
+  icon: "./assets/images/tikisse-logo.png",
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
   // Suit `version` automatiquement à chaque publication plutôt qu'une chaîne figée à mettre à
@@ -103,7 +103,7 @@ const config: ExpoConfig = {
   web: {
     bundler: "metro",
     output: "static",
-    favicon: "./assets/images/favicon.png",
+    favicon: "./assets/images/tikisse-logo.png",
   },
   extra: env.easProjectId ? { eas: { projectId: env.easProjectId } } : undefined,
   plugins: [
@@ -148,7 +148,7 @@ const config: ExpoConfig = {
     [
       "expo-splash-screen",
       {
-        image: "./assets/images/splash-icon.png",
+        image: "./assets/images/tikisse-logo.png",
         // Doit rester identique au splash animé (components/tikisse/animated-splash.tsx :
         // SPLASH_BACKGROUND, SPLASH_LOGO_SIZE) pour que le relais se fasse sans saut. Brun de l'icône
         // en mode clair comme en mode sombre.

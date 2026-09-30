@@ -21,7 +21,7 @@ export default function IndexScreen() {
   if (restore !== "absent") {
     return (
       <View style={[styles.splash, { backgroundColor: theme.background }]}>
-        <Image accessibilityLabel="Logo Tikisse" source={require("../assets/images/icon.png")} style={styles.logo} />
+        <Image accessibilityLabel="Logo Tikisse" source={require("../assets/images/tikisse-logo.png")} style={styles.logo} />
         <ActivityIndicator color={theme.primary} />
       </View>
     );

@@ -314,7 +314,7 @@ function TrustRow({ icon, title, isDark }: { icon: React.ComponentProps<typeof M
 function WelcomeScreen({ onContinue, isDark }: { onContinue: () => void; isDark: boolean }) {
   return <View style={styles.form}>
     <View style={styles.brandRow}>
-      <Image source={require("@/assets/images/icon.png")} style={styles.brandLogo} accessibilityLabel="Logo Tikisse" />
+      <Image source={require("@/assets/images/tikisse-logo.png")} style={styles.brandLogo} accessibilityLabel="Logo Tikisse" />
       <View style={styles.brandInfo}>
         <Text style={[styles.brandName, isDark && { color: AUTH_DARK.text }]}>Tikisse</Text>
         <View style={styles.brandChipRow}>
