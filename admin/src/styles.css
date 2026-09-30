@@ -269,7 +269,14 @@ a:hover { text-decoration: underline; }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+  /* `clip` et non `hidden` : `hidden` fait de la carte la référence de l'en-tête collant des tableaux,
+     qui se plaçait alors à la hauteur de la barre du haut à l'intérieur de la carte et recouvrait la
+     première ligne. `clip` coupe pareil aux coins arrondis sans capter l'en-tête. */
   overflow: hidden;
+  overflow: clip;
+}
+@supports not (overflow: clip) {
+  .card .table th { top: 0; }
 }
 .card-head {
   display: flex; align-items: center; justify-content: space-between;
@@ -301,6 +308,8 @@ a:hover { text-decoration: underline; }
 .btn-ghost:hover { background: var(--surface-2); }
 .btn-danger { background: var(--error); border-color: var(--error); color: #FFFFFF; }
 .btn-danger:hover { background: #8e2c34; border-color: #8e2c34; }
+.btn-danger-quiet { border-color: transparent; background: transparent; color: var(--error); }
+.btn-danger-quiet:hover { background: var(--error-soft); }
 .btn-success { background: var(--success); border-color: var(--success); color: #FFFFFF; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-sm { padding: 4px 8px; font-size: 12px; }
@@ -344,7 +353,6 @@ a:hover { text-decoration: underline; }
 .table-scroll { overflow-x: auto; }
 .table-scroll .table th { top: 0; }
 .table tbody tr:last-child td { border-bottom: 0; }
-
 /* ---------- PILLS / STATUS ---------- */
 .pill {
   display: inline-flex; align-items: center; gap: 5px;
@@ -389,6 +397,46 @@ a:hover { text-decoration: underline; }
 .banner-error  { background: var(--error-soft);   color: var(--error);   padding: 10px 14px; border-radius: var(--radius-md); font-size: 13px; font-weight: 500; margin-bottom: 16px; border: 1px solid color-mix(in srgb, var(--error) 30%, transparent); }
 .banner-ok     { background: var(--success-soft); color: var(--success); padding: 10px 14px; border-radius: var(--radius-md); font-size: 13px; font-weight: 500; margin-bottom: 16px; }
 .empty-state   { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px; }
+
+/* ---------- MODAL ---------- */
+/* Utilisées par lib/confirm-dialog.tsx et les formulaires en fenêtre ; sans ces règles, les
+   confirmations s'affichaient en bas de page, sans fond ni cadre. */
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(33, 22, 12, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(33, 22, 12, 0.22);
+  width: 100%; max-width: 440px;
+  max-height: calc(100vh - 32px); overflow-y: auto;
+  padding: 20px;
+}
+.modal-wide { max-width: 600px; }
+.modal-title { font-size: 16px; font-weight: 600; letter-spacing: -0.2px; margin: 0 0 8px; }
+.modal-body { font-size: 13px; line-height: 1.55; color: var(--muted-strong); }
+.modal-body p { margin: 0 0 8px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+.modal-double-check { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+/* ---------- FORMS ---------- */
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.form-grid .span-2 { grid-column: 1 / -1; }
+.field-hint { font-size: 11.5px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+.field-warning { font-size: 11.5px; color: var(--warning); margin-top: 4px; line-height: 1.4; }
+.field-error { font-size: 11.5px; color: var(--error); margin-top: 4px; line-height: 1.4; }
+.input:disabled { background: var(--surface-2); color: var(--muted-strong); }
+.phone-preview {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px;
+  font-variant-numeric: tabular-nums; letter-spacing: 0.2px; white-space: nowrap;
+}
+@media (max-width: 560px) {
+  .form-grid { grid-template-columns: 1fr; }
+}
 
 /* ---------- USERS / METRICS ---------- */
 .metric-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--border); }

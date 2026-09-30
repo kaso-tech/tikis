@@ -975,12 +975,14 @@ export async function adminListCountries() {
   const dbc = await getDb();
   if (!dbc) return [];
   const rows = await dbc.select().from(tikisseSupportedCountries);
+  const accounts = await countryAccountCounts(dbc, rows);
   // `issue` rend visibles les lignes enregistrées avant que la cohérence soit
   // vérifiée : la console les signale au lieu de les laisser passer pour bonnes.
   return rows
-    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "fr"))
     .map((row) => ({
       ...row,
+      accountCount: accounts.get(row.id) ?? 0,
       issue: countryDraftIssue({ id: row.id, name: row.name, dialCode: row.dialCode }),
       planWarning: countryPlanWarning({
         id: row.id, name: row.name, dialCode: row.dialCode,
@@ -989,7 +991,23 @@ export async function adminListCountries() {
     }));
 }
 
-export async function adminUpsertCountry(input: { id: string; name: string; dialCode: string; digits: number; groups: number[]; timeZones: string[]; enabled: boolean; sortOrder: number }) {
+/**
+ * Comptes rattachés à chaque pays : pays déclaré au profil, ou à défaut l'indicatif du numéro (les
+ * profils créés avant la colonne `country` n'en ont pas). C'est ce qui interdit une suppression.
+ */
+async function countryAccountCounts(dbc: NonNullable<Awaited<ReturnType<typeof getDb>>>, countries: Array<{ id: string; dialCode: string }>) {
+  const counts = new Map<string, number>();
+  for (const country of countries) {
+    const rows = await dbc.select({ count: count() }).from(tikisseProfiles).where(or(
+      eq(tikisseProfiles.country, country.id),
+      and(isNull(tikisseProfiles.country), like(tikisseProfiles.phone, `${country.dialCode}%`)),
+    ));
+    counts.set(country.id, Number(rows[0]?.count ?? 0));
+  }
+  return counts;
+}
+
+export async function adminUpsertCountry(input: { id: string; name: string; dialCode: string; digits: number; groups: number[]; timeZones: string[]; enabled: boolean; sortOrder?: number }) {
   if (!/^[A-Z]{2}$/.test(input.id)) throw new Error("Le code pays doit être un code ISO à 2 lettres (ex. BF).");
   if (!/^\+\d{1,4}$/.test(input.dialCode)) throw new Error("Indicatif téléphonique invalide (ex. +226).");
   // Le code, le nom et l'indicatif doivent désigner le même pays. Sans cette
@@ -1000,11 +1018,17 @@ export async function adminUpsertCountry(input: { id: string; name: string; dial
   if (!Number.isInteger(input.digits) || input.digits < 4 || input.digits > 15) throw new Error("Nombre de chiffres invalide.");
   if (input.groups.reduce((a, b) => a + b, 0) !== input.digits) throw new Error("La somme des groupes d’affichage doit être égale au nombre de chiffres.");
   if (input.timeZones.length === 0) throw new Error("Au moins un fuseau horaire est requis.");
+  const invalidZone = input.timeZones.find((zone) => !isValidTimeZone(zone));
+  if (invalidZone) throw new Error(`Fuseau horaire inconnu : ${invalidZone} (ex. Africa/Ouagadougou).`);
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  // Un nouveau pays se range à la fin de la liste ; une modification garde sa place.
+  const existing = (await dbc.select().from(tikisseSupportedCountries).where(eq(tikisseSupportedCountries.id, input.id)).limit(1))[0];
+  const last = (await dbc.select({ max: sql<number>`coalesce(max(${tikisseSupportedCountries.sortOrder}), 0)` }).from(tikisseSupportedCountries))[0]?.max ?? 0;
   const values = {
     id: input.id, name: input.name.trim(), dialCode: input.dialCode, digits: input.digits,
-    groups: input.groups.join(","), timeZones: input.timeZones.join(","), enabled: input.enabled, sortOrder: input.sortOrder,
+    groups: input.groups.join(","), timeZones: input.timeZones.join(","), enabled: input.enabled,
+    sortOrder: input.sortOrder ?? existing?.sortOrder ?? Number(last) + 1,
   };
   await dbc.insert(tikisseSupportedCountries).values(values).onDuplicateKeyUpdate({ set: values });
   return values;
@@ -1021,6 +1045,51 @@ export async function adminSetCountryEnabled(id: string, enabled: boolean) {
   }
   await dbc.update(tikisseSupportedCountries).set({ enabled }).where(eq(tikisseSupportedCountries.id, id));
   return { id, enabled };
+}
+
+/**
+ * Supprime un pays de la liste. Refusé tant que des comptes y sont rattachés : leurs numéros ne se
+ * reconnaîtraient plus à la connexion. Pour ceux-là, la désactivation ferme les nouvelles inscriptions
+ * sans rien casser.
+ */
+export async function adminDeleteCountry(id: string) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  const country = (await dbc.select().from(tikisseSupportedCountries).where(eq(tikisseSupportedCountries.id, id)).limit(1))[0];
+  if (!country) throw new Error("Pays introuvable.");
+  if (country.enabled) {
+    const remainingEnabled = await dbc.select({ count: count() }).from(tikisseSupportedCountries).where(and(eq(tikisseSupportedCountries.enabled, true), sql`${tikisseSupportedCountries.id} != ${id}`));
+    if (Number(remainingEnabled[0]?.count ?? 0) === 0) throw new Error("Impossible de supprimer le dernier pays actif.");
+  }
+  const accounts = (await countryAccountCounts(dbc, [country])).get(id) ?? 0;
+  if (accounts > 0) {
+    throw new Error(`${country.name} compte ${accounts} compte${accounts > 1 ? "s" : ""} inscrit${accounts > 1 ? "s" : ""} : il ne peut pas être supprimé. Désactivez-le pour fermer les nouvelles inscriptions.`);
+  }
+  await dbc.delete(tikisseSupportedCountries).where(eq(tikisseSupportedCountries.id, id));
+  return country;
+}
+
+/** Enregistre l'ordre d'affichage (liste d'inscription de l'application). `ids` : tous les pays, dans l'ordre voulu. */
+export async function adminReorderCountries(ids: string[]) {
+  const dbc = await getDb();
+  if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
+  const current = (await dbc.select({ id: tikisseSupportedCountries.id }).from(tikisseSupportedCountries)).map((row) => row.id);
+  if (ids.length !== current.length || new Set(ids).size !== ids.length || ids.some((id) => !current.includes(id))) {
+    throw new Error("La liste des pays a changé entre-temps. Rechargez la page.");
+  }
+  await dbc.transaction(async (tx) => {
+    for (const [index, id] of ids.entries()) await tx.update(tikisseSupportedCountries).set({ sortOrder: index + 1 }).where(eq(tikisseSupportedCountries.id, id));
+  });
+  return { ids };
+}
+
+function isValidTimeZone(zone: string) {
+  try {
+    new Intl.DateTimeFormat("fr-FR", { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // ————————————————————————————————————————————————————————————————————————

@@ -466,7 +466,7 @@ export const tikisseAdminRouter = router({
     upsert: adminProcedure.use(requireTikisseAdminRole("super_admin")).input(z.object({
       id: z.string().length(2), name: z.string().min(2).max(80), dialCode: z.string().min(2).max(6),
       digits: z.number().int().min(4).max(15), groups: z.array(z.number().int().positive()).min(1),
-      timeZones: z.array(z.string().min(1)).min(1), enabled: z.boolean(), sortOrder: z.number().int().default(0),
+      timeZones: z.array(z.string().min(1).max(64)).min(1).max(6), enabled: z.boolean(), sortOrder: z.number().int().optional(),
     })).mutation(async ({ ctx, input }) => {
       const before = (await adminDb.adminListCountries()).find((country) => country.id === input.id) ?? null;
       const result = await adminDb.adminUpsertCountry(input);
@@ -477,6 +477,17 @@ export const tikisseAdminRouter = router({
       const before = (await adminDb.adminListCountries()).find((country) => country.id === input.id)?.enabled ?? null;
       const result = await adminDb.adminSetCountryEnabled(input.id, input.enabled);
       await audit(ctx, "country_enabled_changed", "platform_settings", input.id, { before, after: input.enabled });
+      return result;
+    }),
+    remove: adminProcedure.use(requireTikisseAdminRole("super_admin")).input(z.object({ id: z.string().length(2) })).mutation(async ({ ctx, input }) => {
+      const removed = await adminDb.adminDeleteCountry(input.id);
+      await audit(ctx, "country_deleted", "platform_settings", input.id, { before: removed, after: null });
+      return { success: true } as const;
+    }),
+    reorder: adminProcedure.use(requireTikisseAdminRole("super_admin")).input(z.object({ ids: z.array(z.string().length(2)).min(1).max(250) })).mutation(async ({ ctx, input }) => {
+      const before = (await adminDb.adminListCountries()).map((country) => country.id);
+      const result = await adminDb.adminReorderCountries(input.ids);
+      await audit(ctx, "countries_reordered", "platform_settings", "countries", { before, after: input.ids });
       return result;
     }),
   }),

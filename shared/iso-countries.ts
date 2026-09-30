@@ -17,7 +17,8 @@
  * fin 2024 — donc `digits` et `groups` ne sont renseignés que là où on les
  * connaît, et seulement pour avertir : c'est l'administrateur qui tranche, et
  * qui doit pouvoir corriger le jour où un pays renumérote à son tour. Les
- * fuseaux restent entièrement à lui.
+ * fuseaux et le plan servent aussi à pré-remplir le formulaire d'ajout ; il
+ * reste modifiable.
  */
 
 export type IsoCountry = {
@@ -42,42 +43,44 @@ export type IsoCountry = {
   allowsLeadingZero?: boolean;
   /** Ce qu'il faut savoir sur ce plan, affiché tel quel à l'administrateur. */
   digitsNote?: string;
+  /** Fuseaux IANA du pays, proposés à l'ajout. */
+  timeZones: string[];
 };
 
 export const ISO_COUNTRIES: IsoCountry[] = [
   // Afrique de l'Ouest
-  { id: "BJ", name: "Bénin", dialCode: "+229", digits: 10, groups: [2, 2, 2, 2, 2], allowsLeadingZero: true, digitsNote: "Depuis la renumérotation de novembre 2024, les numéros béninois font 10 chiffres et commencent par 01." },
-  { id: "BF", name: "Burkina Faso", dialCode: "+226", digits: 8, groups: [2, 2, 2, 2] },
-  { id: "CV", name: "Cabo Verde", dialCode: "+238", aliases: ["cap vert", "cap-vert"] },
-  { id: "CI", name: "Côte d’Ivoire", dialCode: "+225", aliases: ["cote d ivoire", "cote divoire"], digits: 10, groups: [2, 2, 2, 2, 2] },
-  { id: "GM", name: "Gambie", dialCode: "+220" },
-  { id: "GH", name: "Ghana", dialCode: "+233", digits: 9, groups: [2, 3, 4] },
-  { id: "GN", name: "Guinée", dialCode: "+224", aliases: ["guinee conakry"] },
-  { id: "GW", name: "Guinée-Bissau", dialCode: "+245" },
-  { id: "LR", name: "Liberia", dialCode: "+231", aliases: ["libéria"] },
-  { id: "ML", name: "Mali", dialCode: "+223", digits: 8, groups: [2, 2, 2, 2] },
-  { id: "MR", name: "Mauritanie", dialCode: "+222" },
-  { id: "NE", name: "Niger", dialCode: "+227", digits: 8, groups: [2, 2, 2, 2] },
-  { id: "NG", name: "Nigeria", dialCode: "+234", aliases: ["nigéria"] },
-  { id: "SN", name: "Sénégal", dialCode: "+221", digits: 9, groups: [2, 3, 2, 2] },
-  { id: "SL", name: "Sierra Leone", dialCode: "+232" },
-  { id: "TG", name: "Togo", dialCode: "+228", digits: 8, groups: [2, 2, 2, 2] },
+  { id: "BJ", name: "Bénin", dialCode: "+229", digits: 10, groups: [2, 2, 2, 2, 2], allowsLeadingZero: true, digitsNote: "Depuis la renumérotation de novembre 2024, les numéros béninois font 10 chiffres et commencent par 01.", timeZones: ["Africa/Porto-Novo"] },
+  { id: "BF", name: "Burkina Faso", dialCode: "+226", digits: 8, groups: [2, 2, 2, 2], timeZones: ["Africa/Ouagadougou"] },
+  { id: "CV", name: "Cabo Verde", dialCode: "+238", aliases: ["cap vert", "cap-vert"], digits: 7, groups: [3, 2, 2], timeZones: ["Atlantic/Cape_Verde"] },
+  { id: "CI", name: "Côte d’Ivoire", dialCode: "+225", aliases: ["cote d ivoire", "cote divoire"], digits: 10, groups: [2, 2, 2, 2, 2], timeZones: ["Africa/Abidjan"] },
+  { id: "GM", name: "Gambie", dialCode: "+220", digits: 7, groups: [3, 4], timeZones: ["Africa/Banjul"] },
+  { id: "GH", name: "Ghana", dialCode: "+233", digits: 9, groups: [2, 3, 4], timeZones: ["Africa/Accra"] },
+  { id: "GN", name: "Guinée", dialCode: "+224", aliases: ["guinee conakry"], digits: 9, groups: [3, 2, 2, 2], timeZones: ["Africa/Conakry"] },
+  { id: "GW", name: "Guinée-Bissau", dialCode: "+245", timeZones: ["Africa/Bissau"] },
+  { id: "LR", name: "Liberia", dialCode: "+231", aliases: ["libéria"], timeZones: ["Africa/Monrovia"] },
+  { id: "ML", name: "Mali", dialCode: "+223", digits: 8, groups: [2, 2, 2, 2], timeZones: ["Africa/Bamako"] },
+  { id: "MR", name: "Mauritanie", dialCode: "+222", digits: 8, groups: [2, 2, 2, 2], timeZones: ["Africa/Nouakchott"] },
+  { id: "NE", name: "Niger", dialCode: "+227", digits: 8, groups: [2, 2, 2, 2], timeZones: ["Africa/Niamey"] },
+  { id: "NG", name: "Nigeria", dialCode: "+234", aliases: ["nigéria"], digits: 10, groups: [3, 3, 4], timeZones: ["Africa/Lagos"] },
+  { id: "SN", name: "Sénégal", dialCode: "+221", digits: 9, groups: [2, 3, 2, 2], timeZones: ["Africa/Dakar"] },
+  { id: "SL", name: "Sierra Leone", dialCode: "+232", digits: 8, groups: [2, 3, 3], timeZones: ["Africa/Freetown"] },
+  { id: "TG", name: "Togo", dialCode: "+228", digits: 8, groups: [2, 2, 2, 2], timeZones: ["Africa/Lome"] },
   // Afrique centrale
-  { id: "CM", name: "Cameroun", dialCode: "+237" },
-  { id: "CF", name: "République centrafricaine", dialCode: "+236", aliases: ["centrafrique"] },
-  { id: "TD", name: "Tchad", dialCode: "+235" },
-  { id: "CG", name: "Congo-Brazzaville", dialCode: "+242", aliases: ["republique du congo"] },
+  { id: "CM", name: "Cameroun", dialCode: "+237", digits: 9, groups: [1, 2, 2, 2, 2], timeZones: ["Africa/Douala"] },
+  { id: "CF", name: "République centrafricaine", dialCode: "+236", aliases: ["centrafrique"], digits: 8, groups: [2, 2, 2, 2], timeZones: ["Africa/Bangui"] },
+  { id: "TD", name: "Tchad", dialCode: "+235", digits: 8, groups: [2, 2, 2, 2], timeZones: ["Africa/Ndjamena"] },
+  { id: "CG", name: "Congo-Brazzaville", dialCode: "+242", aliases: ["republique du congo"], timeZones: ["Africa/Brazzaville"] },
   // « Congo » seul ne désigne ni l'un ni l'autre : laissé sans alias, pour ne pas
   // corriger un administrateur vers le mauvais des deux.
-  { id: "CD", name: "République démocratique du Congo", dialCode: "+243", aliases: ["rdc", "congo kinshasa"] },
-  { id: "GQ", name: "Guinée équatoriale", dialCode: "+240" },
-  { id: "GA", name: "Gabon", dialCode: "+241" },
-  { id: "ST", name: "Sao Tomé-et-Principe", dialCode: "+239", aliases: ["sao tome et principe"] },
+  { id: "CD", name: "République démocratique du Congo", dialCode: "+243", aliases: ["rdc", "congo kinshasa"], digits: 9, groups: [3, 3, 3], timeZones: ["Africa/Kinshasa", "Africa/Lubumbashi"] },
+  { id: "GQ", name: "Guinée équatoriale", dialCode: "+240", digits: 9, groups: [3, 3, 3], timeZones: ["Africa/Malabo"] },
+  { id: "GA", name: "Gabon", dialCode: "+241", timeZones: ["Africa/Libreville"] },
+  { id: "ST", name: "Sao Tomé-et-Principe", dialCode: "+239", aliases: ["sao tome et principe"], timeZones: ["Africa/Sao_Tome"] },
   // Maghreb et Europe
-  { id: "MA", name: "Maroc", dialCode: "+212" },
-  { id: "DZ", name: "Algérie", dialCode: "+213" },
-  { id: "TN", name: "Tunisie", dialCode: "+216" },
-  { id: "FR", name: "France", dialCode: "+33", digits: 9, groups: [1, 2, 2, 2, 2] },
+  { id: "MA", name: "Maroc", dialCode: "+212", digits: 9, groups: [3, 2, 2, 2], timeZones: ["Africa/Casablanca"] },
+  { id: "DZ", name: "Algérie", dialCode: "+213", digits: 9, groups: [3, 2, 2, 2], timeZones: ["Africa/Algiers"] },
+  { id: "TN", name: "Tunisie", dialCode: "+216", digits: 8, groups: [2, 3, 3], timeZones: ["Africa/Tunis"] },
+  { id: "FR", name: "France", dialCode: "+33", digits: 9, groups: [1, 2, 2, 2, 2], timeZones: ["Europe/Paris"] },
 ];
 
 /** Réduit un nom à sa forme comparable : sans accent, sans ponctuation, en minuscules. */

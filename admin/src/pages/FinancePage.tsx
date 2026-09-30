@@ -242,13 +242,13 @@ export default function FinancePage() {
                     <td style={{ fontSize: 12 }}>{t.provider}</td>
                     <td style={{ fontSize: 11, fontFamily: "ui-monospace, monospace" }}>{t.providerReference}</td>
                     <td style={{ fontSize: 11.5, color: "var(--muted)" }}>{new Date(t.createdAt).toLocaleString("fr-FR")}</td>
-                    <td style={{ textAlign: "right", display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                      {canEdit ? <>
+                    <td style={{ textAlign: "right" }}>
+                      {canEdit ? <div className="row-actions">
                         {isRealYengapayDeposit(t)
                           ? <button className="btn btn-sm btn-primary" disabled={busyId === t.id} onClick={() => void reconcile(t)}>Vérifier auprès de YengaPay</button>
                           : <button className="btn btn-sm btn-primary" disabled={busyId === t.id} onClick={() => askSettle(t, "succeeded")}>Valider</button>}
                         <button className="btn btn-sm btn-danger" disabled={busyId === t.id} onClick={() => askSettle(t, "failed")}>Rejeter</button>
-                      </> : null}
+                      </div> : null}
                     </td>
                   </tr>
                 ))}
