@@ -9,6 +9,8 @@ import { describe, expect, it } from "vitest";
 import { escapeCell, rowsToCsv } from "../admin/src/lib/csv";
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+/** Migration initiale PostgreSQL : reprend tout ce que les migrations MySQL successives avaient ajouté. */
+const BASELINE = "drizzle/migrations/0000_baseline.sql";
 
 describe("export CSV — aucune cellule saisie par un utilisateur ne devient une formule", () => {
   it.each(["=HYPERLINK(\"http://x\",\"clic\")", "+33 1 23", "-2+3", "@SUM(A1)", "\t=1"])("neutralise %s", (value) => {
@@ -107,9 +109,9 @@ describe("lot 1 — décisions financières encadrées dans les écrans", () => 
   });
 
   it("la migration ajoute la référence de versement, unique", () => {
-    const migration = read("drizzle/manual/0043_withdrawal_payout_reference.sql");
-    expect(migration).toContain("ADD COLUMN IF NOT EXISTS `payoutReference` varchar(80)");
-    expect(migration).toContain("CREATE UNIQUE INDEX IF NOT EXISTS `tikisse_payment_transactions_payoutReference_unique`");
+    const migration = read(BASELINE);
+    expect(migration).toContain('"payoutReference" varchar(80)');
+    expect(migration).toContain('CONSTRAINT "tikisse_payment_transactions_payoutReference_unique" UNIQUE("payoutReference")');
     expect(read("drizzle/schema.ts")).toContain('payoutReference: varchar("payoutReference", { length: 80 }).unique()');
   });
 });
@@ -147,10 +149,10 @@ describe("lot 2 — la console ne manipule plus aucun jeton de session", () => {
   });
 
   it("la migration crée la table des sessions, sans jamais y stocker le jeton en clair", () => {
-    const migration = read("drizzle/manual/0044_admin_sessions.sql");
-    expect(migration).toContain("CREATE TABLE IF NOT EXISTS `tikisse_admin_sessions`");
-    expect(migration).toContain("`tokenHash` varchar(64) NOT NULL");
-    expect(migration).not.toMatch(/`token` /);
+    const migration = read(BASELINE);
+    const sessions = migration.slice(migration.indexOf('CREATE TABLE "tikisse_admin_sessions"'), migration.indexOf(");", migration.indexOf('CREATE TABLE "tikisse_admin_sessions"')));
+    expect(sessions).toContain('"tokenHash" varchar(64) NOT NULL');
+    expect(sessions).not.toMatch(/"token" /);
   });
 });
 
@@ -194,10 +196,11 @@ describe("lot 3 — double authentification dans la console", () => {
   });
 
   it("la migration ajoute le secret chiffré, l'étape de session et la politique", () => {
-    const migration = read("drizzle/manual/0045_admin_totp.sql");
-    expect(migration).toContain("ADD COLUMN IF NOT EXISTS `totpSecret` varchar(255)");
-    expect(migration).toContain("ADD COLUMN IF NOT EXISTS `stage` enum('pending_totp','active') NOT NULL DEFAULT 'active'");
-    expect(migration).toContain("ADD COLUMN IF NOT EXISTS `adminTotpRequired` boolean NOT NULL DEFAULT false");
+    const migration = read(BASELINE);
+    expect(migration).toContain('"totpSecret" varchar(255)');
+    expect(migration).toContain(`CREATE TYPE "public"."tikisse_admin_sessions_stage" AS ENUM('pending_totp', 'active')`);
+    expect(migration).toContain(`"stage" "tikisse_admin_sessions_stage" DEFAULT 'active' NOT NULL`);
+    expect(migration).toContain('"adminTotpRequired" boolean DEFAULT false NOT NULL');
   });
 
   it("qrcode est une dépendance d'exécution : le serveur de production le charge (esbuild --packages=external)", () => {
@@ -310,7 +313,7 @@ describe("lot A — contrôle financier", () => {
   });
 
   it("la migration ajoute le montant annoncé par YengaPay", () => {
-    expect(read("drizzle/manual/0046_payment_reported_amount.sql")).toContain("ADD COLUMN IF NOT EXISTS `providerReportedAmount` int DEFAULT NULL");
+    expect(read(BASELINE)).toContain('"providerReportedAmount" integer,');
   });
 });
 
@@ -354,8 +357,7 @@ describe("lot B — gouvernance", () => {
     const declared = /export type AdminRole = ([^;]+);/.exec(auth)?.[1] ?? "";
     expect(declared.split("|").map((part) => part.trim().replace(/"/g, ""))).toEqual([...ADMIN_ROLES]);
     const schema = read("drizzle/schema.ts");
-    const adminTable = schema.slice(schema.indexOf('mysqlTable("tikisse_admin_users"'));
-    const schemaRoles = /role: mysqlEnum\("role", (\[[^\]]*\])\)/.exec(adminTable)?.[1];
+    const schemaRoles = /pgEnum\("tikisse_admin_users_role", (\[[^\]]*\])\)/.exec(schema)?.[1];
     expect(JSON.parse(schemaRoles ?? "[]")).toEqual([...ADMIN_ROLES]);
   });
 
@@ -378,10 +380,10 @@ describe("lot B — gouvernance", () => {
   it("le journal se filtre et s'exporte ; la migration crée la gouvernance", () => {
     const page = read("admin/src/pages/AuditLogPage.tsx");
     expect(page).toContain("trpc.adminConsole.auditLog.export.query(queryFilters())");
-    const migration = read("drizzle/manual/0047_admin_governance.sql");
-    expect(migration).toContain("enum('super_admin','support','finance','viewer','kyc_reviewer')");
-    expect(migration).toContain("CREATE TABLE IF NOT EXISTS `tikisse_admin_approvals`");
-    expect(migration).toContain("ADD COLUMN IF NOT EXISTS `adminApprovalThreshold` int NOT NULL DEFAULT 100000");
+    const migration = read(BASELINE);
+    expect(migration).toContain(`AS ENUM('super_admin', 'support', 'finance', 'viewer', 'kyc_reviewer')`);
+    expect(migration).toContain('CREATE TABLE "tikisse_admin_approvals"');
+    expect(migration).toContain('"adminApprovalThreshold" integer DEFAULT 100000 NOT NULL');
   });
 });
 
@@ -407,8 +409,8 @@ describe("lot C — litiges et avis", () => {
   });
 
   it("la migration ajoute la modération et la nouvelle action à valider", () => {
-    const migration = read("drizzle/manual/0048_disputes_and_reviews.sql");
-    expect(migration).toContain("`hiddenAt`");
+    const migration = read(BASELINE);
+    expect(migration).toContain('"hiddenAt" timestamp with time zone');
     expect(migration).toContain("'delivery_refund'");
     expect(read("admin/src/pages/ApprovalsPage.tsx")).toContain('delivery_refund: "Dédommagement (litige)"');
   });
@@ -438,8 +440,8 @@ describe("lot D — utilisateurs", () => {
   });
 
   it("la migration crée notes, correspondances et file d'effacement", () => {
-    const migration = read("drizzle/manual/0049_user_support_and_deletion.sql");
-    for (const fragment of ["`sessionsRevokedAt`", "CREATE TABLE IF NOT EXISTS `tikisse_profile_notes`", "CREATE TABLE IF NOT EXISTS `tikisse_deleted_accounts`", "CREATE TABLE IF NOT EXISTS `tikisse_storage_erasures`", "`documentsErasedAt`", "'manual_payout'"]) {
+    const migration = read(BASELINE);
+    for (const fragment of ['"sessionsRevokedAt"', 'CREATE TABLE "tikisse_profile_notes"', 'CREATE TABLE "tikisse_deleted_accounts"', 'CREATE TABLE "tikisse_storage_erasures"', '"documentsErasedAt"', "'manual_payout'"]) {
       expect(migration).toContain(fragment);
     }
   });

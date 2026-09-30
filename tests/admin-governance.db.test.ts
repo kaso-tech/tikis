@@ -1,5 +1,5 @@
 /**
- * Lot B — gouvernance de la console, exécuté contre une vraie base MySQL/MariaDB, par le vrai routeur.
+ * Lot B — gouvernance de la console, exécuté contre une vraie base PostgreSQL, par le vrai routeur.
  *
  *   DATABASE_URL=<url> npx drizzle-kit push --force
  *   TIKISSE_TEST_DATABASE_URL=<url> npx vitest run tests/admin-governance.db.test.ts

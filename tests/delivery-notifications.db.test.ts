@@ -1,5 +1,5 @@
 /**
- * Notifications de livraison, exécuté contre une vraie base MySQL/MariaDB :
+ * Notifications de livraison, exécuté contre une vraie base PostgreSQL :
  *
  *   TIKISSE_TEST_DATABASE_URL=<url> npx vitest run tests/delivery-notifications.db.test.ts
  *
@@ -72,7 +72,7 @@ async function fundedDriver() {
 
 async function commissionFor(price: number) {
   const handle = (await db.getDb())!;
-  await handle.insert(schema.tikissePlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  await handle.insert(schema.tikissePlatformSettings).values({ id: 1 }).onConflictDoNothing();
   const rate = Number((await handle.select().from(schema.tikissePlatformSettings).limit(1))[0]!.commissionRate);
   return Math.round(price * rate);
 }

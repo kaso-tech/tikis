@@ -1,5 +1,5 @@
 /**
- * Lot A — contrôle financier de la console, exécuté contre une vraie base MySQL/MariaDB.
+ * Lot A — contrôle financier de la console, exécuté contre une vraie base PostgreSQL.
  *
  *   DATABASE_URL=<url> npx drizzle-kit push --force
  *   TIKISSE_TEST_DATABASE_URL=<url> npx vitest run tests/admin-finance-control.db.test.ts
@@ -189,6 +189,15 @@ describe.skipIf(!TEST_DB)("export comptable mensuel", () => {
     expect(() => control.monthRange("2019-13")).toThrow(/AAAA-MM/);
   });
 
+  /** Le grand livre est immuable (déclencheur) : on antidate ici sans déclencheurs, le temps d'une transaction de test. */
+  async function backdateLedger(where: ReturnType<typeof orm.eq>, createdAt: Date) {
+    const handle = (await db.getDb())!;
+    await handle.transaction(async (tx) => {
+      await tx.execute(orm.sql`set local session_replication_role = replica`);
+      await tx.update(schema.tikisseWalletLedger).set({ createdAt }).where(where);
+    });
+  }
+
   it("totaux par opération, paiements réglés dans le mois, commissions nettes et détail des mouvements", async () => {
     const handle = (await db.getDb())!;
     // Un mois ancien tiré au hasard ; la base de test persiste d'une exécution à l'autre, d'où la comparaison
@@ -205,12 +214,12 @@ describe.skipIf(!TEST_DB)("export comptable mensuel", () => {
       await db.applyWalletMovement(tx, { profilePhone: phone, operation: "compensation", amount: 300, availableDelta: 300, heldDelta: 0, reason: "Commission rendue (test)", idempotencyKey: keys[2]! });
       await db.applyWalletMovement(tx, { profilePhone: phone, operation: "bonus", amount: 500, availableDelta: 500, heldDelta: 0, reason: "Bonus (test)", idempotencyKey: keys[3]! });
     });
-    await handle.update(schema.tikisseWalletLedger).set({ createdAt: inMonth }).where(orm.inArray(schema.tikisseWalletLedger.idempotencyKey, keys));
+    await backdateLedger(orm.inArray(schema.tikisseWalletLedger.idempotencyKey, keys), inMonth);
     // Un mouvement à minuit pile le 1er du mois suivant n'appartient pas au mois.
     await handle.transaction(async (tx) => {
       await db.applyWalletMovement(tx, { profilePhone: phone, operation: "bonus", amount: 999, availableDelta: 999, heldDelta: 0, reason: "Bonus mois suivant (test)", idempotencyKey: `${phone}:next` });
     });
-    await handle.update(schema.tikisseWalletLedger).set({ createdAt: control.monthRange(month).end }).where(orm.eq(schema.tikisseWalletLedger.idempotencyKey, `${phone}:next`));
+    await backdateLedger(orm.eq(schema.tikisseWalletLedger.idempotencyKey, `${phone}:next`), control.monthRange(month).end);
     const deposit = randomUUID();
     await handle.insert(schema.tikissePaymentTransactions).values({ id: deposit, profilePhone: phone, type: "deposit", provider: "yengapay_sandbox", amount: 10_000, status: "succeeded", providerReference: `pi_lot_a_acc_${deposit}`, checkoutUrl: null, idempotencyKey: `lot-a:${deposit}`, settledAt: inMonth });
 

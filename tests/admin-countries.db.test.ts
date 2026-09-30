@@ -1,6 +1,6 @@
 /**
  * Pays de la console : ajout en fin de liste, suppression protégée, ordre d'affichage. Exécuté contre une
- * vraie base MySQL/MariaDB :
+ * vraie base PostgreSQL :
  *
  *   TIKISSE_TEST_DATABASE_URL=<url> npx vitest run tests/admin-countries.db.test.ts
  *

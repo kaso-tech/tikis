@@ -40,7 +40,7 @@ export async function getApprovalThreshold(): Promise<number> {
 export async function setApprovalThreshold(threshold: number) {
   if (!Number.isSafeInteger(threshold) || threshold < MIN_APPROVAL_THRESHOLD) throw new Error(`Le seuil doit être d’au moins ${MIN_APPROVAL_THRESHOLD.toLocaleString("fr-FR")} FCFA.`);
   const handle = await database();
-  await handle.insert(tikissePlatformSettings).values({ id: 1, adminApprovalThreshold: threshold }).onDuplicateKeyUpdate({ set: { adminApprovalThreshold: threshold } });
+  await handle.insert(tikissePlatformSettings).values({ id: 1, adminApprovalThreshold: threshold }).onConflictDoUpdate({ target: tikissePlatformSettings.id, set: { adminApprovalThreshold: threshold } });
   return { threshold };
 }
 

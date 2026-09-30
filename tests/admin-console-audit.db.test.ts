@@ -1,5 +1,5 @@
 /**
- * Audit de la console d'administration, exécuté contre une vraie base MySQL/MariaDB.
+ * Audit de la console d'administration, exécuté contre une vraie base PostgreSQL.
  *
  * Même principe que tests/payment-direct-audit.db.test.ts : ces tests appellent les fonctions qui
  * touchent réellement aux Wallets et aux sessions admin, sans rien simuler de la base. Ils ne tournent
@@ -494,7 +494,7 @@ describe.skipIf(!TEST_DB)("lot 3 — double authentification TOTP", () => {
 
   async function setPolicy(required: boolean) {
     const handle = (await db.getDb())!;
-    await handle.insert(schema.tikissePlatformSettings).values({ id: 1, adminTotpRequired: required }).onDuplicateKeyUpdate({ set: { adminTotpRequired: required } });
+    await handle.insert(schema.tikissePlatformSettings).values({ id: 1, adminTotpRequired: required }).onConflictDoUpdate({ target: schema.tikissePlatformSettings.id, set: { adminTotpRequired: required } });
   }
   afterAll(async () => { if (TEST_DB) await setPolicy(false); });
 
@@ -780,11 +780,11 @@ describe.skipIf(!TEST_DB)("lot 5 — traçabilité et pilotage", () => {
     const before = await db.getTikisseCommissionRate();
     const handle = (await db.getDb())!;
     const { sql } = await import("drizzle-orm");
-    await handle.execute(sql`RENAME TABLE tikisse_admin_audit_log TO tikisse_admin_audit_log_offline`);
+    await handle.execute(sql`ALTER TABLE tikisse_admin_audit_log RENAME TO tikisse_admin_audit_log_offline`);
     try {
       await expect(api.commission.update({ rate: before === 0.1 ? 0.15 : 0.1 })).rejects.toThrow(/journal d’audit est indisponible/);
     } finally {
-      await handle.execute(sql`RENAME TABLE tikisse_admin_audit_log_offline TO tikisse_admin_audit_log`);
+      await handle.execute(sql`ALTER TABLE tikisse_admin_audit_log_offline RENAME TO tikisse_admin_audit_log`);
     }
     expect(await db.getTikisseCommissionRate()).toBe(before);
   });

@@ -1,12 +1,7 @@
-import { sql, type SQL } from "drizzle-orm";
+import { and, count, countDistinct, eq, gte, lt, sql, type AnyColumn } from "drizzle-orm";
 import { getDb } from "./db";
-import { tikisseDailyMetrics } from "../drizzle/schema";
+import { tikisseDailyMetrics, tikisseDeliveries, tikisseDeliveryReports, tikisseProfiles, tikisseWalletLedger } from "../drizzle/schema";
 import { getLocalDateString } from "./_test-helpers/date-format";
-
-async function readMetricRow(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, query: SQL) {
-  const result = await db.execute(query);
-  return (result as unknown as Array<Record<string, unknown>>)[0] ?? {};
-}
 
 /** Calcule les métriques d'une journée et les upsert dans tikisse_daily_metrics.
  *  Idempotent : peut être appelé plusieurs fois pour la même date.
@@ -28,21 +23,27 @@ export async function computeDailyMetrics(date: string): Promise<{
   const db = await getDb();
   if (!db) throw new Error("La base de données est temporairement indisponible.");
 
-  const startOfDay = `${date} 00:00:00`;
-  const endOfDay = `${date} 23:59:59`;
+  // Journée du fuseau de la base (UTC chez Supabase), bornes [début, début + 1 jour[ : un
+  // `BETWEEN … 23:59:59` laissait de côté la dernière seconde.
+  const inDay = (column: AnyColumn) => and(
+    gte(column, sql`${date}::date`),
+    lt(column, sql`${date}::date + interval '1 day'`),
+  );
+  const first = async <T extends Record<string, unknown>>(rows: Promise<T[]>) => (await rows)[0] ?? ({} as Partial<T>);
+  const total = (expression: ReturnType<typeof sql>) => sql<number>`coalesce(sum(${expression}), 0)`.mapWith(Number);
 
   const [createdRow, completedRow, cancelledRow, gmvRow, commissionRow, newDriversRow, newSendersRow, activeDriversRow, activeSendersRow, bonusRow, reportsRow] = await Promise.all([
-    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikisse_deliveries WHERE createdAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikisse_deliveries WHERE status = 'completed' AND completedAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikisse_deliveries WHERE status = 'cancelled' AND updatedAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COALESCE(SUM(COALESCE(offeredPrice, estimatedPrice)), 0) AS total FROM tikisse_deliveries WHERE status = 'completed' AND completedAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COALESCE(SUM(amount), 0) AS total FROM tikisse_wallet_ledger WHERE operation = 'compensation' AND createdAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikisse_profiles WHERE accountType = 'driver' AND DATE(createdAt) = ${date}`),
-    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikisse_profiles WHERE accountType = 'sender' AND DATE(createdAt) = ${date}`),
-    readMetricRow(db, sql`SELECT COUNT(DISTINCT driverPhone) AS count FROM tikisse_deliveries WHERE status = 'completed' AND completedAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COUNT(DISTINCT senderPhone) AS count FROM tikisse_deliveries WHERE createdAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COALESCE(SUM(amount), 0) AS total FROM tikisse_wallet_ledger WHERE operation = 'bonus' AND createdAt BETWEEN ${startOfDay} AND ${endOfDay}`),
-    readMetricRow(db, sql`SELECT COUNT(*) AS count FROM tikisse_delivery_reports WHERE createdAt BETWEEN ${startOfDay} AND ${endOfDay}`),
+    first(db.select({ count: count() }).from(tikisseDeliveries).where(inDay(tikisseDeliveries.createdAt))),
+    first(db.select({ count: count() }).from(tikisseDeliveries).where(and(eq(tikisseDeliveries.status, "completed"), inDay(tikisseDeliveries.completedAt)))),
+    first(db.select({ count: count() }).from(tikisseDeliveries).where(and(eq(tikisseDeliveries.status, "cancelled"), inDay(tikisseDeliveries.updatedAt)))),
+    first(db.select({ total: total(sql`coalesce(${tikisseDeliveries.offeredPrice}, ${tikisseDeliveries.estimatedPrice})`) }).from(tikisseDeliveries).where(and(eq(tikisseDeliveries.status, "completed"), inDay(tikisseDeliveries.completedAt)))),
+    first(db.select({ total: total(sql`${tikisseWalletLedger.amount}`) }).from(tikisseWalletLedger).where(and(eq(tikisseWalletLedger.operation, "compensation"), inDay(tikisseWalletLedger.createdAt)))),
+    first(db.select({ count: count() }).from(tikisseProfiles).where(and(eq(tikisseProfiles.accountType, "driver"), inDay(tikisseProfiles.createdAt)))),
+    first(db.select({ count: count() }).from(tikisseProfiles).where(and(eq(tikisseProfiles.accountType, "sender"), inDay(tikisseProfiles.createdAt)))),
+    first(db.select({ count: countDistinct(tikisseDeliveries.driverPhone) }).from(tikisseDeliveries).where(and(eq(tikisseDeliveries.status, "completed"), inDay(tikisseDeliveries.completedAt)))),
+    first(db.select({ count: countDistinct(tikisseDeliveries.senderPhone) }).from(tikisseDeliveries).where(inDay(tikisseDeliveries.createdAt))),
+    first(db.select({ total: total(sql`${tikisseWalletLedger.amount}`) }).from(tikisseWalletLedger).where(and(eq(tikisseWalletLedger.operation, "bonus"), inDay(tikisseWalletLedger.createdAt)))),
+    first(db.select({ count: count() }).from(tikisseDeliveryReports).where(inDay(tikisseDeliveryReports.createdAt))),
   ]);
 
   const metrics = {
@@ -60,7 +61,7 @@ export async function computeDailyMetrics(date: string): Promise<{
     reportsOpened: Number(reportsRow.count ?? 0),
   };
 
-  await db.insert(tikisseDailyMetrics).values(metrics).onDuplicateKeyUpdate({
+  await db.insert(tikisseDailyMetrics).values(metrics).onConflictDoUpdate({ target: tikisseDailyMetrics.date,
     set: {
       deliveriesCreated: metrics.deliveriesCreated,
       deliveriesCompleted: metrics.deliveriesCompleted,

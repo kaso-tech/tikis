@@ -55,10 +55,10 @@ if (!process.env.DATABASE_URL) {
   process.exit(0);
 }
 
-const mysql = await import("mysql2/promise");
-const conn = await mysql.createConnection(process.env.DATABASE_URL);
+const { default: postgres } = await import("postgres");
+const sql = postgres(process.env.DATABASE_URL, { prepare: false, max: 1 });
 try {
-  const [rows] = await conn.query("SELECT id, name, dialCode, digits, `groups`, enabled FROM tikisse_supported_countries ORDER BY sortOrder");
+  const rows = await sql`SELECT id, name, "dialCode", digits, groups, enabled FROM tikisse_supported_countries ORDER BY "sortOrder"`;
   const broken = [];
   const warned = [];
   for (const row of rows) {
@@ -70,13 +70,13 @@ try {
 
   console.log(`${rows.length} pays en base, ${broken.length} à corriger, ${warned.length} au plan de numérotation douteux.\n`);
   for (const { row, issue, suggestion } of broken) {
-    const [[used]] = await conn.query("SELECT COUNT(*) AS n FROM tikisse_profiles WHERE country = ?", [row.id]);
+    const [used] = await sql`SELECT COUNT(*)::int AS n FROM tikisse_profiles WHERE country = ${row.id}`;
     console.log(`✖ ${row.name} (${row.id}) — ${issue}`);
     console.log(`  Profils rattachés à ce code : ${used.n}`);
     if (suggestion) {
       console.log("  Le code étant la clé primaire, la correction se fait en trois temps :");
-      console.log(`    1. INSERT INTO tikisse_supported_countries (id, name, dialCode, digits, \`groups\`, timeZones, enabled, sortOrder)`);
-      console.log(`         SELECT '${suggestion.id}', name, '${suggestion.dialCode}', digits, \`groups\`, timeZones, enabled, sortOrder`);
+      console.log(`    1. INSERT INTO tikisse_supported_countries (id, name, "dialCode", digits, groups, "timeZones", enabled, "sortOrder")`);
+      console.log(`         SELECT '${suggestion.id}', name, '${suggestion.dialCode}', digits, groups, "timeZones", enabled, "sortOrder"`);
       console.log(`         FROM tikisse_supported_countries WHERE id = '${row.id}';`);
       console.log(`    2. UPDATE tikisse_profiles SET country = '${suggestion.id}' WHERE country = '${row.id}';`);
       console.log(`    3. DELETE FROM tikisse_supported_countries WHERE id = '${row.id}';`);
@@ -86,10 +86,10 @@ try {
   }
   for (const { row, planWarning } of warned) {
     console.log(`⚠ ${row.name} (${row.id}) — ${planWarning}`);
-    console.log(`  UPDATE tikisse_supported_countries SET digits = <n>, \`groups\` = '<a,b,c>' WHERE id = '${row.id}';`);
+    console.log(`  UPDATE tikisse_supported_countries SET digits = <n>, groups = '<a,b,c>' WHERE id = '${row.id}';`);
     console.log("  Le code et l’indicatif sont justes : une simple mise à jour suffit, sans toucher aux profils.\n");
   }
   process.exit(broken.length > 0 ? 1 : 0);
 } finally {
-  await conn.end();
+  await sql.end();
 }

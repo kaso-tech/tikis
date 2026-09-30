@@ -10,7 +10,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import { and, desc, eq, gte, isNull, sql } from "drizzle-orm";
-import { getDb } from "./db";
+import { affectedRowCount, getDb } from "./db";
 import { tikisseProfileSessions } from "../drizzle/schema";
 import { hashSessionToken, tokenLast4 } from "./_test-helpers/sessions-hash";
 import { TIKISSE_SESSION_TTL_SECONDS } from "./tikisse-session";
@@ -26,7 +26,8 @@ export function isMissingProfileSessionsSchema(error: unknown): boolean {
   const cause = candidate?.cause as { code?: unknown; message?: unknown } | undefined;
   const code = cause?.code ?? candidate?.code;
   const message = cause?.message ?? candidate?.message;
-  return code === "ER_NO_SUCH_TABLE" && typeof message === "string" && /tikisse_profile_sessions/i.test(message);
+  // PostgreSQL : 42P01 « relation "tikisse_profile_sessions" does not exist ».
+  return code === "42P01" && typeof message === "string" && /tikisse_profile_sessions/i.test(message);
 }
 
 export type Platform = "ios" | "android" | "web" | "unknown";
@@ -129,7 +130,7 @@ export async function revokeAllOtherSessions(input: { phone: string; currentToke
       isNull(tikisseProfileSessions.revokedAt),
       sql`${tikisseProfileSessions.tokenHash} != ${input.currentTokenHash}`,
     ));
-  return { revoked: (result as unknown as { affectedRows?: number }).affectedRows ?? 0 };
+  return { revoked: affectedRowCount(result) };
 }
 
 /** Vérifie qu'un token donné n'est pas révoqué. Utilisé par le middleware

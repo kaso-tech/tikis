@@ -87,7 +87,7 @@ export async function evaluateLoyaltyGrantsForCompletedDelivery(input: { deliver
   for (const program of programs) {
     const since = new Date(Date.now() - program.windowDays * 24 * 60 * 60 * 1000);
     const phoneColumn = input.role === "sender" ? tikisseDeliveries.senderPhone : tikisseDeliveries.driverPhone;
-    const { count: total } = (await db.select({ count: sql<number>`COUNT(*)` }).from(tikisseDeliveries).where(and(
+    const { count: total } = (await db.select({ count: sql<number>`COUNT(*)`.mapWith(Number) }).from(tikisseDeliveries).where(and(
       eq(phoneColumn, input.profilePhone),
       eq(tikisseDeliveries.status, "completed"),
       gte(tikisseDeliveries.completedAt, since),
@@ -102,24 +102,17 @@ export async function evaluateLoyaltyGrantsForCompletedDelivery(input: { deliver
     const { randomUUID } = await import("node:crypto");
     const grantId = randomUUID();
     const expiresAt = computeSessionExpiry(new Date());
-    try {
-      await db.insert(tikisseLoyaltyGrants).values({
-        id: grantId,
-        programId: program.id,
-        profilePhone: input.profilePhone,
-        deliveryId: input.deliveryId,
-        bonusAmount: program.bonusAmount,
-        status: "pending",
-        expiresAt,
-      });
-      created.push({ programId: program.id, bonusAmount: program.bonusAmount, grantId });
-    } catch (cause) {
-      // Si une race crée un doublon (programId+deliveryId unique), on ignore.
-      const message = cause instanceof Error ? cause.message : String(cause);
-      if (!message.includes("Duplicate")) {
-        throw cause;
-      }
-    }
+    // Deux évaluations simultanées : l'index unique (programId, deliveryId) en laisse passer une seule.
+    const inserted = await db.insert(tikisseLoyaltyGrants).values({
+      id: grantId,
+      programId: program.id,
+      profilePhone: input.profilePhone,
+      deliveryId: input.deliveryId,
+      bonusAmount: program.bonusAmount,
+      status: "pending",
+      expiresAt,
+    }).onConflictDoNothing().returning({ id: tikisseLoyaltyGrants.id });
+    if (inserted.length > 0) created.push({ programId: program.id, bonusAmount: program.bonusAmount, grantId });
   }
   return { created };
 }

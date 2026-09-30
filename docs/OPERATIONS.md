@@ -36,6 +36,42 @@ curl -X POST -H "Authorization: Bearer $CRON_TOKEN" \
      https://api.tikisse.app/api/scheduled/expire-deliveries
 ```
 
+## Base de données (PostgreSQL / Supabase)
+
+`DATABASE_URL` pointe sur la base Postgres du projet Supabase. Prendre la chaîne du **pooler en mode
+transaction** (Supabase → Project Settings → Database → Connection string → « Transaction pooler », port
+6543), avec `?sslmode=require` :
+
+```
+DATABASE_URL=postgresql://postgres.<ref>:<mot de passe>@aws-0-<région>.pooler.supabase.com:6543/postgres?sslmode=require
+DATABASE_POOL_MAX=10   # connexions par processus serveur (optionnel)
+```
+
+Le serveur désactive les requêtes préparées (`prepare: false`, server/db.ts), ce que ce mode exige.
+
+### Migrations
+
+```bash
+pnpm db:migrate          # applique drizzle/migrations/* (idempotent : ne rejoue que ce qui manque)
+pnpm db:check-schema     # tables présentes et RLS activée partout (avec DATABASE_URL : vérifie la base)
+```
+
+Pour une modification du schéma : éditer `drizzle/schema.ts`, puis `pnpm db:generate` écrit la migration SQL
+dans `drizzle/migrations`. Toute nouvelle table doit y recevoir `ENABLE ROW LEVEL SECURITY`
+(`tests/postgres-migration-contract.test.ts` le vérifie) : sans elle, l'API publique de Supabase la
+lirait avec la clé `anon`, embarquée dans l'application.
+
+Les migrations MySQL/TiDB d'avant le passage à Supabase restent dans `drizzle/mysql-legacy` pour
+l'historique ; elles ne s'appliquent plus.
+
+### Tests contre une vraie base
+
+```bash
+TIKISSE_TEST_DATABASE_URL=postgres://<user>:<mdp>@localhost:5432/<base_jetable> pnpm test
+```
+
+La base doit être jetable et migrée (`DATABASE_URL=<même url> pnpm db:migrate`). Jamais la base de production.
+
 ## Variables d'environnement sensibles
 
 | Var                       | Usage                                          |
@@ -57,7 +93,8 @@ curl -X POST -H "Authorization: Bearer $CRON_TOKEN" \
 
 ## Backups DB
 
-À planifier par l'opérateur via la console webdevtoken (section "Backups"). Requis :
+Sauvegardes quotidiennes de Supabase (Project Settings → Database → Backups ; la restauration à un instant
+précis, « PITR », est une option payante). Requis :
 - Sauvegarde quotidienne, conservée 30 jours.
 - Test de restauration mensuel.
 

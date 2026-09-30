@@ -1,5 +1,5 @@
 /**
- * Lot D — support utilisateur et suppression des comptes, contre une vraie base MySQL/MariaDB, par le
+ * Lot D — support utilisateur et suppression des comptes, contre une vraie base PostgreSQL, par le
  * vrai routeur admin.
  *
  *   TIKISSE_TEST_DATABASE_URL=<url> npx vitest run tests/admin-users.db.test.ts

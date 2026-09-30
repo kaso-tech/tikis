@@ -4,8 +4,7 @@ Application web séparée (React + Vite), servie par le même serveur Express qu
 
 ## 1. Sessions de la console
 
-Aucune variable d'environnement n'est nécessaire pour les sessions admin. Depuis la migration
-`drizzle/manual/0044_admin_sessions.sql`, la console reçoit à la connexion un jeton aléatoire dans un cookie
+Aucune variable d'environnement n'est nécessaire pour les sessions admin. La console reçoit à la connexion un jeton aléatoire dans un cookie
 httpOnly (`tikisse_admin_session`, SameSite=Strict, chemin `/api`). La base n'en garde que l'empreinte SHA-256.
 La déconnexion ou la suspension du compte révoque la session côté serveur. Une session dure 8 h au plus.
 
@@ -25,24 +24,18 @@ Générez-la par exemple avec `node -e "console.log(require('crypto').randomByte
 Conservez-la précieusement : la perdre ou la changer oblige tous les admins à se réenrôler (un super-admin
 réinitialise leur double authentification depuis « Équipe admin »).
 
-Migration : `drizzle/manual/0045_admin_totp.sql`. Un super-admin peut ensuite la rendre obligatoire pour
+Un super-admin peut ensuite la rendre obligatoire pour
 les rôles super-admin et finance depuis « Équipe admin », une fois tous ces comptes enrôlés.
 
 Si la console est servie depuis un autre sous-domaine que l'API (par ex. `admin.tikisse.app`), cette origine
 doit figurer dans `TIKISSE_ALLOWED_ORIGINS` : le serveur n'accepte le cookie qu'accompagné de l'en-tête
 `X-Tikisse-Admin: 1`, qu'un navigateur n'envoie qu'aux origines autorisées par CORS.
 
-## 2. Appliquer la migration base de données
+## 2. Base de données
 
-```
-mysql -u <user> -p <database> < drizzle/manual/0020_admin_console.sql
-mysql -u <user> -p <database> < drizzle/manual/0044_admin_sessions.sql
-mysql -u <user> -p <database> < drizzle/manual/0045_admin_totp.sql
-```
-
-(ou régénérez proprement via `pnpm drizzle-kit generate` une fois la connexion DB disponible — ce fichier manuel sert de référence immédiate.)
-
-> **Déploiement TiDB.** Les tables de cette migration sont compatibles et ont été créées. TiDB ne prend toutefois pas en charge les triggers MySQL d’immuabilité du journal d’audit. La console n’expose aucune opération de modification ou de suppression de `tikisse_admin_audit_log` ; pour une protection équivalente en production, utilisez également un compte de base de données dont les privilèges sur cette table sont limités à `INSERT` et `SELECT`.
+La base est PostgreSQL (Supabase). Les tables de la console sont créées par les migrations communes à toute
+l'application (`pnpm db:migrate`, voir docs/OPERATIONS.md). Le journal d'audit `tikisse_admin_audit_log` y est
+rendu immuable par un déclencheur : aucune entrée ne peut être modifiée ni supprimée, même en SQL direct.
 
 ## 3. Créer le premier compte super-admin
 

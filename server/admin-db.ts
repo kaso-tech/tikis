@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, count, desc, eq, gte, inArray, isNull, like, lt, lte, ne, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, isNull, like, lt, lte, ne, or, sql } from "drizzle-orm";
 import { countryDraftIssue, countryPlanWarning } from "../shared/iso-countries";
 import { ADMIN_SESSION_TTL_SECONDS, hashAdminSessionToken, newAdminSessionToken, type AdminRole } from "./admin-auth";
 import {
@@ -225,7 +225,7 @@ export async function completeTotpLogin(input: { token: string | undefined; code
     const factor = await consumeSecondFactor(tx, pending.adminId, input.code);
     if (!factor) {
       // Compté hors de la transaction qui échoue : l'échec doit rester enregistré.
-      await db.insert(tikisseRateLimits).values({ rateLimitKey: attemptsKey, count: 1 }).onDuplicateKeyUpdate({ set: { count: sql`${tikisseRateLimits.count} + 1` } });
+      await db.insert(tikisseRateLimits).values({ rateLimitKey: attemptsKey, count: 1 }).onConflictDoUpdate({ target: tikisseRateLimits.rateLimitKey, set: { count: sql`${tikisseRateLimits.count} + 1` } });
       throw new Error("Code invalide.");
     }
     await tx.update(tikisseAdminSessions).set({ revokedAt: new Date() }).where(eq(tikisseAdminSessions.id, pending.sessionId));
@@ -316,7 +316,7 @@ export async function setAdminTotpRequired(input: { actorAdminId: number; requir
       .where(and(eq(tikisseAdminUsers.active, true), inArray(tikisseAdminUsers.role, [...TOTP_REQUIRED_ROLES]), isNull(tikisseAdminUsers.totpEnabledAt)));
     if (missing.length > 0) throw new Error(`Impossible d’exiger la double authentification : ${missing.length} compte(s) super-admin ou finance ne l’ont pas encore activée (${missing.map((row) => row.email).join(", ")}).`);
   }
-  await db.insert(tikissePlatformSettings).values({ id: 1, adminTotpRequired: input.required }).onDuplicateKeyUpdate({ set: { adminTotpRequired: input.required } });
+  await db.insert(tikissePlatformSettings).values({ id: 1, adminTotpRequired: input.required }).onConflictDoUpdate({ target: tikissePlatformSettings.id, set: { adminTotpRequired: input.required } });
   return { required: input.required };
 }
 
@@ -361,7 +361,7 @@ export async function recordAdminLoginFailure(email: string, ip: string) {
   const db = await getDb();
   if (!db) return;
   for (const rateLimitKey of Object.values(adminLoginKeys(email, ip))) {
-    await db.insert(tikisseRateLimits).values({ rateLimitKey, count: 1 }).onDuplicateKeyUpdate({ set: { count: sql`${tikisseRateLimits.count} + 1` } });
+    await db.insert(tikisseRateLimits).values({ rateLimitKey, count: 1 }).onConflictDoUpdate({ target: tikisseRateLimits.rateLimitKey, set: { count: sql`${tikisseRateLimits.count} + 1` } });
   }
 }
 
@@ -408,7 +408,7 @@ export async function listAdminAuditLog(input: AuditLogFilter & { limit?: number
     !input.includeRequests && !input.targetType ? ne(tikisseAdminAuditLog.targetType, "admin_request") : undefined,
     input.adminEmail ? eq(tikisseAdminAuditLog.adminEmail, input.adminEmail.trim().toLowerCase()) : undefined,
     // Préfixe : « wallet » retrouve wallet_bonus_credited comme wallet_penalty_applied.
-    input.action ? like(tikisseAdminAuditLog.action, `${input.action.trim().replace(/[\\%_]/g, (char) => `\\${char}`)}%`) : undefined,
+    input.action ? ilike(tikisseAdminAuditLog.action, `${input.action.trim().replace(/[\\%_]/g, (char) => `\\${char}`)}%`) : undefined,
     input.from ? gte(tikisseAdminAuditLog.createdAt, input.from) : undefined,
     input.to ? lt(tikisseAdminAuditLog.createdAt, input.to) : undefined,
   ].filter((value): value is NonNullable<typeof value> => Boolean(value));
@@ -428,7 +428,7 @@ export async function adminUpdateCommissionRate(rate: number) {
   if (!Number.isFinite(rate) || rate <= 0 || rate >= 1) throw new Error("Le taux de commission doit être strictement compris entre 0 et 1 (ex. 0.10 pour 10 %).");
   const db = await getDb();
   if (!db) throw new Error("La console d’administration est temporairement indisponible.");
-  await db.insert(tikissePlatformSettings).values({ id: 1, commissionRate: rate.toFixed(5) }).onDuplicateKeyUpdate({ set: { commissionRate: rate.toFixed(5) } });
+  await db.insert(tikissePlatformSettings).values({ id: 1, commissionRate: rate.toFixed(5) }).onConflictDoUpdate({ target: tikissePlatformSettings.id, set: { commissionRate: rate.toFixed(5) } });
   return { rate };
 }
 
@@ -515,7 +515,7 @@ export async function adminSearchDeliveries(input: { query?: string; status?: st
   const db = await getDb();
   if (!db) return [];
   const conditions = [
-    input.query ? or(eq(tikisseDeliveries.id, input.query), like(tikisseDeliveries.senderPhone, `${input.query}%`), like(tikisseDeliveries.driverPhone, `${input.query}%`), like(tikisseDeliveries.title, `${input.query}%`)) : undefined,
+    input.query ? or(eq(tikisseDeliveries.id, input.query), like(tikisseDeliveries.senderPhone, `${input.query}%`), like(tikisseDeliveries.driverPhone, `${input.query}%`), ilike(tikisseDeliveries.title, `${input.query}%`)) : undefined,
     input.status ? eq(tikisseDeliveries.status, input.status as TikisseDelivery["status"]) : undefined,
   ].filter((value): value is NonNullable<typeof value> => Boolean(value));
   return db.select().from(tikisseDeliveries).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(tikisseDeliveries.createdAt)).limit(Math.min(input.limit ?? 50, 200));
@@ -546,7 +546,7 @@ export async function adminSearchProfiles(input: { query?: string; limit?: numbe
   const offset = Math.max(input.offset ?? 0, 0);
   const query = input.query?.trim();
   const where = query
-    ? or(like(tikisseProfiles.phone, `${query}%`), like(tikisseProfiles.fullName, `${query}%`), like(tikisseProfiles.email, `${query}%`))
+    ? or(like(tikisseProfiles.phone, `${query}%`), ilike(tikisseProfiles.fullName, `${query}%`), ilike(tikisseProfiles.email, `${query}%`))
     : undefined;
   const [rows, totalResult] = await Promise.all([
     db.select().from(tikisseProfiles).where(where).orderBy(desc(tikisseProfiles.createdAt)).limit(limit).offset(offset),
@@ -580,13 +580,13 @@ export async function adminDashboardMetrics(sinceDays = 30) {
   // de publication. Compter par date de création sous-estimait les courses publiées juste avant la période
   // et terminées pendant, et gonflait la période suivante de courses publiées mais pas encore terminées.
   const completedInPeriod = and(eq(tikisseDeliveries.status, "completed"), gte(tikisseDeliveries.completedAt, since));
-  const ledgerTotal = (operation: "commission_debit" | "compensation") => db.select({ total: sql<number>`coalesce(sum(${tikisseWalletLedger.amount}), 0)` }).from(tikisseWalletLedger)
+  const ledgerTotal = (operation: "commission_debit" | "compensation") => db.select({ total: sql<number>`coalesce(sum(${tikisseWalletLedger.amount}), 0)`.mapWith(Number) }).from(tikisseWalletLedger)
     .where(and(eq(tikisseWalletLedger.operation, operation), gte(tikisseWalletLedger.createdAt, since), lte(tikisseWalletLedger.createdAt, now)));
   const [deliveriesTotal, deliveriesCompleted, openReports, activeDrivers, commissionGross, commissionRefunds, recentDeliveries, recentCompletions] = await Promise.all([
     db.select({ count: count() }).from(tikisseDeliveries).where(gte(tikisseDeliveries.createdAt, since)),
     db.select({ count: count() }).from(tikisseDeliveries).where(completedInPeriod),
     db.select({ count: count() }).from(tikisseDeliveryReports).where(eq(tikisseDeliveryReports.status, "open")),
-    db.select({ count: sql<number>`count(distinct ${tikisseDeliveries.driverPhone})` }).from(tikisseDeliveries).where(completedInPeriod),
+    db.select({ count: sql<number>`count(distinct ${tikisseDeliveries.driverPhone})`.mapWith(Number) }).from(tikisseDeliveries).where(completedInPeriod),
     // "commission_debit" est le seul mouvement qui correspond à un revenu réel de Tikisse ; "debit" générique
     // couvre aussi les retraits (argent des utilisateurs qui sort de leur propre Wallet), à ne jamais compter ici.
     ledgerTotal("commission_debit"),
@@ -729,7 +729,7 @@ export async function adminListDeliveries(input: { query?: string; status?: stri
   const dbc = await getDb();
   if (!dbc) return [];
   const conditions = [
-    input.query ? or(eq(tikisseDeliveries.id, input.query), like(tikisseDeliveries.senderPhone, `%${input.query}%`), like(tikisseDeliveries.driverPhone, `%${input.query}%`), like(tikisseDeliveries.title, `%${input.query}%`)) : undefined,
+    input.query ? or(eq(tikisseDeliveries.id, input.query), like(tikisseDeliveries.senderPhone, `%${input.query}%`), like(tikisseDeliveries.driverPhone, `%${input.query}%`), ilike(tikisseDeliveries.title, `%${input.query}%`)) : undefined,
     input.status ? eq(tikisseDeliveries.status, input.status as TikisseDelivery["status"]) : undefined,
     input.from ? gte(tikisseDeliveries.createdAt, input.from) : undefined,
     input.to ? lte(tikisseDeliveries.createdAt, input.to) : undefined,
@@ -800,9 +800,9 @@ export async function adminForceCancelDelivery(input: { deliveryId: string; reas
       await tx.update(tikisseDeliveryCandidates).set({ status: "withdrawn", updatedAt: new Date() }).where(eq(tikisseDeliveryCandidates.id, candidate.id));
     }
     await tx.update(tikisseDeliveries).set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() }).where(eq(tikisseDeliveries.id, input.deliveryId));
-    await tx.insert(tikisseDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.senderPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikisse.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel` }).onDuplicateKeyUpdate({ set: { idempotencyKey: `${input.deliveryId}:admin-cancel` } });
+    await tx.insert(tikisseDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.senderPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikisse.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel` }).onConflictDoNothing();
     if (delivery.driverPhone) {
-      await tx.insert(tikisseDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.driverPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikisse.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel-driver` }).onDuplicateKeyUpdate({ set: { idempotencyKey: `${input.deliveryId}:admin-cancel-driver` } });
+      await tx.insert(tikisseDeliveryEvents).values({ id: randomUUID(), deliveryId: input.deliveryId, eventType: "admin_cancelled", status: "cancelled", actorPhone: null, recipientPhone: delivery.driverPhone, title: "Livraison annulée par l’administration", body: input.reason || "Cette livraison a été annulée après examen par l’équipe Tikisse.", tone: "warning", idempotencyKey: `${input.deliveryId}:admin-cancel-driver` }).onConflictDoNothing();
     }
     return { id: input.deliveryId, status: "cancelled" as const };
   });
@@ -838,7 +838,7 @@ export async function adminRewardReferral(input: { referralId: string; adminId: 
 export async function adminGetReferralSettings() {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  await dbc.insert(tikissePlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  await dbc.insert(tikissePlatformSettings).values({ id: 1 }).onConflictDoNothing();
   const settings = (await dbc.select().from(tikissePlatformSettings).where(eq(tikissePlatformSettings.id, 1)).limit(1))[0];
   return { rewardAmount: settings?.referralRewardAmount ?? 1000, enabled: settings?.referralEnabled ?? true, requiredDeliveries: settings?.referralRequiredDeliveries ?? 1 };
 }
@@ -848,7 +848,7 @@ export async function adminUpdateReferralSettings(input: { rewardAmount: number;
   if (!Number.isSafeInteger(input.requiredDeliveries) || input.requiredDeliveries < 1 || input.requiredDeliveries > 100) throw new Error("Le nombre de courses requis doit être compris entre 1 et 100.");
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  await dbc.insert(tikissePlatformSettings).values({ id: 1, referralRewardAmount: input.rewardAmount, referralEnabled: input.enabled, referralRequiredDeliveries: input.requiredDeliveries }).onDuplicateKeyUpdate({ set: { referralRewardAmount: input.rewardAmount, referralEnabled: input.enabled, referralRequiredDeliveries: input.requiredDeliveries } });
+  await dbc.insert(tikissePlatformSettings).values({ id: 1, referralRewardAmount: input.rewardAmount, referralEnabled: input.enabled, referralRequiredDeliveries: input.requiredDeliveries }).onConflictDoUpdate({ target: tikissePlatformSettings.id, set: { referralRewardAmount: input.rewardAmount, referralEnabled: input.enabled, referralRequiredDeliveries: input.requiredDeliveries } });
   return input;
 }
 
@@ -859,7 +859,7 @@ export async function adminUpdateReferralSettings(input: { rewardAmount: number;
 export async function adminGetFinanceSettings() {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  await dbc.insert(tikissePlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  await dbc.insert(tikissePlatformSettings).values({ id: 1 }).onConflictDoNothing();
   const settings = (await dbc.select().from(tikissePlatformSettings).where(eq(tikissePlatformSettings.id, 1)).limit(1))[0];
   // Réutilise la même validation stricte que le taux appliqué en production (db.getTikisseCommissionRate) :
   // si la configuration est absente ou invalide, l'admin doit voir une erreur explicite plutôt qu'un
@@ -876,7 +876,7 @@ export async function adminUpdateFinanceSettings(input: { minWithdrawal: number;
   if (!Number.isSafeInteger(input.maxWithdrawal) || input.maxWithdrawal <= input.minWithdrawal) throw new Error("Le montant maximum doit être supérieur au minimum.");
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  await dbc.insert(tikissePlatformSettings).values({ id: 1, minWithdrawal: input.minWithdrawal, maxWithdrawal: input.maxWithdrawal }).onDuplicateKeyUpdate({ set: { minWithdrawal: input.minWithdrawal, maxWithdrawal: input.maxWithdrawal } });
+  await dbc.insert(tikissePlatformSettings).values({ id: 1, minWithdrawal: input.minWithdrawal, maxWithdrawal: input.maxWithdrawal }).onConflictDoUpdate({ target: tikissePlatformSettings.id, set: { minWithdrawal: input.minWithdrawal, maxWithdrawal: input.maxWithdrawal } });
   return input;
 }
 
@@ -941,7 +941,7 @@ const DEFAULT_PRICING_CONFIG: PricingConfig = {
 export async function adminGetPricingConfig(): Promise<PricingConfig> {
   const dbc = await getDb();
   if (!dbc) return DEFAULT_PRICING_CONFIG;
-  await dbc.insert(tikissePlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  await dbc.insert(tikissePlatformSettings).values({ id: 1 }).onConflictDoNothing();
   const settings = (await dbc.select().from(tikissePlatformSettings).where(eq(tikissePlatformSettings.id, 1)).limit(1))[0];
   if (!settings?.pricingConfig) return DEFAULT_PRICING_CONFIG;
   try {
@@ -963,7 +963,7 @@ export async function adminUpdatePricingConfig(config: PricingConfig) {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   const serialized = JSON.stringify(config);
-  await dbc.insert(tikissePlatformSettings).values({ id: 1, pricingConfig: serialized }).onDuplicateKeyUpdate({ set: { pricingConfig: serialized } });
+  await dbc.insert(tikissePlatformSettings).values({ id: 1, pricingConfig: serialized }).onConflictDoUpdate({ target: tikissePlatformSettings.id, set: { pricingConfig: serialized } });
   return config;
 }
 
@@ -1024,13 +1024,13 @@ export async function adminUpsertCountry(input: { id: string; name: string; dial
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   // Un nouveau pays se range à la fin de la liste ; une modification garde sa place.
   const existing = (await dbc.select().from(tikisseSupportedCountries).where(eq(tikisseSupportedCountries.id, input.id)).limit(1))[0];
-  const last = (await dbc.select({ max: sql<number>`coalesce(max(${tikisseSupportedCountries.sortOrder}), 0)` }).from(tikisseSupportedCountries))[0]?.max ?? 0;
+  const last = (await dbc.select({ max: sql<number>`coalesce(max(${tikisseSupportedCountries.sortOrder}), 0)`.mapWith(Number) }).from(tikisseSupportedCountries))[0]?.max ?? 0;
   const values = {
     id: input.id, name: input.name.trim(), dialCode: input.dialCode, digits: input.digits,
     groups: input.groups.join(","), timeZones: input.timeZones.join(","), enabled: input.enabled,
     sortOrder: input.sortOrder ?? existing?.sortOrder ?? Number(last) + 1,
   };
-  await dbc.insert(tikisseSupportedCountries).values(values).onDuplicateKeyUpdate({ set: values });
+  await dbc.insert(tikisseSupportedCountries).values(values).onConflictDoUpdate({ target: tikisseSupportedCountries.id, set: values });
   return values;
 }
 
@@ -1099,7 +1099,7 @@ function isValidTimeZone(zone: string) {
 export async function adminSetMaintenance(input: { enabled: boolean; message?: string }) {
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
-  await dbc.insert(tikissePlatformSettings).values({ id: 1, maintenanceEnabled: input.enabled, maintenanceMessage: input.message?.trim() || null }).onDuplicateKeyUpdate({ set: { maintenanceEnabled: input.enabled, maintenanceMessage: input.message?.trim() || null } });
+  await dbc.insert(tikissePlatformSettings).values({ id: 1, maintenanceEnabled: input.enabled, maintenanceMessage: input.message?.trim() || null }).onConflictDoUpdate({ target: tikissePlatformSettings.id, set: { maintenanceEnabled: input.enabled, maintenanceMessage: input.message?.trim() || null } });
   return { enabled: input.enabled, message: input.message?.trim() || undefined };
 }
 
@@ -1191,7 +1191,7 @@ export async function adminUpsertLoyaltyProgram(input: {
     autoCredit,
     autoCreditMaxAmount,
     enabled: input.enabled,
-  }).onDuplicateKeyUpdate({
+  }).onConflictDoUpdate({ target: tikisseLoyaltyPrograms.id,
     set: {
       name: input.name.trim(),
       description: input.description?.trim() || null,

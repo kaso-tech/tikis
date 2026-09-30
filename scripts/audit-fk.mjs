@@ -29,7 +29,7 @@ if (!fs.existsSync(schemaPath)) {
 
 const schemaText = fs.readFileSync(schemaPath, "utf8");
 
-const tableMatches = [...schemaText.matchAll(/mysqlTable\(\s*["']([^"']+)["']/g)].map((m) => m[1]);
+const tableMatches = [...schemaText.matchAll(/pgTable\(\s*["']([^"']+)["']/g)].map((m) => m[1]);
 const tables = new Set(tableMatches);
 
 const expectedRelations = [
@@ -52,9 +52,8 @@ const expectedRelations = [
   { child: "tikisse_referrals", childCol: "refereePhone", parent: "tikisse_profiles", parentCol: "phone", required: true, note: "Filleul connu." },
   { child: "tikisse_favorite_places", childCol: "profilePhone", parent: "tikisse_profiles", parentCol: "phone", required: true, note: "Adresse favorite d'un profil connu." },
   { child: "tikisse_payment_transactions", childCol: "profilePhone", parent: "tikisse_profiles", parentCol: "phone", required: true, note: "Transaction d'un profil connu." },
-  { child: "tikisse_payment_transactions", childCol: "deliveryId", parent: "tikisse_deliveries", parentCol: "id", required: false, note: "Transaction peut être un dépôt sans livraison." },
-  { child: "tikisse_push_tokens", childCol: "profilePhone", parent: "tikisse_profiles", parentCol: "phone", required: true, note: "Push token d'un profil connu." },
-  { child: "tikisse_profile_sessions", childCol: "profilePhone", parent: "tikisse_profiles", parentCol: "phone", required: true, note: "Session d'un profil connu." },
+  { child: "tikisse_push_tokens", childCol: "phone", parent: "tikisse_profiles", parentCol: "phone", required: true, note: "Push token d'un profil connu." },
+  { child: "tikisse_profile_sessions", childCol: "phone", parent: "tikisse_profiles", parentCol: "phone", required: true, note: "Session d'un profil connu." },
   { child: "tikisse_loyalty_grants", childCol: "profilePhone", parent: "tikisse_profiles", parentCol: "phone", required: true, note: "Octroi de bonus d'un profil connu." },
   { child: "tikisse_admin_audit_log", childCol: "adminId", parent: "tikisse_admin_users", parentCol: "id", required: true, note: "Action tracée d'un admin connu." },
 ];
@@ -79,11 +78,17 @@ const liveIssues = [];
 if (process.env.DATABASE_URL) {
   console.log("\nDATABASE_URL détectée : détection des orphelins…");
   try {
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.createConnection(process.env.DATABASE_URL);
+    const { default: postgres } = await import("postgres");
+    const sql = postgres(process.env.DATABASE_URL, { prepare: false, max: 1 });
+    const columns = new Set((await sql`SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public'`).map((row) => `${row.table_name}.${row.column_name}`));
     for (const rel of present) {
-      const query = `SELECT COUNT(*) AS orphans FROM \`${rel.child}\` c LEFT JOIN \`${rel.parent}\` p ON c.\`${rel.childCol}\` = p.\`${rel.parentCol}\` WHERE p.\`${rel.parentCol}\` IS NULL${rel.required ? "" : ` AND c.\`${rel.childCol}\` IS NOT NULL`}`;
-      const [rows] = await conn.query(query);
+      const stale = [`${rel.child}.${rel.childCol}`, `${rel.parent}.${rel.parentCol}`].filter((column) => !columns.has(column));
+      if (stale.length > 0) {
+        console.log(`  ℹ ${rel.child}.${rel.childCol} → ${rel.parent}.${rel.parentCol} : colonne absente (${stale.join(", ")}), relation à retirer de ce script.`);
+        continue;
+      }
+      const query = `SELECT COUNT(*)::int AS orphans FROM "${rel.child}" c LEFT JOIN "${rel.parent}" p ON c."${rel.childCol}" = p."${rel.parentCol}" WHERE p."${rel.parentCol}" IS NULL${rel.required ? "" : ` AND c."${rel.childCol}" IS NOT NULL`}`;
+      const rows = await sql.unsafe(query);
       const orphans = Number(rows[0]?.orphans ?? 0);
       if (orphans > 0) {
         liveIssues.push(`  ✗ ${rel.child}.${rel.childCol} → ${rel.parent}.${rel.parentCol} : ${orphans} orphelin(s)`);
@@ -91,7 +96,7 @@ if (process.env.DATABASE_URL) {
         console.log(`  ✓ ${rel.child}.${rel.childCol} : aucun orphelin`);
       }
     }
-    await conn.end();
+    await sql.end();
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : String(cause);
     console.error(`\nErreur live : ${message}`);

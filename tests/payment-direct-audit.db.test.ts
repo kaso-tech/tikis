@@ -1,5 +1,5 @@
 /**
- * Audit du paiement direct YengaPay, exécuté contre une vraie base MySQL/MariaDB.
+ * Audit du paiement direct YengaPay, exécuté contre une vraie base PostgreSQL.
  *
  * Ces tests appellent les fonctions qui créditent réellement les Wallets — règlement, webhook —, sans
  * rien simuler de la base : ce sont elles qu'un défaut ferait payer en argent. Ils ne tournent que si

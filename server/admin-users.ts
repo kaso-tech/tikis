@@ -54,8 +54,8 @@ export async function forceLogout(phone: string) {
     const sessions = await tx.update(tikisseProfileSessions).set({ revokedAt: now }).where(and(eq(tikisseProfileSessions.phone, phone), isNull(tikisseProfileSessions.revokedAt)));
     const tokens = await tx.delete(tikissePushTokens).where(eq(tikissePushTokens.phone, phone));
     return {
-      revokedSessions: (sessions as unknown as [{ affectedRows?: number }])[0]?.affectedRows ?? 0,
-      removedPushTokens: (tokens as unknown as [{ affectedRows?: number }])[0]?.affectedRows ?? 0,
+      revokedSessions: db.affectedRowCount(sessions),
+      removedPushTokens: db.affectedRowCount(tokens),
       at: now,
     };
   });

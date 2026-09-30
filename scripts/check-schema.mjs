@@ -4,11 +4,11 @@
  *
  * Vérifie la cohérence entre :
  *  - les tables définies dans drizzle/schema.ts
- *  - les fichiers de migration drizzle/manual/*.sql et les migrations générées
- *  - les tables réellement présentes en base (optionnel, via DATABASE_URL)
+ *  - les migrations PostgreSQL de drizzle/migrations (création, et RLS activée : sans elle, l'API publique
+ *    de Supabase lirait la table avec la clé « anon » embarquée dans l'application)
+ *  - la base elle-même (optionnel, via DATABASE_URL) : tables présentes, RLS activée
  *
  * Sans DATABASE_URL, le script fait un check statique (rapide, safe en CI).
- * Avec DATABASE_URL, il ajoute un check de présence en base.
  *
  * Exit code 0 = OK, 1 = problème détecté.
  */
@@ -23,8 +23,7 @@ const __dirname = path.dirname(__filename);
 const root = path.resolve(__dirname, "..");
 
 const schemaPath = path.join(root, "drizzle", "schema.ts");
-const manualDir = path.join(root, "drizzle", "manual");
-const metaJournal = path.join(root, "drizzle", "meta", "_journal.json");
+const migrationsDir = path.join(root, "drizzle", "migrations");
 
 const issues = [];
 
@@ -43,97 +42,51 @@ if (!fs.existsSync(schemaPath)) {
 }
 
 const schemaText = fs.readFileSync(schemaPath, "utf8");
-const tableMatches = schemaText.matchAll(/mysqlTable\(\s*["']([^"']+)["']/g);
-const tablesInSchema = new Set();
-for (const match of tableMatches) {
-  tablesInSchema.add(match[1]);
-}
+const tablesInSchema = new Set([...schemaText.matchAll(/pgTable\(\s*["']([^"']+)["']/g)].map((match) => match[1]));
 
 console.log(`Tables définies dans drizzle/schema.ts : ${tablesInSchema.size}`);
-for (const table of [...tablesInSchema].sort()) {
-  console.log(`  • ${table}`);
+for (const table of [...tablesInSchema].sort()) console.log(`  • ${table}`);
+
+const migrations = fs.existsSync(migrationsDir) ? fs.readdirSync(migrationsDir).filter((f) => f.endsWith(".sql")).sort() : [];
+console.log(`\nMigrations PostgreSQL : ${migrations.length}`);
+const created = new Set();
+const secured = new Set();
+for (const file of migrations) {
+  const sql = fs.readFileSync(path.join(migrationsDir, file), "utf8");
+  for (const match of sql.matchAll(/CREATE TABLE\s+(?:IF NOT EXISTS\s+)?"?([a-zA-Z_][a-zA-Z0-9_]*)"?/g)) created.add(match[1]);
+  for (const match of sql.matchAll(/ALTER TABLE\s+"?([a-zA-Z_][a-zA-Z0-9_]*)"?\s+ENABLE ROW LEVEL SECURITY/g)) secured.add(match[1]);
 }
 
-const manualMigrations = fs.existsSync(manualDir) ? fs.readdirSync(manualDir).filter((f) => f.endsWith(".sql")).sort() : [];
-console.log(`\nMigrations manuelles : ${manualMigrations.length}`);
-const tableRefsInManual = new Set();
-for (const file of manualMigrations) {
-  const sql = fs.readFileSync(path.join(manualDir, file), "utf8");
-  const matches = sql.matchAll(/(?:CREATE TABLE|ALTER TABLE|DROP TABLE)\s+(?:IF NOT EXISTS\s+)?`?([a-zA-Z_][a-zA-Z0-9_]*)`?/g);
-  for (const match of matches) {
-    tableRefsInManual.add(match[1]);
-  }
-}
+const notCreated = [...tablesInSchema].filter((table) => !created.has(table));
+for (const table of notCreated) logIssue(`Table '${table}' présente dans schema.ts mais créée par aucune migration — lance 'pnpm db:generate'.`);
+if (notCreated.length === 0) logOk(`Toutes les tables du schéma sont créées par les migrations.`);
 
-const tablesWithoutMigration = [...tablesInSchema].filter((table) => !tableRefsInManual.has(table));
-if (tablesWithoutMigration.length > 0) {
-  const drizzleDir = path.join(root, "drizzle");
-  const drizzleSqlFiles = fs.existsSync(drizzleDir) ? fs.readdirSync(drizzleDir).filter((f) => /^\d{4}_.+\.sql$/.test(f)) : [];
-  const drizzleTableRefs = new Set();
-  for (const file of drizzleSqlFiles) {
-    const sql = fs.readFileSync(path.join(drizzleDir, file), "utf8");
-    const matches = sql.matchAll(/(?:CREATE TABLE|ALTER TABLE)\s+(?:IF NOT EXISTS\s+)?`?([a-zA-Z_][a-zA-Z0-9_]*)`?/g);
-    for (const match of matches) {
-      drizzleTableRefs.add(match[1]);
-    }
-  }
-  const stillOrphan = tablesWithoutMigration.filter((t) => !drizzleTableRefs.has(t));
-  if (stillOrphan.length > 0) {
-    for (const table of stillOrphan) {
-      logIssue(`Table '${table}' présente dans schema.ts mais absente des migrations (manual/ et drizzle/).`);
-    }
-  } else {
-    logOk(`Toutes les tables du schema sont couvertes par ${manualMigrations.length} migration(s) manuelle(s) + ${drizzleSqlFiles.length} migration(s) drizzle.`);
-  }
-} else {
-  logOk("Toutes les tables du schema sont référencées dans au moins une migration manuelle.");
-}
-
-let journalMigrations = [];
-if (fs.existsSync(metaJournal)) {
-  const journal = JSON.parse(fs.readFileSync(metaJournal, "utf8"));
-  journalMigrations = (journal.entries ?? []).map((entry) => entry.when).sort();
-  console.log(`\nMigrations générées (drizzle-kit) : ${journalMigrations.length}`);
-} else {
-  console.warn(`\nFichier meta/_journal.json introuvable — vérifie que 'drizzle-kit generate' a déjà été lancé.`);
-}
-
-if (manualMigrations.length > 0 && journalMigrations.length > 0) {
-  const manualPrefixes = new Set(manualMigrations.map((f) => f.split("_")[0]));
-  const missingInDrizzleKit = [...manualPrefixes].filter((prefix) => !journalMigrations.includes(Number(prefix)));
-  if (missingInDrizzleKit.length > 0) {
-    console.log(`  ℹ Migrations manuelles (${missingInDrizzleKit.join(", ")}) non couvertes par drizzle-kit. C'est attendu : elles sont appliquées manuellement (cf. docs/OPERATIONS.md).`);
-  } else {
-    logOk("Toutes les migrations manuelles sont alignées avec le journal drizzle-kit.");
-  }
-}
-
-const minConstraints = schemaText.match(/\.min\(\s*(\d+)/g) || [];
-const maxConstraints = schemaText.match(/\.max\(\s*(\d+)/g) || [];
-console.log(`\nContraintes détectées : ${minConstraints.length} min() + ${maxConstraints.length} max()`);
+const notSecured = [...tablesInSchema].filter((table) => !secured.has(table));
+for (const table of notSecured) logIssue(`Table '${table}' sans 'ENABLE ROW LEVEL SECURITY' dans les migrations : elle serait lisible par l'API publique de Supabase.`);
+if (notSecured.length === 0) logOk(`RLS activée par les migrations sur toutes les tables.`);
 
 if (process.env.DATABASE_URL) {
-  console.log("\nDATABASE_URL détectée : check live (SELECT table_name)…");
+  console.log("\nDATABASE_URL détectée : check live…");
+  const { default: postgres } = await import("postgres");
+  const sql = postgres(process.env.DATABASE_URL, { prepare: false, max: 1 });
   try {
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.createConnection(process.env.DATABASE_URL);
-    const [rows] = await conn.query("SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()");
-    const tablesInDb = new Set(rows.map((r) => r.TABLE_NAME || r.table_name));
-    const missingInDb = [...tablesInSchema].filter((t) => !tablesInDb.has(t));
-    if (missingInDb.length > 0) {
-      for (const t of missingInDb) logIssue(`Table '${t}' absente en base — applique les migrations.`);
-    } else {
-      logOk(`Toutes les ${tablesInSchema.size} tables sont présentes en base.`);
-    }
-    const orphanInDb = [...tablesInDb].filter((t) => t.startsWith("tikisse_") && !tablesInSchema.has(t));
-    if (orphanInDb.length > 0) {
+    const rows = await sql`SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'`;
+    const inDb = new Map(rows.map((row) => [row.tablename, row.rowsecurity]));
+    const missing = [...tablesInSchema].filter((table) => !inDb.has(table));
+    for (const table of missing) logIssue(`Table '${table}' absente en base — applique les migrations ('pnpm db:migrate').`);
+    if (missing.length === 0) logOk(`Toutes les ${tablesInSchema.size} tables sont présentes en base.`);
+    const open = [...tablesInSchema].filter((table) => inDb.has(table) && !inDb.get(table));
+    for (const table of open) logIssue(`Table '${table}' sans RLS en base : lisible par l'API publique de Supabase.`);
+    if (missing.length === 0 && open.length === 0) logOk("RLS activée en base sur toutes les tables.");
+    const orphans = [...inDb.keys()].filter((table) => table.startsWith("tikisse_") && !tablesInSchema.has(table) && table !== "tikisse_delivery_channel_members");
+    if (orphans.length > 0) {
       console.warn(`\n  ℹ Tables 'tikisse_*' en base mais pas dans schema.ts :`);
-      for (const t of orphanInDb) console.warn(`      • ${t}`);
+      for (const table of orphans) console.warn(`      • ${table}`);
     }
-    await conn.end();
   } catch (cause) {
-    const message = cause instanceof Error ? cause.message : String(cause);
-    logIssue(`Échec du check live : ${message}`);
+    logIssue(`Échec du check live : ${cause instanceof Error ? cause.message : String(cause)}`);
+  } finally {
+    await sql.end();
   }
 } else {
   console.log("\nDATABASE_URL non définie : check statique uniquement (set DATABASE_URL pour un check live).");

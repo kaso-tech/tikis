@@ -51,9 +51,10 @@ describe("une course clôturée automatiquement est datée de son échéance", (
   });
 
   it("une migration redate les courses déjà clôturées, sans toucher aux autres", () => {
-    // Exécutée sur MariaDB 10.11 avec quatre cas (clôture tardive, clôture manuelle, clôture à l'heure,
+    // Correction de données déjà appliquée à la base MySQL (historique) ; les données migrées vers PostgreSQL
+    // la portent. Exécutée sur MariaDB 10.11 avec quatre cas (clôture tardive, clôture manuelle, clôture à l'heure,
     // avis laissé après la clôture) et rejouée deux fois : voir le message du commit.
-    const sql = read("drizzle/manual/0038_backfill_auto_completed_at.sql");
+    const sql = read("drizzle/mysql-legacy/manual/0038_backfill_auto_completed_at.sql");
     expect(sql).toContain("CONCAT(d.`id`, ':auto-completed-driver')");
     expect(sql).toContain("previous.`createdAt` < closing.`createdAt`");
     expect(sql).toContain("+ INTERVAL 24 HOUR");

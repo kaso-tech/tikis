@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const direct = readFileSync(join(process.cwd(), "server/yengapay-direct.ts"), "utf8");
 const database = readFileSync(join(process.cwd(), "server/db.ts"), "utf8");
-const migration = readFileSync(join(process.cwd(), "drizzle/manual/0040_direct_deposit_metadata.sql"), "utf8");
+const migration = readFileSync(join(process.cwd(), "drizzle/migrations/0000_baseline.sql"), "utf8");
 
 describe("règlement YengaPay Direct", () => {
   it("utilise le provider correspondant au mode externe", () => {

@@ -8,7 +8,7 @@
  *  - Wallets : totaux, et contrôle que chaque solde est exactement la somme de ses mouvements ;
  *  - export comptable d'un mois.
  */
-import { and, asc, count, desc, eq, gte, isNotNull, like, lt, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, isNotNull, ilike, like, lt, ne, or, sql } from "drizzle-orm";
 import { tikissePaymentTransactions, tikisseWalletLedger, tikisseWallets, tikisseYengapayWebhookEvents } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -36,7 +36,7 @@ export async function adminListWebhookEvents(input: { status?: WebhookEventStatu
       eq(tikisseYengapayWebhookEvents.providerEventId, query),
       like(tikisseYengapayWebhookEvents.providerEventId, `${escapeLike(query)}:%`),
       eq(tikisseYengapayWebhookEvents.paymentTransactionId, query),
-      ...(query.length >= 8 ? [like(tikisseYengapayWebhookEvents.payload, `%${escapeLike(query)}%`)] : []),
+      ...(query.length >= 8 ? [ilike(tikisseYengapayWebhookEvents.payload, `%${escapeLike(query)}%`)] : []),
     ) : undefined,
   );
   const limit = Math.min(input.limit ?? 50, 200);
@@ -93,11 +93,11 @@ export async function adminWalletCheck() {
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   const totals = (await dbc.select({
     wallets: count(),
-    available: sql<number>`coalesce(sum(${tikisseWallets.availableBalance}), 0)`,
-    held: sql<number>`coalesce(sum(${tikisseWallets.heldBalance}), 0)`,
+    available: sql<number>`coalesce(sum(${tikisseWallets.availableBalance}), 0)`.mapWith(Number),
+    held: sql<number>`coalesce(sum(${tikisseWallets.heldBalance}), 0)`.mapWith(Number),
   }).from(tikisseWallets))[0];
-  const ledgerAvailable = sql<number>`coalesce(sum(${tikisseWalletLedger.availableAfter} - ${tikisseWalletLedger.availableBefore}), 0)`;
-  const ledgerHeld = sql<number>`coalesce(sum(${tikisseWalletLedger.heldAfter} - ${tikisseWalletLedger.heldBefore}), 0)`;
+  const ledgerAvailable = sql<number>`coalesce(sum(${tikisseWalletLedger.availableAfter} - ${tikisseWalletLedger.availableBefore}), 0)`.mapWith(Number);
+  const ledgerHeld = sql<number>`coalesce(sum(${tikisseWalletLedger.heldAfter} - ${tikisseWalletLedger.heldBefore}), 0)`.mapWith(Number);
   const discrepancies = await dbc.select({
     profilePhone: tikisseWallets.profilePhone,
     availableBalance: tikisseWallets.availableBalance,
@@ -140,9 +140,9 @@ export async function adminAccountingMonth(month: string) {
   const inMonth = and(gte(tikisseWalletLedger.createdAt, start), lt(tikisseWalletLedger.createdAt, end));
   const settledInMonth = and(eq(tikissePaymentTransactions.status, "succeeded"), gte(tikissePaymentTransactions.settledAt, start), lt(tikissePaymentTransactions.settledAt, end));
   const [operations, payments, rows] = await Promise.all([
-    dbc.select({ operation: tikisseWalletLedger.operation, movements: count(), total: sql<number>`coalesce(sum(${tikisseWalletLedger.amount}), 0)` })
+    dbc.select({ operation: tikisseWalletLedger.operation, movements: count(), total: sql<number>`coalesce(sum(${tikisseWalletLedger.amount}), 0)`.mapWith(Number) })
       .from(tikisseWalletLedger).where(inMonth).groupBy(tikisseWalletLedger.operation),
-    dbc.select({ type: tikissePaymentTransactions.type, transactions: count(), total: sql<number>`coalesce(sum(${tikissePaymentTransactions.amount}), 0)` })
+    dbc.select({ type: tikissePaymentTransactions.type, transactions: count(), total: sql<number>`coalesce(sum(${tikissePaymentTransactions.amount}), 0)`.mapWith(Number) })
       .from(tikissePaymentTransactions).where(settledInMonth).groupBy(tikissePaymentTransactions.type),
     dbc.select({
       createdAt: tikisseWalletLedger.createdAt, profilePhone: tikisseWalletLedger.profilePhone, operation: tikisseWalletLedger.operation, amount: tikisseWalletLedger.amount,

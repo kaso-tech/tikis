@@ -16,7 +16,7 @@
  */
 import { randomBytes, randomUUID } from "node:crypto";
 import { and, count, desc, eq, getTableColumns, inArray, is, isNotNull, isNull, like, lt, lte, or, sql } from "drizzle-orm";
-import { MySqlTable, getTableConfig } from "drizzle-orm/mysql-core";
+import { PgTable, getTableConfig } from "drizzle-orm/pg-core";
 import * as schema from "../drizzle/schema";
 import {
   tikisseAdminApprovals, tikisseDeletedAccounts, tikisseDeliveries, tikisseDeliveryEvents, tikisseDeliveryLiveLocations, tikisseDriverPreferences, tikisseFavoritePlaces,
@@ -171,7 +171,7 @@ const TEXT_EMBEDDING_PHONE = [
 
 /** Remplace le numéro par le pseudonyme dans toutes les tables qui le portent. */
 async function pseudonymizePhone(tx: Tx, phone: string, pseudonym: string) {
-  const tables = (Object.values(schema) as unknown[]).filter((value): value is MySqlTable => is(value, MySqlTable));
+  const tables = (Object.values(schema) as unknown[]).filter((value): value is PgTable => is(value, PgTable));
   for (const table of tables) {
     if (PHONE_KEPT_IN.has(getTableConfig(table).name)) continue;
     for (const [key, column] of Object.entries(getTableColumns(table))) {
@@ -256,7 +256,7 @@ export async function processStorageErasures(limit = 50, erase: (key: string) =>
 export async function purgeExpiredDeletedAccounts(now = new Date()) {
   const handle = await database();
   const result = await handle.delete(tikisseDeletedAccounts).where(lte(tikisseDeletedAccounts.purgeAfter, now));
-  return { purged: (result as unknown as [{ affectedRows?: number }])[0]?.affectedRows ?? 0 };
+  return { purged: db.affectedRowCount(result) };
 }
 
 /** Tâche planifiée : suppressions arrivées à échéance (sauf celles bloquées), effacement des fichiers, purge à 10 ans. */

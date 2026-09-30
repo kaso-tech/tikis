@@ -1,7 +1,8 @@
 import { isoCountry } from "../shared/iso-countries";
 import { createHash, randomUUID } from "crypto";
 import { and, count, desc, eq, gte, inArray, isNotNull, isNull, like, lt, lte, ne, or, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import { InsertTikisseDelivery, InsertTikissePlace, InsertUser, TikisseAdminAuditLog, TikisseAdminUser, TikisseDelivery, TikisseDeliveryCandidate, TikisseDeliveryReport, TikissePlace, tikisseAdminAuditLog, tikisseAdminUsers, tikisseDeliveries, tikisseDeliveryCandidates, tikisseDeliveryEvents, tikisseDeliveryLiveLocations, tikisseDeliveryReports, tikisseDeliveryReviews, TikisseDriverPreferences, tikisseDriverPreferences, tikisseFavoritePlaces, tikisseKycSubmissions, tikissePaymentTransactions, tikissePlaces, tikissePlatformSettings, tikisseProfiles, tikissePushTokens, tikisseRateLimits, tikisseReferrals, tikisseSupportedCountries, tikisseWalletLedger, tikisseWallets, tikisseYengapayWebhookEvents, users } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { assertSimulatedSettlementAllowed, createYengapayPaymentIntent, readYengapayConfig, verifyYengapayPayment, YENGAPAY_TEST_PROVIDERS } from "./yengapay";
@@ -14,7 +15,33 @@ import { candidateMovementVersion, computeReplacementSettlement } from "../share
 import { BASE_POSITION_MAX_AGE_MS, DEFAULT_DRIVER_PERIMETER, distanceKmBetween, evaluatePerimeter, isValidPerimeterRadius, MAX_PERIMETER_RADIUS_KM, MIN_PERIMETER_RADIUS_KM, type DriverPerimeterPreferences } from "../shared/driver-perimeter";
 import { autoCompletionTimestamp, DELIVERY_EXPIRATION_MS, deliveryActivityTimestamp, deliveryExpirationOutcome } from "../shared/delivery-expiration";
 
-let _db: ReturnType<typeof drizzle> | null = null;
+/**
+ * Connexion PostgreSQL (Supabase). `prepare: false` : le pooler de Supabase en mode transaction (port 6543)
+ * ne garde pas les requêtes préparées d'une transaction à l'autre ; sans cette option, des requêtes
+ * échouent au hasard dès que deux connexions se partagent un même processus serveur.
+ */
+function connect(url: string) {
+  const client = postgres(url, {
+    prepare: false,
+    max: Number(process.env.DATABASE_POOL_MAX) || 10,
+    idle_timeout: 30,
+    connect_timeout: 10,
+  });
+  return drizzle(client);
+}
+
+let _db: ReturnType<typeof connect> | null = null;
+
+/** Violation d'un index unique (PostgreSQL 23505), que drizzle l'enveloppe ou non. */
+export function isUniqueViolation(cause: unknown): boolean {
+  const error = cause as { code?: string; cause?: { code?: string } } | null;
+  return error?.code === "23505" || error?.cause?.code === "23505";
+}
+
+/** Lignes touchées par un UPDATE ou un DELETE (postgres-js les rend dans `count`). */
+export function affectedRowCount(result: unknown): number {
+  return Number((result as { count?: number } | null)?.count ?? 0);
+}
 
 /** Push des notifications d'une transaction : envoyés seulement une fois la transaction validée. Envoyés
  *  plus tôt, un utilisateur pouvait être notifié d'une action finalement annulée (erreur plus loin dans la
@@ -43,7 +70,7 @@ function deferPushesUntilCommit(db: NonNullable<typeof _db>) {
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = deferPushesUntilCommit(drizzle(process.env.DATABASE_URL));
+      _db = deferPushesUntilCommit(connect(process.env.DATABASE_URL));
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -72,7 +99,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     values.role = "admin";
     updateSet.role = "admin";
   }
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  await db.insert(users).values(values).onConflictDoUpdate({ target: users.openId, set: updateSet });
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -169,7 +196,7 @@ export async function cancelProfileDeletion(phone: string) {
 export async function getMaintenanceStatus() {
   const dbc = await getDb();
   if (!dbc) return { enabled: false, message: undefined as string | undefined };
-  await dbc.insert(tikissePlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  await dbc.insert(tikissePlatformSettings).values({ id: 1 }).onConflictDoNothing();
   const settings = (await dbc.select().from(tikissePlatformSettings).where(eq(tikissePlatformSettings.id, 1)).limit(1))[0];
   return { enabled: settings?.maintenanceEnabled ?? false, message: settings?.maintenanceMessage ?? undefined };
 }
@@ -202,7 +229,7 @@ export async function listReferralsForReferrer(referrerPhone: string) {
 export async function getReferralPublicSettings() {
   const dbc = await getDb();
   if (!dbc) return { rewardAmount: 1000, requiredDeliveries: 1, enabled: true };
-  await dbc.insert(tikissePlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  await dbc.insert(tikissePlatformSettings).values({ id: 1 }).onConflictDoNothing();
   const settings = (await dbc.select().from(tikissePlatformSettings).where(eq(tikissePlatformSettings.id, 1)).limit(1))[0];
   return { rewardAmount: settings?.referralRewardAmount ?? 1000, requiredDeliveries: settings?.referralRequiredDeliveries ?? 1, enabled: settings?.referralEnabled ?? true };
 }
@@ -347,10 +374,9 @@ export async function saveTikissePlace(input: Omit<InsertTikissePlace, "coordina
     ...input,
     ...(isExactMapSelection ? { googlePlaceId: null, mapboxPlaceId: null } : {}),
     coordinateKey: coordinateCacheKey(input.latitude, input.longitude),
-  });
-  const result = await db.select().from(tikissePlaces).where(eq(tikissePlaces.id, Number(inserted[0].insertId))).limit(1);
-  if (!result[0]) throw new Error("Le lieu n’a pas pu être enregistré.");
-  return result[0];
+  }).returning();
+  if (!inserted[0]) throw new Error("Le lieu n’a pas pu être enregistré.");
+  return inserted[0];
 }
 
 export async function listFavoritePlaces(profilePhone: string) {
@@ -362,7 +388,7 @@ export async function listFavoritePlaces(profilePhone: string) {
 export async function saveFavoritePlace(profilePhone: string, placeId: number, label: string) {
   const db = await getDb();
   if (!db) throw new Error("Les favoris sont temporairement indisponibles.");
-  await db.insert(tikisseFavoritePlaces).values({ profilePhone, placeId, label }).onDuplicateKeyUpdate({ set: { label } });
+  await db.insert(tikisseFavoritePlaces).values({ profilePhone, placeId, label }).onConflictDoUpdate({ target: [tikisseFavoritePlaces.profilePhone, tikisseFavoritePlaces.placeId], set: { label } });
   const result = await db.select().from(tikisseFavoritePlaces).where(and(eq(tikisseFavoritePlaces.profilePhone, profilePhone), eq(tikisseFavoritePlaces.placeId, placeId))).limit(1);
   return result[0];
 }
@@ -506,8 +532,8 @@ export async function updateDriverPerimeterPreferences(profilePhone: string, pat
   if (patch.discoveryRadiusKm !== undefined) values.discoveryRadiusKm = patch.discoveryRadiusKm;
   await db.insert(tikisseDriverPreferences).values({ profilePhone, ...values })
     // `profilePhone` dans le SET garantit un UPDATE non vide même si `values` est vide (aucun champ
-    // fourni) : MySQL rejette un `ON DUPLICATE KEY UPDATE` sans affectation.
-    .onDuplicateKeyUpdate({ set: { profilePhone, ...values } });
+    // fourni) : un `ON CONFLICT DO UPDATE` exige au moins une affectation.
+    .onConflictDoUpdate({ target: tikisseDriverPreferences.profilePhone, set: { profilePhone, ...values } });
   return getDriverPerimeterPreferences(profilePhone);
 }
 
@@ -519,7 +545,7 @@ export async function updateDriverBasePosition(profilePhone: string, latitude: n
   const baseUpdatedAt = new Date();
   const position = { baseLatitude: String(latitude), baseLongitude: String(longitude), baseUpdatedAt };
   await db.insert(tikisseDriverPreferences).values({ profilePhone, ...position })
-    .onDuplicateKeyUpdate({ set: position });
+    .onConflictDoUpdate({ target: tikisseDriverPreferences.profilePhone, set: position });
   return getDriverPerimeterPreferences(profilePhone);
 }
 
@@ -660,7 +686,7 @@ export async function saveTikisseDeliveryLiveLocation(input: {
       longitude: String(input.longitude),
       heading: String(input.heading),
       recordedAt,
-    }).onDuplicateKeyUpdate({
+    }).onConflictDoUpdate({ target: tikisseDeliveryLiveLocations.deliveryId,
       set: {
         driverPhone: input.driverPhone,
         latitude: String(input.latitude),
@@ -748,7 +774,7 @@ export async function expireOpenTikisseDeliveries(now = new Date()) {
   const cutoff = new Date(now.getTime() - DELIVERY_EXPIRATION_MS);
   return db.transaction(async (tx) => {
     const stale = await tx.select().from(tikisseDeliveries)
-      .where(and(inArray(tikisseDeliveries.status, ["open", "pending_confirmation", "active", "disabled"]), lt(sql`GREATEST(${tikisseDeliveries.updatedAt}, ${tikisseDeliveries.createdAt})`, cutoff)))
+      .where(and(inArray(tikisseDeliveries.status, ["open", "pending_confirmation", "active", "disabled"]), lt(tikisseDeliveries.updatedAt, cutoff), lt(tikisseDeliveries.createdAt, cutoff)))
       .for("update");
     let expiredCount = 0;
     let completedCount = 0;
@@ -852,7 +878,7 @@ type DeliveryEventInput = {
 };
 
 export async function ensureTikisseWallet(tx: any, profilePhone: string) {
-  await tx.insert(tikisseWallets).values({ profilePhone }).onDuplicateKeyUpdate({ set: { profilePhone } });
+  await tx.insert(tikisseWallets).values({ profilePhone }).onConflictDoNothing();
   const rows = await tx.select().from(tikisseWallets).where(eq(tikisseWallets.profilePhone, profilePhone)).limit(1).for("update");
   if (!rows[0]) throw new Error("Le Wallet est temporairement indisponible.");
   return rows[0];
@@ -899,7 +925,7 @@ export async function appendDeliveryEvent(tx: any, event: DeliveryEventInput) {
     id: eventId, deliveryId: event.deliveryId, eventType: event.eventType, status: event.status ?? null,
     actorPhone: event.actorPhone ?? null, recipientPhone: event.recipientPhone, title: event.title, body: event.body,
     tone: event.tone, metadata: null, feedHidden: event.feed === false, idempotencyKey: event.idempotencyKey,
-  }).onDuplicateKeyUpdate({ set: { idempotencyKey: event.idempotencyKey } });
+  }).onConflictDoNothing();
   if (event.recipientPhone && event.push !== false && event.feed !== false) {
     const persisted = (await tx.select({ id: tikisseDeliveryEvents.id }).from(tikisseDeliveryEvents).where(eq(tikisseDeliveryEvents.idempotencyKey, event.idempotencyKey)).limit(1))[0];
     // Clé déjà connue : l'insertion vient d'être ignorée, la notification existait déjà. La repousser
@@ -934,7 +960,7 @@ export async function listSupportedCountries(onlyEnabled = true) {
 export async function getTikisseCommissionRate() {
   const db = await getDb();
   if (!db) throw new Error("La configuration de commission est temporairement indisponible.");
-  await db.insert(tikissePlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  await db.insert(tikissePlatformSettings).values({ id: 1 }).onConflictDoNothing();
   const settings = await db.select().from(tikissePlatformSettings).where(eq(tikissePlatformSettings.id, 1)).limit(1);
   const rate = Number(settings[0]?.commissionRate);
   if (!Number.isFinite(rate) || rate <= 0 || rate >= 1) throw new Error("Le taux de commission configuré est invalide.");
@@ -944,7 +970,7 @@ export async function getTikisseCommissionRate() {
 export async function getTikisseWalletSnapshot(profilePhone: string): Promise<WalletSnapshot> {
   const db = await getDb();
   if (!db) return { total: 0, blocked: 0 };
-  await db.insert(tikisseWallets).values({ profilePhone }).onDuplicateKeyUpdate({ set: { profilePhone } });
+  await db.insert(tikisseWallets).values({ profilePhone }).onConflictDoNothing();
   const rows = await db.select().from(tikisseWallets).where(eq(tikisseWallets.profilePhone, profilePhone)).limit(1);
   const wallet = rows[0];
   if (!wallet) return { total: 0, blocked: 0 };
@@ -1000,9 +1026,9 @@ export async function requestTikisseWalletOperation(profilePhone: string, type: 
   await db.transaction(async (tx) => {
     // `requestId` est fourni par l'appelant (généré une seule fois par soumission) : une relance réseau
     // de la même demande ne doit pas créer une seconde ligne. On vérifie d'abord (comme le fait
-    // `applyWalletMovement` partout ailleurs) plutôt que de s'appuyer sur `onDuplicateKeyUpdate`, qui
-    // déclencherait une vraie clause UPDATE — bloquée par le trigger d'immuabilité de `tikisse_wallet_ledger`
-    // (drizzle/manual/0034_wallet_ledger_hardening.sql), même pour ré-écrire la même valeur.
+    // `applyWalletMovement` partout ailleurs) plutôt que de s'appuyer sur un `ON CONFLICT DO UPDATE`, qui
+    // déclencherait une vraie clause UPDATE — bloquée par le déclencheur d'immuabilité de `tikisse_wallet_ledger`
+    // (drizzle/migrations/0001_reference_data_and_guards.sql), même pour ré-écrire la même valeur.
     const idempotencyKey = `${type}:${profilePhone}:${requestId}`;
     const existing = await tx.select({ id: tikisseWalletLedger.id }).from(tikisseWalletLedger).where(eq(tikisseWalletLedger.idempotencyKey, idempotencyKey)).limit(1);
     if (existing.length > 0) return;
@@ -1020,7 +1046,7 @@ export async function requestTikisseWalletOperation(profilePhone: string, type: 
 // ===== Paiement Mobile Money direct (in-app, sans redirection web) =====
 // On réutilise la table tikisse_payment_transactions avec le provider yengapay_direct_* et on ajoute
 // les colonnes ussdCode / phoneE164 / operatorCode / countryCode / expiresAt via la migration
-// drizzle/manual/0040_direct_deposit_metadata.sql.
+// drizzle/mysql-legacy/manual/0040_direct_deposit_metadata.sql.
 
 export type DirectDepositRecord = {
   transactionId: string;
@@ -1147,7 +1173,7 @@ export async function listPendingDirectDeposits(profilePhone: string): Promise<D
       eq(tikissePaymentTransactions.profilePhone, profilePhone),
       eq(tikissePaymentTransactions.type, "deposit"),
       eq(tikissePaymentTransactions.status, "pending"),
-      // `provider` est un enum MySQL, pas un LIKE arbitraire : on teste les 3 valeurs direct
+      // `provider` est un type énuméré, pas un LIKE arbitraire : on teste les 3 valeurs direct
       // explicitement. Si on ajoute un nouveau provider direct un jour, mettre à jour ici aussi.
       inArray(tikissePaymentTransactions.provider, ["yengapay_direct_test", "yengapay_direct_sandbox", "yengapay_direct_live"]),
       // Expiré = `expiresAt` est dans le passé. SQL brut : comparaison directe avec NOW().
@@ -1385,7 +1411,7 @@ export async function adminSettlePaymentTransaction(input: { paymentId: string; 
       } catch (cause) {
         // Deux validations simultanées avec la même référence : l'index unique tranche, la transaction entière
         // (débit compris) est annulée.
-        if ((cause as { code?: string; cause?: { code?: string } })?.code === "ER_DUP_ENTRY" || (cause as { cause?: { code?: string } })?.cause?.code === "ER_DUP_ENTRY") {
+        if (isUniqueViolation(cause)) {
           throw new Error("Cette référence de versement est déjà utilisée pour un autre retrait.");
         }
         throw cause;
@@ -1446,13 +1472,13 @@ async function enforceDriverApplicationRateLimit(driverPhone: string, db: DbHand
  *  plusieurs connexions peut alors multiplier la limite effective par le nombre d'instances).
  *  Fenêtre fixe (bucket = fenêtre temporelle entière, pas une fenêtre glissante) : plus simple et
  *  suffisamment précis pour du rate-limiting anti-abus, sans nécessiter un magasin partagé type Redis.
- *  Incrément atomique via `ON DUPLICATE KEY UPDATE count = count + 1` (sûr sous concurrence). */
+ *  Incrément atomique via `ON CONFLICT DO UPDATE SET count = count + 1` (sûr sous concurrence). */
 export async function checkDistributedRateLimit(scope: string, identifier: string, windowMs: number, maxRequests: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return true; // Panne DB : ne jamais bloquer l'usage à cause d'un souci d'infrastructure du rate-limit lui-même.
   const bucket = Math.floor(Date.now() / windowMs);
   const rateLimitKey = `${scope}:${identifier}:${bucket}`.slice(0, 191);
-  await db.insert(tikisseRateLimits).values({ rateLimitKey, count: 1 }).onDuplicateKeyUpdate({ set: { count: sql`${tikisseRateLimits.count} + 1` } });
+  await db.insert(tikisseRateLimits).values({ rateLimitKey, count: 1 }).onConflictDoUpdate({ target: tikisseRateLimits.rateLimitKey, set: { count: sql`${tikisseRateLimits.count} + 1` } });
   const row = (await db.select({ count: tikisseRateLimits.count }).from(tikisseRateLimits).where(eq(tikisseRateLimits.rateLimitKey, rateLimitKey)).limit(1))[0];
   if (Math.random() < 0.01) {
     // Seulement les compteurs de cette limite : le nettoyage d'une limite à fenêtre courte (1 min pour les
@@ -1483,7 +1509,7 @@ export async function checkPhoneAttemptLimit(scope: string, phone: string): Prom
   if (Math.random() < 0.01) void db.delete(tikisseRateLimits).where(and(like(tikisseRateLimits.rateLimitKey, "phone-block:%"), lt(tikisseRateLimits.count, nowMinute))).catch(() => {});
   if (await checkDistributedRateLimit(`phone:${scope}`, phone, PHONE_ATTEMPT_WINDOW_MS, PHONE_ATTEMPT_MAX)) return { allowed: true };
   const until = nowMinute + PHONE_ATTEMPT_BLOCK_MINUTES;
-  await db.insert(tikisseRateLimits).values({ rateLimitKey: blockKey, count: until }).onDuplicateKeyUpdate({ set: { count: until } });
+  await db.insert(tikisseRateLimits).values({ rateLimitKey: blockKey, count: until }).onConflictDoUpdate({ target: tikisseRateLimits.rateLimitKey, set: { count: until } });
   return { allowed: false, retryInMinutes: PHONE_ATTEMPT_BLOCK_MINUTES };
 }
 
@@ -1496,7 +1522,7 @@ export async function applyForTikisseDelivery(input: { id: string; deliveryId: s
     const delivery = deliveries[0];
     if (!delivery) throw new Error("Cette livraison n’accepte plus de candidatures.");
     if (delivery.senderPhone === input.driverPhone) throw new Error("Vous ne pouvez pas candidater à votre propre livraison.");
-    await tx.insert(tikissePlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+    await tx.insert(tikissePlatformSettings).values({ id: 1 }).onConflictDoNothing();
     const rateRows = await tx.select().from(tikissePlatformSettings).where(eq(tikissePlatformSettings.id, 1)).limit(1);
     const rate = Number(rateRows[0]?.commissionRate);
     if (!Number.isFinite(rate) || rate <= 0 || rate >= 1) throw new Error("Le taux de commission configuré est invalide.");
@@ -1925,13 +1951,13 @@ export async function createReferralIfCodeProvided(refereePhone: string, referre
   if (!db) return;
   const referrer = await getTikisseProfileByReferralCode(referredByCode);
   if (!referrer || referrer.phone === refereePhone) return;
-  await db.insert(tikissePlatformSettings).values({ id: 1 }).onDuplicateKeyUpdate({ set: { id: 1 } });
+  await db.insert(tikissePlatformSettings).values({ id: 1 }).onConflictDoNothing();
   const settings = (await db.select().from(tikissePlatformSettings).where(eq(tikissePlatformSettings.id, 1)).limit(1))[0];
   if (!settings?.referralEnabled) return;
   await db.insert(tikisseReferrals).values({
     id: randomUUID(), referrerPhone: referrer.phone, refereePhone, referralCode: referredByCode,
     status: "invited", rewardAmount: settings.referralRewardAmount,
-  }).onDuplicateKeyUpdate({ set: { refereePhone } }); // no-op update: unique(refereePhone) makes this idempotent
+  }).onConflictDoNothing(); // no-op update: unique(refereePhone) makes this idempotent
 }
 
 /** Qualifie un parrainage « invité » dès que le filleul termine sa première livraison (comme Sender ou Livreur). */
@@ -1941,7 +1967,7 @@ async function qualifyReferralIfEligible(tx: any, phone: string | null, delivery
   if (!referral) return;
   const settings = (await tx.select().from(tikissePlatformSettings).where(eq(tikissePlatformSettings.id, 1)).limit(1))[0];
   const requiredDeliveries = settings?.referralRequiredDeliveries ?? 1;
-  const totalCompleted = await tx.select({ count: sql<number>`count(*)` }).from(tikisseDeliveries).where(and(or(eq(tikisseDeliveries.senderPhone, phone), eq(tikisseDeliveries.driverPhone, phone)), eq(tikisseDeliveries.status, "completed")));
+  const totalCompleted = await tx.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(tikisseDeliveries).where(and(or(eq(tikisseDeliveries.senderPhone, phone), eq(tikisseDeliveries.driverPhone, phone)), eq(tikisseDeliveries.status, "completed")));
   if (Number(totalCompleted[0]?.count ?? 0) < requiredDeliveries) return; // seuil de courses terminées pas encore atteint
   await tx.update(tikisseReferrals).set({ status: "qualified", qualifiedAt: new Date(), qualifyingDeliveryId: deliveryId }).where(eq(tikisseReferrals.id, referral.id));
 }
@@ -2094,10 +2120,10 @@ export async function getTikisseDeliveryCandidateForDriver(deliveryId: string, d
 export async function getTikisseDriverStats(driverPhone: string): Promise<{ rating: number; completedDeliveries: number; reviewsCount: number }> {
   const db = await getDb();
   if (!db) return { rating: 0, completedDeliveries: 0, reviewsCount: 0 };
-  const [ratingRow] = await db.select({ sum: sql<number>`COALESCE(SUM(${tikisseDeliveryReviews.rating}), 0)`, count: sql<number>`COUNT(*)` })
+  const [ratingRow] = await db.select({ sum: sql<number>`COALESCE(SUM(${tikisseDeliveryReviews.rating}), 0)`.mapWith(Number), count: sql<number>`COUNT(*)`.mapWith(Number) })
     .from(tikisseDeliveryReviews)
     .where(and(eq(tikisseDeliveryReviews.driverPhone, driverPhone), isNull(tikisseDeliveryReviews.hiddenAt)));
-  const [completedRow] = await db.select({ count: sql<number>`COUNT(*)` })
+  const [completedRow] = await db.select({ count: sql<number>`COUNT(*)`.mapWith(Number) })
     .from(tikisseDeliveries)
     .where(and(eq(tikisseDeliveries.driverPhone, driverPhone), eq(tikisseDeliveries.status, "completed")));
   const sum = Number(ratingRow?.sum ?? 0);
@@ -2290,7 +2316,7 @@ export async function unregisterPushToken(input: { phone: string; token: string 
   const db = await getDb();
   if (!db) return { removed: 0 };
   const result = await db.delete(tikissePushTokens).where(and(eq(tikissePushTokens.phone, input.phone), eq(tikissePushTokens.token, input.token)));
-  return { removed: (result as unknown as { affectedRows?: number }).affectedRows ?? 0 };
+  return { removed: affectedRowCount(result) };
 }
 
 export async function listActivePushTokens(phone: string) {
