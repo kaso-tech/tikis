@@ -159,17 +159,19 @@ async function maybeAutoCreditGrant(grantId: string, programId: string, bonusAmo
 }
 
 /** Envoie un push notification pour chaque grant créé. Best-effort. */
-export async function enqueueLoyaltyGrantNotification(grants: Array<{ profilePhone: string; grantId: string; programId: string; bonusAmount: number }>) {
+export async function enqueueLoyaltyGrantNotification(grants: Array<{ profilePhone: string; grantId: string; programId: string; bonusAmount: number; autoCredited?: boolean }>) {
   if (grants.length === 0) return;
   const { enqueuePushToPhone } = await import("./db");
   for (const g of grants) {
     try {
       await enqueuePushToPhone({
         phone: g.profilePhone,
-        title: "🎁 Bonus de fidélité disponible",
-        body: `Vous avez atteint un palier ! ${g.bonusAmount.toLocaleString("fr-FR")} FCFA vous attendent dans l'admin.`,
+        title: "Bonus de fidélité",
+        body: g.autoCredited
+          ? `Palier atteint : ${g.bonusAmount.toLocaleString("fr-FR")} FCFA ont été crédités sur votre Wallet.`
+          : `Palier atteint : ${g.bonusAmount.toLocaleString("fr-FR")} FCFA seront crédités sur votre Wallet après validation.`,
         data: { grantId: g.grantId, programId: g.programId, kind: "loyalty_grant" },
-        channelId: "tikisse-loyalty",
+        channelId: "tikisse-transactional",
       });
     } catch {
       // best-effort, on ne fait pas échouer

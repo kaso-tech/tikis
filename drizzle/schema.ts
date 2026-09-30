@@ -253,6 +253,8 @@ export const tikisseDeliveryEvents = mysqlTable("tikisse_delivery_events", {
   body: varchar("body", { length: 300 }).notNull(),
   tone: mysqlEnum("tone", ["info", "success", "warning"]).notNull().default("info"),
   metadata: text("metadata"),
+  /** Enregistré pour la chronologie (console, litiges) mais absent du fil de l'utilisateur, sans push. */
+  feedHidden: boolean("feedHidden").notNull().default(false),
   idempotencyKey: varchar("idempotencyKey", { length: 100 }).notNull().unique(),
   readAt: timestamp("readAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),

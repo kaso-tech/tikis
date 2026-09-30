@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PropsWithChildren } from "react";
 import { subscribeToDeliveryChannel, subscribeToWalletChannel, supabaseClient } from "@/lib/supabase-tracking";
-import { presentDeliveryStatusPush } from "@/lib/simulated-push-notifications";
 import { startBackgroundDriverTracking, stopBackgroundDriverTracking } from "@/lib/background-location-task";
 import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
@@ -92,7 +91,8 @@ export function DeliveryRealtimeProvider({ children }: PropsWithChildren) {
           utilities.notifications.list.invalidate(),
           utilities.wallet.snapshot.invalidate(),
         ]);
-        void presentDeliveryStatusPush(event);
+        // Pas de notification locale ici : le serveur envoie déjà le push de chaque changement de
+        // statut au bon destinataire (appendDeliveryEvent), l'afficher aussi en doublait chacun.
       },
     }));
     return () => { unsubscribes.forEach((unsubscribe) => unsubscribe()); };

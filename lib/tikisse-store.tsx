@@ -49,7 +49,6 @@ export function TikisseStoreProvider({ children }: { children: React.ReactNode }
   const registerProfile = (nextProfile: RegisteredProfile) => {
     setProfile(nextProfile);
     setRole(nextProfile.role);
-    setNotifications((items) => [makeNotification("Bienvenue sur Tikisse", `Votre compte ${nextProfile.role === "sender" ? "expéditeur" : "livreur"} a été créé avec succès.`, "success"), ...items]);
   };
 
   const updateProfile = (changes: Partial<Pick<RegisteredProfile, "fullName" | "photoUrl" | "country" | "city" | "deletionRequestedAt" | "deletionScheduledAt">>) => {
