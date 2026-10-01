@@ -16,6 +16,11 @@
  * Base : par connexion PostgreSQL (DATABASE_URL), ou — si SUPABASE_ACCESS_TOKEN est défini et DATABASE_URL
  * ne l'est pas, ou avec --api — par l'API de gestion de Supabase (HTTPS seulement, utile derrière un pare-feu
  * qui ne laisse passer que le web).
+ *
+ * --injected (ou SUPABASE_CREDENTIALS_INJECTED=1) : SUPABASE_ACCESS_TOKEN et SUPABASE_SERVICE_ROLE_KEY ne sont pas
+ * dans l'environnement, un proxy ajoute les en-têtes (Authorization vers api.supabase.com, apikey vers
+ * <ref>.supabase.co), comme les identifiants d'un environnement cloud Claude Code. Les formats de ces deux
+ * secrets ne sont alors pas vérifiés ; les requêtes, elles, le sont.
  */
 import "./load-env.js";
 import fs from "node:fs";
@@ -25,6 +30,7 @@ import process from "node:process";
 
 const root = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), "..");
 const env = process.env;
+const injected = process.argv.includes("--injected") || /^(1|true)$/i.test(env.SUPABASE_CREDENTIALS_INJECTED ?? "");
 const blocking = [];
 const warnings = [];
 const ok = (message) => console.log(`  ✓ ${message}`);
@@ -50,6 +56,7 @@ if (env.EXPO_PUBLIC_SUPABASE_URL && env.SUPABASE_URL && env.EXPO_PUBLIC_SUPABASE
   fail("EXPO_PUBLIC_SUPABASE_URL et SUPABASE_URL désignent deux projets différents", "les deux doivent être identiques");
 }
 for (const [name, value, expected, prefix] of [["EXPO_PUBLIC_SUPABASE_ANON_KEY", anonKey, "anon", "sb_publishable_"], ["SUPABASE_SERVICE_ROLE_KEY", serviceKey, "service_role", "sb_secret_"]]) {
+  if (!value && injected && expected === "service_role") { ok(`${name} : ajoutée par le proxy (--injected), format non vérifié`); continue; }
   if (!value) { fail(`${name} absente`, "Project Settings → API Keys"); continue; }
   const role = jwtRole(value);
   if (role === expected) ok(`${name} (clé historique, rôle ${role})`);
@@ -91,7 +98,7 @@ else ok("TIKISSE_OTP_MODE=real : vrais SMS");
 console.log("\n2. Base de données");
 const projectRef = /^https:\/\/([a-z0-9]{20})\.supabase\.co$/.exec(supabaseUrl)?.[1];
 const accessToken = env.SUPABASE_ACCESS_TOKEN ?? "";
-const viaApi = Boolean(accessToken) && (process.argv.includes("--api") || !databaseUrl);
+const viaApi = (Boolean(accessToken) || injected) && (process.argv.includes("--api") || !databaseUrl);
 let runQuery = null;
 let closeQuery = async () => {};
 if (viaApi) {
@@ -101,7 +108,7 @@ if (viaApi) {
     runQuery = async (text) => {
       const response = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/database/query`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        headers: { ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), "Content-Type": "application/json" },
         body: JSON.stringify({ query: text }),
         signal: AbortSignal.timeout(20_000),
       });
@@ -143,7 +150,7 @@ if (runQuery) {
     const obsolete = ["tikisse_delivery_members_can_receive_positions", "tikisse_delivery_members_can_send_positions"].filter((name) => policies.has(name));
     if (obsolete.length) warn("anciennes règles temps réel encore présentes", "réexécuter supabase/setup.sql, qui les retire");
   } catch (cause) {
-    fail(`base illisible : ${cause instanceof Error ? cause.message : String(cause)}`, viaApi ? "vérifier SUPABASE_ACCESS_TOKEN (Account → Access Tokens)" : "vérifier DATABASE_URL (mot de passe, port 6543, ?sslmode=require)");
+    fail(`base illisible : ${cause instanceof Error ? cause.message : String(cause)}`, viaApi ? (accessToken ? "vérifier SUPABASE_ACCESS_TOKEN (Account → Access Tokens)" : "vérifier l'identifiant ajouté pour api.supabase.com (en-tête Authorization, préfixe Bearer)") : "vérifier DATABASE_URL (mot de passe, port 6543, ?sslmode=require)");
   } finally {
     await closeQuery();
   }
@@ -169,16 +176,16 @@ if (supabaseUrl && anonKey) {
 
 // ─── 4. Stockage ─────────────────────────────────────────────────────────────────────────────
 console.log("\n4. Stockage");
-if (supabaseUrl && serviceKey) {
+if (supabaseUrl && (serviceKey || injected)) {
   const bucket = env.SUPABASE_STORAGE_BUCKET || "tikisse-files";
   try {
-    const response = await fetch(`${supabaseUrl}/storage/v1/bucket/${encodeURIComponent(bucket)}`, { headers: { apikey: serviceKey, ...(serviceKey.split(".").length === 3 ? { Authorization: `Bearer ${serviceKey}` } : {}) }, signal: AbortSignal.timeout(10_000) });
+    const response = await fetch(`${supabaseUrl}/storage/v1/bucket/${encodeURIComponent(bucket)}`, { headers: serviceKey ? { apikey: serviceKey, ...(serviceKey.split(".").length === 3 ? { Authorization: `Bearer ${serviceKey}` } : {}) } : {}, signal: AbortSignal.timeout(10_000) });
     if (response.ok) {
       const found = await response.json();
       if (found.public) fail(`le bucket « ${bucket} » est public : photos et pièces d'identité seraient lisibles par leur adresse`, "Storage → bucket → Edit : décocher « Public bucket »");
       else ok(`bucket « ${bucket} » privé`);
     } else if (response.status === 400 || response.status === 404) ok(`bucket « ${bucket} » absent : le serveur le créera, privé, au premier dépôt`);
-    else fail(`stockage illisible (${response.status})`, "vérifier la clé service_role");
+    else fail(`stockage illisible (${response.status})`, serviceKey ? "vérifier la clé service_role" : "vérifier l'identifiant ajouté pour <ref>.supabase.co (en-tête apikey, clé sb_secret_…, sans préfixe)");
   } catch (cause) {
     fail(`stockage injoignable : ${cause instanceof Error ? cause.message : String(cause)}`);
   }

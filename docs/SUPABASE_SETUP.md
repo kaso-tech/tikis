@@ -64,7 +64,9 @@ DATABASE_URL="<adresse Session pooler, port 5432>" pnpm db:migrate
 
 1. Exécuter [`supabase/setup.sql`](../supabase/setup.sql), au choix :
    - `pnpm supabase:setup` (avec `SUPABASE_URL` et `SUPABASE_ACCESS_TOKEN`, jeton personnel créé dans
-     Account → Access Tokens, à révoquer une fois la mise en service terminée) ;
+     Account → Access Tokens, à révoquer une fois la mise en service terminée). Si le jeton est ajouté par un
+     proxy plutôt que placé dans l'environnement (identifiants d'un environnement cloud Claude Code) :
+     `pnpm supabase:setup --injected`, et de même `pnpm supabase:check --injected` ;
    - ou **SQL Editor** → New query → coller le fichier → **Run**.
 2. **Realtime → Settings** : désactiver **Allow public access**.
 
