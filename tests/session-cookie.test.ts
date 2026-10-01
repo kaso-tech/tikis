@@ -35,15 +35,14 @@ describe("les options du cookie de session", () => {
       expect(options.domain).toBe(".tikisse.app");
     });
 
-    it("sans TIKISSE_COOKIE_DOMAIN, retombe sur le domaine parent dérivé (sous-domaines de prévisualisation)", () => {
-      const options = getSessionCookieOptions(fakeReq({ hostname: "3000-abc123.manuspre.computer" }));
-      expect(options.domain).toBe(".manuspre.computer");
+    it("sans TIKISSE_COOKIE_DOMAIN, aucun domaine : jamais déduit de l'en-tête Host, que le client choisit", () => {
+      expect(getSessionCookieOptions(fakeReq({ hostname: "api.tikisse.app" })).domain).toBeUndefined();
+      expect(getSessionCookieOptions(fakeReq({ hostname: "attacker-controlled.example" })).domain).toBeUndefined();
     });
 
-    it("une valeur vide de TIKISSE_COOKIE_DOMAIN ne bloque pas ce repli", () => {
+    it("une valeur vide de TIKISSE_COOKIE_DOMAIN vaut absence", () => {
       vi.stubEnv("TIKISSE_COOKIE_DOMAIN", "");
-      const options = getSessionCookieOptions(fakeReq({ hostname: "3000-abc123.manuspre.computer" }));
-      expect(options.domain).toBe(".manuspre.computer");
+      expect(getSessionCookieOptions(fakeReq({ hostname: "api.tikisse.app" })).domain).toBeUndefined();
     });
   });
 

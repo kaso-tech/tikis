@@ -11,7 +11,7 @@ import { LoyaltyProgress } from "@/components/tikisse/loyalty-progress";
 import { haptic } from "@/lib/haptics";
 import { useTikisseLogout } from "@/lib/tikisse-logout";
 import { countryFlagEmoji, sanitizeFullName, validateFullName } from "@/lib/registration-rules";
-import { getApiBaseUrl } from "@/constants/oauth";
+import { getApiBaseUrl } from "@/constants/api";
 import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
 import { describePerimeter } from "@/shared/driver-perimeter";

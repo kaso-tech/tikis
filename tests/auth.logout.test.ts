@@ -1,65 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { appRouter } from "../server/routers";
-import { COOKIE_NAME } from "../shared/const";
+import { TIKISSE_PROFILE_COOKIE } from "../server/_core/cookies";
 import type { TrpcContext } from "../server/_core/context";
 
-type CookieCall = {
-  name: string;
-  options: Record<string, unknown>;
-};
-
-type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
-
-function createAuthContext(): { ctx: TrpcContext; clearedCookies: CookieCall[] } {
-  const clearedCookies: CookieCall[] = [];
-  
-  const user: AuthenticatedUser = {
-    id: 1,
-    openId: "sample-user",
-    email: "sample@example.com",
-    name: "Sample User",
-    loginMethod: "manus",
-    role: "user",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    lastSignedIn: new Date(),
-  };
-  
-  const ctx: TrpcContext = {
-    user,
-    tikisseProfilePhone: null,
-    req: {
-      protocol: "https",
-      secure: true,
-      headers: {},
-    } as TrpcContext["req"],
-    res: {
-      clearCookie: (name: string, options: Record<string, unknown>) => {
-        clearedCookies.push({ name, options });
-      },
-    } as TrpcContext["res"],
-  };
-  
-  return { ctx, clearedCookies };
-}
-
-// TODO: Remove `.skip` below once you implement user authentication
-describe.skip("auth.logout", () => {
-  it("clears the session cookie and reports success", async () => {
-    const { ctx, clearedCookies } = createAuthContext();
-    const caller = appRouter.createCaller(ctx);
-
-    const result = await caller.auth.logout();
-
+describe("auth.logout", () => {
+  it("efface le cookie de session Tikisse (web) et répond succès, même sans session", async () => {
+    const cleared: Array<{ name: string; options: Record<string, unknown> }> = [];
+    const ctx: TrpcContext = {
+      tikisseProfilePhone: null,
+      req: { protocol: "https", secure: true, hostname: "api.tikisse.app", headers: {} } as unknown as TrpcContext["req"],
+      res: {
+        cookie: () => undefined,
+        clearCookie: (name: string, options: Record<string, unknown>) => { cleared.push({ name, options }); },
+      } as unknown as TrpcContext["res"],
+    };
+    const result = await appRouter.createCaller(ctx).auth.logout();
     expect(result).toEqual({ success: true });
-    expect(clearedCookies).toHaveLength(1);
-    expect(clearedCookies[0]?.name).toBe(COOKIE_NAME);
-    expect(clearedCookies[0]?.options).toMatchObject({
-      maxAge: -1,
-      secure: true,
-      sameSite: "lax",
-      httpOnly: true,
-      path: "/",
-    });
+    expect(cleared.map((cookie) => cookie.name)).toEqual([TIKISSE_PROFILE_COOKIE]);
+    expect(cleared[0]?.options).toMatchObject({ httpOnly: true, path: "/", sameSite: "lax", secure: true });
   });
 });

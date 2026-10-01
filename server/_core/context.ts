@@ -1,6 +1,4 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
-import type { User } from "../../drizzle/schema";
-import { sdk } from "./sdk";
 import { isRevokedByProfile, verifyTikisseProfileSessionClaims } from "../tikisse-session";
 import { getCachedTikisseProfile } from "./profile-cache";
 import { ADMIN_CONSOLE_HEADER, ADMIN_SESSION_COOKIE, LEGACY_ADMIN_SESSION_COOKIE, type AdminRole } from "../admin-auth";
@@ -10,7 +8,6 @@ import { LEGACY_TIKIS_PROFILE_COOKIE, TIKISSE_PROFILE_COOKIE } from "./cookies";
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
-  user: User | null;
   tikisseProfilePhone: string | null;
   tikisseAdmin?: { adminId: number; email: string; role: AdminRole; totpEnabled?: boolean; mustEnrollTotp?: boolean; mustChangePassword?: boolean; sessionId?: string } | null;
 };
@@ -46,15 +43,6 @@ export function getTikisseSessionTokenFromHeaders(headers: Record<string, string
   const headerValue = headers["x-tikisse-session"] ?? headers["x-tikisse-profile-session"] ?? headers["x-tikis-session"];
   const headerToken = Array.isArray(headerValue) ? headerValue[0] : headerValue;
   return headerToken;
-}
-
-export function shouldAuthenticateManusRequest(headers: Record<string, string | string[] | undefined>): boolean {
-  const authorization = headers.authorization;
-  const bearer = Array.isArray(authorization) ? authorization[0] : authorization;
-  if (typeof bearer === "string" && /^Bearer\s+\S+/i.test(bearer)) return true;
-  const cookie = headers.cookie;
-  const cookieValue = Array.isArray(cookie) ? cookie[0] : cookie;
-  return typeof cookieValue === "string" && /(?:^|;\s*)app_session_id=/.test(cookieValue);
 }
 
 function requestCookies(opts: CreateExpressContextOptions): Record<string, string> {
@@ -108,22 +96,12 @@ async function authenticateTikisseProfile(sessionToken: string | undefined) {
 }
 
 export async function createContext(opts: CreateExpressContextOptions): Promise<TrpcContext> {
-  let user: User | null = null;
   const sessionToken = pickTikisseSessionToken(opts);
   const adminSessionToken = pickAdminSessionToken(opts);
-
-  if (shouldAuthenticateManusRequest(opts.req.headers)) {
-    try {
-      user = await sdk.authenticateRequest(opts.req);
-    } catch {
-      user = null;
-    }
-  }
 
   return {
     req: opts.req,
     res: opts.res,
-    user,
     tikisseProfilePhone: await authenticateTikisseProfile(sessionToken),
     // Relit le compte à chaque requête : un admin suspendu ou rétrogradé perd ses droits tout de suite.
     tikisseAdmin: await authenticateAdminSession(adminSessionToken),

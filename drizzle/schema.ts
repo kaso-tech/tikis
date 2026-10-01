@@ -4,7 +4,6 @@ import { bigint, boolean, index, integer, numeric, pgEnum, pgTable, text, timest
  * Types énumérés PostgreSQL. Ajouter une valeur : `ALTER TYPE … ADD VALUE`, que `pnpm db:generate` écrit
  * seul à partir de ce fichier.
  */
-export const usersRoleEnum = pgEnum("users_role", ["user", "admin"]);
 export const tikisseProfilesAccountTypeEnum = pgEnum("tikisse_profiles_account_type", ["sender", "driver"]);
 export const tikisseProfilesStatusEnum = pgEnum("tikisse_profiles_status", ["active", "suspended", "banned"]);
 export const tikisseDeliveriesDeliveryTypeEnum = pgEnum("tikisse_deliveries_delivery_type", ["Plis", "Personne", "Autre"]);
@@ -34,19 +33,6 @@ export const tikisseProfileSessionsPlatformEnum = pgEnum("tikisse_profile_sessio
 export const tikisseScheduledJobRunsStatusEnum = pgEnum("tikisse_scheduled_job_runs_status", ["running", "succeeded", "failed"]);
 export const tikisseScheduledJobRunsTriggerEnum = pgEnum("tikisse_scheduled_job_runs_trigger", ["schedule", "manual"]);
 export const tikisseDeletedAccountsAccountTypeEnum = pgEnum("tikisse_deleted_accounts_account_type", ["sender", "driver"]);
-
-/** Core Manus user table kept for the template OAuth layer. */
-export const users = pgTable("users", {
-  id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
-  name: text("name"),
-  email: varchar("email", { length: 320 }),
-  loginMethod: varchar("loginMethod", { length: 64 }),
-  role: usersRoleEnum("role").default("user").notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().$onUpdate(() => new Date()).notNull(),
-  lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull(),
-});
 
 /**
  * Tikisse phone-based profile. The phone number is unique and the account type
@@ -413,8 +399,6 @@ export type TikisseAdminSession = typeof tikisseAdminSessions.$inferSelect;
 export type TikisseAdminApproval = typeof tikisseAdminApprovals.$inferSelect;
 export type TikisseAdminAuditLog = typeof tikisseAdminAuditLog.$inferSelect;
 
-export type User = typeof users.$inferSelect;
-export type InsertUser = typeof users.$inferInsert;
 /** Parrainage : un enregistrement par filleul, créé à l'inscription si un code de parrain est fourni. */
 export const tikisseReferrals = pgTable("tikisse_referrals", {
   id: varchar("id", { length: 40 }).primaryKey(),

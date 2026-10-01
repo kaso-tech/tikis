@@ -156,8 +156,8 @@ export async function payoutClosingBalance(input: { phone: string; payoutReferen
 // Suppression définitive
 // ————————————————————————————————————————————————————————————————————————
 
-/** Tables où le numéro est gardé tel quel : la correspondance elle-même, et les comptes de la plateforme. */
-const PHONE_KEPT_IN = new Set(["tikisse_deleted_accounts", "users"]);
+/** Table où le numéro est gardé tel quel : la correspondance elle-même. */
+const PHONE_KEPT_IN = new Set(["tikisse_deleted_accounts"]);
 const PHONE_COLUMN = (name: string) => /phone$/i.test(name) || name === "phoneE164";
 
 /** Colonnes de texte qui contiennent le numéro dans une clé ou un contenu (clés anti-doublon, demandes de validation). */

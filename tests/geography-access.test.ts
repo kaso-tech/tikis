@@ -22,7 +22,6 @@ const originalFetch = global.fetch;
 
 function contextFor(phone: string | null): TrpcContext {
   return {
-    user: null,
     tikisseProfilePhone: phone,
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { clearCookie: () => undefined } as unknown as TrpcContext["res"],

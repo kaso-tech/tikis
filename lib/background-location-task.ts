@@ -26,7 +26,7 @@ import * as TaskManager from "expo-task-manager";
 import { createTRPCClient, httpLink, TRPCClientError } from "@trpc/client";
 import superjson from "superjson";
 import type { AppRouter } from "@/server/routers";
-import { getApiBaseUrl } from "@/constants/oauth";
+import { getApiBaseUrl } from "@/constants/api";
 import { getTikisseSessionToken } from "@/lib/tikisse-session";
 import { safeHeading } from "@/lib/background-location-rules";
 import { LIVE_POSITION_GPS_JUMP_ERR_MSG, LIVE_POSITION_OUT_OF_ZONE_ERR_MSG } from "@/shared/const";

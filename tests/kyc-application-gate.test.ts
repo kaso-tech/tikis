@@ -16,7 +16,7 @@ const driver = { phone: "+22676000000", fullName: "Moussa Kaboré", accountType:
 const deliveryId = "2d487499-19e9-4f5e-a9c8-8777af588997";
 
 function contextFor(phone: string): TrpcContext {
-  return { user: null, tikisseProfilePhone: phone, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as unknown as TrpcContext["res"] };
+  return { tikisseProfilePhone: phone, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as unknown as TrpcContext["res"] };
 }
 
 async function apply() {

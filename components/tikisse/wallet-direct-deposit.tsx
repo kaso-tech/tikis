@@ -140,7 +140,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
 
   // Reprise d'un dépôt en attente depuis la bannière du Wallet.
   // Le setTimeout(0) évite les warnings React "setState during render" si le parent re-render
-  // simultanément (cf. fix Manus 433bbe0). cleanup clearTimeout au démontage du composant.
+  // simultanément (cf. correctif 433bbe0). cleanup clearTimeout au démontage du composant.
   useEffect(() => {
     if (!visible) return;
     if (!initialDeposit) return;

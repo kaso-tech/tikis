@@ -11,7 +11,6 @@ import { tikisseAdminRouter } from "../server/admin-router";
 
 function createAdminContext(): TrpcContext {
   return {
-    user: null,
     tikisseProfilePhone: null,
     tikisseAdmin: { adminId: 1, email: "admin@tikisse.app", role: "super_admin" },
     req: { headers: {} } as TrpcContext["req"],

@@ -5,7 +5,6 @@ import path from "node:path";
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { registerAdminDocumentRoutes } from "../admin-documents";
 import { appRouter } from "../routers";
@@ -59,7 +58,6 @@ async function startServer() {
 
   registerStorageProxy(app);
   registerAdminDocumentRoutes(app);
-  registerOAuthRoutes(app);
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });

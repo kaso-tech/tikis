@@ -2,8 +2,7 @@ import { createTRPCReact } from "@trpc/react-query";
 import { httpBatchLink, httpLink, splitLink } from "@trpc/client";
 import superjson from "superjson";
 import type { AppRouter } from "@/server/routers";
-import { getApiBaseUrl } from "@/constants/oauth";
-import * as Auth from "@/lib/_core/auth";
+import { getApiBaseUrl } from "@/constants/api";
 import { getTikisseSessionToken } from "@/lib/tikisse-session";
 
 /**
@@ -35,9 +34,8 @@ function createTimeoutSignal(input: RequestInit | undefined, timeoutMs: number):
 }
 
 async function authHeaders() {
-  const token = await Auth.getSessionToken();
   const tikisseSessionToken = await getTikisseSessionToken();
-  return { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(tikisseSessionToken ? { "x-tikisse-session": tikisseSessionToken } : {}) };
+  return tikisseSessionToken ? { "x-tikisse-session": tikisseSessionToken } : {};
 }
 
 function fetchWithTimeout(timeoutMs: number) {

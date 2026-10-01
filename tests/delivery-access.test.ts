@@ -57,7 +57,7 @@ const input = {
 };
 
 function contextFor(phone: string | null): TrpcContext {
-  return { user: null, tikisseProfilePhone: phone, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as unknown as TrpcContext["res"] };
+  return { tikisseProfilePhone: phone, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as unknown as TrpcContext["res"] };
 }
 
 describe("livraisons persistées Tikisse", () => {

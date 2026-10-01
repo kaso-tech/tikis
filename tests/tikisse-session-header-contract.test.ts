@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { getTikisseSessionTokenFromHeaders, shouldAuthenticateManusRequest } from "../server/_core/context";
+import { readFileSync } from "node:fs";
+import { getTikisseSessionTokenFromHeaders } from "../server/_core/context";
 
 describe("contrat d’en-tête de session Tikisse", () => {
   it("accepte l’en-tête courant envoyé par le client tRPC", () => {
@@ -22,12 +23,9 @@ describe("contrat d’en-tête de session Tikisse", () => {
     expect(getTikisseSessionTokenFromHeaders({ "x-tikisse-session": "session-courante", "x-tikis-session": "session-avant-renommage" })).toBe("session-courante");
   });
 
-  it("n’initialise pas l’authentification Manus pour une requête Tikisse anonyme", () => {
-    expect(shouldAuthenticateManusRequest({ "x-tikisse-session": "session-tikisse" })).toBe(false);
-  });
-
-  it("préserve l’authentification Manus pour un bearer ou son cookie interne", () => {
-    expect(shouldAuthenticateManusRequest({ authorization: "Bearer manus-token" })).toBe(true);
-    expect(shouldAuthenticateManusRequest({ cookie: "app_session_id=manus-cookie" })).toBe(true);
+  it("plus aucune authentification Manus : ni utilisateur dans le contexte, ni jeton porté par le client", () => {
+    const context = readFileSync("server/_core/context.ts", "utf8");
+    expect(context).not.toMatch(/sdk|Manus|user:/);
+    expect(readFileSync("lib/trpc.ts", "utf8")).not.toContain("Authorization");
   });
 });

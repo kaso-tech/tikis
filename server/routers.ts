@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { COOKIE_NAME, LIVE_POSITION_GPS_JUMP_ERR_MSG, LIVE_POSITION_OUT_OF_ZONE_ERR_MSG } from "../shared/const";
+import { LIVE_POSITION_GPS_JUMP_ERR_MSG, LIVE_POSITION_OUT_OF_ZONE_ERR_MSG } from "../shared/const";
 import type { DriverCandidate } from "../shared/tikisse-domain";
 import { randomInt, randomUUID } from "node:crypto";
 import * as db from "./db";
@@ -9,10 +9,9 @@ import { concealPlaceForDriver } from "./_test-helpers/delivery-visibility";
 import { isCoordinateInCountry } from "./_test-helpers/geo-fence";
 import { publicFileUrl, storagePut } from "./storage";
 import * as geography from "./geography";
-import { getSessionCookieOptions, setTikisseProfileCookie, clearTikisseProfileCookie } from "./_core/cookies";
+import { setTikisseProfileCookie, clearTikisseProfileCookie } from "./_core/cookies";
 import { getTikisseSessionTokenFromHeaders } from "./_core/context";
 import { clientIp } from "./_core/security";
-import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router, tikisseProtectedProcedure, tikisseSessionProcedure } from "./_core/trpc";
 import { findCountryForPhone } from "../lib/registration-rules";
 import { COUNTRIES } from "../lib/registration-rules";
@@ -310,7 +309,6 @@ function candidateForSender(candidate: DriverCandidate): DriverCandidate {
 }
 
 export const appRouter = router({
-  system: systemRouter,
   adminConsole: tikisseAdminRouter,
   platform: router({
     maintenanceStatus: publicProcedure.query(() => db.getMaintenanceStatus()),
@@ -337,10 +335,7 @@ export const appRouter = router({
     }),
   }),
   auth: router({
-    me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       clearTikisseProfileCookie(ctx.res, ctx.req);
       return { success: true } as const;
     }),

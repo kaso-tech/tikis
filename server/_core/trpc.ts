@@ -1,5 +1,4 @@
 import { isAdminPathAllowed, type AdminRole } from "../../shared/admin-roles";
-import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from "../../shared/const.js";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
@@ -15,23 +14,6 @@ const t = initTRPC.context<TrpcContext>().create({
 export const router = t.router;
 export const mergeRouters = t.mergeRouters;
 export const publicProcedure = t.procedure;
-
-const requireUser = t.middleware(async (opts) => {
-  const { ctx, next } = opts;
-
-  if (!ctx.user) {
-    throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
-  }
-
-  return next({
-    ctx: {
-      ...ctx,
-      user: ctx.user,
-    },
-  });
-});
-
-export const protectedProcedure = t.procedure.use(requireUser);
 
 const requireTikisseProfile = t.middleware(async (opts) => {
   if (!opts.ctx.tikisseProfilePhone) {
@@ -107,7 +89,7 @@ const requireTikisseAdmin = t.middleware(async (opts) => {
   return opts.next({ ctx: { ...opts.ctx, tikisseAdmin: opts.ctx.tikisseAdmin } });
 });
 
-/** Procédure pour la console d'administration Tikisse — distincte de `adminProcedure` (plateforme interne). */
+/** Procédure pour la console d'administration Tikisse. */
 export const tikisseAdminProcedure = t.procedure.use(requireTikisseAdmin);
 
 /** Session admin valide, même si le mot de passe provisoire ou l'enrôlement à la double authentification reste à faire. */
@@ -122,19 +104,3 @@ export function requireTikisseAdminRole(...roles: AdminRole[]) {
   });
 }
 
-export const adminProcedure = t.procedure.use(
-  t.middleware(async (opts) => {
-    const { ctx, next } = opts;
-
-    if (!ctx.user || ctx.user.role !== "admin") {
-      throw new TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
-    }
-
-    return next({
-      ctx: {
-        ...ctx,
-        user: ctx.user,
-      },
-    });
-  }),
-);

@@ -2,15 +2,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as { scripts?: Record<string, string> };
-const projectConfig = JSON.parse(readFileSync(".project-config.json", "utf8")) as { build_command?: string };
 const serverEntry = readFileSync("server/_core/index.ts", "utf8");
 
-describe("contrat de build WebDev backend", () => {
-  it("utilise la commande de déploiement dédiée au backend", () => {
-    expect(projectConfig.build_command).toBe("pnpm run build:deploy");
-  });
-
-  it("redirige le build par défaut du conteneur vers le build de déploiement", () => {
+describe("contrat de build de déploiement", () => {
+  it("`pnpm build` (commande par défaut des hébergeurs) lance le build de déploiement", () => {
     expect(packageJson.scripts?.build).toBe("pnpm run build:deploy");
   });
 

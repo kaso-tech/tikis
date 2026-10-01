@@ -26,7 +26,7 @@ function candidate(overrides: Partial<{ id: string; driverId: string; status: "a
 }
 
 function contextFor(phone: string): TrpcContext {
-  return { user: null, tikisseProfilePhone: phone, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as unknown as TrpcContext["res"] };
+  return { tikisseProfilePhone: phone, req: { protocol: "https", headers: {} } as TrpcContext["req"], res: { clearCookie: () => undefined } as unknown as TrpcContext["res"] };
 }
 
 async function fetchAsSender() {

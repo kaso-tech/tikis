@@ -3,8 +3,7 @@ import { createHash, randomUUID } from "crypto";
 import { and, count, desc, eq, gte, inArray, isNotNull, isNull, like, lt, lte, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { InsertTikisseDelivery, InsertTikissePlace, InsertUser, TikisseAdminAuditLog, TikisseAdminUser, TikisseDelivery, TikisseDeliveryCandidate, TikisseDeliveryReport, TikissePlace, tikisseAdminAuditLog, tikisseAdminUsers, tikisseDeliveries, tikisseDeliveryCandidates, tikisseDeliveryEvents, tikisseDeliveryLiveLocations, tikisseDeliveryReports, tikisseDeliveryReviews, TikisseDriverPreferences, tikisseDriverPreferences, tikisseFavoritePlaces, tikisseKycSubmissions, tikissePaymentTransactions, tikissePlaces, tikissePlatformSettings, tikisseProfiles, tikissePushTokens, tikisseRateLimits, tikisseReferrals, tikisseSupportedCountries, tikisseWalletLedger, tikisseWallets, tikisseYengapayWebhookEvents, users } from "../drizzle/schema";
-import { ENV } from "./_core/env";
+import { InsertTikisseDelivery, InsertTikissePlace, TikisseAdminAuditLog, TikisseAdminUser, TikisseDelivery, TikisseDeliveryCandidate, TikisseDeliveryReport, TikissePlace, tikisseAdminAuditLog, tikisseAdminUsers, tikisseDeliveries, tikisseDeliveryCandidates, tikisseDeliveryEvents, tikisseDeliveryLiveLocations, tikisseDeliveryReports, tikisseDeliveryReviews, TikisseDriverPreferences, tikisseDriverPreferences, tikisseFavoritePlaces, tikisseKycSubmissions, tikissePaymentTransactions, tikissePlaces, tikissePlatformSettings, tikisseProfiles, tikissePushTokens, tikisseRateLimits, tikisseReferrals, tikisseSupportedCountries, tikisseWalletLedger, tikisseWallets, tikisseYengapayWebhookEvents } from "../drizzle/schema";
 import { assertSimulatedSettlementAllowed, createYengapayPaymentIntent, readYengapayConfig, verifyYengapayPayment, YENGAPAY_TEST_PROVIDERS } from "./yengapay";
 import { publishWalletBroadcast } from "./supabase-realtime";
 import { sendPushToTokens, type PushMessage } from "./push";
@@ -77,36 +76,6 @@ export async function getDb() {
     }
   }
   return _db;
-}
-
-export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) throw new Error("User openId is required for upsert");
-  const db = await getDb();
-  if (!db) return;
-
-  const values: InsertUser = { openId: user.openId, lastSignedIn: new Date() };
-  const updateSet: Record<string, unknown> = { lastSignedIn: new Date() };
-  for (const field of ["name", "email", "loginMethod"] as const) {
-    if (user[field] !== undefined) {
-      values[field] = user[field] ?? null;
-      updateSet[field] = user[field] ?? null;
-    }
-  }
-  if (user.role !== undefined) {
-    values.role = user.role;
-    updateSet.role = user.role;
-  } else if (user.openId === ENV.ownerOpenId) {
-    values.role = "admin";
-    updateSet.role = "admin";
-  }
-  await db.insert(users).values(values).onConflictDoUpdate({ target: users.openId, set: updateSet });
-}
-
-export async function getUserByOpenId(openId: string) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-  return result[0];
 }
 
 export type PersistedTikisseProfile = {

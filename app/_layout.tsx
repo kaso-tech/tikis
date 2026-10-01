@@ -5,7 +5,7 @@ import "@/global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { Platform } from "react-native";
@@ -22,15 +22,12 @@ import { TikisseNavigationProvider } from "@/lib/tikisse-navigation";
 import { TikisseLogoutProvider } from "@/lib/tikisse-logout";
 import { TikisseStoreProvider } from "@/lib/tikisse-store";
 import {
-  SafeAreaFrameContext,
-  SafeAreaInsetsContext,
   SafeAreaProvider,
   initialWindowMetrics,
 } from "react-native-safe-area-context";
-import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
+import type { EdgeInsets, Rect } from "react-native-safe-area-context";
 
 import { trpc, createTRPCClient } from "@/lib/trpc";
-import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 import { TikisseErrorBoundary } from "@/components/tikisse/error-boundary";
 import { OfflineBanner } from "@/components/tikisse/offline-banner";
 import { PushRegistrationHandler } from "@/components/tikisse/push-registration-handler";
@@ -52,12 +49,6 @@ export default function RootLayout() {
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
   const initialFrame = initialWindowMetrics?.frame ?? DEFAULT_WEB_FRAME;
 
-  const [insets, setInsets] = useState<EdgeInsets>(initialInsets);
-  const [frame, setFrame] = useState<Rect>(initialFrame);
-
-  useEffect(() => {
-    initManusRuntime();
-  }, []);
 
   // Filet de sécurité : si le splash animé n'était jamais dessiné, l'écran natif ne resterait pas
   // affiché indéfiniment.
@@ -66,17 +57,6 @@ export default function RootLayout() {
     const fallback = setTimeout(() => void SplashScreen.hideAsync().catch(() => {}), 3000);
     return () => clearTimeout(fallback);
   }, []);
-
-  const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
-    setInsets(metrics.insets);
-    setFrame(metrics.frame);
-  }, []);
-
-  useEffect(() => {
-    if (Platform.OS !== "web") return;
-    const unsubscribe = subscribeSafeAreaInsets(handleSafeAreaUpdate);
-    return () => unsubscribe();
-  }, [handleSafeAreaUpdate]);
 
   const [queryClient] = useState(
     () =>
@@ -116,7 +96,6 @@ export default function RootLayout() {
                 <DeliveryRealtimeProvider><Stack screenOptions={{ headerShown: false }}>
                   <Stack.Screen name="index" />
                   <Stack.Screen name="(tabs)" />
-                  <Stack.Screen name="oauth/callback" />
                 </Stack>
                 <TikisseDrawer /></DeliveryRealtimeProvider>
               </AppStatusGate>
@@ -129,22 +108,6 @@ export default function RootLayout() {
       </trpc.Provider>
     </GestureHandlerRootView>
   );
-
-  const shouldOverrideSafeArea = Platform.OS === "web";
-
-  if (shouldOverrideSafeArea) {
-    return (
-      <ThemeProvider>
-      <SafeAreaProvider initialMetrics={providerInitialMetrics}>
-          <SafeAreaFrameContext.Provider value={frame}>
-            <SafeAreaInsetsContext.Provider value={insets}>
-              <TikisseStoreProvider><TikisseNavigationProvider>{content}</TikisseNavigationProvider></TikisseStoreProvider>
-            </SafeAreaInsetsContext.Provider>
-          </SafeAreaFrameContext.Provider>
-        </SafeAreaProvider>
-      </ThemeProvider>
-    );
-  }
 
   return (
     <ThemeProvider>
