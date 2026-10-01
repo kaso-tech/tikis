@@ -57,7 +57,8 @@ export const SCHEDULED_JOBS: ScheduledJob[] = [
     schedule: { dailyAt: { hour: 0, minute: 15 } },
     run: async ({ days = 7 }) => {
       const { computeRecentMetrics } = await import("./analytics-metrics");
-      const capped = Math.min(Math.max(Number.isFinite(days) ? Math.trunc(days) : 7, 1), 30);
+      // Jusqu'à un an en déclenchement manuel : recalculer l'historique après une correction de calcul.
+      const capped = Math.min(Math.max(Number.isFinite(days) ? Math.trunc(days) : 7, 1), 366);
       return { days: capped, metrics: await computeRecentMetrics(capped) };
     },
   },

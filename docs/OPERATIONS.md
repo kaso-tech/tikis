@@ -24,7 +24,7 @@ Heures UTC (= heure du Burkina Faso).
 
 ```bash
 CRON_SECRET=<secret du serveur> TIKISSE_API_URL=https://api.tikisse.app pnpm jobs:run expire-deliveries
-CRON_SECRET=… pnpm jobs:run compute-daily-metrics --days=30
+CRON_SECRET=… pnpm jobs:run compute-daily-metrics --days=366   # recalcule jusqu'à un an d'historique
 ```
 
 Les routes `POST /api/scheduled/<tâche>` exigent `Authorization: Bearer <CRON_SECRET>` (32 caractères au

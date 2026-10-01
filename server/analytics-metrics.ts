@@ -1,4 +1,4 @@
-import { and, count, countDistinct, eq, gte, lt, sql, type AnyColumn } from "drizzle-orm";
+import { and, count, countDistinct, eq, gte, inArray, lt, sql, type AnyColumn } from "drizzle-orm";
 import { getDb } from "./db";
 import { tikisseDailyMetrics, tikisseDeliveries, tikisseDeliveryReports, tikisseProfiles, tikisseWalletLedger } from "../drizzle/schema";
 import { getLocalDateString } from "./_test-helpers/date-format";
@@ -37,7 +37,12 @@ export async function computeDailyMetrics(date: string): Promise<{
     first(db.select({ count: count() }).from(tikisseDeliveries).where(and(eq(tikisseDeliveries.status, "completed"), inDay(tikisseDeliveries.completedAt)))),
     first(db.select({ count: count() }).from(tikisseDeliveries).where(and(eq(tikisseDeliveries.status, "cancelled"), inDay(tikisseDeliveries.updatedAt)))),
     first(db.select({ total: total(sql`coalesce(${tikisseDeliveries.offeredPrice}, ${tikisseDeliveries.estimatedPrice})`) }).from(tikisseDeliveries).where(and(eq(tikisseDeliveries.status, "completed"), inDay(tikisseDeliveries.completedAt)))),
-    first(db.select({ total: total(sql`${tikisseWalletLedger.amount}`) }).from(tikisseWalletLedger).where(and(eq(tikisseWalletLedger.operation, "compensation"), inDay(tikisseWalletLedger.createdAt)))),
+    // Commission nette de Tikisse, comme au tableau de bord (server/admin-db.ts) : commissions prélevées
+    // (`commission_debit`) moins commissions rendues (`compensation` : livreur remplacé, course expirée ou
+    // annulée, litige). Ce total additionnait auparavant les seules commissions rendues — l'inverse d'un revenu.
+    first(db.select({
+      total: sql<number>`coalesce(sum(case when ${tikisseWalletLedger.operation} = 'commission_debit' then ${tikisseWalletLedger.amount} else -${tikisseWalletLedger.amount} end), 0)`.mapWith(Number),
+    }).from(tikisseWalletLedger).where(and(inArray(tikisseWalletLedger.operation, ["commission_debit", "compensation"]), inDay(tikisseWalletLedger.createdAt)))),
     first(db.select({ count: count() }).from(tikisseProfiles).where(and(eq(tikisseProfiles.accountType, "driver"), inDay(tikisseProfiles.createdAt)))),
     first(db.select({ count: count() }).from(tikisseProfiles).where(and(eq(tikisseProfiles.accountType, "sender"), inDay(tikisseProfiles.createdAt)))),
     first(db.select({ count: countDistinct(tikisseDeliveries.driverPhone) }).from(tikisseDeliveries).where(and(eq(tikisseDeliveries.status, "completed"), inDay(tikisseDeliveries.completedAt)))),
