@@ -45,19 +45,23 @@ jobs:
     # La console d'administration est un projet autonome — son propre package.json, son
     # propre lockfile npm, sa propre chaîne de build (voir admin/README.md) — délibérément
     # tenu à l'écart du workspace pnpm racine, jamais installé par `pnpm install`.
-    defaults:
-      run:
-        working-directory: admin
+    # Mais elle importe les types du routeur du serveur (../server) : la vérification a donc
+    # aussi besoin des dépendances de la racine (@types/node, express, jose…), comme le build Render.
     steps:
       - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: admin/package-lock.json
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
 
       - run: npm ci
+        working-directory: admin
 
       - name: Types (tsc -b)
         run: npx tsc -b
+        working-directory: admin
