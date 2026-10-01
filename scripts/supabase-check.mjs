@@ -88,8 +88,8 @@ for (const [name, value, why] of [
   if (value.length >= 32) ok(`${name} (${why})`);
   else fail(`${name} absent ou trop court (${value.length} caractères, 32 au moins) — ${why}`, `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`);
 }
-const distinct = new Set([secret("TIKISSE_SESSION_SECRET", "JWT_SECRET"), secret("TIKISSE_ADMIN_TOTP_KEY", "TIKIS_ADMIN_TOTP_KEY"), secret("CRON_SECRET")].filter(Boolean));
-if (distinct.size < 3) warn("deux des secrets Tikisse sont identiques", "un secret par usage : la fuite de l'un ne doit pas ouvrir les autres");
+const presentSecrets = [secret("TIKISSE_SESSION_SECRET", "JWT_SECRET"), secret("TIKISSE_ADMIN_TOTP_KEY", "TIKIS_ADMIN_TOTP_KEY"), secret("CRON_SECRET")].filter(Boolean);
+if (new Set(presentSecrets).size < presentSecrets.length) warn("deux des secrets Tikisse sont identiques", "un secret par usage : la fuite de l'un ne doit pas ouvrir les autres");
 
 if ((env.TIKISSE_OTP_MODE ?? "sim") === "sim") warn("TIKISSE_OTP_MODE=sim : connexion avec le code de simulation", "passer à « real » (et EXPO_PUBLIC_ENABLE_SUPABASE_PHONE_AUTH=true dans l'application) une fois le fournisseur SMS configuré");
 else ok("TIKISSE_OTP_MODE=real : vrais SMS");
