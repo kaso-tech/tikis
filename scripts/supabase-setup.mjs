@@ -13,6 +13,7 @@
  *
  * Si Supabase refuse (droits sur le schéma `realtime`), coller le même fichier dans Supabase → SQL Editor.
  */
+import "./injected-proxy.mjs";
 import "./load-env.js";
 import fs from "node:fs";
 import path from "node:path";

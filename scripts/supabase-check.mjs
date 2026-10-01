@@ -22,6 +22,7 @@
  * <ref>.supabase.co), comme les identifiants d'un environnement cloud Claude Code. Les formats de ces deux
  * secrets ne sont alors pas vérifiés ; les requêtes, elles, le sont.
  */
+import "./injected-proxy.mjs";
 import "./load-env.js";
 import fs from "node:fs";
 import path from "node:path";
