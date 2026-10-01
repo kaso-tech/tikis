@@ -26,4 +26,21 @@ describe("contrat de build de déploiement", () => {
   it("répond sainement à la racine lorsque le bundle Expo Web est absent", () => {
     expect(serverEntry).toContain('res.status(200).json({ ok: true, service: "Tikisse API" })');
   });
+
+  it("Railway : migrations avant la mise en service, contrôle de santé, redémarrage automatique", () => {
+    const railway = JSON.parse(readFileSync("railway.json", "utf8")) as { build: { buildCommand: string }; deploy: { preDeployCommand: string[]; startCommand: string; healthcheckPath: string; restartPolicyType: string } };
+    expect(railway.build.buildCommand).toBe("pnpm run build");
+    expect(railway.deploy.preDeployCommand).toEqual(["pnpm run db:migrate"]);
+    expect(railway.deploy.startCommand).toBe("pnpm start");
+    expect(railway.deploy.healthcheckPath).toBe("/api/health");
+    expect(railway.deploy.restartPolicyType).toBe("ON_FAILURE");
+  });
+
+  it("les migrations de déploiement n'utilisent que des dépendances d'exécution (pas drizzle-kit)", () => {
+    expect(packageJson.scripts?.["db:migrate"]).toContain("scripts/db-migrate.mjs");
+    const migrator = readFileSync("scripts/db-migrate.mjs", "utf8");
+    expect(migrator).toContain('from "drizzle-orm/postgres-js/migrator"');
+    expect(migrator).not.toContain("drizzle-kit\"");
+    expect(migrator).toContain("process.exitCode = 1");
+  });
 });

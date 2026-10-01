@@ -48,18 +48,24 @@ Le modèle complet, commenté, est dans [`.env.example`](../.env.example).
 
 ## 4. Créer les tables
 
-Depuis un poste qui a le projet et ses dépendances (`pnpm install`), avec l'adresse **Session pooler** :
+Automatique : Railway applique les migrations (`pnpm db:migrate`) avant chaque mise en service
+(`railway.json`). Si une migration échoue, la nouvelle version n'est pas mise en ligne.
+
+Elles créent les 32 tables, les données de référence (pays, programme de fidélité), rendent le journal
+d'audit et le grand livre immuables, et ferment toutes les tables à l'API publique de Supabase (RLS).
+
+À la main, depuis un poste qui a le projet (`pnpm install`) :
 
 ```bash
-DATABASE_URL="postgresql://postgres.<ref>:<mot de passe>@aws-0-<région>.pooler.supabase.com:5432/postgres?sslmode=require" pnpm db:migrate
+DATABASE_URL="<adresse Session pooler, port 5432>" pnpm db:migrate
 ```
-
-Crée les 32 tables, les données de référence (pays, programme de fidélité), rend le journal d'audit et le
-grand livre immuables, et ferme toutes les tables à l'API publique de Supabase (RLS).
 
 ## 5. Configurer le temps réel
 
-1. **SQL Editor** → New query → coller le contenu de [`supabase/setup.sql`](../supabase/setup.sql) → **Run**.
+1. Exécuter [`supabase/setup.sql`](../supabase/setup.sql), au choix :
+   - `pnpm supabase:setup` (avec `SUPABASE_URL` et `SUPABASE_ACCESS_TOKEN`, jeton personnel créé dans
+     Account → Access Tokens, à révoquer une fois la mise en service terminée) ;
+   - ou **SQL Editor** → New query → coller le fichier → **Run**.
 2. **Realtime → Settings** : désactiver **Allow public access**.
 
 ## 6. Connexion par téléphone et SMS
@@ -93,17 +99,30 @@ pnpm supabase:check
 
 Contrôle les variables, la base (migrations, RLS, accès anonyme fermé, temps réel), la connexion par
 téléphone et le bucket. Chaque problème est donné avec sa correction. Code de sortie 1 s'il reste un
-point bloquant.
+point bloquant. Sans accès direct à la base (pare-feu), il passe par l'API de gestion de Supabase si
+`SUPABASE_ACCESS_TOKEN` est défini.
 
-## 9. Héberger le serveur
+## 9. Héberger le serveur sur Railway
 
-Supabase n'héberge pas le serveur Tikisse (API, console d'administration, webhooks). Il faut un hébergeur
-Node.js qui garde le serveur **toujours allumé** — les tâches planifiées en dépendent — par exemple
-Railway, Render (offre payante) ou Fly.io, de préférence dans la même région que la base.
+Supabase n'héberge pas le serveur Tikisse (API Node.js toujours allumée, tâches planifiées, console
+d'administration, version web). Railway le fait, depuis le dépôt GitHub. La configuration est dans
+[`railway.json`](../railway.json) : build, migrations avant mise en service, démarrage, contrôle de santé
+(`/api/health`), redémarrage automatique en cas de plantage.
 
-- Node.js 22, `pnpm install` puis `pnpm build` ; démarrage : `pnpm start` ; santé : `GET /api/health`.
-- Domaine : `api.tikisse.app` (à pointer vers l'hébergeur), et `EXPO_PUBLIC_API_BASE_URL` en conséquence.
-- Webhook YengaPay à déclarer dans leur console : `https://api.tikisse.app/api/webhooks/yengapay`.
+1. [railway.com](https://railway.com) → **New Project** → **Deploy from GitHub repo** → `kaso-tech/tikisse`,
+   branche `main`. Chaque mise à jour de `main` redéploie.
+2. Service → **Settings** → **Region** : Europe (au plus près de la base Supabase).
+3. Service → **Variables** : toutes celles de [`.env.example`](../.env.example), **y compris les
+   `EXPO_PUBLIC_*`** : la version web de l'application est construite sur Railway et les intègre au build.
+   Ajouter `DATABASE_MIGRATION_URL` = adresse **Session pooler** (port 5432) pour les migrations.
+   Ne pas définir `PORT` : Railway le fournit.
+4. Service → **Settings** → **Networking** → **Custom Domain** : `api.tikisse.app`, puis créer chez le
+   registraire du domaine l'enregistrement CNAME indiqué par Railway. Le certificat HTTPS est automatique.
+5. Déployer, puis vérifier `https://api.tikisse.app/api/health`.
+6. Console YengaPay : webhook `https://api.tikisse.app/api/webhooks/yengapay`.
+
+Une seule instance suffit au départ ; si vous en ajoutez, les tâches planifiées restent exécutées une seule
+fois par créneau (voir docs/OPERATIONS.md).
 
 ## 10. Ensuite
 

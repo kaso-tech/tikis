@@ -12,6 +12,10 @@
  *   4. stockage : bucket privé (ou absent : le serveur le crée au premier dépôt).
  *
  * Code de sortie 1 si un point bloque la mise en service.
+ *
+ * Base : par connexion PostgreSQL (DATABASE_URL), ou — si SUPABASE_ACCESS_TOKEN est défini et DATABASE_URL
+ * ne l'est pas, ou avec --api — par l'API de gestion de Supabase (HTTPS seulement, utile derrière un pare-feu
+ * qui ne laisse passer que le web).
  */
 import "./load-env.js";
 import fs from "node:fs";
@@ -83,41 +87,65 @@ else ok("TIKISSE_OTP_MODE=real : vrais SMS");
 
 // ─── 2. Base de données ──────────────────────────────────────────────────────────────────────
 console.log("\n2. Base de données");
-if (databaseUrl) {
+const projectRef = /^https:\/\/([a-z0-9]{20})\.supabase\.co$/.exec(supabaseUrl)?.[1];
+const accessToken = env.SUPABASE_ACCESS_TOKEN ?? "";
+const viaApi = Boolean(accessToken) && (process.argv.includes("--api") || !databaseUrl);
+let runQuery = null;
+let closeQuery = async () => {};
+if (viaApi) {
+  if (!projectRef) fail("API de gestion : SUPABASE_URL nécessaire pour identifier le projet");
+  else {
+    console.log("  (par l'API de gestion Supabase)");
+    runQuery = async (text) => {
+      const response = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/database/query`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ query: text }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!response.ok) throw new Error(`API de gestion ${response.status} : ${(await response.text()).slice(0, 200)}`);
+      return response.json();
+    };
+  }
+} else if (databaseUrl) {
   const { default: postgres } = await import("postgres");
   const sql = postgres(databaseUrl, { prepare: false, max: 1, connect_timeout: 10 });
+  runQuery = (text) => sql.unsafe(text);
+  closeQuery = () => sql.end({ timeout: 2 });
+}
+if (runQuery) {
   try {
     const journal = JSON.parse(fs.readFileSync(path.join(root, "drizzle/migrations/meta/_journal.json"), "utf8")).entries.length;
-    const applied = await sql`SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations`.then((rows) => rows[0].n).catch(() => 0);
+    const applied = await runQuery("SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations").then((rows) => Number(rows[0]?.n ?? 0)).catch(() => 0);
     if (applied >= journal) ok(`migrations appliquées (${applied}/${journal})`);
-    else fail(`migrations : ${applied}/${journal} appliquées`, "pnpm db:migrate (avec ce DATABASE_URL)");
+    else fail(`migrations : ${applied}/${journal} appliquées`, "elles s'appliquent au déploiement sur Railway ; à la main : pnpm db:migrate");
 
     const schemaTables = [...fs.readFileSync(path.join(root, "drizzle/schema.ts"), "utf8").matchAll(/pgTable\("([a-z_]+)"/g)].map((m) => m[1]);
-    const tables = new Map((await sql`SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'`).map((row) => [row.tablename, row.rowsecurity]));
+    const tables = new Map((await runQuery("SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'")).map((row) => [row.tablename, row.rowsecurity]));
     const missing = schemaTables.filter((table) => !tables.has(table));
     const open = schemaTables.filter((table) => tables.has(table) && !tables.get(table));
-    if (missing.length) fail(`tables absentes : ${missing.join(", ")}`, "pnpm db:migrate");
+    if (missing.length) fail(`tables absentes : ${missing.join(", ")}`, "déployer sur Railway (migrations automatiques) ou pnpm db:migrate");
     if (open.length) fail(`RLS désactivée : ${open.join(", ")} — lisibles avec la clé anon de l'application`, "pnpm db:migrate, ou ALTER TABLE … ENABLE ROW LEVEL SECURITY");
     if (!missing.length && !open.length) ok(`${schemaTables.length} tables, RLS activée partout`);
 
-    const anonGrants = await sql`SELECT table_name FROM information_schema.role_table_grants WHERE grantee = 'anon' AND table_schema = 'public' AND table_name LIKE 'tikisse_%'`.catch(() => []);
-    if (anonGrants.length) warn(`le rôle anon garde des droits sur ${new Set(anonGrants.map((row) => row.table_name)).size} table(s)`, "sans effet tant que la RLS est active ; pour les retirer : REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon");
+    const anonGrants = await runQuery("SELECT DISTINCT table_name FROM information_schema.role_table_grants WHERE grantee = 'anon' AND table_schema = 'public' AND table_name LIKE 'tikisse_%'").catch(() => []);
+    if (anonGrants.length) warn(`le rôle anon garde des droits sur ${anonGrants.length} table(s)`, "sans effet tant que la RLS est active ; pour les retirer : REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon");
     else ok("aucun droit du rôle anon sur les tables Tikisse");
 
     const realtimeTable = tables.has("tikisse_delivery_channel_members");
-    const policies = new Set((await sql`SELECT policyname FROM pg_policies WHERE schemaname = 'realtime' AND tablename = 'messages'`.catch(() => [])).map((row) => row.policyname));
+    const policies = new Set((await runQuery("SELECT policyname FROM pg_policies WHERE schemaname = 'realtime' AND tablename = 'messages'").catch(() => [])).map((row) => row.policyname));
     const expected = ["Tikisse delivery participants receive broadcasts", "Tikisse assigned driver broadcasts positions", "Tikisse profile receives own wallet broadcasts"];
     const absent = expected.filter((name) => !policies.has(name));
     if (realtimeTable && !absent.length) ok("temps réel : table des participants et 3 règles d'accès en place");
-    else fail("temps réel non configuré (supabase/setup.sql pas encore exécuté)", "Supabase → SQL Editor : coller et exécuter supabase/setup.sql");
+    else fail("temps réel non configuré (supabase/setup.sql pas encore exécuté)", "pnpm supabase:setup, ou Supabase → SQL Editor : coller et exécuter supabase/setup.sql");
     const obsolete = ["tikisse_delivery_members_can_receive_positions", "tikisse_delivery_members_can_send_positions"].filter((name) => policies.has(name));
     if (obsolete.length) warn("anciennes règles temps réel encore présentes", "réexécuter supabase/setup.sql, qui les retire");
   } catch (cause) {
-    fail(`connexion impossible : ${cause instanceof Error ? cause.message : String(cause)}`, "vérifier DATABASE_URL (mot de passe, port 6543, ?sslmode=require)");
+    fail(`base illisible : ${cause instanceof Error ? cause.message : String(cause)}`, viaApi ? "vérifier SUPABASE_ACCESS_TOKEN (Account → Access Tokens)" : "vérifier DATABASE_URL (mot de passe, port 6543, ?sslmode=require)");
   } finally {
-    await sql.end({ timeout: 2 });
+    await closeQuery();
   }
-} else console.log("  (ignoré : DATABASE_URL absente)");
+} else if (!viaApi) console.log("  (ignoré : ni DATABASE_URL, ni SUPABASE_ACCESS_TOKEN)");
 
 // ─── 3. Supabase Auth ────────────────────────────────────────────────────────────────────────
 console.log("\n3. Supabase Auth");
