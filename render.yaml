@@ -14,7 +14,9 @@ services:
     branch: main
     autoDeploy: true
     # Version web de l'application, console d'administration et serveur, en un seul build.
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm run build
+    # --prod=false : NODE_ENV=production (plus bas) ferait sauter les devDependencies, dont le build a besoin
+    # (TypeScript, Vite, types) ; de même --include=dev pour la console dans build:deploy.
+    buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm run build
     # Migrations avant chaque mise en ligne : si l'une échoue, l'ancienne version continue de tourner.
     preDeployCommand: pnpm run db:migrate
     startCommand: pnpm start
