@@ -31,6 +31,8 @@ export const tikissePushTokensPlatformEnum = pgEnum("tikisse_push_tokens_platfor
 export const tikisseLoyaltyProgramsRoleEnum = pgEnum("tikisse_loyalty_programs_role", ["sender", "driver"]);
 export const tikisseLoyaltyGrantsStatusEnum = pgEnum("tikisse_loyalty_grants_status", ["pending", "credited", "cancelled"]);
 export const tikisseProfileSessionsPlatformEnum = pgEnum("tikisse_profile_sessions_platform", ["ios", "android", "web", "unknown"]);
+export const tikisseScheduledJobRunsStatusEnum = pgEnum("tikisse_scheduled_job_runs_status", ["running", "succeeded", "failed"]);
+export const tikisseScheduledJobRunsTriggerEnum = pgEnum("tikisse_scheduled_job_runs_trigger", ["schedule", "manual"]);
 export const tikisseDeletedAccountsAccountTypeEnum = pgEnum("tikisse_deleted_accounts_account_type", ["sender", "driver"]);
 
 /** Core Manus user table kept for the template OAuth layer. */
@@ -695,3 +697,27 @@ export const tikisseStorageErasures = pgTable("tikisse_storage_erasures", {
 }, (table) => [
   index("tikisse_storage_erasures_pending_index").on(table.erasedAt, table.createdAt),
 ]);
+
+/**
+ * Exécutions des tâches planifiées (server/scheduled-jobs.ts). Une ligne par tâche et par créneau : l'index
+ * unique garantit qu'un créneau ne tourne qu'une fois, même avec plusieurs serveurs. Sert aussi d'historique.
+ */
+export const tikisseScheduledJobRuns = pgTable("tikisse_scheduled_job_runs", {
+  id: varchar("id", { length: 40 }).primaryKey(),
+  jobName: varchar("jobName", { length: 60 }).notNull(),
+  /** Heure prévue (ISO, UTC) pour une exécution planifiée ; « manual:<id> » pour un déclenchement à la main. */
+  slot: varchar("slot", { length: 60 }).notNull(),
+  trigger: tikisseScheduledJobRunsTriggerEnum("trigger").notNull().default("schedule"),
+  status: tikisseScheduledJobRunsStatusEnum("status").notNull().default("running"),
+  attempts: integer("attempts").notNull().default(1),
+  startedAt: timestamp("startedAt", { withTimezone: true }).defaultNow().notNull(),
+  finishedAt: timestamp("finishedAt", { withTimezone: true }),
+  /** Résumé JSON renvoyé par la tâche (nombre de courses clôturées, de comptes supprimés…). */
+  result: text("result"),
+  error: varchar("error", { length: 500 }),
+}, (table) => [
+  uniqueIndex("tikisse_scheduled_job_runs_job_slot_unique").on(table.jobName, table.slot),
+  index("tikisse_scheduled_job_runs_job_started_index").on(table.jobName, table.startedAt),
+]);
+
+export type TikisseScheduledJobRun = typeof tikisseScheduledJobRuns.$inferSelect;

@@ -7,7 +7,7 @@ import { publishDeliveryPositionBroadcast, publishDeliveryStatusBroadcast, syncD
 import { sortDriverOpportunities } from "../shared/driver-opportunities";
 import { concealPlaceForDriver } from "./_test-helpers/delivery-visibility";
 import { isCoordinateInCountry } from "./_test-helpers/geo-fence";
-import { storagePut } from "./storage";
+import { publicFileUrl, storagePut } from "./storage";
 import * as geography from "./geography";
 import { getSessionCookieOptions, setTikisseProfileCookie, clearTikisseProfileCookie } from "./_core/cookies";
 import { getTikisseSessionTokenFromHeaders } from "./_core/context";
@@ -144,7 +144,7 @@ function toPublicProfile(profile: { phone: string; fullName: string; accountType
     if (Array.isArray(parsed)) vehicles = parsed.filter((item): item is ValidVehicle => vehicleSchema.safeParse(item).success);
   } catch { vehicles = []; }
   const deletionScheduledAt = profile.deletionScheduledAt ?? (profile.deletionRequestedAt ? new Date(profile.deletionRequestedAt.getTime() + DELETION_GRACE_PERIOD_MS) : undefined);
-  return { phone: profile.phone, fullName: profile.fullName, countryCode: findCountryForPhone(profile.phone).id, role: profile.accountType, vehicles, roleLocked: true as const, photoUrl: profile.photoKey ? `/manus-storage/${profile.photoKey}` : undefined, email: profile.email ?? undefined, phoneVerified: profile.phoneVerified ?? true, emailVerified: profile.emailVerified ?? false, referralCode: profile.accountType === "driver" ? profile.referralCode ?? undefined : undefined, country: profile.country ?? undefined, city: profile.city ?? undefined, accountStatus: profile.status ?? "active", accountStatusReason: profile.statusReason ?? undefined, deletionRequestedAt: profile.deletionRequestedAt?.toISOString(), deletionScheduledAt: deletionScheduledAt?.toISOString() };
+  return { phone: profile.phone, fullName: profile.fullName, countryCode: findCountryForPhone(profile.phone).id, role: profile.accountType, vehicles, roleLocked: true as const, photoUrl: profile.photoKey ? publicFileUrl(profile.photoKey) : undefined, email: profile.email ?? undefined, phoneVerified: profile.phoneVerified ?? true, emailVerified: profile.emailVerified ?? false, referralCode: profile.accountType === "driver" ? profile.referralCode ?? undefined : undefined, country: profile.country ?? undefined, city: profile.city ?? undefined, accountStatus: profile.status ?? "active", accountStatusReason: profile.statusReason ?? undefined, deletionRequestedAt: profile.deletionRequestedAt?.toISOString(), deletionScheduledAt: deletionScheduledAt?.toISOString() };
 }
 
 function sessionCountryCode(profilePhone: string) {

@@ -10,12 +10,8 @@ import { registerStorageProxy } from "./storageProxy";
 import { registerAdminDocumentRoutes } from "../admin-documents";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-import { sdk } from "./sdk";
 import * as db from "../db";
-import { expireOpenTikisseDeliveries } from "../db";
-import { runAccountDeletionJobs } from "../admin-deletions";
-import { expireLoyaltyGrants } from "../loyalty";
-import { publishDeliveryStatusBroadcast } from "../supabase-realtime";
+import { registerScheduledRoutes, startScheduler } from "../scheduled-jobs";
 import { corsMiddleware, securityHeadersMiddleware, publicApiRateLimit } from "./security";
 import { initSentry, reportException } from "./sentry";
 import { assertYengapayWebhookSecretConfigured } from "../yengapay";
@@ -69,66 +65,9 @@ async function startServer() {
     res.json({ ok: true, timestamp: Date.now() });
   });
 
-  app.post("/api/scheduled/expire-deliveries", async (req, res) => {
-    try {
-      const user = await sdk.authenticateRequest(req);
-      if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
-      const result = await expireOpenTikisseDeliveries();
-      for (const deliveryId of result.completedDeliveryIds) {
-        void publishDeliveryStatusBroadcast({ deliveryId, status: "completed", title: "Livraison finalisée automatiquement", body: "La course active a été clôturée après 24 heures.", occurredAt: new Date().toISOString() });
-      }
-      for (const deliveryId of result.expiredDeliveryIds) {
-        void publishDeliveryStatusBroadcast({ deliveryId, status: "expired", title: "Livraison non terminée", body: "La course a expiré avant son démarrage et ses mouvements financiers ont été annulés.", occurredAt: new Date().toISOString() });
-      }
-      return res.json({ ok: true, ...result, taskUid: user.taskUid });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Erreur inconnue";
-      console.error("[scheduled:expire-deliveries]", error);
-      return res.status(500).json({ error: message, timestamp: new Date().toISOString() });
-    }
-  });
-
-  app.post("/api/scheduled/finalize-account-deletions", async (req, res) => {
-    try {
-      const user = await sdk.authenticateRequest(req);
-      if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
-      const result = await runAccountDeletionJobs();
-      return res.json({ ok: true, ...result, taskUid: user.taskUid });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Erreur inconnue";
-      console.error("[scheduled:finalize-account-deletions]", error);
-      return res.status(500).json({ error: message, timestamp: new Date().toISOString() });
-    }
-  });
-
-  app.post("/api/scheduled/expire-loyalty-grants", async (req, res) => {
-    try {
-      const user = await sdk.authenticateRequest(req);
-      if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
-      const result = await expireLoyaltyGrants();
-      return res.json({ ok: true, ...result, taskUid: user.taskUid });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Erreur inconnue";
-      console.error("[scheduled:expire-loyalty-grants]", error);
-      return res.status(500).json({ error: message, timestamp: new Date().toISOString() });
-    }
-  });
-
-  app.post("/api/scheduled/compute-daily-metrics", async (req, res) => {
-    try {
-      const user = await sdk.authenticateRequest(req);
-      if (!user.isCron || !user.taskUid) return res.status(403).json({ error: "cron-only" });
-      const { computeRecentMetrics } = await import("../analytics-metrics");
-      const days = Number(req.query?.days ?? 7);
-      const cappedDays = Math.min(Math.max(Number.isFinite(days) ? days : 7, 1), 30);
-      const metrics = await computeRecentMetrics(cappedDays);
-      return res.json({ ok: true, days: cappedDays, metrics, taskUid: user.taskUid });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Erreur inconnue";
-      console.error("[scheduled:compute-daily-metrics]", error);
-      return res.status(500).json({ error: message, timestamp: new Date().toISOString() });
-    }
-  });
+  // Tâches planifiées : exécutées par ce serveur (startScheduler, plus bas) ; ces routes servent au
+  // déclenchement à la main, protégées par CRON_SECRET (server/scheduled-jobs.ts).
+  registerScheduledRoutes(app);
 
   // Webhook YengaPay — appelé par le PSP pour confirmer un paiement (deposit/withdrawal).
   // Idempotent : on enregistre l'événement, on vérifie la signature, on applique le settlement.
@@ -199,6 +138,7 @@ async function startServer() {
   const port = parseInt(process.env.PORT || "3000");
   server.listen(port, () => {
     console.log(`[api] server listening on port ${port}`);
+    startScheduler();
   });
 }
 

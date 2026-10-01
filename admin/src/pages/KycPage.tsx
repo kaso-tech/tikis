@@ -15,7 +15,7 @@ const STATUS_PILL: Record<string, string> = { submitted: "pill-warning", approve
 /**
  * Les pièces passent par la route admin authentifiée (server/admin-documents.ts) : le cookie de session
  * accompagne la requête de l'image, le serveur vérifie le rôle et journalise la consultation. Le proxy
- * public /manus-storage refuse désormais ces fichiers.
+ * public /api/files refuse ces fichiers.
  */
 function documentUrl(submissionId: string, side: "id-front" | "id-back" | "selfie") {
   return `/api/admin/documents/kyc/${encodeURIComponent(submissionId)}/${side}`;

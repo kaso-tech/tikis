@@ -1,7 +1,7 @@
 /**
  * Pièces d'identité KYC et pièces jointes de signalement, servies à la console d'administration seulement.
  *
- * Jusqu'ici, ces fichiers passaient par le proxy public `/manus-storage/*`, qui les servait à quiconque
+ * Jusqu’ici, ces fichiers passaient par le proxy public de l’ancien stockage, qui les servait à quiconque
  * connaissait le chemin (numéro de téléphone, horodatage et 8 caractères aléatoires). Désormais :
  *  - le proxy public les refuse (`isPrivateStorageKey`) ;
  *  - cette route exige une session admin active, un rôle qui en a l'usage (super_admin, support) et une

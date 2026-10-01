@@ -1,29 +1,35 @@
 # Tikisse — Guide des opérations
 
-## Crons planifiés
+## Tâches planifiées
 
-Trois crons doivent être enregistrés dans la console **webdevtoken.v1.WebDevService** (section "Scheduled jobs") :
+Le serveur les exécute lui-même (server/scheduled-jobs.ts) : rien à enregistrer dans une console externe.
+Heures UTC (= heure du Burkina Faso).
 
-| Cron                       | Schedule         | Endpoint                                          | Description |
-|----------------------------|------------------|---------------------------------------------------|-------------|
-| `expire-deliveries`        | `*/10 * * * *`   | `POST /api/scheduled/expire-deliveries`           | Finalise les livraisons actives depuis plus de 24 h, notifie les parties, et crédite les livreurs. |
-| `finalize-account-deletions` | `0 3 * * *`     | `POST /api/scheduled/finalize-account-deletions`  | Supprime définitivement les comptes dont `deletionScheduledAt < now()` (suppression 30j après demande). |
-| `expire-loyalty-grants`    | `0 4 * * *`      | `POST /api/scheduled/expire-loyalty-grants`       | Annule les `tikisse_loyalty_grants` dont `status='pending'` ET `expiresAt < now()` (grants non crédités > 30j). |
-| `compute-daily-metrics`     | `15 0 * * *`     | `POST /api/scheduled/compute-daily-metrics?days=7` | Calcule les métriques business des N derniers jours (GMV, commission, courses terminées) et les upsert dans `tikisse_daily_metrics`. Param `days` entre 1 et 30. |
+| Tâche                        | Quand              | Ce qu'elle fait |
+|------------------------------|--------------------|-----------------|
+| `expire-deliveries`          | toutes les 10 min  | Clôture les courses actives depuis 24 h (crédite le livreur), expire celles jamais démarrées, notifie les parties. |
+| `compute-daily-metrics`      | chaque jour 00:15  | Recalcule les statistiques des 7 derniers jours (`tikisse_daily_metrics`). |
+| `finalize-account-deletions` | chaque jour 03:00  | Supprime les comptes au bout des 30 jours (sauf blocage), efface leurs fichiers, purge les correspondances de plus de 10 ans. |
+| `expire-loyalty-grants`      | chaque jour 04:00  | Annule les bonus de fidélité non crédités arrivés à échéance. |
 
-### Enregistrement initial (one-shot)
+- **Une seule exécution par créneau**, même avec plusieurs serveurs : chacune est réservée en base
+  (`tikisse_scheduled_job_runs`, qui sert aussi d'historique : statut, durée, résultat, erreur).
+- **Rattrapage** : un créneau manqué (serveur arrêté à 3 h) est exécuté au redémarrage.
+- **Échec** : retenté 15 minutes plus tard, 5 fois au plus. Une exécution restée « en cours » plus d'une heure
+  (serveur arrêté au milieu) est reprise.
+- `TIKISSE_SCHEDULER=off` désactive le planificateur sur une instance (par exemple une instance de secours) ;
+  les autres continuent.
+
+### Déclenchement à la main
 
 ```bash
-# 1. Afficher la liste + instructions
-pnpm cron:register-all
-
-# 2. (optionnel) Tester en local que les endpoints répondent
-pnpm cron:register-all --ping
-# → 403 cron-only est le comportement attendu sans token de service
-
-# 3. Aller sur la console webdevtoken et enregistrer les 3 crons
-#    avec le token isCron=true du service Tikisse.
+CRON_SECRET=<secret du serveur> TIKISSE_API_URL=https://api.tikisse.app pnpm jobs:run expire-deliveries
+CRON_SECRET=… pnpm jobs:run compute-daily-metrics --days=30
 ```
+
+Les routes `POST /api/scheduled/<tâche>` exigent `Authorization: Bearer <CRON_SECRET>` (32 caractères au
+moins) ; sans `CRON_SECRET` défini sur le serveur, elles répondent 503. Elles peuvent aussi servir à un
+planificateur externe si l'hébergeur endort le serveur la nuit.
 
 ### Vérification de la santé
 
@@ -31,9 +37,8 @@ pnpm cron:register-all --ping
 # Healthcheck global (rapide)
 curl -s http://localhost:3000/api/health | jq
 
-# Healthcheck cron (avec le token de service, en prod)
-curl -X POST -H "Authorization: Bearer $CRON_TOKEN" \
-     https://api.tikisse.app/api/scheduled/expire-deliveries
+# Dernières exécutions des tâches planifiées
+psql "$DATABASE_URL" -c 'select "jobName", slot, status, attempts, "finishedAt", error from tikisse_scheduled_job_runs order by "startedAt" desc limit 20'
 ```
 
 ## Base de données (PostgreSQL / Supabase)
@@ -83,7 +88,24 @@ La base doit être jetable et migrée (`DATABASE_URL=<même url> pnpm db:migrate
 | `YENGAPAY_PROJECT_ID`     | idem.                                           |
 | `YENGAPAY_WEBHOOK_SECRET` | Signature HMAC des webhooks entrants.           |
 | `SENTRY_DSN`              | DSN Sentry (server).                            |
-| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Realtime + storage. |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | Realtime + stockage des fichiers. La clé `service_role` ne doit jamais quitter le serveur. |
+| `SUPABASE_STORAGE_BUCKET` | Bucket des fichiers (défaut `tikisse-files`), créé privé au premier dépôt. |
+| `CRON_SECRET`             | Déclenchement manuel des tâches planifiées (32 caractères au moins). |
+| `TIKISSE_SCHEDULER`       | `off` pour désactiver le planificateur intégré sur une instance. |
+
+## Stockage des fichiers (Supabase Storage)
+
+Un seul bucket **privé** (`SUPABASE_STORAGE_BUCKET`, défaut `tikisse-files`), créé par le serveur au premier
+dépôt, limité aux images (JPEG, PNG, WebP) de 8 Mo au plus. Le serveur refuse de déposer dans un bucket
+public. Rien n'y est accessible directement :
+
+- photos de profil : `GET /api/files/<clé>` redirige vers un lien signé valable 5 minutes ;
+- pièces d'identité KYC et pièces jointes des signalements : jamais par cette route, seulement par la console
+  (`/api/admin/documents/…`, session admin, rôle vérifié, consultation journalisée) ;
+- suppression d'un compte : ses fichiers sont réellement supprimés du bucket.
+
+L'ancienne adresse `/manus-storage/<clé>` est toujours servie de la même façon, pour une application installée
+avant le changement.
 
 ## Logs
 

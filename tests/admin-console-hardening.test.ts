@@ -227,7 +227,8 @@ describe("lot 4 — pièces justificatives servies par la route admin", () => {
 
   it("le proxy public filtre avant toute autre étape, et la route admin est montée", () => {
     const proxy = read("server/_core/storageProxy.ts");
-    expect(proxy.indexOf("isPrivateStorageKey(key)")).toBeLessThan(proxy.indexOf("ENV.forgeApiUrl"));
+    expect(proxy.indexOf("isPrivateStorageKey(key)")).toBeGreaterThan(-1);
+    expect(proxy.indexOf("isPrivateStorageKey(key)")).toBeLessThan(proxy.indexOf("storageGetSignedUrl(key)"));
     expect(read("server/_core/index.ts")).toContain("registerAdminDocumentRoutes(app);");
   });
 });
@@ -435,7 +436,7 @@ describe("lot D — utilisateurs", () => {
     expect(deletions).toContain("if (blockers.length > 0) throw new DeletionBlockedError(blockers);");
     expect(deletions).toContain("documentsErasedAt: now");
     expect(deletions).toContain("await pseudonymizePhone(tx, phone, pseudonym);");
-    expect(read("server/_core/index.ts")).toContain("await runAccountDeletionJobs()");
+    expect(read("server/scheduled-jobs.ts")).toContain("run: () => runAccountDeletionJobs(),");
     expect(read("server/db.ts")).not.toContain("export async function finalizeExpiredAccountDeletions");
   });
 
