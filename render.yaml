@@ -1,0 +1,79 @@
+# Render Blueprint — serveur Tikisse (API, console d'administration, version web, webhooks, tâches planifiées).
+# Render → New → Blueprint → dépôt kaso-tech/tikisse : crée le service à partir de ce fichier.
+# Guide : docs/SUPABASE_SETUP.md, section 9.
+services:
+  - type: web
+    name: tikisse-api
+    runtime: node
+    # Même centre de données que la base Supabase (région « Central EU (Frankfurt) ») : chaque requête de
+    # l'application fait plusieurs allers-retours avec la base.
+    region: frankfurt
+    # Au moins Starter : l'offre gratuite met le serveur en veille après 15 minutes sans trafic, ce qui
+    # couperait les tâches planifiées (clôture des courses à 24 h, suppressions de comptes…).
+    plan: starter
+    branch: main
+    autoDeploy: true
+    # Version web de l'application, console d'administration et serveur, en un seul build.
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm run build
+    # Migrations avant chaque mise en ligne : si l'une échoue, l'ancienne version continue de tourner.
+    preDeployCommand: pnpm run db:migrate
+    startCommand: pnpm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+
+      # ─── Base de données (Supabase → Connect) ─────────────────────────────────────────────────
+      - key: DATABASE_URL # Transaction pooler, port 6543, ?sslmode=require
+        sync: false
+      - key: DATABASE_MIGRATION_URL # Session pooler, port 5432, ?sslmode=require
+        sync: false
+
+      # ─── Supabase (Project Settings → API Keys → Legacy API keys) ─────────────────────────────
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # ─── Secrets Tikisse ──────────────────────────────────────────────────────────────────────
+      # Reprendre les valeurs de l'ancien serveur s'il en avait : sinon, tous les utilisateurs sont
+      # déconnectés, et chaque admin doit réactiver sa double authentification.
+      - key: TIKISSE_SESSION_SECRET
+        sync: false
+      - key: TIKISSE_ADMIN_TOTP_KEY
+        sync: false
+      # Nouveau : Render le génère.
+      - key: CRON_SECRET
+        generateValue: true
+
+      # ─── Web, SMS, paiements, cartes, erreurs ────────────────────────────────────────────────
+      - key: TIKISSE_ALLOWED_ORIGINS
+        value: https://tikisse.app,https://admin.tikisse.app
+      - key: TIKISSE_OTP_MODE
+        value: sim
+      - key: YENGAPAY_MODE
+        sync: false
+      - key: YENGAPAY_API_KEY
+        sync: false
+      - key: YENGAPAY_ORG_ID
+        sync: false
+      - key: YENGAPAY_PROJECT_ID
+        sync: false
+      - key: YENGAPAY_WEBHOOK_SECRET
+        sync: false
+      - key: MAPBOX_SECRET_ACCESS_TOKEN
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+
+      # ─── Application (EXPO_PUBLIC_*) : intégrées au build de la version web, faite ici ───────
+      - key: EXPO_PUBLIC_API_BASE_URL
+        value: https://api.tikisse.app
+      - key: EXPO_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: EXPO_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: EXPO_PUBLIC_ENABLE_SUPABASE_PHONE_AUTH
+        value: "false"

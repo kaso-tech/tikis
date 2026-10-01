@@ -2,7 +2,7 @@
 /**
  * Applique les migrations de drizzle/migrations à la base (DATABASE_MIGRATION_URL, sinon DATABASE_URL).
  *
- * Exécuté par Railway avant chaque mise en service (railway.json → preDeployCommand) : si une migration
+ * Exécuté par Render avant chaque mise en service (render.yaml → preDeployCommand) : si une migration
  * échoue, la nouvelle version n'est pas mise en ligne et l'ancienne continue de tourner. Ne rejoue que ce qui
  * manque (journal drizzle.__drizzle_migrations), sans risque à chaque déploiement.
  *

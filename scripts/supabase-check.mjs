@@ -118,13 +118,13 @@ if (runQuery) {
     const journal = JSON.parse(fs.readFileSync(path.join(root, "drizzle/migrations/meta/_journal.json"), "utf8")).entries.length;
     const applied = await runQuery("SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations").then((rows) => Number(rows[0]?.n ?? 0)).catch(() => 0);
     if (applied >= journal) ok(`migrations appliquées (${applied}/${journal})`);
-    else fail(`migrations : ${applied}/${journal} appliquées`, "elles s'appliquent au déploiement sur Railway ; à la main : pnpm db:migrate");
+    else fail(`migrations : ${applied}/${journal} appliquées`, "elles s'appliquent au déploiement sur Render ; à la main : pnpm db:migrate");
 
     const schemaTables = [...fs.readFileSync(path.join(root, "drizzle/schema.ts"), "utf8").matchAll(/pgTable\("([a-z_]+)"/g)].map((m) => m[1]);
     const tables = new Map((await runQuery("SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'")).map((row) => [row.tablename, row.rowsecurity]));
     const missing = schemaTables.filter((table) => !tables.has(table));
     const open = schemaTables.filter((table) => tables.has(table) && !tables.get(table));
-    if (missing.length) fail(`tables absentes : ${missing.join(", ")}`, "déployer sur Railway (migrations automatiques) ou pnpm db:migrate");
+    if (missing.length) fail(`tables absentes : ${missing.join(", ")}`, "déployer sur Render (migrations automatiques) ou pnpm db:migrate");
     if (open.length) fail(`RLS désactivée : ${open.join(", ")} — lisibles avec la clé anon de l'application`, "pnpm db:migrate, ou ALTER TABLE … ENABLE ROW LEVEL SECURITY");
     if (!missing.length && !open.length) ok(`${schemaTables.length} tables, RLS activée partout`);
 

@@ -27,13 +27,20 @@ describe("contrat de build de déploiement", () => {
     expect(serverEntry).toContain('res.status(200).json({ ok: true, service: "Tikisse API" })');
   });
 
-  it("Railway : migrations avant la mise en service, contrôle de santé, redémarrage automatique", () => {
-    const railway = JSON.parse(readFileSync("railway.json", "utf8")) as { build: { buildCommand: string }; deploy: { preDeployCommand: string[]; startCommand: string; healthcheckPath: string; restartPolicyType: string } };
-    expect(railway.build.buildCommand).toBe("pnpm run build");
-    expect(railway.deploy.preDeployCommand).toEqual(["pnpm run db:migrate"]);
-    expect(railway.deploy.startCommand).toBe("pnpm start");
-    expect(railway.deploy.healthcheckPath).toBe("/api/health");
-    expect(railway.deploy.restartPolicyType).toBe("ON_FAILURE");
+  it("Render : Francfort, offre toujours allumée, migrations avant la mise en service, contrôle de santé", () => {
+    const render = readFileSync("render.yaml", "utf8");
+    expect(render).toContain("region: frankfurt");
+    expect(render).toMatch(/plan: (starter|standard|pro)/);
+    expect(render).toContain("buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm run build");
+    expect(render).toContain("preDeployCommand: pnpm run db:migrate");
+    expect(render).toContain("startCommand: pnpm start");
+    expect(render).toContain("healthCheckPath: /api/health");
+    // Les EXPO_PUBLIC_* sont intégrées au build de la version web, fait sur Render.
+    for (const key of ["EXPO_PUBLIC_API_BASE_URL", "EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY"]) expect(render).toContain(`key: ${key}`);
+    // Aucun secret écrit en clair dans le fichier : saisis dans Render (sync: false) ou générés.
+    for (const key of ["DATABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "TIKISSE_SESSION_SECRET", "TIKISSE_ADMIN_TOTP_KEY", "YENGAPAY_API_KEY", "YENGAPAY_WEBHOOK_SECRET"]) {
+      expect(render).toMatch(new RegExp(`key: ${key}(\\s+#[^\\n]*)?\\n\\s+sync: false`));
+    }
   });
 
   it("les migrations de déploiement n'utilisent que des dépendances d'exécution (pas drizzle-kit)", () => {

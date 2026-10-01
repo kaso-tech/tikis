@@ -48,8 +48,8 @@ Le modèle complet, commenté, est dans [`.env.example`](../.env.example).
 
 ## 4. Créer les tables
 
-Automatique : Railway applique les migrations (`pnpm db:migrate`) avant chaque mise en service
-(`railway.json`). Si une migration échoue, la nouvelle version n'est pas mise en ligne.
+Automatique : Render applique les migrations (`pnpm db:migrate`) avant chaque mise en service
+(`render.yaml`). Si une migration échoue, la nouvelle version n'est pas mise en ligne.
 
 Elles créent les 32 tables, les données de référence (pays, programme de fidélité), rendent le journal
 d'audit et le grand livre immuables, et ferment toutes les tables à l'API publique de Supabase (RLS).
@@ -102,27 +102,34 @@ téléphone et le bucket. Chaque problème est donné avec sa correction. Code d
 point bloquant. Sans accès direct à la base (pare-feu), il passe par l'API de gestion de Supabase si
 `SUPABASE_ACCESS_TOKEN` est défini.
 
-## 9. Héberger le serveur sur Railway
+## 9. Héberger le serveur sur Render
 
 Supabase n'héberge pas le serveur Tikisse (API Node.js toujours allumée, tâches planifiées, console
-d'administration, version web). Railway le fait, depuis le dépôt GitHub. La configuration est dans
-[`railway.json`](../railway.json) : build, migrations avant mise en service, démarrage, contrôle de santé
-(`/api/health`), redémarrage automatique en cas de plantage.
+d'administration, version web). Render le fait, depuis le dépôt GitHub, à **Francfort** — le même centre de
+données que la base. Tout est décrit dans [`render.yaml`](../render.yaml) : région, offre, build, migrations
+avant mise en service, démarrage, contrôle de santé (`/api/health`), variables attendues.
 
-1. [railway.com](https://railway.com) → **New Project** → **Deploy from GitHub repo** → `kaso-tech/tikisse`,
-   branche `main`. Chaque mise à jour de `main` redéploie.
-2. Service → **Settings** → **Region** : Europe (au plus près de la base Supabase).
-3. Service → **Variables** : toutes celles de [`.env.example`](../.env.example), **y compris les
-   `EXPO_PUBLIC_*`** : la version web de l'application est construite sur Railway et les intègre au build.
-   Ajouter `DATABASE_MIGRATION_URL` = adresse **Session pooler** (port 5432) pour les migrations.
-   Ne pas définir `PORT` : Railway le fournit.
-4. Service → **Settings** → **Networking** → **Custom Domain** : `api.tikisse.app`, puis créer chez le
-   registraire du domaine l'enregistrement CNAME indiqué par Railway. Le certificat HTTPS est automatique.
-5. Déployer, puis vérifier `https://api.tikisse.app/api/health`.
-6. Console YengaPay : webhook `https://api.tikisse.app/api/webhooks/yengapay`.
+1. [render.com](https://render.com) → **New** → **Blueprint** → autoriser l'accès GitHub à
+   `kaso-tech/tikisse` → choisir ce dépôt. Render lit `render.yaml` et prépare le service `tikisse-api`.
+2. Render demande la valeur des variables marquées à saisir : celles de [`.env.example`](../.env.example).
+   - `DATABASE_URL` : Transaction pooler (port 6543) ; `DATABASE_MIGRATION_URL` : Session pooler (port 5432).
+   - `TIKISSE_SESSION_SECRET`, `TIKISSE_ADMIN_TOTP_KEY` : **les valeurs de l'ancien serveur** s'il en avait
+     (sinon : tout le monde est déconnecté, et chaque admin réactive sa double authentification) ; sinon
+     des valeurs neuves, générées comme indiqué à l'étape 3. `CRON_SECRET` est généré par Render.
+   - Les `EXPO_PUBLIC_*` sont nécessaires dès le build : la version web de l'application est construite sur
+     Render et les intègre.
+   - Ne pas définir `PORT` : Render le fournit.
+3. **Apply** : premier build et déploiement (quelques minutes). Les migrations créent les tables dans Supabase.
+4. Service → **Settings** → **Custom Domains** : `api.tikisse.app`, puis créer chez le registraire du domaine
+   l'enregistrement CNAME indiqué par Render. Le certificat HTTPS est automatique.
+5. Vérifier `https://api.tikisse.app/api/health`, puis déclarer dans la console YengaPay le webhook
+   `https://api.tikisse.app/api/webhooks/yengapay`.
 
-Une seule instance suffit au départ ; si vous en ajoutez, les tâches planifiées restent exécutées une seule
-fois par créneau (voir docs/OPERATIONS.md).
+Offre **Starter** au minimum : l'offre gratuite met le serveur en veille après 15 minutes sans trafic, ce qui
+couperait les tâches planifiées. Si le build échoue faute de mémoire (la version web Expo est gourmande),
+passer temporairement à l'offre supérieure pour le build. Chaque mise à jour de `main` redéploie ; une seule
+instance suffit au départ, et les tâches planifiées restent exécutées une seule fois par créneau si vous en
+ajoutez (voir docs/OPERATIONS.md).
 
 ## 10. Ensuite
 
