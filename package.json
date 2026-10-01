@@ -22,6 +22,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:check-schema": "node scripts/check-schema.mjs",
+    "supabase:check": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/supabase-check.mjs",
     "db:audit-fk": "node scripts/audit-fk.mjs",
     "db:audit-countries": "node scripts/audit-countries.mjs",
     "android": "expo start --android",

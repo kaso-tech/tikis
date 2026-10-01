@@ -83,7 +83,7 @@ function walletTopic(supabaseUserId: string) {
 /**
  * Signale un mouvement du Wallet d'un profil sur son canal privé, propre à cet utilisateur — pas
  * de table d'adhésion à tenir à jour (contrairement aux livraisons) : c'est toujours exactement le
- * même utilisateur des deux côtés. Voir supabase/realtime_wallet_rls.sql pour l'autorisation RLS.
+ * même utilisateur des deux côtés. Voir supabase/setup.sql pour l'autorisation RLS.
  *
  * Aucune donnée financière dans la charge utile : juste un signal « quelque chose a changé », que
  * le client traduit en invalidation de wallet.snapshot / wallet.driverEarningsHistory — le solde

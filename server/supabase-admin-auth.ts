@@ -1,7 +1,7 @@
 /**
  * Établit une session Supabase Auth pour un profil Tikisse authentifié par son propre système —
  * OTP de simulation compris — afin que les canaux Realtime privés (server/supabase-realtime.ts,
- * supabase/realtime_auth_phone_rls.sql) s'authentifient pour tout le monde, pas seulement les
+ * supabase/setup.sql) s'authentifient pour tout le monde, pas seulement les
  * profils passés par Supabase Phone Auth (profiles.lookupSupabase/registerSupabase).
  *
  * Sans ça, `auth.uid()` valait toujours NULL côté RLS pour le parcours par défaut de
