@@ -2,13 +2,13 @@
 
 ## Décision
 
-Tikis migre vers **Mapbox Search** pour les suggestions et la résolution d’adresse, et **Mapbox Directions** avec le profil `driving-traffic` pour les itinéraires routiers. Les appels Mapbox restent côté backend et utilisent exclusivement `MAPBOX_SECRET_ACCESS_TOKEN`. Le jeton public est réservé à Mapbox GL dans le futur build de développement Expo.
+Tikisse migre vers **Mapbox Search** pour les suggestions et la résolution d’adresse, et **Mapbox Directions** avec le profil `driving-traffic` pour les itinéraires routiers. Les appels Mapbox restent côté backend et utilisent exclusivement `MAPBOX_SECRET_ACCESS_TOKEN`. Le jeton public est réservé à Mapbox GL dans le futur build de développement Expo.
 
 Pendant les tests avec Expo Go, la carte native actuelle reste disponible. **Mapbox GL** sera activé après la création d’un build de développement, car son module natif ne peut pas être chargé par Expo Go.
 
 ## Contrat de lieu
 
-Une suggestion Mapbox est d’abord retournée avec un `mapboxId` et un jeton de session. À sa sélection, le backend appelle `retrieve` afin d’obtenir les coordonnées et l’adresse complète. Les coordonnées validées restent la source de vérité des estimations et des favoris. La table `tikis_places` conserve `mapboxPlaceId` pour dédupliquer les lieux, sans supprimer les identifiants Google historiques.
+Une suggestion Mapbox est d’abord retournée avec un `mapboxId` et un jeton de session. À sa sélection, le backend appelle `retrieve` afin d’obtenir les coordonnées et l’adresse complète. Les coordonnées validées restent la source de vérité des estimations et des favoris. La table `tikisse_places` conserve `mapboxPlaceId` pour dédupliquer les lieux, sans supprimer les identifiants Google historiques.
 
 ## Suivi GPS
 
