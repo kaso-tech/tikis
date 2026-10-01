@@ -13,7 +13,7 @@ describe("contrat de build de déploiement", () => {
     const command = packageJson.scripts?.["build:deploy"] ?? "";
     expect(command).toContain("CI=1 EXPO_NO_INTERACTIVE=1");
     expect(command).toContain("pnpm run build:web");
-    expect(command).toContain("npm --prefix admin ci --ignore-scripts");
+    expect(command).toContain("npm --prefix admin ci --include=dev --ignore-scripts");
     expect(command).toContain("npm --prefix admin run build");
     expect(command).toContain("pnpm run build:server");
   });
@@ -31,7 +31,7 @@ describe("contrat de build de déploiement", () => {
     const render = readFileSync("render.yaml", "utf8");
     expect(render).toContain("region: frankfurt");
     expect(render).toMatch(/plan: (starter|standard|pro)/);
-    expect(render).toContain("buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm run build");
+    expect(render).toContain("buildCommand: corepack enable && pnpm install --frozen-lockfile --prod=false && pnpm run build");
     expect(render).toContain("preDeployCommand: pnpm run db:migrate");
     expect(render).toContain("startCommand: pnpm start");
     expect(render).toContain("healthCheckPath: /api/health");
