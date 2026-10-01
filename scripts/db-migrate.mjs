@@ -23,6 +23,15 @@ if (!connectionString) {
   console.error("[migrate] DATABASE_MIGRATION_URL ou DATABASE_URL requis.");
   process.exit(1);
 }
+// Adresse illisible (souvent un mot de passe avec # / ? @ :) : le dire sans l'afficher, car postgres
+// recopierait l'adresse entière, mot de passe compris, dans les journaux.
+try {
+  const parsed = new URL(connectionString);
+  if (!/^postgres(ql)?:$/.test(parsed.protocol) || !parsed.hostname) throw new Error("adresse incomplète");
+} catch {
+  console.error("[migrate] adresse de la base invalide (DATABASE_MIGRATION_URL ou DATABASE_URL). Le mot de passe contient sans doute un caractère réservé (# / ? @ : %) : le réinitialiser dans Supabase avec des lettres et des chiffres seulement, ou l'encoder (encodeURIComponent).");
+  process.exit(1);
+}
 const root = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), "..");
 const client = postgres(connectionString, { prepare: false, max: 1, connect_timeout: 15, onnotice: () => {} });
 const started = Date.now();

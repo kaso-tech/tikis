@@ -71,7 +71,9 @@ export async function getDb() {
     try {
       _db = deferPushesUntilCommit(connect(process.env.DATABASE_URL));
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      // Pas l'erreur entière : une adresse invalide y figure en clair, mot de passe compris.
+      const code = (error as { code?: string } | null)?.code;
+      console.warn("[Database] Failed to connect:", code === "ERR_INVALID_URL" ? "DATABASE_URL invalide (caractère réservé dans le mot de passe ?)" : error instanceof Error ? error.message : String(error));
       _db = null;
     }
   }
