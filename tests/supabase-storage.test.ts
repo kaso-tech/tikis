@@ -9,6 +9,8 @@ import { registerStorageProxy } from "../server/_core/storageProxy";
 import { publicFileUrl, resetStorageStateForTests, storageErase, storageGetSignedUrl, storagePut, storageReadObject } from "../server/storage";
 
 const SUPABASE = "https://projet.supabase.co";
+/** Clé « Legacy » : un JWT (en-tête, contenu, signature). */
+const LEGACY_SERVICE_KEY = "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.signature";
 type Call = { method: string; url: string; headers: Record<string, string>; body: unknown };
 let calls: Call[] = [];
 let bucket: { exists: boolean; public: boolean } = { exists: true, public: false };
@@ -38,7 +40,7 @@ beforeEach(() => {
   bucket = { exists: true, public: false };
   resetStorageStateForTests();
   vi.stubEnv("SUPABASE_URL", SUPABASE);
-  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "cle-service");
+  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", LEGACY_SERVICE_KEY);
   vi.stubEnv("SUPABASE_STORAGE_BUCKET", "");
   vi.stubGlobal("fetch", vi.fn(fakeStorage));
 });
@@ -55,9 +57,19 @@ describe("dépôt", () => {
     expect(stored.url).toBe(`/api/files/${stored.key}`);
     const upload = calls.find((call) => call.method === "POST" && call.url.includes("/object/tikisse-files/"))!;
     expect(upload.url).toBe(`${SUPABASE}/storage/v1/object/tikisse-files/${stored.key}`);
-    expect(upload.headers.authorization).toBe("Bearer cle-service");
+    expect(upload.headers.authorization).toBe(`Bearer ${LEGACY_SERVICE_KEY}`);
+    expect(upload.headers.apikey).toBe(LEGACY_SERVICE_KEY);
     expect(upload.headers["x-upsert"]).toBe("false");
     expect(upload.headers["content-type"]).toBe("image/jpeg");
+  });
+
+  it("nouvelle clé secrète sb_… : seulement dans apikey, jamais dans Authorization (réservé aux sessions)", async () => {
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "sb_secret_abc123");
+    await storagePut("a/b.png", Buffer.from([1]), "image/png");
+    for (const call of calls) {
+      expect(call.headers.apikey).toBe("sb_secret_abc123");
+      expect(call.headers.authorization).toBeUndefined();
+    }
   });
 
   it("crée le bucket, privé et limité aux images, s'il n'existe pas — une seule fois", async () => {

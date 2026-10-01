@@ -49,12 +49,14 @@ else fail("SUPABASE_URL absente ou mal formée", "Project Settings → API → P
 if (env.EXPO_PUBLIC_SUPABASE_URL && env.SUPABASE_URL && env.EXPO_PUBLIC_SUPABASE_URL.replace(/\/+$/, "") !== env.SUPABASE_URL.replace(/\/+$/, "")) {
   fail("EXPO_PUBLIC_SUPABASE_URL et SUPABASE_URL désignent deux projets différents", "les deux doivent être identiques");
 }
-for (const [name, value, expected] of [["EXPO_PUBLIC_SUPABASE_ANON_KEY", anonKey, "anon"], ["SUPABASE_SERVICE_ROLE_KEY", serviceKey, "service_role"]]) {
-  if (!value) { fail(`${name} absente`, "Project Settings → API Keys → onglet « Legacy API keys »"); continue; }
+for (const [name, value, expected, prefix] of [["EXPO_PUBLIC_SUPABASE_ANON_KEY", anonKey, "anon", "sb_publishable_"], ["SUPABASE_SERVICE_ROLE_KEY", serviceKey, "service_role", "sb_secret_"]]) {
+  if (!value) { fail(`${name} absente`, "Project Settings → API Keys"); continue; }
   const role = jwtRole(value);
-  if (role === expected) ok(`${name} (rôle ${role})`);
+  if (role === expected) ok(`${name} (clé historique, rôle ${role})`);
   else if (role) fail(`${name} porte le rôle « ${role} » au lieu de « ${expected} »`, "les deux clés semblent inversées");
-  else warn(`${name} n'est pas une clé « Legacy » (JWT)`, "le serveur a été écrit et testé avec les clés « Legacy API keys » (anon / service_role) : utilisez celles-là");
+  else if (value.startsWith(prefix)) ok(`${name} (nouvelle clé ${prefix}…)`);
+  else if (value.startsWith("sb_")) fail(`${name} n'est pas une clé ${prefix}…`, expected === "anon" ? "l'application prend la clé publishable" : "le serveur prend la clé secret");
+  else fail(`${name} : format de clé inconnu`, "Project Settings → API Keys");
 }
 if (anonKey && anonKey === serviceKey) fail("clé anon et clé service_role identiques", "la clé service_role ne doit jamais être celle de l'application");
 
@@ -170,7 +172,7 @@ console.log("\n4. Stockage");
 if (supabaseUrl && serviceKey) {
   const bucket = env.SUPABASE_STORAGE_BUCKET || "tikisse-files";
   try {
-    const response = await fetch(`${supabaseUrl}/storage/v1/bucket/${encodeURIComponent(bucket)}`, { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` }, signal: AbortSignal.timeout(10_000) });
+    const response = await fetch(`${supabaseUrl}/storage/v1/bucket/${encodeURIComponent(bucket)}`, { headers: { apikey: serviceKey, ...(serviceKey.split(".").length === 3 ? { Authorization: `Bearer ${serviceKey}` } : {}) }, signal: AbortSignal.timeout(10_000) });
     if (response.ok) {
       const found = await response.json();
       if (found.public) fail(`le bucket « ${bucket} » est public : photos et pièces d'identité seraient lisibles par leur adresse`, "Storage → bucket → Edit : décocher « Public bucket »");

@@ -22,6 +22,7 @@
  */
 import { randomBytes } from "node:crypto";
 import * as db from "./db";
+import { supabaseKeyHeaders } from "./supabase-keys";
 
 export type SupabaseRealtimeSession = { accessToken: string; refreshToken: string };
 
@@ -36,7 +37,7 @@ function supabaseConfig() {
 async function createSupabaseUser(base: string, serviceKey: string, phone: string): Promise<string | null> {
   const response = await fetch(`${base}/auth/v1/admin/users`, {
     method: "POST",
-    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+    headers: supabaseKeyHeaders(serviceKey, { "Content-Type": "application/json" }),
     body: JSON.stringify({ phone, phone_confirm: true }),
     signal: AbortSignal.timeout(5_000),
   });
@@ -48,7 +49,7 @@ async function createSupabaseUser(base: string, serviceKey: string, phone: strin
 async function setSupabasePassword(base: string, serviceKey: string, userId: string, password: string): Promise<boolean> {
   const response = await fetch(`${base}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
     method: "PUT",
-    headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json" },
+    headers: supabaseKeyHeaders(serviceKey, { "Content-Type": "application/json" }),
     body: JSON.stringify({ password }),
     signal: AbortSignal.timeout(5_000),
   });

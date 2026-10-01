@@ -10,6 +10,8 @@
  * API REST de Supabase Storage appelée directement (pas de SDK) : quatre opérations, toutes côté serveur.
  */
 
+import { supabaseKeyHeaders } from "./supabase-keys";
+
 const DEFAULT_BUCKET = "tikisse-files";
 /** Durée de validité d'un lien signé servi au navigateur ou à l'application. */
 export const SIGNED_URL_TTL_SECONDS = 300;
@@ -31,7 +33,7 @@ function storageConfig(): StorageConfig {
 }
 
 function headers(config: StorageConfig, extra: Record<string, string> = {}) {
-  return { Authorization: `Bearer ${config.serviceKey}`, apikey: config.serviceKey, ...extra };
+  return supabaseKeyHeaders(config.serviceKey, extra);
 }
 
 function normalizeKey(relKey: string): string {

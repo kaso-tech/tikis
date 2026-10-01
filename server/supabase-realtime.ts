@@ -1,3 +1,5 @@
+import { supabaseKeyHeaders } from "./supabase-keys";
+
 export type DeliveryStatusBroadcast = {
   deliveryId: string;
   status: "draft" | "open" | "pending_confirmation" | "active" | "completed" | "disabled" | "cancelled" | "expired";
@@ -28,7 +30,7 @@ export async function syncDeliveryRealtimeMembers(deliveryId: string, members: D
   const safeId = deliveryId.replace(/[^a-zA-Z0-9-]/g, "");
   if (!url || !secret || !/^[0-9a-fA-F-]{36}$/.test(safeId)) return false;
   const base = url.replace(/\/$/, "");
-  const headers = { apikey: secret, Authorization: `Bearer ${secret}`, "Content-Type": "application/json" };
+  const headers = supabaseKeyHeaders(secret, { "Content-Type": "application/json" });
   try {
     const removed = await fetch(`${base}/rest/v1/tikisse_delivery_channel_members?delivery_id=eq.${encodeURIComponent(safeId)}`, { method: "DELETE", headers, signal: AbortSignal.timeout(4_000) });
     if (!removed.ok) return false;
@@ -49,7 +51,7 @@ export async function publishDeliveryStatusBroadcast(event: DeliveryStatusBroadc
     const endpoint = `${url.replace(/\/$/, "")}/realtime/v1/api/broadcast/${encodeURIComponent(topic)}/events/status?private=true`;
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { apikey: secret, Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+      headers: supabaseKeyHeaders(secret, { "Content-Type": "application/json" }),
       body: JSON.stringify(event),
       signal: AbortSignal.timeout(4_000),
     });
@@ -67,7 +69,7 @@ export async function publishDeliveryPositionBroadcast(event: DeliveryPositionBr
     const endpoint = `${url.replace(/\/$/, "")}/realtime/v1/api/broadcast/${encodeURIComponent(topic)}/events/position?private=true`;
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { apikey: secret, Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+      headers: supabaseKeyHeaders(secret, { "Content-Type": "application/json" }),
       body: JSON.stringify(event),
       signal: AbortSignal.timeout(4_000),
     });
@@ -98,7 +100,7 @@ export async function publishWalletBroadcast(supabaseUserId: string) {
     const endpoint = `${url.replace(/\/$/, "")}/realtime/v1/api/broadcast/${encodeURIComponent(topic)}/events/changed?private=true`;
     const response = await fetch(endpoint, {
       method: "POST",
-      headers: { apikey: secret, Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+      headers: supabaseKeyHeaders(secret, { "Content-Type": "application/json" }),
       body: JSON.stringify({ at: new Date().toISOString() }),
       signal: AbortSignal.timeout(4_000),
     });

@@ -22,14 +22,14 @@ Durée : environ une heure, hors validation du fournisseur SMS.
 | Où dans Supabase | Quoi | Variable |
 |---|---|---|
 | Project Settings → API → Project URL | `https://<ref>.supabase.co` | `SUPABASE_URL` et `EXPO_PUBLIC_SUPABASE_URL` |
-| Project Settings → API Keys → **Legacy API keys** → `anon` | clé publique | `EXPO_PUBLIC_SUPABASE_ANON_KEY` |
-| Project Settings → API Keys → **Legacy API keys** → `service_role` | clé **secrète** | `SUPABASE_SERVICE_ROLE_KEY` |
+| Project Settings → API Keys → clé **publishable** (`sb_publishable_…`) ou, onglet *Legacy*, `anon` | clé publique | `EXPO_PUBLIC_SUPABASE_ANON_KEY` |
+| Project Settings → API Keys → clé **secret** (`sb_secret_…`) ou, onglet *Legacy*, `service_role` | clé **secrète** | `SUPABASE_SERVICE_ROLE_KEY` |
 | Connect → Connection string → **Transaction pooler** (port 6543) | adresse de la base | `DATABASE_URL` (+ `?sslmode=require`) |
-| Connect → Connection string → **Session pooler** (port 5432) | adresse de la base | pour les migrations seulement (étape 4) |
+| Connect → Connection string → **Session pooler** (port 5432) | adresse de la base | `DATABASE_MIGRATION_URL` (migrations) |
 
-Utilisez les clés **Legacy** (`anon`, `service_role`) : c'est avec elles que le serveur a été écrit et
-testé. La clé `service_role` donne un accès total au projet : elle ne va que dans les variables du
-serveur, jamais dans l'application, jamais dans un message ou un fichier commité.
+Les deux formats de clés fonctionnent (nouvelles `sb_…` ou historiques). Prenez les deux clés dans le **même**
+format. La clé secrète (`sb_secret_…` / `service_role`) donne un accès total au projet : elle ne va que dans
+les variables du serveur, jamais dans l'application, jamais dans un message ou un fichier commité.
 
 ## 3. Renseigner les variables
 
