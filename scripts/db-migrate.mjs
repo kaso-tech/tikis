@@ -23,14 +23,36 @@ if (!connectionString) {
   console.error("[migrate] DATABASE_MIGRATION_URL ou DATABASE_URL requis.");
   process.exit(1);
 }
-// Adresse illisible (souvent un mot de passe avec # / ? @ :) : le dire sans l'afficher, car postgres
-// recopierait l'adresse entière, mot de passe compris, dans les journaux.
-try {
-  const parsed = new URL(connectionString);
-  if (!/^postgres(ql)?:$/.test(parsed.protocol) || !parsed.hostname) throw new Error("adresse incomplète");
-} catch {
-  console.error("[migrate] adresse de la base invalide (DATABASE_MIGRATION_URL ou DATABASE_URL). Le mot de passe contient sans doute un caractère réservé (# / ? @ : %) : le réinitialiser dans Supabase avec des lettres et des chiffres seulement, ou l'encoder (encodeURIComponent).");
+// Adresse illisible : dire précisément pourquoi, sans jamais l'afficher — postgres recopierait l'adresse
+// entière, mot de passe compris, dans les journaux.
+const variable = process.env.DATABASE_MIGRATION_URL ? "DATABASE_MIGRATION_URL" : "DATABASE_URL";
+const problem = describeUrlProblem(connectionString);
+if (problem) {
+  console.error(`[migrate] ${variable} invalide : ${problem}`);
+  console.error("[migrate] Format attendu : postgresql://postgres.<ref>:<mot de passe>@<hôte>.pooler.supabase.com:5432/postgres?sslmode=require");
   process.exit(1);
+}
+
+/** Cause d'une adresse inutilisable, sans rien en citer de secret ; null si elle est lisible. */
+function describeUrlProblem(value) {
+  if (value !== value.trim()) return "espace ou retour à la ligne au début ou à la fin de la valeur — les retirer.";
+  if (/^["']|["']$/.test(value)) return "la valeur est entourée de guillemets — les retirer (Render n'en veut pas).";
+  if (/^[A-Z_]+=/.test(value)) return "la valeur commence par « NOM= » — ne coller que l'adresse, à partir de postgresql://.";
+  if (!/^postgres(ql)?:\/\//.test(value)) return "la valeur ne commence pas par postgresql:// .";
+  if (/[\[\]]/.test(value)) return "crochets [ ] présents — ceux de l'exemple Supabase autour du mot de passe sont à retirer.";
+  if (/\s/.test(value)) return "espace à l'intérieur de l'adresse.";
+  const credentials = value.slice(value.indexOf("//") + 2, value.lastIndexOf("@"));
+  if (value.lastIndexOf("@") < 0) return "pas de « @ » : identifiant et mot de passe manquants.";
+  if ((value.match(/@/g) ?? []).length > 1) return "plusieurs « @ » : le mot de passe en contient un — l'encoder (%40) ou le changer.";
+  if (/[#/?]/.test(credentials)) return "le mot de passe contient # / ou ? — l'encoder ou le changer (lettres et chiffres).";
+  try {
+    const parsed = new URL(value);
+    if (!parsed.hostname) return "hôte manquant après « @ ».";
+    if (!parsed.port) return "port manquant (5432 pour DATABASE_MIGRATION_URL, 6543 pour DATABASE_URL).";
+  } catch {
+    return "adresse illisible (caractère inattendu).";
+  }
+  return null;
 }
 const root = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), "..");
 const client = postgres(connectionString, { prepare: false, max: 1, connect_timeout: 15, onnotice: () => {} });
