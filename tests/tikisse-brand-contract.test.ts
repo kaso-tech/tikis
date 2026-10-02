@@ -25,9 +25,9 @@ describe("charte officielle Tikisse mobile", () => {
   it("définit la palette brun profond, terre cuite et or dans le thème global", () => {
     const theme = read("theme.config.js");
     expect(theme).toContain("primary: { light: '#A95000', dark: '#F8A008' }");
-    expect(theme).toContain("background: { light: '#EEEDF3', dark: '#401000' }");
+    expect(theme).toContain("background: { light: '#EEEDF3', dark: '#15100D' }");
     expect(theme).toContain("foreground: { light: '#241510', dark: '#FFF9F2' }");
-    expect(theme).toContain("border: { light: '#E7D9CF', dark: '#7A4A2D' }");
+    expect(theme).toContain("border: { light: '#E7D9CF', dark: '#3E322B' }");
   });
 
   it("conserve un contraste accessible sur le bouton principal", () => {

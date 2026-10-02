@@ -7,7 +7,7 @@ const { darkColor, darkenStyle, themedStyleSheets } = await import("../lib/theme
 
 describe("mode sombre des couleurs écrites en dur", () => {
   it("un fond blanc devient la surface brune ; un texte blanc (sur bouton plein) reste blanc", () => {
-    expect(darkColor("#FFFFFF", "surface")).toBe("#581E08");
+    expect(darkColor("#FFFFFF", "surface")).toBe("#211915");
     expect(darkColor("#FFFFFF", "text")).toBe("#FFFFFF");
   });
 
@@ -19,12 +19,12 @@ describe("mode sombre des couleurs écrites en dur", () => {
   });
 
   it("ne touche qu'aux propriétés de couleur", () => {
-    expect(darkenStyle({ backgroundColor: "#FFFFFF", color: "#241510", borderColor: "#E7D9CF", fontSize: 14 })).toEqual({ backgroundColor: "#581E08", color: "#FFF9F2", borderColor: "#7A4A2D", fontSize: 14 });
+    expect(darkenStyle({ backgroundColor: "#FFFFFF", color: "#241510", borderColor: "#E7D9CF", fontSize: 14 })).toEqual({ backgroundColor: "#211915", color: "#FFF9F2", borderColor: "#3E322B", fontSize: 14 });
   });
 
   it("la feuille claire reste exactement celle d'origine", () => {
     const sheets = themedStyleSheets({ card: { backgroundColor: "#FFFFFF", padding: 4 } });
     expect(sheets.light.card).toEqual({ backgroundColor: "#FFFFFF", padding: 4 });
-    expect(sheets.dark.card).toEqual({ backgroundColor: "#581E08", padding: 4 });
+    expect(sheets.dark.card).toEqual({ backgroundColor: "#211915", padding: 4 });
   });
 });

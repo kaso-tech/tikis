@@ -21,7 +21,7 @@ describe("palette des champs et menus", () => {
   it("expose un fond de champ neutre, pas une teinte de la couleur de marque", () => {
     // Le crème #F7EFE5 venait du brun d'origine : chaque champ arrivait teinté. Les quatre écrans
     // qui lisent ce token posent tous une bordure par-dessus, donc un fond neutre reste visible.
-    expect(themeSource).toContain('input: scheme === "light" ? "#EEEDF3" : "#4A1C0B"');
+    expect(themeSource).toContain('input: scheme === "light" ? "#EEEDF3" : "#2B211C"');
   });
 
   it("rend en noir le texte que l'utilisateur tape, jamais dans la couleur de marque", () => {

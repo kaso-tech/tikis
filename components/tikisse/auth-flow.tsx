@@ -17,7 +17,7 @@ import { useThemeColors } from "@/lib/use-theme-colors";
 
 /** Palette dédiée à l'écran d'authentification (design chaud, distinct du reste de l'app), alignée
  *  sur les tons sombres déjà utilisés ailleurs (tiroir de navigation) pour rester cohérente. */
-const AUTH_DARK = { bg: "#401000", surface: "#581E08", input: "#401000", border: "#7A4A2D", text: "#FFF9F2", muted: "#D7B79C", accent: "#F8A008", chip: "#2B0D02" };
+const AUTH_DARK = { bg: "#15100D", surface: "#211915", input: "#15100D", border: "#3E322B", text: "#FFF9F2", muted: "#D7B79C", accent: "#F8A008", chip: "#2B0D02" };
 
 type Stage = "welcome" | "phone" | "otp" | "role" | "vehicles" | "name";
 

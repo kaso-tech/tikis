@@ -27,11 +27,11 @@ function buildThemed(scheme: ColorScheme): ThemedColors {
     border: base.border,
     // Fond de champ neutre : le crème #FFF0D8 venait du brun d'origine et teintait chaque saisie.
     // Les quatre usages posent tous une bordure par-dessus, donc un fond neutre reste visible.
-    input: scheme === "light" ? "#EEEDF3" : "#4A1C0B",
+    input: scheme === "light" ? "#EEEDF3" : "#2B211C",
     placeholder: base.muted,
-    pressed: scheme === "light" ? "#E3DFEA" : "#4A1C0B",
+    pressed: scheme === "light" ? "#E3DFEA" : "#2B211C",
     overlay: scheme === "light" ? "rgba(0,0,0,0.42)" : "rgba(0,0,0,0.62)",
-    divider: scheme === "light" ? "#EFE5DF" : "#63331E",
+    divider: scheme === "light" ? "#EFE5DF" : "#342A24",
   };
 }
 

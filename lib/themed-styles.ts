@@ -16,23 +16,23 @@ const DARK_TEXT: Record<string, string> = {
   "#A95000": "#F8A008", "#C65A00": "#F1B653", "#C96900": "#F1B653", "#7A3000": "#F8A008",
   "#A43F32": "#F09286", "#C75145": "#F09286", "#8D362B": "#F09286",
   "#367552": "#72C497", "#3C8B60": "#72C497", "#2E704E": "#72C497", "#145C45": "#72C497", "#4D9B72": "#8DD5AD",
-  "#EEEDF3": "#4A1C0B", "#E7D9CF": "#7A4A2D", "#F1E7E0": "#7A4A2D",
+  "#EEEDF3": "#2B211C", "#E7D9CF": "#3E322B", "#F1E7E0": "#3E322B",
 };
 
 const DARK_SURFACE: Record<string, string> = {
-  "#FFFFFF": "#581E08", "#FFF": "#581E08", "#FAF8F5": "#4A1C0B", "#FFF9F2": "#581E08",
-  "#EEEDF3": "#4A1C0B", "#F2E9E3": "#4A1C0B", "#F0E5DE": "#4A1C0B", "#F2E7E0": "#4A1C0B",
-  "#FFF0D8": "#5A3A12", "#FFF7ED": "#5A3A12", "#FFF5E7": "#5A3A12", "#F7EFE5": "#4A2A12",
-  "#F8E7E3": "#5A2416", "#F9E7E2": "#5A2416", "#F9E8E4": "#5A2416", "#FBE9E5": "#5A2416",
+  "#FFFFFF": "#211915", "#FFF": "#211915", "#FAF8F5": "#2B211C", "#FFF9F2": "#211915",
+  "#EEEDF3": "#2B211C", "#F2E9E3": "#2B211C", "#F0E5DE": "#2B211C", "#F2E7E0": "#2B211C",
+  "#FFF0D8": "#382A18", "#FFF7ED": "#382A18", "#FFF5E7": "#382A18", "#F7EFE5": "#30251B",
+  "#F8E7E3": "#3A201C", "#F9E7E2": "#3A201C", "#F9E8E4": "#3A201C", "#FBE9E5": "#3A201C",
   "#E7F2EC": "#1F3B2A", "#E6F4ED": "#1F3B2A", "#E8F2EE": "#1F3B2A",
   // Tons de bordure employés en fond (pistes de progression, blocs du fond de carte, séparateurs pleins).
-  "#E7D9CF": "#6A3418", "#F1E7E0": "#4A1C0B", "#E2D4CB": "#6A3418", "#E2D3CC": "#6A3418", "#D7C3B8": "#6A3418",
+  "#E7D9CF": "#3A2E27", "#F1E7E0": "#2B211C", "#E2D4CB": "#3A2E27", "#E2D3CC": "#3A2E27", "#D7C3B8": "#3A2E27",
 };
 
 const DARK_BORDER: Record<string, string> = {
-  "#E7D9CF": "#7A4A2D", "#F1E7E0": "#7A4A2D", "#EFE5DF": "#63331E", "#EEEDF3": "#63331E",
-  "#E2D4CB": "#7A4A2D", "#E2D3CC": "#7A4A2D", "#D7C3B8": "#7A4A2D", "#E2D0C5": "#63331E", "#DCCAC0": "#7A4A2D",
-  "#CBB8AB": "#8A5A3B", "#C9B6AA": "#8A5A3B", "#E9B8AF": "#8A3B2E", "#FFFFFF": "#7A4A2D",
+  "#E7D9CF": "#3E322B", "#F1E7E0": "#3E322B", "#EFE5DF": "#342A24", "#EEEDF3": "#342A24",
+  "#E2D4CB": "#3E322B", "#E2D3CC": "#3E322B", "#D7C3B8": "#3E322B", "#E2D0C5": "#342A24", "#DCCAC0": "#3E322B",
+  "#CBB8AB": "#5A4A40", "#C9B6AA": "#5A4A40", "#E9B8AF": "#6A3A33", "#FFFFFF": "#3E322B",
 };
 
 export type ColorRole = "text" | "surface" | "border";
