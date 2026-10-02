@@ -74,6 +74,8 @@ function Shell() {
   const { admin, logout } = useAdminAuth();
   const [page, setPage] = useState<PageKey>("dashboard");
   const [search, setSearch] = useState("");
+  // Sur téléphone, le menu est replié derrière le bouton ☰ ; il se referme dès qu'on choisit une page.
+  const [navOpen, setNavOpen] = useState(false);
   const [openReportsCount, setOpenReportsCount] = useState(0);
   useEffect(() => {
     // Avant ce correctif, un nouveau signalement n'était visible qu'en rechargeant la page Tableau de
@@ -95,7 +97,7 @@ function Shell() {
   useEffect(() => {
     function onNavigate(event: Event) {
       const custom = event as CustomEvent<{ page: PageKey }>;
-      if (custom.detail?.page) setPage(custom.detail.page);
+      if (custom.detail?.page) { setPage(custom.detail.page); setNavOpen(false); }
     }
     window.addEventListener("tikisse:navigate", onNavigate as EventListener);
     return () => window.removeEventListener("tikisse:navigate", onNavigate as EventListener);
@@ -121,10 +123,11 @@ function Shell() {
   const currentGroup = visibleNav.find((item) => item.key === activePage)?.group ?? "ops";
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
+    <div className={`app-shell ${navOpen ? "nav-open" : ""}`}>
+      <div className="sidebar-backdrop" onClick={() => setNavOpen(false)} aria-hidden="true" />
+      <aside className="sidebar" id="admin-sidebar">
         <div className="sidebar-brand">
-          <img className="sidebar-brand-logo" src="/logo.png" alt="Logo Tikisse" />
+          <img className="sidebar-brand-logo" src={`${import.meta.env.BASE_URL}logo.png`} alt="Logo Tikisse" />
           <div className="sidebar-brand-text">
             <div className="sidebar-brand-title">Tikisse Admin</div>
             <div className="sidebar-brand-sub">Console opérateur</div>
@@ -141,7 +144,7 @@ function Shell() {
                   <button
                     key={item.key}
                     className={`sidebar-link ${activePage === item.key ? "active" : ""}`}
-                    onClick={() => setPage(item.key)}
+                    onClick={() => { setPage(item.key); setNavOpen(false); }}
                   >
                     <NavIcon glyph={item.icon} />
                     <span className="sidebar-link-label">{item.label}</span>
@@ -162,6 +165,17 @@ function Shell() {
       </aside>
       <div className="main-wrap">
         <header className="topbar">
+          <button
+            className="icon-btn nav-toggle"
+            type="button"
+            aria-label={navOpen ? "Fermer le menu" : "Ouvrir le menu"}
+            aria-expanded={navOpen}
+            aria-controls="admin-sidebar"
+            onClick={() => setNavOpen((open) => !open)}
+          >
+            ☰
+          </button>
+          <img className="topbar-logo" src={`${import.meta.env.BASE_URL}logo.png`} alt="" />
           <div className="crumbs">
             <span>{GROUP_LABELS[currentGroup]}</span>
             <span className="sep">/</span>
