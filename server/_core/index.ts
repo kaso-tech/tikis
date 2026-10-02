@@ -60,8 +60,17 @@ async function startServer() {
   registerStorageProxy(app);
   registerAdminDocumentRoutes(app);
 
+  // Rien de secret : de quoi vérifier d'un coup d'œil quelle version tourne et comment les SMS sont réglés.
+  // `commit` : fourni par Render (RENDER_GIT_COMMIT) ; les EXPO_PUBLIC_* sont celles du build de la version web.
   app.get("/api/health", (_req, res) => {
-    res.json({ ok: true, timestamp: Date.now() });
+    res.json({
+      ok: true,
+      timestamp: Date.now(),
+      commit: (process.env.RENDER_GIT_COMMIT ?? "").slice(0, 7) || undefined,
+      otpMode: process.env.TIKISSE_OTP_MODE ?? process.env.TIKIS_OTP_MODE ?? "sim",
+      webPhoneAuth: process.env.EXPO_PUBLIC_ENABLE_SUPABASE_PHONE_AUTH === "true",
+      webSupabaseConfigured: Boolean(process.env.EXPO_PUBLIC_SUPABASE_URL && process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY),
+    });
   });
 
   // Tâches planifiées : exécutées par ce serveur (startScheduler, plus bas) ; ces routes servent au
