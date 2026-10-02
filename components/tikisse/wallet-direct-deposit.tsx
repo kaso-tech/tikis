@@ -275,7 +275,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   }, [statusQuery.data, stage, deposit, onSuccess]);
 
   const displayedPollError = pollError || (stage === "confirmation" && statusQuery.error
-    ? "La confirmation YengaPay est momentanément indisponible. La vérification automatique va réessayer."
+    ? "La confirmation du paiement est momentanément indisponible. La vérification automatique va réessayer."
     : "");
 
   // ===== Rendu =====

@@ -53,6 +53,9 @@ export default function WalletScreen() {
   const pendingDirectDeposits = pendingDirectDepositsQuery.data ?? [];
   const topPendingDirectDeposit = pendingDirectDeposits[0] ?? null;
   const initiateMutation = trpc.wallet.initiateYengaPay.useMutation();
+  // LigdiCash : un seul bouton, le paiement Mobile Money dans l'application (pas de page de paiement externe).
+  const paymentOptionsQuery = trpc.wallet.paymentOptions.useQuery(undefined, { staleTime: 5 * 60_000 });
+  const ligdicash = paymentOptionsQuery.data?.directProvider === "ligdicash";
   const settleMutation = trpc.wallet.settleYengaPayTest.useMutation();
   const [requestType, setRequestType] = useState<"deposit" | "withdrawal" | null>(null);
   const [amountInput, setAmountInput] = useState("");
@@ -199,7 +202,18 @@ export default function WalletScreen() {
           </Pressable>
         ) : null}
 
-        <View style={styles.actionsRow}>
+        {ligdicash ? (
+          <View style={styles.actionsRow}>
+            <Pressable onPress={() => setDirectModalVisible(true)} accessibilityRole="button" accessibilityLabel="Recharger mon Wallet par Mobile Money" style={({ pressed }) => [styles.actionCard, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]}>
+              <View style={[styles.actionIcon, { backgroundColor: theme.background }]}><MaterialIcons name="add-card" size={15} color={theme.primary} /></View>
+              <View style={styles.actionText}>
+                <Text style={[styles.actionLabel, { color: theme.foreground }]}>Recharger</Text>
+                <Text style={[styles.actionSub, { color: theme.muted }]}>Orange Money · Moov Money via LigdiCash</Text>
+              </View>
+              <MaterialIcons name="chevron-right" size={18} color={theme.muted} />
+            </Pressable>
+          </View>
+        ) : <View style={styles.actionsRow}>
           <Pressable onPress={() => openRequest("deposit")} style={({ pressed }) => [styles.actionCard, { backgroundColor: theme.surface, borderColor: theme.border }, pressed && styles.pressed]}>
             <View style={[styles.actionIcon, { backgroundColor: theme.background }]}><MaterialIcons name="add-card" size={15} color={theme.primary} /></View>
             <View style={styles.actionText}>
@@ -214,7 +228,7 @@ export default function WalletScreen() {
               <Text style={[styles.actionSub, { color: theme.muted }]}>Mobile Money in-app</Text>
             </View>
           </Pressable>
-        </View>
+        </View>}
 
         {isDriver ? null : (
           <View style={[styles.senderInfo, { backgroundColor: theme.background, borderColor: theme.border }]}>

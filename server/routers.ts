@@ -868,6 +868,11 @@ export const appRouter = router({
       const profile = await currentTikisseProfile(ctx.tikisseProfilePhone);
       return db.settleYengaPayTestPayment({ ...input, profilePhone: profile.phone });
     }),
+    /** Prestataire des rechargements, pour que l'application présente le bon parcours. */
+    paymentOptions: tikisseProtectedProcedure.query(async () => {
+      const { directPaymentProvider } = await import("./direct-deposit");
+      return { directProvider: directPaymentProvider() };
+    }),
     // ===== Paiement Mobile Money direct (in-app, sans redirection web) =====
     requestDirectDeposit: tikisseProtectedProcedure.input(z.object({
       amount: z.number().int().min(100).max(10_000_000),
