@@ -1423,6 +1423,10 @@ export async function adminSettlePaymentTransaction(input: { paymentId: string; 
   });
 }
 
+/** Notification de compte (décision sur l'identité) : rangée avec les événements de livraison, sans livraison.
+ *  Partagé avec l'application (shared/tikisse-domain.ts), qui l'ouvre sur l'écran « Vérification ». */
+export { ACCOUNT_VERIFICATION_NOTIFICATION } from "../shared/tikisse-domain";
+
 export async function listTikisseDeliveryEvents(profilePhone: string): Promise<InAppNotification[]> {
   const db = await getDb();
   if (!db) return [];

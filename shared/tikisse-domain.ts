@@ -287,3 +287,6 @@ export const deliveryStatusMeta: Record<
   cancelled: { label: "Annulée", color: "#A43740", background: "#F7E6E7" },
   expired: { label: "Expirée", color: "#6B6257", background: "#EEE8E0" },
 };
+
+/** `deliveryId` d'une notification qui concerne le compte et non une livraison (décision sur l'identité). */
+export const ACCOUNT_VERIFICATION_NOTIFICATION = "account:verification";

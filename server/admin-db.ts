@@ -1132,19 +1132,33 @@ export async function adminReviewKyc(input: { submissionId: string; decision: "a
   const dbc = await getDb();
   if (!dbc) throw new Error("La console d’administration est temporairement indisponible.");
   const rejectionReason = input.decision === "rejected" ? (input.rejectionReason?.trim() || "Documents non conformes.") : null;
+  const title = input.decision === "approved" ? "Identité vérifiée" : "Vérification d’identité refusée";
+  const body = input.decision === "approved" ? "Vos documents sont validés : vous pouvez candidater aux livraisons." : `Motif : ${rejectionReason} Vous pouvez soumettre de nouveaux documents.`;
   const driverPhone = await dbc.transaction(async (tx) => {
     const submission = (await tx.select().from(tikisseKycSubmissions).where(eq(tikisseKycSubmissions.id, input.submissionId)).limit(1).for("update"))[0];
     if (!submission) throw new Error("Dossier introuvable.");
     if (submission.status !== "submitted") throw new Error(`Ce dossier a déjà été ${submission.status === "approved" ? "approuvé" : "refusé"}. Le livreur doit en soumettre un nouveau pour une nouvelle décision.`);
     await tx.update(tikisseKycSubmissions).set({ status: input.decision, rejectionReason, reviewedAt: new Date(), reviewedByAdminId: input.adminId }).where(eq(tikisseKycSubmissions.id, input.submissionId));
+    // Notification dans l'application (cloche), enregistrée avec la décision : elle arrive aussi sur le web
+    // et sur un téléphone sans notifications push. Pas de livraison : l'identifiant porte le marqueur
+    // ACCOUNT_VERIFICATION_NOTIFICATION, que l'application ouvre sur l'écran « Vérification ».
+    await tx.insert(tikisseDeliveryEvents).values({
+      id: randomUUID(),
+      deliveryId: db.ACCOUNT_VERIFICATION_NOTIFICATION,
+      eventType: "kyc_decision",
+      recipientPhone: submission.driverPhone,
+      title,
+      body,
+      tone: input.decision === "approved" ? "success" : "warning",
+      idempotencyKey: `kyc:${input.submissionId}:${input.decision}`,
+    }).onConflictDoNothing();
     return submission.driverPhone;
   });
-  // Pas de livraison à laquelle rattacher une notification in-app : un push, et l'écran « Vérification »
-  // de l'app affiche déjà le statut et le motif du refus. Best-effort : la décision est enregistrée.
+  // Push en plus, best-effort : la décision et la notification dans l'application sont déjà enregistrées.
   void db.enqueuePushToPhone({
     phone: driverPhone,
-    title: input.decision === "approved" ? "Identité vérifiée" : "Vérification d’identité refusée",
-    body: input.decision === "approved" ? "Vos documents sont validés : vous pouvez candidater aux livraisons." : `Motif : ${rejectionReason} Vous pouvez soumettre de nouveaux documents.`,
+    title,
+    body,
     data: { kind: "kyc_decision", screen: "verification" },
     channelId: "tikisse-transactional",
   }).catch((cause) => console.error("[kyc] notification non envoyée", cause));

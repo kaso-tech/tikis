@@ -6,7 +6,7 @@ import { useThemeColors } from "@/lib/use-theme-colors";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
-import { formatRelativeDate, type InAppNotification } from "@/shared/tikisse-domain";
+import { ACCOUNT_VERIFICATION_NOTIFICATION, formatRelativeDate, type InAppNotification } from "@/shared/tikisse-domain";
 
 const ICON_BY_TONE: Record<InAppNotification["tone"], { icon: React.ComponentProps<typeof MaterialIcons>["name"]; bgClass: "primary" | "success" | "warning" }> = {
   info: { icon: "notifications", bgClass: "primary" },
@@ -69,6 +69,10 @@ export default function NotificationsScreen() {
       markOneReadMutation.mutate({ notificationId: notif.id });
     }
     if (!notif.deliveryId) return;
+    if (notif.deliveryId === ACCOUNT_VERIFICATION_NOTIFICATION) {
+      router.push("/verification" as any);
+      return;
+    }
     // Les livreurs n'ont jamais accès au suivi en direct : toujours la page de détails.
     // Pour les expéditeurs, seul le suivi d'une livraison "En cours" ouvre la carte en direct.
     if (role === "sender" && notif.deliveryStatus === "active") {
