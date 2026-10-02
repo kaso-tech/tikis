@@ -71,12 +71,27 @@ export function AuthFlow() {
   const [selectedVehicles, setSelectedVehicles] = useState<VehicleType[]>([]);
   const [fullName, setFullName] = useState("");
   const [nameError, setNameError] = useState("");
+  // Ville de l'utilisateur, dans le pays choisi au début : texte saisi, et nom retenu dans les suggestions.
+  const [cityInput, setCityInput] = useState("");
+  const [selectedCity, setSelectedCity] = useState("");
+  const [cityQuery, setCityQuery] = useState("");
+  const [cityError, setCityError] = useState("");
   const [referralCode, setReferralCode] = useState("");
   const [referralFieldOpen, setReferralFieldOpen] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const inputs = useRef<(TextInput | null)[]>([]);
   const phone = useMemo(() => normalizedInternationalPhone(phoneInput, country), [country, phoneInput]);
   const otp = digits.join("");
+  useEffect(() => {
+    const query = cityInput.trim();
+    const timer = setTimeout(() => setCityQuery(query.length >= 2 && query !== selectedCity ? query : ""), 300);
+    return () => clearTimeout(timer);
+  }, [cityInput, selectedCity]);
+  const citySuggestionsQuery = trpc.geography.signupCities.useQuery(
+    { query: cityQuery, countryCode: country.id },
+    { enabled: stage === "name" && cityQuery.length >= 2, retry: false, staleTime: 5 * 60_000 },
+  );
+  const citySuggestions = cityQuery && !selectedCity ? citySuggestionsQuery.data ?? [] : [];
   /**
    * Le bandeau annonçait « INSCRIPTION · Étape n sur 5 » dès le premier écran,
    * à quelqu'un qui se connectait comme à quelqu'un qui s'inscrivait — on ne
@@ -261,13 +276,25 @@ export function AuthFlow() {
       setNameError("Sélectionnez au moins un engin pour votre compte livreur.");
       return;
     }
+    // Ville choisie dans la liste ; à défaut (service de cartes muet), le texte saisi, vérifié par le serveur.
+    const city = selectedCity || cityInput.trim();
+    if (city.length < 2) {
+      setCityError(`Indiquez votre ville au ${country.name}.`);
+      haptic.error();
+      return;
+    }
+    if (!selectedCity && citySuggestions.length > 0) {
+      setCityError("Choisissez votre ville dans la liste proposée.");
+      haptic.error();
+      return;
+    }
     setFinishing(true);
     await new Promise((resolve) => setTimeout(resolve, 550));
     const localProfile = createRegisteredProfile({ fullName: validatedName, phone, countryCode: country.id, role: selectedRole, vehicles: selectedVehicles });
     const sanitizedReferralCode = referralCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
     const referredByCode = sanitizedReferralCode.length >= 4 ? sanitizedReferralCode : undefined;
     try {
-      const persistedProfile = supabaseAccessToken ? await registerSupabaseProfileMutation.mutateAsync({ phone: localProfile.phone, fullName: localProfile.fullName, countryCode: localProfile.countryCode, role: localProfile.role, vehicles: localProfile.vehicles, accessToken: supabaseAccessToken, referredByCode }) : await registerProfileMutation.mutateAsync({ phone: localProfile.phone, fullName: localProfile.fullName, countryCode: localProfile.countryCode, role: localProfile.role, vehicles: localProfile.vehicles, otp: otp as "730512", referredByCode });
+      const persistedProfile = supabaseAccessToken ? await registerSupabaseProfileMutation.mutateAsync({ phone: localProfile.phone, fullName: localProfile.fullName, countryCode: localProfile.countryCode, role: localProfile.role, vehicles: localProfile.vehicles, accessToken: supabaseAccessToken, referredByCode, city }) : await registerProfileMutation.mutateAsync({ phone: localProfile.phone, fullName: localProfile.fullName, countryCode: localProfile.countryCode, role: localProfile.role, vehicles: localProfile.vehicles, otp: otp as "730512", referredByCode, city });
       await setTikisseSessionToken(persistedProfile.sessionToken);
       registerProfile(persistedProfile.profile);
     } catch (error) {
@@ -282,7 +309,7 @@ export function AuthFlow() {
     router.replace("/(tabs)");
   }
 
-  return <SafeAreaView style={[styles.safeArea, isDark && { backgroundColor: AUTH_DARK.bg }]} edges={["top", "bottom"]}><KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">{stage === "welcome" ? null : <FlowHeader creating={creating} step={creationStep} total={creationTotal} isDark={isDark} onBack={() => { if (stage === "phone") setStage("welcome"); else if (stage === "otp") setStage("phone"); else if (stage === "role") setStage("phone"); else if (stage === "vehicles") setStage("role"); else setStage(selectedRole === "driver" ? "vehicles" : "role"); }} />}{stage === "welcome" ? <WelcomeScreen onContinue={() => setStage("phone")} isDark={isDark} /> : null}{stage === "phone" ? <PhoneScreen country={country} value={phoneInput} error={phoneError} loading={sending} onCountryPress={() => setCountryPickerOpen(true)} onChange={(value) => { setPhoneInput(sanitizePhoneInput(value, country)); setPhoneError(""); }} onContinue={() => void requestOtp()} isDark={isDark} /> : null}{stage === "otp" ? <OtpScreen phone={phone} digits={digits} error={otpError} verifying={verifying} secondsLeft={secondsLeft} provider={otpProvider} onChangeDigit={updateDigit} onKeyPress={handleKeyPress} inputRefs={inputs} onResend={() => void resendOtp()} onSubmit={() => void submitOtp()} isDark={isDark} /> : null}{stage === "role" ? <RoleScreen selectedRole={selectedRole} onSelect={setSelectedRole} onContinue={continueRole} isDark={isDark} /> : null}{stage === "vehicles" ? <VehiclesScreen selected={selectedVehicles} onToggle={toggleVehicle} onContinue={continueVehicles} isDark={isDark} /> : null}{stage === "name" ? <NameScreen role={selectedRole} phone={phone} vehicles={selectedVehicles} value={fullName} error={nameError} loading={finishing} onChange={(value) => { setFullName(sanitizeFullName(value, { preserveTrailingSeparator: true })); setNameError(""); }} onContinue={() => void finishRegistration()} onEditRole={() => setStage("role")} onEditVehicles={() => setStage("vehicles")} referralCode={referralCode} referralFieldOpen={referralFieldOpen} onReferralFieldOpen={() => setReferralFieldOpen(true)} onReferralCodeChange={setReferralCode} isDark={isDark} /> : null}</ScrollView></KeyboardAvoidingView><CountryPicker visible={isCountryPickerOpen} selected={country} countries={availableCountries} onClose={() => setCountryPickerOpen(false)} onSelect={selectCountry} isDark={isDark} /></SafeAreaView>;
+  return <SafeAreaView style={[styles.safeArea, isDark && { backgroundColor: AUTH_DARK.bg }]} edges={["top", "bottom"]}><KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">{stage === "welcome" ? null : <FlowHeader creating={creating} step={creationStep} total={creationTotal} isDark={isDark} onBack={() => { if (stage === "phone") setStage("welcome"); else if (stage === "otp") setStage("phone"); else if (stage === "role") setStage("phone"); else if (stage === "vehicles") setStage("role"); else setStage(selectedRole === "driver" ? "vehicles" : "role"); }} />}{stage === "welcome" ? <WelcomeScreen onContinue={() => setStage("phone")} isDark={isDark} /> : null}{stage === "phone" ? <PhoneScreen country={country} value={phoneInput} error={phoneError} loading={sending} onCountryPress={() => setCountryPickerOpen(true)} onChange={(value) => { setPhoneInput(sanitizePhoneInput(value, country)); setPhoneError(""); }} onContinue={() => void requestOtp()} isDark={isDark} /> : null}{stage === "otp" ? <OtpScreen phone={phone} digits={digits} error={otpError} verifying={verifying} secondsLeft={secondsLeft} provider={otpProvider} onChangeDigit={updateDigit} onKeyPress={handleKeyPress} inputRefs={inputs} onResend={() => void resendOtp()} onSubmit={() => void submitOtp()} isDark={isDark} /> : null}{stage === "role" ? <RoleScreen selectedRole={selectedRole} onSelect={setSelectedRole} onContinue={continueRole} isDark={isDark} /> : null}{stage === "vehicles" ? <VehiclesScreen selected={selectedVehicles} onToggle={toggleVehicle} onContinue={continueVehicles} isDark={isDark} /> : null}{stage === "name" ? <NameScreen role={selectedRole} phone={phone} vehicles={selectedVehicles} value={fullName} error={nameError} loading={finishing} onChange={(value) => { setFullName(sanitizeFullName(value, { preserveTrailingSeparator: true })); setNameError(""); }} onContinue={() => void finishRegistration()} onEditRole={() => setStage("role")} onEditVehicles={() => setStage("vehicles")} referralCode={referralCode} referralFieldOpen={referralFieldOpen} onReferralFieldOpen={() => setReferralFieldOpen(true)} onReferralCodeChange={setReferralCode} countryName={country.name} cityInput={cityInput} cityError={cityError} citySuggestions={citySuggestions} citySearching={citySuggestionsQuery.isFetching} selectedCity={selectedCity} onCityChange={(value) => { setCityInput(value); setSelectedCity(""); setCityError(""); }} onSelectCity={(value) => { setSelectedCity(value); setCityInput(value); setCityError(""); Keyboard.dismiss(); }} isDark={isDark} /> : null}</ScrollView></KeyboardAvoidingView><CountryPicker visible={isCountryPickerOpen} selected={country} countries={availableCountries} onClose={() => setCountryPickerOpen(false)} onSelect={selectCountry} isDark={isDark} /></SafeAreaView>;
 }
 
 /**
@@ -395,7 +422,7 @@ function VehiclesScreen({ selected, onToggle, onContinue, isDark }: { selected: 
  * sur l'écran d'avant. Le récapitulatif le remet sous les yeux, et rend chaque
  * ligne corrigeable sans revenir en arrière à l'aveugle.
  */
-function NameScreen({ role, phone, vehicles, value, error, loading, onChange, onContinue, onEditRole, onEditVehicles, referralCode, referralFieldOpen, onReferralFieldOpen, onReferralCodeChange, isDark }: { role: UserRole | null; phone: string; vehicles: VehicleType[]; value: string; error: string; loading: boolean; onChange: (value: string) => void; onContinue: () => void; onEditRole: () => void; onEditVehicles: () => void; referralCode: string; referralFieldOpen: boolean; onReferralFieldOpen: () => void; onReferralCodeChange: (value: string) => void; isDark: boolean }) {
+function NameScreen({ role, phone, vehicles, value, error, loading, onChange, onContinue, onEditRole, onEditVehicles, referralCode, referralFieldOpen, onReferralFieldOpen, onReferralCodeChange, countryName, cityInput, cityError, citySuggestions, citySearching, selectedCity, onCityChange, onSelectCity, isDark }: { role: UserRole | null; phone: string; vehicles: VehicleType[]; value: string; error: string; loading: boolean; onChange: (value: string) => void; onContinue: () => void; onEditRole: () => void; onEditVehicles: () => void; referralCode: string; referralFieldOpen: boolean; onReferralFieldOpen: () => void; onReferralCodeChange: (value: string) => void; countryName: string; cityInput: string; cityError: string; citySuggestions: string[]; citySearching: boolean; selectedCity: string; onCityChange: (value: string) => void; onSelectCity: (value: string) => void; isDark: boolean }) {
   return <View style={styles.form}>
     <View style={[styles.heroIcon, isDark && { backgroundColor: AUTH_DARK.surface }]}><MaterialIcons name="badge" size={30} color={isDark ? AUTH_DARK.accent : "#A95000"} /></View>
     <Text style={[styles.title, isDark && { color: AUTH_DARK.text }]}>Comment devons-nous vous appeler ?</Text>
@@ -403,6 +430,20 @@ function NameScreen({ role, phone, vehicles, value, error, loading, onChange, on
     <Text style={[styles.fieldLabel, isDark && { color: AUTH_DARK.muted }]}>NOM</Text>
     <TextInput accessibilityLabel="Nom" autoCapitalize="words" autoComplete="name" maxLength={70} placeholder="Ex. Mariam ou Mariam Ouédraogo" placeholderTextColor={isDark ? AUTH_DARK.muted : "#9B8478"} value={value} onChangeText={onChange} style={[styles.nameInput, isDark && { backgroundColor: AUTH_DARK.input, color: AUTH_DARK.text }, error && styles.fieldError]} returnKeyType={referralFieldOpen ? "next" : "done"} onSubmitEditing={referralFieldOpen ? undefined : onContinue} />
     {error ? <Text style={styles.error}>{error}</Text> : null}
+
+    <Text style={[styles.fieldLabel, isDark && { color: AUTH_DARK.muted }]}>VILLE</Text>
+    <TextInput accessibilityLabel="Ville" autoCapitalize="words" autoCorrect={false} autoComplete="off" maxLength={80} placeholder={`Votre ville au ${countryName}`} placeholderTextColor={isDark ? AUTH_DARK.muted : "#9B8478"} value={cityInput} onChangeText={onCityChange} style={[styles.nameInput, isDark && { backgroundColor: AUTH_DARK.input, color: AUTH_DARK.text }, cityError && styles.fieldError]} returnKeyType="done" />
+    {citySearching && !selectedCity ? <Text style={[styles.helper, isDark && { color: AUTH_DARK.muted }]}>Recherche…</Text> : null}
+    {citySuggestions.length > 0 ? <View style={[styles.citySuggestions, isDark && { backgroundColor: AUTH_DARK.surface, borderColor: AUTH_DARK.border }]}>
+      {citySuggestions.map((name) => (
+        <Pressable key={name} accessibilityRole="button" accessibilityLabel={`Choisir ${name}`} onPress={() => onSelectCity(name)} style={({ pressed }) => [styles.cityOption, pressed && styles.pressed]}>
+          <MaterialIcons name="location-city" size={17} color={isDark ? AUTH_DARK.muted : "#76665E"} />
+          <Text style={[styles.cityOptionText, isDark && { color: AUTH_DARK.text }]}>{name}</Text>
+        </Pressable>
+      ))}
+    </View> : null}
+    {selectedCity ? <Text style={[styles.helper, isDark && { color: AUTH_DARK.muted }]}>Ville retenue : {selectedCity}, {countryName}.</Text> : null}
+    {cityError ? <Text style={styles.error}>{cityError}</Text> : null}
 
     {referralFieldOpen ? <>
       <Text style={[styles.fieldLabel, isDark && { color: AUTH_DARK.muted }]}>CODE DE PARRAINAGE (FACULTATIF)</Text>
@@ -502,6 +543,9 @@ const styles = StyleSheet.create({
   vehicleCardActive: { ...baseStyles.vehicleCardActive, backgroundColor: "#A95000", borderWidth: 0 },
   vehicleTitle: { ...baseStyles.vehicleTitle, fontWeight: "600" },
   nameInput: { ...baseStyles.nameInput, borderRadius: 10, borderWidth: 0, fontWeight: "500" },
+  citySuggestions: { marginTop: 6, borderRadius: 10, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7D9CF", overflow: "hidden" },
+  cityOption: { minHeight: 46, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14 },
+  cityOptionText: { flex: 1, color: "#241510", fontSize: 15, fontWeight: "500" },
   lockedRole: { ...baseStyles.lockedRole, borderRadius: 10, marginTop: 14 },
   countrySheet: { ...baseStyles.countrySheet, borderTopLeftRadius: 14, borderTopRightRadius: 14, padding: 16, paddingBottom: 24 },
   sheetTitle: { ...baseStyles.sheetTitle, fontWeight: "600" },

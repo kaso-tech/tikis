@@ -394,6 +394,20 @@ export async function cityBelongsToCountry(city: string, countryCode: string) {
   return matches.some((match) => normalizeCityName(match) === normalizedCity);
 }
 
+/**
+ * Ville saisie à l'inscription : le nom officiel si elle figure parmi les villes du pays, une erreur si le
+ * service répond sans elle, et le texte saisi tel quel si le service ne répond pas (indisponible, ou petite
+ * localité inconnue) — l'inscription ne doit pas échouer pour une panne du service de cartes.
+ */
+export async function resolveSignupCity(city: string, countryCode: string): Promise<string> {
+  const typed = sanitizePlaceText(city, 80).trim();
+  const matches = await searchCities(typed, countryCode);
+  if (matches.length === 0) return typed;
+  const found = matches.find((match) => normalizeCityName(match) === normalizeCityName(typed));
+  if (!found) throw new Error("Choisissez votre ville dans la liste proposée.");
+  return found;
+}
+
 export async function searchPlaces(query: string, bias?: { latitude: number; longitude: number }, countryCode?: string, includeCommunityFallback = false) {
   const textQuery = sanitizePlaceText(query, 120);
   if (textQuery.length < 2) return [];

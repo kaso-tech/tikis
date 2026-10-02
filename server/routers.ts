@@ -64,6 +64,7 @@ const profileFieldsSchema = z.object({
   role: z.enum(["sender", "driver"]),
   vehicles: z.array(vehicleSchema).max(5),
   referredByCode: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{4,8}$/).optional(),
+  city: z.string().trim().min(2).max(80).optional(),
 });
 
 function validateProfileRole(value: z.infer<typeof profileFieldsSchema>, ctx: z.RefinementCtx) {
@@ -143,6 +144,16 @@ async function enforcePerIpRateLimit(req: { ip?: string; socket?: { remoteAddres
   if (!allowed) throw new Error("Trop de tentatives depuis cette connexion. Réessayez plus tard.");
 }
 
+
+/** Comptes créés avant que l'inscription enregistre le pays : celui de l'indicatif, à la connexion. */
+async function withCountryFromPhone<T extends { phone: string; country?: string | null }>(profile: T) {
+  if (profile.country) return profile;
+  try {
+    return { ...profile, ...(await db.updateTikisseProfile(profile.phone, { country: findCountryForPhone(profile.phone).id })) };
+  } catch {
+    return profile;
+  }
+}
 
 function toPublicProfile(profile: { phone: string; fullName: string; accountType: "sender" | "driver"; vehicles: string; photoKey?: string | null; email?: string | null; phoneVerified?: boolean; emailVerified?: boolean; referralCode?: string | null; status?: "active" | "suspended" | "banned"; statusReason?: string | null; country?: string | null; city?: string | null; deletionRequestedAt?: Date | null; deletionScheduledAt?: Date | null }) {
   let vehicles: ValidVehicle[] = [];
@@ -392,9 +403,10 @@ export const appRouter = router({
     lookup: publicProcedure.input(z.object({ phone: phoneSchema, otp: simulationOtpSchema })).mutation(async ({ input, ctx }) => {
       await enforcePerIpRateLimit(ctx.req);
       await enforcePerPhoneRateLimit("lookup", input.phone);
-      const profile = await db.getTikisseProfileByPhone(input.phone);
-      if (profile) assertProfileNotBlocked(profile);
-      if (!profile) return null;
+      const found = await db.getTikisseProfileByPhone(input.phone);
+      if (found) assertProfileNotBlocked(found);
+      if (!found) return null;
+      const profile = await withCountryFromPhone(found);
       const sessionToken = await createTikisseProfileSession(profile.phone);
       setTikisseProfileCookie(ctx.res, ctx.req, sessionToken);
       return { profile: toPublicProfile(profile), sessionToken };
@@ -406,7 +418,7 @@ export const appRouter = router({
       const profile = await db.getTikisseProfileByPhone(input.phone);
       if (!profile) return null;
       assertProfileNotBlocked(profile);
-      const linked = await db.linkTikisseProfileToSupabaseUser(profile.phone, supabaseUserId);
+      const linked = await withCountryFromPhone(await db.linkTikisseProfileToSupabaseUser(profile.phone, supabaseUserId));
       const sessionToken = await createTikisseProfileSession(linked.phone);
       setTikisseProfileCookie(ctx.res, ctx.req, sessionToken);
       return { profile: toPublicProfile(linked), sessionToken };
@@ -415,6 +427,7 @@ export const appRouter = router({
       await enforcePerIpRateLimit(ctx.req);
       await enforcePerPhoneRateLimit("register", input.phone);
       await assertCountryEnabled(input.countryCode);
+      const city = input.city ? await geography.resolveSignupCity(input.city, input.countryCode) : null;
       const referralCode = input.role === "driver" ? await generateUniqueReferralCode(input.fullName) : undefined;
       const profile = await db.createTikisseProfile({
         phone: input.phone,
@@ -422,6 +435,8 @@ export const appRouter = router({
         accountType: input.role,
         vehicles: JSON.stringify(input.role === "driver" ? input.vehicles : []),
         referralCode,
+        country: input.countryCode,
+        city,
       });
       await db.createReferralIfCodeProvided(profile.phone, input.referredByCode);
       const sessionToken = await createTikisseProfileSession(profile.phone);
@@ -433,8 +448,9 @@ export const appRouter = router({
       await enforcePerPhoneRateLimit("registerSupabase", input.phone);
       await assertCountryEnabled(input.countryCode);
       const supabaseUserId = await verifySupabasePhoneSession(input.phone, input.accessToken);
+      const city = input.city ? await geography.resolveSignupCity(input.city, input.countryCode) : null;
       const referralCode = input.role === "driver" ? await generateUniqueReferralCode(input.fullName) : undefined;
-      const profile = await db.createTikisseProfile({ phone: input.phone, fullName: input.fullName, accountType: input.role, vehicles: JSON.stringify(input.role === "driver" ? input.vehicles : []), referralCode, supabaseUserId });
+      const profile = await db.createTikisseProfile({ phone: input.phone, fullName: input.fullName, accountType: input.role, vehicles: JSON.stringify(input.role === "driver" ? input.vehicles : []), referralCode, supabaseUserId, country: input.countryCode, city });
       const linked = await db.linkTikisseProfileToSupabaseUser(profile.phone, supabaseUserId);
       await db.createReferralIfCodeProvided(linked.phone, input.referredByCode);
       const sessionToken = await createTikisseProfileSession(linked.phone);
@@ -553,6 +569,15 @@ export const appRouter = router({
     route: protectedGeographyProcedure.input(z.object({ origin: placeSchema, destination: placeSchema })).mutation(async ({ input }) => geography.computeRoute(input.origin, input.destination)),
     pricingConfig: tikisseProtectedProcedure.query(() => adminDb.adminGetPricingConfig()),
     countries: publicProcedure.query(() => db.listSupportedCountries()),
+    // Avant la connexion (étape « nom et ville » de l'inscription) : publique, donc limitée par adresse IP
+    // — chaque recherche interroge le service de cartes, facturé.
+    signupCities: publicProcedure.input(z.object({ query: z.string().min(2).max(80), countryCode: countryCodeSchema })).query(async ({ ctx, input }) => {
+      const ip = clientIp(ctx.req ?? {});
+      if (ip !== "unknown" && !(await db.checkDistributedRateLimit("signup-cities", ip, 10 * 60_000, 120))) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Trop de recherches. Réessayez dans quelques minutes." });
+      }
+      return geography.searchCities(input.query, input.countryCode);
+    }),
     searchCities: tikisseProtectedProcedure.input(z.object({ query: z.string().min(2).max(80), countryCode: z.string().length(2) })).query(({ input }) => geography.searchCities(input.query, input.countryCode)),
     // Identique à `saveDeliveryPlace` (même schéma, même sanitization, même persistance) : un seul
     // chemin d'écriture des lieux, pour ne jamais laisser deux logiques diverger silencieusement.
