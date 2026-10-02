@@ -74,6 +74,12 @@ function validateProfileRole(value: z.infer<typeof profileFieldsSchema>, ctx: z.
 const profileInputSchema = profileFieldsSchema.superRefine(validateProfileRole);
 const registrationInputSchema = profileFieldsSchema.extend({ otp: simulationOtpSchema }).superRefine(validateProfileRole);
 
+/** Même numéro, au « + » près : Supabase Auth l'omet, Tikisse le garde. */
+export function samePhoneNumber(a: string, b: string) {
+  const digits = (value: string) => value.replace(/\D/g, "");
+  return digits(a).length > 0 && digits(a) === digits(b);
+}
+
 async function verifySupabasePhoneSession(phone: string, accessToken: string) {
   const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
@@ -84,7 +90,8 @@ async function verifySupabasePhoneSession(phone: string, accessToken: string) {
     const response = await fetch(`${url.replace(/\/$/, "")}/auth/v1/user`, { headers: { apikey: anonKey, authorization: `Bearer ${accessToken}` }, signal: controller.signal });
     if (!response.ok) throw new Error("La session Supabase a expiré ou n’est pas valide.");
     const user = await response.json() as { id?: unknown; phone?: unknown };
-    if (typeof user.id !== "string" || typeof user.phone !== "string" || user.phone !== phone) throw new Error("La session Supabase ne correspond pas à ce numéro Tikisse.");
+    // Supabase Auth enregistre le numéro sans « + » (22670000000) ; Tikisse le garde en E.164 (+22670000000).
+    if (typeof user.id !== "string" || typeof user.phone !== "string" || !samePhoneNumber(user.phone, phone)) throw new Error("La session Supabase ne correspond pas à ce numéro Tikisse.");
     return user.id;
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") throw new Error("La vérification Supabase a expiré. Réessayez.");
