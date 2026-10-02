@@ -146,13 +146,15 @@ export function ligdicashPayinBody(config: LigdicashConfig, input: LigdicashPayi
   };
 }
 
-/** Envoie la demande de paiement ; renvoie le jeton LigdiCash de la transaction. */
-export async function createLigdicashPayin(input: LigdicashPayinRequest, config = readLigdicashConfig()): Promise<string> {
+/** Envoie la demande de paiement ; renvoie le jeton LigdiCash de la transaction et, pour les opérateurs à
+ *  page de paiement (Orange Mali, Wave Sénégal), l'adresse de cette page, donnée dans `response_text`. */
+export async function createLigdicashPayin(input: LigdicashPayinRequest, config = readLigdicashConfig()): Promise<{ token: string; paymentUrl: string | null }> {
   const data = await call(config, "POST", "straight/checkout-invoice/create", ligdicashPayinBody(config, input));
   if (text(data.response_code) !== "00") throw new LigdicashError(refusalMessage(data), text(data.response_code));
   const token = text(data.token);
   if (!token) throw new LigdicashError("LigdiCash n'a pas renvoyé de référence pour ce paiement.");
-  return token;
+  const responseText = text(data.response_text);
+  return { token, paymentUrl: /^https:\/\/[^\s]+$/i.test(responseText) ? responseText : null };
 }
 
 export type LigdicashPayinStatus = { status: "succeeded" | "pending" | "failed"; amount: number | null; operatorTransactionId: string | null };

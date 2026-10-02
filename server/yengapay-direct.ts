@@ -131,7 +131,8 @@ function selectedRemoteOperator(data: RemoteDirectResponse, input: YengapayDirec
 }
 
 function viewFromStored(stored: db.DirectDepositRecord, mode: YengapayDirectDeposit["mode"]): YengapayDirectDeposit {
-  const operator = stored.operator;
+  // YengaPay ne crée que des paiements Orange Money et Moov Money (voir server/direct-deposit.ts).
+  const operator = stored.operator as YengapayOperatorCode;
   const flow: RemoteFlow | "TEST" = mode === "test" ? "TEST" : operator === "moov_money" ? "TWO_STEP" : "ONE_STEP";
   const requiresOtp = mode !== "test";
   return {
@@ -193,7 +194,7 @@ export async function payYengapayDirectDeposit(input: { profilePhone: string; tr
 
   const data = await callDirect(config, "/pay", {
     paymentIntentId: stored.providerReference,
-    operatorCode: remoteOperator(stored.operator),
+    operatorCode: remoteOperator(stored.operator as YengapayOperatorCode),
     countryCode: stored.countryCode,
     customerMSISDN: stored.phone.replace(/^\+/, ""),
     otp: input.otp,

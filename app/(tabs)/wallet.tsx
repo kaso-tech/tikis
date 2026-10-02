@@ -1,3 +1,4 @@
+import { mobileMoneyOperatorLabel, mobileMoneyOperatorsFor } from "@/shared/mobile-money-operators";
 import { useState } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { openBrowserAsync } from "expo-web-browser";
@@ -56,6 +57,7 @@ export default function WalletScreen() {
   // LigdiCash : un seul bouton, le paiement Mobile Money dans l'application (pas de page de paiement externe).
   const paymentOptionsQuery = trpc.wallet.paymentOptions.useQuery(undefined, { staleTime: 5 * 60_000 });
   const ligdicash = paymentOptionsQuery.data?.directProvider === "ligdicash";
+  const countryOperators = mobileMoneyOperatorsFor("ligdicash", profile?.country);
   const settleMutation = trpc.wallet.settleYengaPayTest.useMutation();
   const [requestType, setRequestType] = useState<"deposit" | "withdrawal" | null>(null);
   const [amountInput, setAmountInput] = useState("");
@@ -195,7 +197,7 @@ export default function WalletScreen() {
             <View style={styles.pendingDirectText}>
               <Text style={[styles.pendingDirectTitle, { color: theme.foreground }]}>Dépôt Mobile Money en attente</Text>
               <Text style={[styles.pendingDirectSub, { color: theme.muted }]} numberOfLines={1}>
-                {formatMoney(topPendingDirectDeposit.amount)} · {topPendingDirectDeposit.operator === "orange_money" ? "Orange Money" : "Moov Money"} · touchez pour reprendre
+                {formatMoney(topPendingDirectDeposit.amount)} · {mobileMoneyOperatorLabel(topPendingDirectDeposit.operator)} · touchez pour reprendre
               </Text>
             </View>
             <MaterialIcons name="chevron-right" size={18} color={theme.muted} />
@@ -208,7 +210,7 @@ export default function WalletScreen() {
               <View style={[styles.actionIcon, { backgroundColor: theme.background }]}><MaterialIcons name="add-card" size={15} color={theme.primary} /></View>
               <View style={styles.actionText}>
                 <Text style={[styles.actionLabel, { color: theme.foreground }]}>Recharger</Text>
-                <Text style={[styles.actionSub, { color: theme.muted }]}>Orange Money · Moov Money via LigdiCash</Text>
+                <Text style={[styles.actionSub, { color: theme.muted }]}>{countryOperators.length > 0 ? `${countryOperators.map((item) => item.label).join(" · ")} via LigdiCash` : "Mobile Money · bientôt dans votre pays"}</Text>
               </View>
               <MaterialIcons name="chevron-right" size={18} color={theme.muted} />
             </Pressable>

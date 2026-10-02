@@ -1,3 +1,4 @@
+import { MOBILE_MONEY_OPERATOR_IDS } from "../shared/mobile-money-operators";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { LIVE_POSITION_GPS_JUMP_ERR_MSG, LIVE_POSITION_OUT_OF_ZONE_ERR_MSG } from "../shared/const";
@@ -878,7 +879,7 @@ export const appRouter = router({
       amount: z.number().int().min(100).max(10_000_000),
       countryCode: z.string().length(2),
       phoneLocal: z.string().regex(/^[0-9]{6,12}$/),
-      operator: z.enum(["orange_money", "moov_money"]),
+      operator: z.enum(MOBILE_MONEY_OPERATOR_IDS),
       idempotencyKey: z.string().regex(/^[A-Za-z0-9_-]{16,48}$/),
     })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisseProfile(ctx.tikisseProfilePhone);

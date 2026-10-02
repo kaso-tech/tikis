@@ -4,7 +4,7 @@ type Row = {
   transactionId: string; profilePhone: string; amount: number; phone: string; operator: "orange_money" | "moov_money";
   countryCode: string; ussdCode: string; providerReference: string; status: "pending" | "succeeded" | "failed" | "cancelled" | "expired";
   expiresAt: string; createdAt: string; settledAt: string | null; mode: "test" | "sandbox" | "live"; provider: "yengapay" | "ligdicash";
-  providerToken: string | null; idempotencyKey: string;
+  providerToken: string | null; idempotencyKey: string; checkoutUrl?: string | null;
 };
 const rows = new Map<string, Row>();
 const credited: string[] = [];
@@ -16,7 +16,7 @@ vi.mock("../server/db", () => ({
   },
   getDirectDepositIntent: async (id: string, phone: string) => { const r = rows.get(id); return r && r.profilePhone === phone ? { ...r } : null; },
   getDirectDepositById: async (id: string) => (rows.has(id) ? { ...rows.get(id)! } : null),
-  setDirectDepositProviderToken: async (id: string, token: string) => { rows.get(id)!.providerToken = token; },
+  setDirectDepositProviderToken: async (id: string, token: string, checkoutUrl?: string | null) => { rows.get(id)!.providerToken = token; if (checkoutUrl) rows.get(id)!.checkoutUrl = checkoutUrl; },
   settleTikisseWalletDepositRequest: async ({ transactionId }: { transactionId: string }) => { const r = rows.get(transactionId)!; if (r.status !== "succeeded") { credited.push(transactionId); r.status = "succeeded"; } },
   refuseTikisseWalletDepositRequest: async ({ transactionId }: { transactionId: string }) => { const r = rows.get(transactionId)!; if (r.status === "pending") r.status = "failed"; },
   cancelTikisseWalletDirectDeposit: async ({ transactionId, status }: { transactionId: string; status: "cancelled" | "expired" }) => { const r = rows.get(transactionId)!; if (r.status === "pending") r.status = status; return { ...r }; },
@@ -43,7 +43,8 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
-const request = (operator: "orange_money" | "moov_money", key = "cle-idempotence-0001") => ({ profilePhone: "+22670000001", amount: 2500, phone: "+22670111222", operator, countryCode: "BF", idempotencyKey: key });
+type OperatorId = "orange_money" | "moov_money" | "mtn_money" | "wave" | "airtel_money" | "yas_money";
+const request = (operator: OperatorId, key = "cle-idempotence-0001", countryCode = "BF") => ({ profilePhone: "+22670000001", amount: 2500, phone: "+22670111222", operator, countryCode, idempotencyKey: key });
 
 describe("LigdiCash : format des requêtes", () => {
   it("corps du paiement sans redirection : numéro sans « + », code, rappel vers la transaction", () => {
@@ -141,5 +142,30 @@ describe("erreurs LigdiCash lisibles", () => {
   it("serveur injoignable : message explicite", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
     await expect(deposit.createDirectDeposit(request("moov_money", "cle-idempotence-0500"))).rejects.toThrow("injoignable");
+  });
+});
+
+describe("opérateurs pays par pays", () => {
+  it("MTN Côte d'Ivoire : demande immédiate sans code, consigne du SMS à suivre", async () => {
+    replies.push({ response_code: "00", token: "jeton-mtn" });
+    const view = await deposit.createDirectDeposit(request("mtn_money", "cle-idempotence-ci01", "CI"));
+    expect(calls).toHaveLength(1);
+    expect((calls[0].body as { commande: { invoice: { otp: string } } }).commande.invoice.otp).toBe("");
+    expect(view).toMatchObject({ flow: "GUIDED", requiresOtp: false });
+    expect(view.otpInstructions).toContain("SMS");
+  });
+
+  it("Orange Mali : page de paiement renvoyée par LigdiCash, gardée pour l'application", async () => {
+    replies.push({ response_code: "00", token: "jeton-om-ml", response_text: "https://paiement.orange.ml/session/abc" });
+    const view = await deposit.createDirectDeposit(request("orange_money", "cle-idempotence-ml01", "ML"));
+    expect(view).toMatchObject({ flow: "REDIRECT", requiresOtp: false });
+    expect(rows.get(view.transactionId)!.providerToken).toBe("jeton-om-ml");
+    expect(view.checkoutUrl).toBe("https://paiement.orange.ml/session/abc");
+  });
+
+  it("opérateur absent du pays, ou pays sans opérateur : refus, rien n'est envoyé", async () => {
+    await expect(deposit.createDirectDeposit(request("wave", "cle-idempotence-bf99", "BF"))).rejects.toThrow("pas disponible dans votre pays");
+    await expect(deposit.createDirectDeposit(request("orange_money", "cle-idempotence-gh01", "GH"))).rejects.toThrow("pas disponible dans votre pays");
+    expect(calls).toHaveLength(0);
   });
 });

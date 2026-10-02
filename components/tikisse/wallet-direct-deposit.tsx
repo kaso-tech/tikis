@@ -6,7 +6,8 @@ import { TikisseButton } from "@/components/tikisse/ui";
 import { COUNTRIES, countryFlagEmoji, formatLocalPhone, sanitizePhoneInput, type CountrySpec } from "@/lib/registration-rules";
 import { trpc } from "@/lib/trpc";
 import { useThemeColors } from "@/lib/use-theme-colors";
-import { buildUssdCode, operatorLabel, type YengapayOperatorCode } from "@/shared/yengapay-ussd";
+import { buildUssdCode } from "@/shared/yengapay-ussd";
+import { mobileMoneyOperatorLabel as operatorLabel, mobileMoneyOperatorsFor, type MobileMoneyOperator, type MobileMoneyOperatorId } from "@/shared/mobile-money-operators";
 import { useTikisseStore } from "@/lib/tikisse-store";
 
 /**
@@ -33,7 +34,12 @@ import { useTikisseStore } from "@/lib/tikisse-store";
  */
 
 type Stage = "request" | "confirmation" | "success" | "failed";
-type Operator = YengapayOperatorCode;
+type Operator = MobileMoneyOperatorId;
+
+/** Code USSD d'Orange/Moov via YengaPay, quand le serveur n'en a pas fourni. */
+function fallbackUssd(operator: Operator, amount: number) {
+  return operator === "orange_money" || operator === "moov_money" ? buildUssdCode(operator, amount) : "";
+}
 
 const QUICK_AMOUNTS = [1_000, 5_000, 10_000, 25_000];
 const POLL_INTERVAL_MS = 3_000;
@@ -55,7 +61,9 @@ export type DirectDepositView = {
   mode: "test" | "sandbox" | "live";
   requiresOtp?: boolean;
   /** PUSH : pas de code, l'opérateur demande au client de valider sur son téléphone (Moov via LigdiCash). */
-  flow?: "ONE_STEP" | "TWO_STEP" | "TEST" | "PUSH";
+  flow?: "ONE_STEP" | "TWO_STEP" | "TEST" | "PUSH" | "GUIDED" | "REDIRECT";
+  /** Page de paiement de l'opérateur à ouvrir (flux REDIRECT : Orange Mali, Wave Sénégal). */
+  checkoutUrl?: string;
   otpInstructions?: string;
   provider?: "yengapay" | "ligdicash";
 };
@@ -78,6 +86,13 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     const fromProfile = COUNTRIES.find((c) => c.id === profileCountry);
     return fromProfile ?? COUNTRIES[0];
   }, [profileCountry]);
+
+  // Opérateurs du pays du profil, chez le prestataire actif (shared/mobile-money-operators.ts).
+  const paymentOptionsQuery = trpc.wallet.paymentOptions.useQuery(undefined, { enabled: visible, staleTime: 5 * 60_000 });
+  const operators = useMemo(
+    () => mobileMoneyOperatorsFor(paymentOptionsQuery.data?.directProvider ?? "yengapay", country.id),
+    [paymentOptionsQuery.data?.directProvider, country.id],
+  );
 
   // ===== ÉTAT FORMULAIRE =====
   const [amount, setAmount] = useState<string>("");
@@ -108,7 +123,9 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   const amountNum = useMemo(() => parseInt(amount, 10), [amount]);
   const isAmountValid = Number.isFinite(amountNum) && amountNum >= 100 && amountNum <= 10_000_000;
   const isPhoneValid = phoneLocal.length === country.digits;
-  const canSubmit = isAmountValid && isPhoneValid && !requestMutation.isPending;
+  // L'opérateur choisi doit exister dans le pays : sinon, le premier proposé.
+  const selectedOperator: Operator = operators.some((item) => item.id === operator) ? operator : operators[0]?.id ?? operator;
+  const canSubmit = isAmountValid && isPhoneValid && operators.some((item) => item.id === selectedOperator) && !requestMutation.isPending;
 
   // ===== Reset =====
   const reset = useCallback(() => {
@@ -120,7 +137,6 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     setOtpCells(Array.from({ length: 6 }, () => ""));
     setDeposit(null);
     setModifying(false);
-    setOperator("orange_money");
     setRequestKey(createDirectPaymentKey());
   }, []);
   const closeModal = useCallback(() => {
@@ -174,13 +190,13 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
       return;
     }
     try {
-      const result = await requestMutation.mutateAsync({ amount: amountNum, countryCode: country.id, phoneLocal, operator, idempotencyKey: requestKey });
+      const result = await requestMutation.mutateAsync({ amount: amountNum, countryCode: country.id, phoneLocal, operator: selectedOperator, idempotencyKey: requestKey });
       setDeposit(result);
       setStage("confirmation");
     } catch (cause) {
       setSubmitError(cause instanceof Error ? cause.message : "La demande de paiement n'a pas pu être créée.");
     }
-  }, [amountNum, phoneLocal, country, operator, requestKey, requestMutation, isAmountValid, isPhoneValid]);
+  }, [amountNum, phoneLocal, country, selectedOperator, requestKey, requestMutation, isAmountValid, isPhoneValid]);
 
   const onCancelWaiting = useCallback(async () => {
     if (!deposit) return;
@@ -301,7 +317,8 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
             country={country}
             amount={amount}
             phoneLocal={phoneLocal}
-            operator={operator}
+            operator={selectedOperator}
+            operators={operators}
             submitError={submitError}
             deposit={deposit}
             otpCells={otpCells}
@@ -320,7 +337,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
             onModify={() => void onModify()}
             onSubmit={deposit ? () => void onPay() : () => void onSubmit()}
             onOpenUssd={async () => {
-              const code = deposit?.ussdCode || buildUssdCode(operator, Number.parseInt(amount, 10));
+              const code = deposit?.ussdCode || fallbackUssd(selectedOperator, Number.parseInt(amount, 10));
               if (!code) return;
               try {
                 await Linking.openURL(`tel:${code.replace("#", "%23")}`);
@@ -357,6 +374,7 @@ function InputStage(props: {
   amount: string;
   phoneLocal: string;
   operator: Operator;
+  operators: readonly MobileMoneyOperator[];
   submitError: string;
   deposit: DirectDepositView | null;
   otpCells: string[];
@@ -379,7 +397,7 @@ function InputStage(props: {
   onCancel: () => void;
   onDevSettle: (outcome: "succeeded" | "failed") => void;
 }) {
-  const { theme, styles, country, amount, phoneLocal, operator, submitError, deposit, otpCells, submitting, confirming, resendingOtp, cancelling, settling, modifying, pollError, canSubmit, onChangeAmount, onChangePhone, onChangeOperator, onChangeOtpCell, onSubmit, onOpenUssd, onModify, onResendOtp, onCancel, onDevSettle } = props;
+  const { theme, styles, country, amount, phoneLocal, operator, operators, submitError, deposit, otpCells, submitting, confirming, resendingOtp, cancelling, settling, modifying, pollError, canSubmit, onChangeAmount, onChangePhone, onChangeOperator, onChangeOtpCell, onSubmit, onOpenUssd, onModify, onResendOtp, onCancel, onDevSettle } = props;
 
   if (deposit) {
     return <ConfirmationStage
@@ -427,10 +445,13 @@ function InputStage(props: {
 
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <Text style={[styles.label, { color: theme.muted }]}>OPÉRATEUR</Text>
-          <View style={styles.operatorRow}>
-            <OperatorCard theme={theme} styles={styles} operator="orange_money" active={operator === "orange_money"} disabled={submitting} onPress={() => onChangeOperator("orange_money")} />
-            <OperatorCard theme={theme} styles={styles} operator="moov_money" active={operator === "moov_money"} disabled={submitting} onPress={() => onChangeOperator("moov_money")} />
-          </View>
+          {operators.length === 0 ? (
+            <Text style={[styles.otpHint, { color: theme.muted }]}>Le rechargement par Mobile Money n’est pas encore disponible au {country.name}. Il le sera dès qu’un opérateur y sera ouvert.</Text>
+          ) : (
+            <View style={[styles.operatorRow, { flexWrap: "wrap" }]}>
+              {operators.map((item) => <OperatorCard key={item.id} theme={theme} styles={styles} operator={item} active={operator === item.id} disabled={submitting} onPress={() => onChangeOperator(item.id)} />)}
+            </View>
+          )}
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -482,7 +503,7 @@ function ConfirmationStage(props: {
   const { theme, styles, deposit, otpCells, confirming, resendingOtp, cancelling, settling, modifying, pollError, onSubmit, onOpenUssd, onModify, onResendOtp, onCancel, onChangeOtpCell, onDevSettle } = props;
   const isTest = deposit.mode === "test";
   const requiresOtp = Boolean(!isTest && deposit.requiresOtp !== false);
-  const ussdCode = deposit.ussdCode || buildUssdCode(deposit.operator, deposit.amount);
+  const ussdCode = deposit.ussdCode || (deposit.provider === "ligdicash" ? "" : fallbackUssd(deposit.operator, deposit.amount));
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}>
@@ -512,8 +533,11 @@ function ConfirmationStage(props: {
         ) : !isTest && deposit.otpInstructions ? (
           // Pas de code à saisir : validation sur le téléphone (Moov), ou code déjà envoyé (Orange).
           <View style={[styles.otpCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <Text style={[styles.label, { color: theme.muted }]}>{deposit.flow === "PUSH" ? "VALIDEZ SUR VOTRE TÉLÉPHONE" : "PAIEMENT EN COURS"}</Text>
+            <Text style={[styles.label, { color: theme.muted }]}>{deposit.flow === "PUSH" ? "VALIDEZ SUR VOTRE TÉLÉPHONE" : deposit.flow === "GUIDED" ? "SUIVEZ LE SMS DE VOTRE OPÉRATEUR" : deposit.flow === "REDIRECT" ? "PAGE DE PAIEMENT" : "PAIEMENT EN COURS"}</Text>
             <Text style={[styles.otpHint, { color: theme.foreground }]}>{deposit.otpInstructions}</Text>
+            {deposit.flow === "REDIRECT" && deposit.checkoutUrl ? (
+              <TikisseButton label={`Ouvrir la page ${operatorLabel(deposit.operator)}`} icon="open-in-new" onPress={() => { void Linking.openURL(deposit.checkoutUrl!).catch(() => undefined); }} style={styles.cta} />
+            ) : null}
             <Text style={[styles.otpHint, { color: theme.muted }]}>Cet écran se met à jour tout seul dès que l’opérateur confirme le paiement.</Text>
           </View>
         ) : null}
@@ -559,17 +583,16 @@ function OtpCells(props: { theme: ReturnType<typeof useThemeColors>["colors"]; s
   </View>;
 }
 
-function OperatorCard(props: { theme: ReturnType<typeof useThemeColors>["colors"]; styles: ReturnType<typeof makeStyles>; operator: Operator; active: boolean; disabled?: boolean; onPress: () => void }) {
+function OperatorCard(props: { theme: ReturnType<typeof useThemeColors>["colors"]; styles: ReturnType<typeof makeStyles>; operator: MobileMoneyOperator; active: boolean; disabled?: boolean; onPress: () => void }) {
   const { theme, styles, operator, active, disabled = false, onPress } = props;
-  const isOM = operator === "orange_money";
-  const color = isOM ? "#C96900" : "#0033A0";
+  const color = operator.color;
   return (
     <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.operatorCard, { backgroundColor: active ? "#FFF0D8" : theme.surface, borderColor: active ? theme.primary : theme.border }, disabled && { opacity: 0.55 }, pressed && styles.pressed]} accessibilityRole="radio" accessibilityState={{ selected: active, disabled }}>
       <View style={[styles.operatorLogo, { backgroundColor: color }]}>
-        <Text style={styles.operatorLogoText}>{isOM ? "OM" : "MV"}</Text>
+        <Text style={styles.operatorLogoText}>{operator.short}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.operatorName, { color: theme.foreground }]}>{operatorLabel(operator)}</Text>
+        <Text style={[styles.operatorName, { color: theme.foreground }]}>{operator.label}</Text>
       </View>
       {active ? <MaterialIcons name="check-circle" size={16} color={theme.primary} /> : null}
     </Pressable>
@@ -652,7 +675,7 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
     quickAmount: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },
     quickAmountText: { fontSize: 12, fontWeight: "600" },
     operatorRow: { flexDirection: "row", gap: 10 },
-    operatorCard: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: 10, borderWidth: 2 },
+    operatorCard: { flex: 1, minWidth: 140, flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: 10, borderWidth: 2 },
     operatorLogo: { width: 36, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center" },
     operatorLogoText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
     operatorName: { fontSize: 13, fontWeight: "600" },

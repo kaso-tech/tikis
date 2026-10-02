@@ -1,3 +1,4 @@
+import type { MobileMoneyOperatorId } from "../shared/mobile-money-operators";
 import { isoCountry } from "../shared/iso-countries";
 import { createHash, randomUUID } from "crypto";
 import { and, count, desc, eq, gte, inArray, isNotNull, isNull, like, lt, lte, ne, or, sql } from "drizzle-orm";
@@ -1024,7 +1025,7 @@ export type DirectDepositRecord = {
   profilePhone: string;
   amount: number;
   phone: string;
-  operator: "orange_money" | "moov_money";
+  operator: MobileMoneyOperatorId;
   countryCode: string;
   ussdCode: string;
   providerReference: string;
@@ -1038,6 +1039,8 @@ export type DirectDepositRecord = {
   provider: "yengapay" | "ligdicash";
   /** Jeton LigdiCash (vérification du statut) ; absent tant que la demande n'est pas partie chez lui. */
   providerToken: string | null;
+  /** Page de paiement à ouvrir (opérateurs « redirect » : Orange Mali, Wave Sénégal). */
+  checkoutUrl: string | null;
 };
 
 export const DIRECT_DEPOSIT_PROVIDERS = ["yengapay_direct_test", "yengapay_direct_sandbox", "yengapay_direct_live", "ligdicash_direct_sandbox", "ligdicash_direct_live"] as const;
@@ -1051,7 +1054,7 @@ function paymentTransactionToDirectDeposit(record: typeof tikissePaymentTransact
     profilePhone: record.profilePhone,
     amount: record.amount,
     phone: record.phoneE164 ?? "",
-    operator: (record.operatorCode as "orange_money" | "moov_money" | null) ?? "orange_money",
+    operator: (record.operatorCode as MobileMoneyOperatorId | null) ?? "orange_money",
     countryCode: record.countryCode ?? "",
     ussdCode: record.ussdCode ?? "",
     providerReference: record.providerReference,
@@ -1062,6 +1065,7 @@ function paymentTransactionToDirectDeposit(record: typeof tikissePaymentTransact
     mode,
     provider: record.provider.startsWith("ligdicash_") ? "ligdicash" : "yengapay",
     providerToken: record.providerToken ?? null,
+    checkoutUrl: record.checkoutUrl ?? null,
   };
 }
 
@@ -1071,7 +1075,7 @@ export async function recordDirectDepositIntent(input: {
   profilePhone: string;
   amount: number;
   phone: string;
-  operator: "orange_money" | "moov_money";
+  operator: MobileMoneyOperatorId;
   countryCode: string;
   ussdCode: string;
   expiresAt: string;
@@ -1126,10 +1130,10 @@ export async function getDirectDepositById(transactionId: string): Promise<Direc
 }
 
 /** Enregistre le jeton LigdiCash une fois la demande acceptée par LigdiCash. */
-export async function setDirectDepositProviderToken(transactionId: string, providerToken: string) {
+export async function setDirectDepositProviderToken(transactionId: string, providerToken: string, checkoutUrl?: string | null) {
   const db = await getDb();
   if (!db) throw new Error("Le paiement direct est temporairement indisponible.");
-  await db.update(tikissePaymentTransactions).set({ providerToken }).where(eq(tikissePaymentTransactions.id, transactionId));
+  await db.update(tikissePaymentTransactions).set({ providerToken, ...(checkoutUrl ? { checkoutUrl } : {}) }).where(eq(tikissePaymentTransactions.id, transactionId));
 }
 
 /** Retrouve une intention déjà créée après une relance réseau de la même demande. */
