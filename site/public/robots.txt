@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /mentions-legales.html
+Disallow: /confidentialite.html
+Disallow: /conditions.html
+Sitemap: https://tikisweb-25ergebn.manus.space/sitemap.xml
