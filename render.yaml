@@ -52,7 +52,7 @@ services:
 
       # ─── Web, SMS, paiements, cartes, erreurs ────────────────────────────────────────────────
       - key: TIKISSE_ALLOWED_ORIGINS
-        value: https://tikisse.app,https://admin.tikisse.app
+        value: https://tikisse.com,https://www.tikisse.com,https://console.tikisse.com
       - key: TIKISSE_OTP_MODE
         value: sim
       - key: YENGAPAY_MODE
@@ -72,7 +72,7 @@ services:
 
       # ─── Application (EXPO_PUBLIC_*) : intégrées au build de la version web, faite ici ───────
       - key: EXPO_PUBLIC_API_BASE_URL
-        value: https://api.tikisse.app
+        value: https://api.tikisse.com
       - key: EXPO_PUBLIC_SUPABASE_URL
         sync: false
       - key: EXPO_PUBLIC_SUPABASE_ANON_KEY
