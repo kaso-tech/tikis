@@ -61,7 +61,8 @@ type LigdicashResponse = Record<string, unknown> & {
 
 async function call(config: LigdicashConfig, method: "GET" | "POST", path: string, body?: unknown): Promise<LigdicashResponse> {
   if (!isLigdicashConfigured(config)) throw new LigdicashError("Le paiement Mobile Money n'est pas encore configuré. Réessayez plus tard.");
-  const response = await fetch(`${config.baseUrl.replace(/\/?$/, "/")}${path}`, {
+  const url = `${config.baseUrl.replace(/\/?$/, "/")}${path}`;
+  const response = await fetch(url, {
     method,
     headers: {
       Apikey: config.apiKey!,
@@ -71,13 +72,23 @@ async function call(config: LigdicashConfig, method: "GET" | "POST", path: strin
     },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(20_000),
+  }).catch((cause: unknown) => {
+    console.error(`[ligdicash] ${method} ${path.split("?")[0]} (${config.mode}) → injoignable : ${cause instanceof Error ? cause.message : String(cause)}`);
+    throw new LigdicashError(`LigdiCash est injoignable depuis le serveur (${config.mode === "live" ? "app" : "test"}.ligdicash.com). Réessayez dans un instant.`);
   });
-  const text = await response.text().catch(() => "");
+  const raw = await response.text().catch(() => "");
   let data: LigdicashResponse = {};
-  try { data = text ? JSON.parse(text) as LigdicashResponse : {}; } catch { data = {}; }
+  try { data = raw ? JSON.parse(raw) as LigdicashResponse : {}; } catch { data = {}; }
   if (!response.ok) {
-    console.error(`[ligdicash] ${method} ${path.split("?")[0]} → HTTP ${response.status} : ${text.slice(0, 300)}`);
-    throw new LigdicashError("LigdiCash est momentanément indisponible. Réessayez dans un instant.");
+    console.error(`[ligdicash] ${method} ${path.split("?")[0]} (${config.mode}) → HTTP ${response.status} : ${raw.slice(0, 300)}`);
+    // Identifiants refusés : c'est la configuration, pas une panne passagère.
+    if (response.status === 401 || response.status === 403) {
+      throw new LigdicashError(`LigdiCash refuse les identifiants du serveur (HTTP ${response.status}). Vérifiez LIGDICASH_API_KEY, LIGDICASH_AUTH_TOKEN et LIGDICASH_MODE (sandbox ou live).`);
+    }
+    // LigdiCash renvoie souvent la raison dans le corps, même avec un code HTTP d'erreur.
+    const detail = refusalDetail(data);
+    if (detail) throw new LigdicashError(`Paiement refusé par LigdiCash : ${detail}`, text(data.response_code) || String(response.status));
+    throw new LigdicashError(`LigdiCash est momentanément indisponible (HTTP ${response.status}). Réessayez dans un instant.`);
   }
   return data;
 }
@@ -86,9 +97,13 @@ function text(value: unknown) {
   return typeof value === "string" ? value.trim() : typeof value === "number" ? String(value) : "";
 }
 
+function refusalDetail(data: LigdicashResponse) {
+  return text(data.description) || text(data.response_text) || text(data.message);
+}
+
 /** Message lisible d'une demande refusée (`response_code` différent de « 00 »). */
 function refusalMessage(data: LigdicashResponse) {
-  const detail = text(data.description) || text(data.response_text);
+  const detail = refusalDetail(data);
   return detail ? `Paiement refusé par LigdiCash : ${detail}` : "Le paiement a été refusé par LigdiCash.";
 }
 

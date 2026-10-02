@@ -126,3 +126,20 @@ describe("rappel LigdiCash", () => {
     expect(await deposit.handleLigdicashCallback("22222222-2222-2222-2222-222222222222")).toMatchObject({ status: 404 });
   });
 });
+
+describe("erreurs LigdiCash lisibles", () => {
+  it("identifiants refusés : le message pointe la configuration", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("Unauthorized", { status: 401 })));
+    await expect(deposit.createDirectDeposit(request("moov_money", "cle-idempotence-0401"))).rejects.toThrow("LIGDICASH_API_KEY");
+  });
+
+  it("raison donnée dans le corps d'une erreur HTTP : affichée telle quelle", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ response_code: "02", description: "Numéro non éligible" }), { status: 400 })));
+    await expect(deposit.createDirectDeposit(request("moov_money", "cle-idempotence-0400"))).rejects.toThrow("Numéro non éligible");
+  });
+
+  it("serveur injoignable : message explicite", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("fetch failed"); }));
+    await expect(deposit.createDirectDeposit(request("moov_money", "cle-idempotence-0500"))).rejects.toThrow("injoignable");
+  });
+});
