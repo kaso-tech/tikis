@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { consoleHosts, isConsoleHost } from "../server/_core/console-host";
+import { consoleHosts, isConsoleHost, siteHosts, siteRedirectHosts } from "../server/_core/console-host";
 
 describe("domaine de la console", () => {
   it("console.tikisse.com par défaut", () => {
@@ -16,5 +16,14 @@ describe("domaine de la console", () => {
     expect(isConsoleHost("admin.example.com", hosts)).toBe(true);
     expect(isConsoleHost("console.example.com", hosts)).toBe(true);
     expect(isConsoleHost("console.tikisse.com", hosts)).toBe(false);
+  });
+});
+
+describe("domaines du site vitrine", () => {
+  it("tikisse.com sert le site, www y renvoie", () => {
+    expect(siteHosts({})).toEqual(["tikisse.com"]);
+    expect(isConsoleHost("tikisse.com", siteHosts({}))).toBe(true);
+    expect(isConsoleHost("app.tikisse.com", siteHosts({}))).toBe(false);
+    expect(isConsoleHost("www.tikisse.com", siteRedirectHosts({}))).toBe(true);
   });
 });

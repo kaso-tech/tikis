@@ -3,4 +3,4 @@ Allow: /
 Disallow: /mentions-legales.html
 Disallow: /confidentialite.html
 Disallow: /conditions.html
-Sitemap: https://tikisweb-25ergebn.manus.space/sitemap.xml
+Sitemap: https://tikisse.com/sitemap.xml

@@ -1,16 +1,32 @@
 /**
- * Domaines dédiés à la console d'administration (TIKISSE_CONSOLE_HOSTS, séparés par des virgules ;
- * défaut : console.tikisse.com). Sur ces domaines, la console est servie à la racine — le même serveur
- * sert sinon la version web de l'application à la racine et la console sous /admin.
+ * Domaines servis par ce même serveur, chacun avec son contenu à la racine :
+ *  - console (TIKISSE_CONSOLE_HOSTS, défaut console.tikisse.com) : la console d'administration ;
+ *  - site vitrine (TIKISSE_SITE_HOSTS, défaut tikisse.com) : les pages statiques de site/public ;
+ *    TIKISSE_SITE_REDIRECT_HOSTS (défaut www.tikisse.com) y renvoie, en 301, vers le premier domaine du site ;
+ *  - tout autre domaine (api.tikisse.com, app.tikisse.com) : la version web de l'application, la console
+ *    restant sous /admin. L'API, sous /api, répond sur tous.
  */
-export function consoleHosts(env: Record<string, string | undefined> = process.env): Set<string> {
-  const configured = (env.TIKISSE_CONSOLE_HOSTS ?? "console.tikisse.com")
+function hostList(value: string | undefined, fallback: string): string[] {
+  return (value ?? fallback)
     .split(",")
     .map((host) => host.trim().toLowerCase())
     .filter(Boolean);
-  return new Set(configured);
 }
 
-export function isConsoleHost(hostname: string | undefined, hosts: Set<string>): boolean {
-  return Boolean(hostname) && hosts.has(hostname!.toLowerCase());
+export function consoleHosts(env: Record<string, string | undefined> = process.env): Set<string> {
+  return new Set(hostList(env.TIKISSE_CONSOLE_HOSTS, "console.tikisse.com"));
+}
+
+export function siteHosts(env: Record<string, string | undefined> = process.env): string[] {
+  return hostList(env.TIKISSE_SITE_HOSTS, "tikisse.com");
+}
+
+export function siteRedirectHosts(env: Record<string, string | undefined> = process.env): Set<string> {
+  return new Set(hostList(env.TIKISSE_SITE_REDIRECT_HOSTS, "www.tikisse.com"));
+}
+
+export function isConsoleHost(hostname: string | undefined, hosts: Set<string> | string[]): boolean {
+  if (!hostname) return false;
+  const host = hostname.toLowerCase();
+  return hosts instanceof Set ? hosts.has(host) : hosts.includes(host);
 }

@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerStorageProxy } from "./storageProxy";
 import { registerAdminDocumentRoutes } from "../admin-documents";
-import { consoleHosts, isConsoleHost } from "./console-host";
+import { consoleHosts, isConsoleHost, siteHosts, siteRedirectHosts } from "./console-host";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import * as db from "../db";
@@ -99,6 +99,22 @@ async function startServer() {
     });
   } else {
     app.get("/admin", (_req, res) => res.status(503).send("Console d’administration non compilée. Voir admin/README.md pour la builder (npm run build dans le dossier admin/)."));
+  }
+
+  // Site vitrine (site/public, statique, sans build) sur tikisse.com ; www y renvoie. L'API reste servie.
+  const sitePath = path.resolve(process.cwd(), "site/public");
+  if (fs.existsSync(path.join(sitePath, "index.html"))) {
+    const hostsOfSite = siteHosts();
+    const redirectHosts = siteRedirectHosts();
+    const serveSite = express.static(sitePath, { extensions: ["html"] });
+    app.use((req, res, next) => {
+      const isApi = req.path === "/api" || req.path.startsWith("/api/");
+      if (!isApi && hostsOfSite.length && isConsoleHost(req.hostname, redirectHosts)) {
+        return res.redirect(301, `https://${hostsOfSite[0]}${req.originalUrl}`);
+      }
+      if (isApi || !isConsoleHost(req.hostname, hostsOfSite)) return next();
+      return serveSite(req, res, () => res.status(404).sendFile(path.join(sitePath, "index.html")));
+    });
   }
 
   const webDistPath = path.resolve(process.cwd(), "web-build");

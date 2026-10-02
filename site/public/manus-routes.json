@@ -1,8 +1,0 @@
-{
-  "routes": [
-    { "path": "/", "title": "Accueil" },
-    { "path": "/mentions-legales.html", "title": "Mentions légales" },
-    { "path": "/confidentialite.html", "title": "Confidentialité" },
-    { "path": "/conditions.html", "title": "Conditions" }
-  ]
-}
