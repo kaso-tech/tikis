@@ -1034,11 +1034,17 @@ export type DirectDepositRecord = {
   settledAt: string | null;
   /** Mode dérivé du provider : utile au client pour adapter l'UI (ex: carte __DEV__). */
   mode: "test" | "sandbox" | "live";
+  /** Prestataire qui traite le paiement : fixé à la création, il ne change plus. */
+  provider: "yengapay" | "ligdicash";
+  /** Jeton LigdiCash (vérification du statut) ; absent tant que la demande n'est pas partie chez lui. */
+  providerToken: string | null;
 };
 
+export const DIRECT_DEPOSIT_PROVIDERS = ["yengapay_direct_test", "yengapay_direct_sandbox", "yengapay_direct_live", "ligdicash_direct_sandbox", "ligdicash_direct_live"] as const;
+
 function paymentTransactionToDirectDeposit(record: typeof tikissePaymentTransactions.$inferSelect): DirectDepositRecord {
-  const isLive = record.provider === "yengapay_direct_live";
-  const isSandbox = record.provider === "yengapay_direct_sandbox";
+  const isLive = record.provider === "yengapay_direct_live" || record.provider === "ligdicash_direct_live";
+  const isSandbox = record.provider === "yengapay_direct_sandbox" || record.provider === "ligdicash_direct_sandbox";
   const mode: DirectDepositRecord["mode"] = isLive ? "live" : isSandbox ? "sandbox" : "test";
   return {
     transactionId: record.id,
@@ -1054,6 +1060,8 @@ function paymentTransactionToDirectDeposit(record: typeof tikissePaymentTransact
     createdAt: record.createdAt.toISOString(),
     settledAt: record.settledAt ? record.settledAt.toISOString() : null,
     mode,
+    provider: record.provider.startsWith("ligdicash_") ? "ligdicash" : "yengapay",
+    providerToken: record.providerToken ?? null,
   };
 }
 
@@ -1070,10 +1078,14 @@ export async function recordDirectDepositIntent(input: {
   idempotencyKey: string;
   providerReference?: string;
   mode?: "test" | "sandbox" | "live";
+  provider?: "yengapay" | "ligdicash";
+  providerToken?: string | null;
 }) {
   const db = await getDb();
   if (!db) throw new Error("Le paiement direct est temporairement indisponible.");
-  const providerName = input.mode === "sandbox" ? "yengapay_direct_sandbox" as const : input.mode === "live" ? "yengapay_direct_live" as const : "yengapay_direct_test" as const;
+  const providerName = input.provider === "ligdicash"
+    ? (input.mode === "live" ? "ligdicash_direct_live" as const : "ligdicash_direct_sandbox" as const)
+    : input.mode === "sandbox" ? "yengapay_direct_sandbox" as const : input.mode === "live" ? "yengapay_direct_live" as const : "yengapay_direct_test" as const;
   await db.insert(tikissePaymentTransactions).values({
     id: input.transactionId,
     profilePhone: input.profilePhone,
@@ -1082,6 +1094,7 @@ export async function recordDirectDepositIntent(input: {
     amount: input.amount,
     status: "pending",
     providerReference: input.providerReference ?? `direct_test_${input.transactionId}`,
+    providerToken: input.providerToken ?? null,
     checkoutUrl: null,
     ussdCode: input.ussdCode,
     phoneE164: input.phone,
@@ -1102,6 +1115,21 @@ export async function getDirectDepositIntent(transactionId: string, profilePhone
   const record = (await db.select().from(tikissePaymentTransactions).where(and(eq(tikissePaymentTransactions.id, transactionId), eq(tikissePaymentTransactions.profilePhone, profilePhone))).limit(1))[0];
   if (!record) return null;
   return paymentTransactionToDirectDeposit(record);
+}
+
+/** Paiement direct par son identifiant seul — pour le rappel du prestataire, qui ne connaît pas le profil. */
+export async function getDirectDepositById(transactionId: string): Promise<DirectDepositRecord | null> {
+  const db = await getDb();
+  if (!db) throw new Error("Le paiement direct est temporairement indisponible.");
+  const record = (await db.select().from(tikissePaymentTransactions).where(eq(tikissePaymentTransactions.id, transactionId)).limit(1))[0];
+  return record ? paymentTransactionToDirectDeposit(record) : null;
+}
+
+/** Enregistre le jeton LigdiCash une fois la demande acceptée par LigdiCash. */
+export async function setDirectDepositProviderToken(transactionId: string, providerToken: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Le paiement direct est temporairement indisponible.");
+  await db.update(tikissePaymentTransactions).set({ providerToken }).where(eq(tikissePaymentTransactions.id, transactionId));
 }
 
 /** Retrouve une intention déjà créée après une relance réseau de la même demande. */
@@ -1146,7 +1174,7 @@ export async function listPendingDirectDeposits(profilePhone: string): Promise<D
       eq(tikissePaymentTransactions.status, "pending"),
       // `provider` est un type énuméré, pas un LIKE arbitraire : on teste les 3 valeurs direct
       // explicitement. Si on ajoute un nouveau provider direct un jour, mettre à jour ici aussi.
-      inArray(tikissePaymentTransactions.provider, ["yengapay_direct_test", "yengapay_direct_sandbox", "yengapay_direct_live"]),
+      inArray(tikissePaymentTransactions.provider, [...DIRECT_DEPOSIT_PROVIDERS]),
       // Expiré = `expiresAt` est dans le passé. SQL brut : comparaison directe avec NOW().
       // On garde les rows dont expiresAt est NULL OU dans le futur — un expiresAt NULL signifie
       // "pas d'expiration" (cas dégénéré, mais on reste permissif).

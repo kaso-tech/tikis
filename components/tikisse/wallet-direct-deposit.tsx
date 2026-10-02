@@ -54,8 +54,10 @@ export type DirectDepositView = {
   status: "pending" | "succeeded" | "failed" | "cancelled" | "expired";
   mode: "test" | "sandbox" | "live";
   requiresOtp?: boolean;
-  flow?: "ONE_STEP" | "TWO_STEP" | "TEST";
+  /** PUSH : pas de code, l'opérateur demande au client de valider sur son téléphone (Moov via LigdiCash). */
+  flow?: "ONE_STEP" | "TWO_STEP" | "TEST" | "PUSH";
   otpInstructions?: string;
+  provider?: "yengapay" | "ligdicash";
 };
 
 export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initialDeposit }: { visible: boolean; onClose: () => void; onSuccess?: () => void; initialDeposit?: DirectDepositView | null }) {
@@ -501,11 +503,18 @@ function ConfirmationStage(props: {
         {requiresOtp ? (
           <View style={[styles.otpCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <Text style={[styles.label, { color: theme.muted }]}>CONFIRMATION OTP</Text>
-            <Text style={[styles.otpHint, { color: theme.muted }]}>Composez le code ci-dessous sur votre téléphone pour obtenir le code OTP :</Text>
+            <Text style={[styles.otpHint, { color: theme.muted }]}>{deposit.otpInstructions ?? "Composez le code ci-dessous sur votre téléphone pour obtenir le code OTP :"}</Text>
             <TikisseButton label={ussdCode || "Code USSD indisponible"} icon="phone" variant="secondary" disabled={!ussdCode || confirming} onPress={onOpenUssd} style={styles.ussdButton} />
             <OtpCells theme={theme} styles={styles} values={otpCells} disabled={confirming} onChange={onChangeOtpCell} />
             <TikisseButton label="Confirmer le paiement" icon="lock-open" loading={confirming} disabled={confirming || otpCells.some((cell) => !cell)} onPress={onSubmit} style={styles.cta} />
-            {deposit.operator === "moov_money" ? <TikisseButton label="Renvoyer le code OTP" loading={resendingOtp} disabled={resendingOtp || confirming} onPress={onResendOtp} variant="ghost" style={styles.refreshButton} /> : null}
+            {deposit.operator === "moov_money" && deposit.provider !== "ligdicash" ? <TikisseButton label="Renvoyer le code OTP" loading={resendingOtp} disabled={resendingOtp || confirming} onPress={onResendOtp} variant="ghost" style={styles.refreshButton} /> : null}
+          </View>
+        ) : !isTest && deposit.otpInstructions ? (
+          // Pas de code à saisir : validation sur le téléphone (Moov), ou code déjà envoyé (Orange).
+          <View style={[styles.otpCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+            <Text style={[styles.label, { color: theme.muted }]}>{deposit.flow === "PUSH" ? "VALIDEZ SUR VOTRE TÉLÉPHONE" : "PAIEMENT EN COURS"}</Text>
+            <Text style={[styles.otpHint, { color: theme.foreground }]}>{deposit.otpInstructions}</Text>
+            <Text style={[styles.otpHint, { color: theme.muted }]}>Cet écran se met à jour tout seul dès que l’opérateur confirme le paiement.</Text>
           </View>
         ) : null}
 

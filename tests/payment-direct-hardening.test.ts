@@ -60,7 +60,7 @@ describe("le paiement Mobile Money est limité par profil", () => {
     expect(body).toContain(`await enforcePaymentRateLimit("${action}", profile.phone);`);
     // La limite passe avant tout appel au prestataire.
     const limitAt = body.indexOf("enforcePaymentRateLimit");
-    const callAt = Math.max(body.indexOf("await import(\"./yengapay-direct\")"), body.indexOf("db.initiateYengaPay"));
+    const callAt = Math.max(body.indexOf("await import(\"./direct-deposit\")"), body.indexOf("db.initiateYengaPay"));
     expect(limitAt).toBeLessThan(callAt);
   });
 });

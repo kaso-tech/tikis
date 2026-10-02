@@ -91,6 +91,20 @@ async function startServer() {
     return res.status(result.status).json(result.body);
   });
 
+  // Rappel LigdiCash après un paiement Mobile Money : simple signal, le statut est revérifié auprès de
+  // LigdiCash avant tout crédit (server/direct-deposit.ts).
+  app.post("/api/webhooks/ligdicash", async (req, res) => {
+    try {
+      const { handleLigdicashCallback } = await import("../direct-deposit");
+      const transaction = typeof req.query.transaction === "string" ? req.query.transaction : undefined;
+      const result = await handleLigdicashCallback(transaction);
+      return res.status(result.status).json(result.body);
+    } catch (error) {
+      console.error("[ligdicash] rappel :", error instanceof Error ? error.message : error);
+      return res.status(500).json({ ok: false });
+    }
+  });
+
   // Console d'administration Tikisse : SPA statique compilée séparément (voir admin/README.md),
   // servie par ce même serveur ("même infra") mais sous son propre chemin, isolée du bundle mobile.
   const adminDistPath = path.resolve(process.cwd(), "admin/dist");

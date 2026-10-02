@@ -12,7 +12,7 @@ export const tikisseDeliveriesRouteSourceEnum = pgEnum("tikisse_deliveries_route
 export const tikisseDeliveryCandidatesStatusEnum = pgEnum("tikisse_delivery_candidates_status", ["applied", "selected", "confirmed", "withdrawn", "replaced"]);
 export const tikisseWalletLedgerOperationEnum = pgEnum("tikisse_wallet_ledger_operation", ["block", "unblock", "debit", "commission_debit", "compensation", "credit", "refund", "deposit_request", "withdrawal_request", "bonus", "penalty"]);
 export const tikissePaymentTransactionsTypeEnum = pgEnum("tikisse_payment_transactions_type", ["deposit", "withdrawal"]);
-export const tikissePaymentTransactionsProviderEnum = pgEnum("tikisse_payment_transactions_provider", ["ligdi_simulated", "yengapay_test", "yengapay_sandbox", "yengapay_live", "yengapay_direct_test", "yengapay_direct_sandbox", "yengapay_direct_live", "manual_payout"]);
+export const tikissePaymentTransactionsProviderEnum = pgEnum("tikisse_payment_transactions_provider", ["ligdi_simulated", "yengapay_test", "yengapay_sandbox", "yengapay_live", "yengapay_direct_test", "yengapay_direct_sandbox", "yengapay_direct_live", "manual_payout", "ligdicash_direct_sandbox", "ligdicash_direct_live"]);
 export const tikissePaymentTransactionsStatusEnum = pgEnum("tikisse_payment_transactions_status", ["pending", "succeeded", "failed", "cancelled", "expired"]);
 export const tikisseDeliveryEventsStatusEnum = pgEnum("tikisse_delivery_events_status", ["draft", "open", "pending_confirmation", "active", "completed", "disabled", "cancelled", "expired"]);
 export const tikisseDeliveryEventsToneEnum = pgEnum("tikisse_delivery_events_tone", ["info", "success", "warning"]);
@@ -239,6 +239,8 @@ export const tikissePaymentTransactions = pgTable("tikisse_payment_transactions"
   amount: integer("amount").notNull(),
   status: tikissePaymentTransactionsStatusEnum("status").notNull().default("pending"),
   providerReference: varchar("providerReference", { length: 80 }).notNull().unique(),
+  /** Jeton de transaction LigdiCash (JWT, trop long pour `providerReference`) : sert à vérifier le statut. */
+  providerToken: text("providerToken"),
   checkoutUrl: varchar("checkoutUrl", { length: 1000 }),
   ussdCode: varchar("ussdCode", { length: 64 }),
   phoneE164: varchar("phoneE164", { length: 24 }),

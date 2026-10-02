@@ -56,6 +56,15 @@ services:
       # Vrais SMS (Supabase Auth + Twilio Verify). Le mode « sim » (code 730512) reste disponible en local.
       - key: TIKISSE_OTP_MODE
         value: real
+      # Paiement Mobile Money dans l'application : « ligdicash » ou « yengapay ».
+      - key: TIKISSE_DIRECT_PAYMENT_PROVIDER
+        value: ligdicash
+      - key: LIGDICASH_MODE # sandbox (test.ligdicash.com) ou live (app.ligdicash.com)
+        sync: false
+      - key: LIGDICASH_API_KEY
+        sync: false
+      - key: LIGDICASH_AUTH_TOKEN
+        sync: false
       - key: YENGAPAY_MODE
         sync: false
       - key: YENGAPAY_API_KEY

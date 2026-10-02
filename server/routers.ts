@@ -882,8 +882,8 @@ export const appRouter = router({
       if (!country) throw new Error("Pays non supporté.");
       if (input.phoneLocal.length !== country.digits) throw new Error(`Le numéro doit contenir ${country.digits} chiffres pour ${country.name}.`);
       const phone = `${country.dialCode}${input.phoneLocal.replace(/^0+/, "")}`;
-      const { createYengapayDirectDeposit } = await import("./yengapay-direct");
-      return createYengapayDirectDeposit({
+      const { createDirectDeposit } = await import("./direct-deposit");
+      return createDirectDeposit({
         profilePhone: profile.phone,
         amount: input.amount,
         phone,
@@ -894,25 +894,25 @@ export const appRouter = router({
     }),
     checkDirectDepositStatus: tikisseProtectedProcedure.input(z.object({ transactionId: z.string().uuid() })).query(async ({ ctx, input }) => {
       const profile = await currentTikisseProfile(ctx.tikisseProfilePhone);
-      const { getYengapayDirectDepositStatus } = await import("./yengapay-direct");
-      return getYengapayDirectDepositStatus({ profilePhone: profile.phone, transactionId: input.transactionId });
+      const { getDirectDepositStatus } = await import("./direct-deposit");
+      return getDirectDepositStatus({ profilePhone: profile.phone, transactionId: input.transactionId });
     }),
     payDirectDeposit: tikisseProtectedProcedure.input(z.object({ transactionId: z.string().uuid(), otp: z.string().regex(/^[0-9]{4,12}$/) })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisseProfile(ctx.tikisseProfilePhone);
       await enforcePaymentRateLimit("submitOtp", profile.phone);
-      const { payYengapayDirectDeposit } = await import("./yengapay-direct");
-      return payYengapayDirectDeposit({ profilePhone: profile.phone, transactionId: input.transactionId, otp: input.otp });
+      const { payDirectDeposit } = await import("./direct-deposit");
+      return payDirectDeposit({ profilePhone: profile.phone, transactionId: input.transactionId, otp: input.otp });
     }),
     resendDirectDepositOtp: tikisseProtectedProcedure.input(z.object({ transactionId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisseProfile(ctx.tikisseProfilePhone);
       await enforcePaymentRateLimit("resendOtp", profile.phone);
-      const { resendYengapayDirectOtp } = await import("./yengapay-direct");
-      return resendYengapayDirectOtp({ profilePhone: profile.phone, transactionId: input.transactionId });
+      const { resendDirectDepositOtp } = await import("./direct-deposit");
+      return resendDirectDepositOtp({ profilePhone: profile.phone, transactionId: input.transactionId });
     }),
     cancelDirectDeposit: tikisseProtectedProcedure.input(z.object({ transactionId: z.string().uuid() })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisseProfile(ctx.tikisseProfilePhone);
-      const { cancelYengapayDirectDeposit } = await import("./yengapay-direct");
-      return cancelYengapayDirectDeposit({ profilePhone: profile.phone, transactionId: input.transactionId });
+      const { cancelDirectDeposit } = await import("./direct-deposit");
+      return cancelDirectDeposit({ profilePhone: profile.phone, transactionId: input.transactionId });
     }),
     // Liste les paiements directs encore en attente pour le profil courant. Sert à la reprise
     // côté client quand l'utilisateur a fermé l'app pendant le polling initial : le dépôt
@@ -925,8 +925,8 @@ export const appRouter = router({
     }),
     settleDirectDepositTest: tikisseProtectedProcedure.input(z.object({ transactionId: z.string().uuid(), outcome: z.enum(["succeeded", "failed"]) })).mutation(async ({ ctx, input }) => {
       const profile = await currentTikisseProfile(ctx.tikisseProfilePhone);
-      const { settleYengapayDirectDepositTest } = await import("./yengapay-direct");
-      return settleYengapayDirectDepositTest({ profilePhone: profile.phone, ...input });
+      const { settleDirectDepositTest } = await import("./direct-deposit");
+      return settleDirectDepositTest({ profilePhone: profile.phone, ...input });
     }),
   }),
   notifications: router({
