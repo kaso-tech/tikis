@@ -122,7 +122,9 @@ avant mise en service, démarrage, contrôle de santé (`/api/health`), variable
      Render et les intègre.
    - Ne pas définir `PORT` : Render le fournit.
 3. **Apply** : premier build et déploiement (quelques minutes). Les migrations créent les tables dans Supabase.
-4. Service → **Settings** → **Custom Domains** : `api.tikisse.com`, puis créer chez le registraire du domaine
+4. Service → **Settings** → **Custom Domains** : `api.tikisse.com`, `tikisse.com`, `www.tikisse.com` et
+   `console.tikisse.com` (le même service sert l'API, l'application web à la racine, et la console à la
+   racine de `console.tikisse.com`), puis créer chez le registraire du domaine
    l'enregistrement CNAME indiqué par Render. Le certificat HTTPS est automatique.
 5. Vérifier `https://api.tikisse.com/api/health`, puis déclarer dans la console YengaPay le webhook
    `https://api.tikisse.com/api/webhooks/yengapay`.

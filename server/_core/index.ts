@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerStorageProxy } from "./storageProxy";
 import { registerAdminDocumentRoutes } from "../admin-documents";
+import { consoleHosts, isConsoleHost } from "./console-host";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import * as db from "../db";
@@ -87,6 +88,15 @@ async function startServer() {
   if (fs.existsSync(adminDistPath)) {
     app.use("/admin", express.static(adminDistPath));
     app.get("/admin/*", (_req, res) => res.sendFile(path.join(adminDistPath, "index.html")));
+    // Domaine propre à la console (console.tikisse.com) : la console à la racine, jamais l'application.
+    // Ses fichiers restent sous /admin/ (base du build), servis juste au-dessus ; l'API, sous /api, passe.
+    const hosts = consoleHosts();
+    app.use((req, res, next) => {
+      if (!isConsoleHost(req.hostname, hosts) || req.path === "/api" || req.path.startsWith("/api/") || req.path.startsWith("/admin/")) return next();
+      if (req.method !== "GET" && req.method !== "HEAD") return next();
+      if (path.extname(req.path)) return res.status(404).end();
+      return res.sendFile(path.join(adminDistPath, "index.html"));
+    });
   } else {
     app.get("/admin", (_req, res) => res.status(503).send("Console d’administration non compilée. Voir admin/README.md pour la builder (npm run build dans le dossier admin/)."));
   }
