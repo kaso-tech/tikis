@@ -20,10 +20,11 @@ describe("domaine de la console", () => {
 });
 
 describe("domaines du site vitrine", () => {
-  it("tikisse.com sert le site, www y renvoie", () => {
-    expect(siteHosts({})).toEqual(["tikisse.com"]);
-    expect(isConsoleHost("tikisse.com", siteHosts({}))).toBe(true);
+  it("tikisse.com et www.tikisse.com servent le site, sans redirection par défaut", () => {
+    expect(siteHosts({})).toEqual(["tikisse.com", "www.tikisse.com"]);
+    expect(isConsoleHost("www.tikisse.com", siteHosts({}))).toBe(true);
     expect(isConsoleHost("app.tikisse.com", siteHosts({}))).toBe(false);
-    expect(isConsoleHost("www.tikisse.com", siteRedirectHosts({}))).toBe(true);
+    expect(siteRedirectHosts({}).size).toBe(0);
+    expect(isConsoleHost("www.tikisse.com", siteRedirectHosts({ TIKISSE_SITE_REDIRECT_HOSTS: "www.tikisse.com" }))).toBe(true);
   });
 });

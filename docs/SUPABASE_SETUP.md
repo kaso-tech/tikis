@@ -124,8 +124,7 @@ avant mise en service, démarrage, contrôle de santé (`/api/health`), variable
 3. **Apply** : premier build et déploiement (quelques minutes). Les migrations créent les tables dans Supabase.
 4. Service → **Settings** → **Custom Domains** : `api.tikisse.com`, `app.tikisse.com` (version web de
    l'application) et `console.tikisse.com` (la console, servie à sa racine) — le même service sert les
-   trois, ainsi que `tikisse.com` (site vitrine, `site/public`) et `www.tikisse.com` (renvoie vers
-   `tikisse.com`). Puis créer chez le registraire du domaine
+   trois, ainsi que `tikisse.com` et `www.tikisse.com` (site vitrine, `site/public`, servi sur les deux). Puis créer chez le registraire du domaine
    l'enregistrement CNAME indiqué par Render. Le certificat HTTPS est automatique.
 5. Vérifier `https://api.tikisse.com/api/health`, puis déclarer dans la console YengaPay le webhook
    `https://api.tikisse.com/api/webhooks/yengapay`.

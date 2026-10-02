@@ -1,6 +1,6 @@
 # Site vitrine Tikisse
 
-Pages statiques servies sur **tikisse.com** par le serveur Tikisse (Render) — `www.tikisse.com` y renvoie.
+Pages statiques servies sur **tikisse.com** et **www.tikisse.com** par le serveur Tikisse (Render).
 Aucune compilation ni dépendance : le serveur publie directement `site/public/`
 (voir `server/_core/console-host.ts` et `server/_core/index.ts`).
 

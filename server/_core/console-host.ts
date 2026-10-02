@@ -1,8 +1,10 @@
 /**
  * Domaines servis par ce même serveur, chacun avec son contenu à la racine :
  *  - console (TIKISSE_CONSOLE_HOSTS, défaut console.tikisse.com) : la console d'administration ;
- *  - site vitrine (TIKISSE_SITE_HOSTS, défaut tikisse.com) : les pages statiques de site/public ;
- *    TIKISSE_SITE_REDIRECT_HOSTS (défaut www.tikisse.com) y renvoie, en 301, vers le premier domaine du site ;
+ *  - site vitrine (TIKISSE_SITE_HOSTS, défaut tikisse.com et www.tikisse.com) : les pages de site/public,
+ *    servies directement sur les deux — le domaine nu garde chez Manus un enregistrement A impossible à
+ *    retirer, une redirection de www vers lui enverrait une visite sur deux chez Manus ;
+ *    TIKISSE_SITE_REDIRECT_HOSTS (vide par défaut) : domaines renvoyés en 301 vers le premier domaine du site ;
  *  - tout autre domaine (api.tikisse.com, app.tikisse.com) : la version web de l'application, la console
  *    restant sous /admin. L'API, sous /api, répond sur tous.
  */
@@ -18,11 +20,11 @@ export function consoleHosts(env: Record<string, string | undefined> = process.e
 }
 
 export function siteHosts(env: Record<string, string | undefined> = process.env): string[] {
-  return hostList(env.TIKISSE_SITE_HOSTS, "tikisse.com");
+  return hostList(env.TIKISSE_SITE_HOSTS, "tikisse.com,www.tikisse.com");
 }
 
 export function siteRedirectHosts(env: Record<string, string | undefined> = process.env): Set<string> {
-  return new Set(hostList(env.TIKISSE_SITE_REDIRECT_HOSTS, "www.tikisse.com"));
+  return new Set(hostList(env.TIKISSE_SITE_REDIRECT_HOSTS, ""));
 }
 
 export function isConsoleHost(hostname: string | undefined, hosts: Set<string> | string[]): boolean {
