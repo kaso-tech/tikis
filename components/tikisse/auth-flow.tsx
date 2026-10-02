@@ -122,11 +122,16 @@ export function AuthFlow() {
     setPhoneError("");
     setSending(true);
     if (isSupabasePhoneAuthEnabled()) {
+      // Pas de repli silencieux sur la simulation : avec les vrais SMS, le serveur refuse le code simulé ;
+      // la personne verrait un code qui ne marche pas. On reste sur l'écran du numéro, avec la raison.
       try {
         await requestSupabasePhoneOtp(phone);
         setOtpProvider("supabase");
       } catch {
-        setOtpProvider("simulation");
+        setSending(false);
+        setPhoneError("Le SMS n’a pas pu être envoyé. Vérifiez le numéro et réessayez dans un instant.");
+        haptic.error();
+        return;
       }
     } else {
       setOtpProvider("simulation");
@@ -210,7 +215,11 @@ export function AuthFlow() {
   async function resendOtp() {
     if (secondsLeft > 0) return;
     if (otpProvider === "supabase") {
-      try { await requestSupabasePhoneOtp(phone); } catch { setOtpProvider("simulation"); }
+      try { await requestSupabasePhoneOtp(phone); } catch {
+        setOtpError("Le SMS n’a pas pu être renvoyé. Réessayez dans un instant.");
+        haptic.error();
+        return;
+      }
     }
     setDigits(["", "", "", "", "", ""]);
     setOtpError("");

@@ -122,7 +122,7 @@ export default function ProfileScreen() {
     const validation = validateFullName(fullName);
     if (!validation.valid) { setError(validation.message); haptic.error(); return; }
     try {
-      const saved = await updateMutation.mutateAsync({ phone: profile.phone, otp: "730512", fullName: validation.value, photoBase64, photoMime });
+      const saved = await updateMutation.mutateAsync({ fullName: validation.value, photoBase64, photoMime });
       updateProfile({ fullName: saved.fullName, photoUrl: saved.photoUrl });
       setEditorOpen(false);
       setPhotoBase64(undefined);
@@ -139,7 +139,7 @@ export default function ProfileScreen() {
     setLocationError("");
     setLocationSaving("country");
     try {
-      const saved = await updateMutation.mutateAsync({ phone: profile.phone, otp: "730512", country: countryId });
+      const saved = await updateMutation.mutateAsync({ country: countryId });
       updateProfile({ country: saved.country, city: saved.city ?? undefined });
       setCountryEditorOpen(false);
       haptic.success();
@@ -156,7 +156,7 @@ export default function ProfileScreen() {
     setLocationError("");
     setLocationSaving("city");
     try {
-      const saved = await updateMutation.mutateAsync({ phone: profile.phone, otp: "730512", city });
+      const saved = await updateMutation.mutateAsync({ city });
       updateProfile({ city: saved.city });
       setCityEditorOpen(false);
       setCitySearch("");

@@ -1,3 +1,4 @@
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { LIVE_POSITION_GPS_JUMP_ERR_MSG, LIVE_POSITION_OUT_OF_ZONE_ERR_MSG } from "../shared/const";
 import type { DriverCandidate } from "../shared/tikisse-domain";
@@ -433,10 +434,15 @@ export const appRouter = router({
       setTikisseProfileCookie(ctx.res, ctx.req, sessionToken);
       return { profile: toPublicProfile(linked), sessionToken };
     }),
-    update: publicProcedure.input(z.object({ phone: phoneSchema, otp: simulationOtpSchema, fullName: fullNameSchema.optional(), photoBase64: base64ImageSchema.optional(), photoMime: photoMimeSchema.optional(), country: z.string().length(2).optional(), city: z.string().trim().min(2).max(80).optional() }).superRefine((value, ctx) => {
+    // Authentifiée par la session Tikisse, pas par le code de simulation : en mode « real » ce code est refusé,
+    // et en simulation il est public — n'importe qui aurait pu modifier le profil d'un autre numéro.
+    // `phone` et `otp` restent acceptés (anciennes versions de l'application) mais ne donnent aucun droit.
+    update: tikisseProtectedProcedure.input(z.object({ phone: phoneSchema.optional(), otp: z.string().optional(), fullName: fullNameSchema.optional(), photoBase64: base64ImageSchema.optional(), photoMime: photoMimeSchema.optional(), country: z.string().length(2).optional(), city: z.string().trim().min(2).max(80).optional() }).superRefine((value, ctx) => {
       if (!value.fullName && !value.photoBase64 && !value.country && !value.city) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Aucune modification à enregistrer." });
       if (value.photoBase64 && !value.photoMime) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["photoMime"], message: "Type d’image requis." });
-    })).mutation(async ({ input, ctx }) => {
+    })).mutation(async ({ input: rawInput, ctx }) => {
+      if (rawInput.phone && rawInput.phone !== ctx.tikisseProfilePhone) throw new TRPCError({ code: "FORBIDDEN", message: "Ce profil n’est pas le vôtre." });
+      const input = { ...rawInput, phone: ctx.tikisseProfilePhone };
       await enforcePerIpRateLimit(ctx.req);
       await enforcePerPhoneRateLimit("update", input.phone);
       let photoKey: string | null | undefined;
@@ -505,16 +511,21 @@ export const appRouter = router({
       }
       return { ok: true, demoOtp: SIMULATION_OTP };
     }),
-    updateContact: publicProcedure.input(z.object({
+    // Authentifiée par la session Tikisse (avant : numéro + code de simulation public, refusé en mode « real »).
+    // Aucun e-mail n'est encore envoyé pour confirmer l'adresse : en mode « real », elle est enregistrée
+    // comme non vérifiée ; en simulation, le code de démonstration fait office de confirmation.
+    updateContact: tikisseProtectedProcedure.input(z.object({
       kind: z.enum(["phone", "email"]),
       value: z.string().min(3).max(180),
-      otp: z.string().min(6).max(6),
-      phone: phoneSchema,
-      sessionOtp: simulationOtpSchema,
-    })).mutation(async ({ input, ctx }) => {
+      otp: z.string().min(6).max(6).optional(),
+      phone: phoneSchema.optional(),
+      sessionOtp: z.string().optional(),
+    })).mutation(async ({ input: rawInput, ctx }) => {
+      if (rawInput.phone && rawInput.phone !== ctx.tikisseProfilePhone) throw new TRPCError({ code: "FORBIDDEN", message: "Ce profil n’est pas le vôtre." });
+      const input = { ...rawInput, phone: ctx.tikisseProfilePhone };
       await enforcePerIpRateLimit(ctx.req);
       await enforcePerPhoneRateLimit("updateContact", input.phone);
-      if (input.otp !== input.sessionOtp) throw new Error("Code de confirmation invalide.");
+      if (OTP_MODE === "sim" && input.otp !== SIMULATION_OTP) throw new Error("Code de confirmation invalide.");
       const current = await db.getTikisseProfileByPhone(input.phone);
       if (!current) throw new Error("Profil introuvable.");
       if (input.kind === "phone") {
@@ -523,7 +534,7 @@ export const appRouter = router({
         return toPublicProfile(current);
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.value.trim())) throw new Error("Adresse e-mail invalide.");
-      const updated = await db.updateTikisseProfile(input.phone, { email: input.value.trim().toLocaleLowerCase("fr-FR"), emailVerified: true, phoneVerified: true });
+      const updated = await db.updateTikisseProfile(input.phone, { email: input.value.trim().toLocaleLowerCase("fr-FR"), emailVerified: OTP_MODE === "sim" });
       return toPublicProfile(updated);
     }),
   }),

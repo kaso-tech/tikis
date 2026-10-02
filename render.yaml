@@ -53,8 +53,9 @@ services:
       # ─── Web, SMS, paiements, cartes, erreurs ────────────────────────────────────────────────
       - key: TIKISSE_ALLOWED_ORIGINS
         value: https://app.tikisse.com,https://tikisse.com,https://www.tikisse.com,https://console.tikisse.com
+      # Vrais SMS (Supabase Auth + Twilio Verify). Le mode « sim » (code 730512) reste disponible en local.
       - key: TIKISSE_OTP_MODE
-        value: sim
+        value: real
       - key: YENGAPAY_MODE
         sync: false
       - key: YENGAPAY_API_KEY
@@ -78,4 +79,4 @@ services:
       - key: EXPO_PUBLIC_SUPABASE_ANON_KEY
         sync: false
       - key: EXPO_PUBLIC_ENABLE_SUPABASE_PHONE_AUTH
-        value: "false"
+        value: "true"

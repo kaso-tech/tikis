@@ -20,9 +20,14 @@ describe("contrat de vérification des contacts", () => {
     expect(contactSource).toContain('phone: profile.phone, sessionOtp: DEMO_OTP');
   });
 
-  it("attache toujours la session du profil aux demandes de contact", () => {
+  it("authentifie la modification par la session, jamais par le numéro seul", () => {
     expect(contactSource).toContain('phone: profile.phone');
+    expect(routerSource).toContain("updateContact: tikisseProtectedProcedure");
+    expect(routerSource).toContain("const input = { ...rawInput, phone: ctx.tikisseProfilePhone }");
     expect(routerSource).toContain('const current = await db.getTikisseProfileByPhone(input.phone)');
-    expect(routerSource).toContain('db.updateTikisseProfile(input.phone, { email: input.value.trim().toLocaleLowerCase("fr-FR"), emailVerified: true, phoneVerified: true })');
+  });
+
+  it("ne marque l'e-mail vérifié qu'en simulation (aucun e-mail de confirmation n'est encore envoyé)", () => {
+    expect(routerSource).toContain('db.updateTikisseProfile(input.phone, { email: input.value.trim().toLocaleLowerCase("fr-FR"), emailVerified: OTP_MODE === "sim" })');
   });
 });
