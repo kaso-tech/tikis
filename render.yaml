@@ -52,7 +52,7 @@ services:
 
       # ─── Web, SMS, paiements, cartes, erreurs ────────────────────────────────────────────────
       - key: TIKISSE_ALLOWED_ORIGINS
-        value: https://tikisse.com,https://www.tikisse.com,https://console.tikisse.com
+        value: https://app.tikisse.com,https://tikisse.com,https://www.tikisse.com,https://console.tikisse.com
       - key: TIKISSE_OTP_MODE
         value: sim
       - key: YENGAPAY_MODE

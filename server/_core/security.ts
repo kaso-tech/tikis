@@ -9,6 +9,7 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "https://admin.tikisse.app",
   "https://console.tikisse.com",
   "https://app.tikisse.app",
+  "https://app.tikisse.com",
 ];
 
 function parseAllowedOrigins(): Set<string> {
