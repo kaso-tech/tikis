@@ -11,12 +11,12 @@ import { isCoordinateInCountry } from "./_test-helpers/geo-fence";
 import { publicFileUrl, storagePut } from "./storage";
 import * as geography from "./geography";
 import { setTikisseProfileCookie, clearTikisseProfileCookie } from "./_core/cookies";
-import { getTikisseSessionTokenFromHeaders } from "./_core/context";
+import { getTikisseSessionTokenFromHeaders, pickTikisseSessionToken } from "./_core/context";
 import { clientIp } from "./_core/security";
 import { publicProcedure, router, tikisseProtectedProcedure, tikisseSessionProcedure } from "./_core/trpc";
 import { findCountryForPhone } from "../lib/registration-rules";
 import { COUNTRIES } from "../lib/registration-rules";
-import { createTikisseProfileSession } from "./tikisse-session";
+import { createTikisseProfileSession, shouldRenewSession, verifyTikisseProfileSessionClaims } from "./tikisse-session";
 import { recordGeographicMetric } from "./geography-observability";
 import { isAllowedDeliveryText, sanitizeDeliveryText } from "../lib/tikisse-engine";
 import { sanitizePlaceText } from "../lib/geo-rules";
@@ -360,6 +360,18 @@ export const appRouter = router({
     }),
   }),
   sessions: router({
+    /** Prolonge la session d'un an quand son jeton a plus d'une semaine (web : nouveau cookie ; mobile :
+     *  nouveau jeton à stocker). Une session révoquée n'arrive pas jusqu'ici (tikisseProtectedProcedure). */
+    renew: tikisseProtectedProcedure.mutation(async ({ ctx }) => {
+      const token = pickTikisseSessionToken({ req: ctx.req, res: ctx.res } as Parameters<typeof pickTikisseSessionToken>[0]);
+      const claims = await verifyTikisseProfileSessionClaims(token);
+      if (!token || !claims || claims.phone !== ctx.tikisseProfilePhone || !shouldRenewSession(claims.issuedAt)) return { renewed: false as const };
+      const sessionToken = await createTikisseProfileSession(claims.phone);
+      const { replaceSessionToken } = await import("./sessions");
+      await replaceSessionToken({ phone: claims.phone, oldToken: token, newToken: sessionToken }).catch(() => undefined);
+      setTikisseProfileCookie(ctx.res, ctx.req, sessionToken);
+      return { renewed: true as const, sessionToken };
+    }),
     registerCurrent: tikisseProtectedProcedure.input(z.object({
       deviceName: z.string().max(120).optional(),
       platform: z.enum(["ios", "android", "web", "unknown"]).default("unknown"),

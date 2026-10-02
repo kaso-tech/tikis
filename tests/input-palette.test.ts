@@ -44,9 +44,9 @@ describe("palette des champs et menus", () => {
   });
 
   it("le parcours d'authentification prend la palette commune, sans variante à lui", () => {
-    // Un bouton par écran : accueil, numéro, code, rôle, engins, nom. Ils avaient leur propre palette
+    // Un bouton par écran (accueil, numéro, code, rôle, engins, nom), plus la confirmation du numéro. Ils avaient leur propre palette
     // (fond orange, texte blanc, 2,16:1) ; ils prennent maintenant celle de tout le monde.
-    expect((authSource.match(/<TikisseButton /g) ?? []).length).toBe(6);
+    expect((authSource.match(/<TikisseButton /g) ?? []).length).toBe(7);
     expect(buttonSource).toContain('primary: { background: "#A95000", foreground: "#FFFFFF"');
   });
 });

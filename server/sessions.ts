@@ -148,3 +148,13 @@ export async function isSessionRevoked(input: { phone: string; token: string }):
     throw error;
   }
 }
+
+/** Renouvellement d'un jeton (voir `sessions.renew`) : la session de l'appareil garde sa ligne — même
+ *  identifiant, même historique — et passe simplement au nouveau jeton. */
+export async function replaceSessionToken(input: { phone: string; oldToken: string; newToken: string }) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(tikisseProfileSessions)
+    .set({ tokenHash: hashSessionToken(input.newToken), tokenLast4: tokenLast4(input.newToken), lastSeenAt: new Date() })
+    .where(and(eq(tikisseProfileSessions.phone, input.phone), eq(tikisseProfileSessions.tokenHash, hashSessionToken(input.oldToken))));
+}

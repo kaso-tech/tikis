@@ -24,8 +24,8 @@ describe("palette des boutons", () => {
     // Tous les boutons principaux étant pleins, la prop ne distinguait plus rien.
     expect(buttonSource).not.toContain("authStyle");
     expect(authSource).not.toContain("authStyle");
-    // Un bouton par écran du parcours : accueil, numéro, code, rôle, engins, nom.
-    expect((authSource.match(/<TikisseButton /g) ?? []).length).toBe(6);
+    // Un bouton par écran du parcours (accueil, numéro, code, rôle, engins, nom) + la confirmation du numéro.
+    expect((authSource.match(/<TikisseButton /g) ?? []).length).toBe(7);
   });
 
   it("les actions écrites en toutes lettres se lisent en neutre, pas en orange pâle", () => {

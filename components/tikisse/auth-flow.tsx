@@ -71,6 +71,7 @@ export function AuthFlow() {
   const [selectedVehicles, setSelectedVehicles] = useState<VehicleType[]>([]);
   const [fullName, setFullName] = useState("");
   const [nameError, setNameError] = useState("");
+  const [phoneConfirmOpen, setPhoneConfirmOpen] = useState(false);
   // Ville de l'utilisateur, dans le pays choisi au début : texte saisi, et nom retenu dans les suggestions.
   const [cityInput, setCityInput] = useState("");
   const [selectedCity, setSelectedCity] = useState("");
@@ -128,12 +129,22 @@ export function AuthFlow() {
     setCountryPickerOpen(false);
   }
 
-  async function requestOtp() {
+  /** Avant tout envoi : le numéro est relu par la personne (chaque SMS est facturé, un numéro mal saisi
+   *  enverrait le code à un inconnu). Le code ne part qu'après « Envoyer le code ». */
+  function confirmPhone() {
     if (!isValidInternationalPhone(phoneInput, country)) {
       setPhoneError(`Saisissez un numéro valide à ${country.digits} chiffres pour ${country.name}.`);
       haptic.error();
       return;
     }
+    setPhoneError("");
+    Keyboard.dismiss();
+    setPhoneConfirmOpen(true);
+  }
+
+  async function requestOtp() {
+    setPhoneConfirmOpen(false);
+    if (!isValidInternationalPhone(phoneInput, country)) return;
     setPhoneError("");
     setSending(true);
     if (isSupabasePhoneAuthEnabled()) {
@@ -309,7 +320,7 @@ export function AuthFlow() {
     router.replace("/(tabs)");
   }
 
-  return <SafeAreaView style={[styles.safeArea, isDark && { backgroundColor: AUTH_DARK.bg }]} edges={["top", "bottom"]}><KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">{stage === "welcome" ? null : <FlowHeader creating={creating} step={creationStep} total={creationTotal} isDark={isDark} onBack={() => { if (stage === "phone") setStage("welcome"); else if (stage === "otp") setStage("phone"); else if (stage === "role") setStage("phone"); else if (stage === "vehicles") setStage("role"); else setStage(selectedRole === "driver" ? "vehicles" : "role"); }} />}{stage === "welcome" ? <WelcomeScreen onContinue={() => setStage("phone")} isDark={isDark} /> : null}{stage === "phone" ? <PhoneScreen country={country} value={phoneInput} error={phoneError} loading={sending} onCountryPress={() => setCountryPickerOpen(true)} onChange={(value) => { setPhoneInput(sanitizePhoneInput(value, country)); setPhoneError(""); }} onContinue={() => void requestOtp()} isDark={isDark} /> : null}{stage === "otp" ? <OtpScreen phone={phone} digits={digits} error={otpError} verifying={verifying} secondsLeft={secondsLeft} provider={otpProvider} onChangeDigit={updateDigit} onKeyPress={handleKeyPress} inputRefs={inputs} onResend={() => void resendOtp()} onSubmit={() => void submitOtp()} isDark={isDark} /> : null}{stage === "role" ? <RoleScreen selectedRole={selectedRole} onSelect={setSelectedRole} onContinue={continueRole} isDark={isDark} /> : null}{stage === "vehicles" ? <VehiclesScreen selected={selectedVehicles} onToggle={toggleVehicle} onContinue={continueVehicles} isDark={isDark} /> : null}{stage === "name" ? <NameScreen role={selectedRole} phone={phone} vehicles={selectedVehicles} value={fullName} error={nameError} loading={finishing} onChange={(value) => { setFullName(sanitizeFullName(value, { preserveTrailingSeparator: true })); setNameError(""); }} onContinue={() => void finishRegistration()} onEditRole={() => setStage("role")} onEditVehicles={() => setStage("vehicles")} referralCode={referralCode} referralFieldOpen={referralFieldOpen} onReferralFieldOpen={() => setReferralFieldOpen(true)} onReferralCodeChange={setReferralCode} countryName={country.name} cityInput={cityInput} cityError={cityError} citySuggestions={citySuggestions} citySearching={citySuggestionsQuery.isFetching} selectedCity={selectedCity} onCityChange={(value) => { setCityInput(value); setSelectedCity(""); setCityError(""); }} onSelectCity={(value) => { setSelectedCity(value); setCityInput(value); setCityError(""); Keyboard.dismiss(); }} isDark={isDark} /> : null}</ScrollView></KeyboardAvoidingView><CountryPicker visible={isCountryPickerOpen} selected={country} countries={availableCountries} onClose={() => setCountryPickerOpen(false)} onSelect={selectCountry} isDark={isDark} /></SafeAreaView>;
+  return <SafeAreaView style={[styles.safeArea, isDark && { backgroundColor: AUTH_DARK.bg }]} edges={["top", "bottom"]}><KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">{stage === "welcome" ? null : <FlowHeader creating={creating} step={creationStep} total={creationTotal} isDark={isDark} onBack={() => { if (stage === "phone") setStage("welcome"); else if (stage === "otp") setStage("phone"); else if (stage === "role") setStage("phone"); else if (stage === "vehicles") setStage("role"); else setStage(selectedRole === "driver" ? "vehicles" : "role"); }} />}{stage === "welcome" ? <WelcomeScreen onContinue={() => setStage("phone")} isDark={isDark} /> : null}{stage === "phone" ? <PhoneScreen country={country} value={phoneInput} error={phoneError} loading={sending} onCountryPress={() => setCountryPickerOpen(true)} onChange={(value) => { setPhoneInput(sanitizePhoneInput(value, country)); setPhoneError(""); }} onContinue={confirmPhone} isDark={isDark} /> : null}{stage === "otp" ? <OtpScreen phone={phone} digits={digits} error={otpError} verifying={verifying} secondsLeft={secondsLeft} provider={otpProvider} onChangeDigit={updateDigit} onKeyPress={handleKeyPress} inputRefs={inputs} onResend={() => void resendOtp()} onSubmit={() => void submitOtp()} isDark={isDark} /> : null}{stage === "role" ? <RoleScreen selectedRole={selectedRole} onSelect={setSelectedRole} onContinue={continueRole} isDark={isDark} /> : null}{stage === "vehicles" ? <VehiclesScreen selected={selectedVehicles} onToggle={toggleVehicle} onContinue={continueVehicles} isDark={isDark} /> : null}{stage === "name" ? <NameScreen role={selectedRole} phone={phone} vehicles={selectedVehicles} value={fullName} error={nameError} loading={finishing} onChange={(value) => { setFullName(sanitizeFullName(value, { preserveTrailingSeparator: true })); setNameError(""); }} onContinue={() => void finishRegistration()} onEditRole={() => setStage("role")} onEditVehicles={() => setStage("vehicles")} referralCode={referralCode} referralFieldOpen={referralFieldOpen} onReferralFieldOpen={() => setReferralFieldOpen(true)} onReferralCodeChange={setReferralCode} countryName={country.name} cityInput={cityInput} cityError={cityError} citySuggestions={citySuggestions} citySearching={citySuggestionsQuery.isFetching} selectedCity={selectedCity} onCityChange={(value) => { setCityInput(value); setSelectedCity(""); setCityError(""); }} onSelectCity={(value) => { setSelectedCity(value); setCityInput(value); setCityError(""); Keyboard.dismiss(); }} isDark={isDark} /> : null}</ScrollView></KeyboardAvoidingView><PhoneConfirmDialog visible={phoneConfirmOpen} phone={`${country.dialCode} ${formatLocalPhone(phoneInput, country)}`} countryName={country.name} onEdit={() => setPhoneConfirmOpen(false)} onConfirm={() => void requestOtp()} isDark={isDark} /><CountryPicker visible={isCountryPickerOpen} selected={country} countries={availableCountries} onClose={() => setCountryPickerOpen(false)} onSelect={selectCountry} isDark={isDark} /></SafeAreaView>;
 }
 
 /**
@@ -493,6 +504,23 @@ function NameScreen({ role, phone, vehicles, value, error, loading, onChange, on
   </View>;
 }
 
+function PhoneConfirmDialog({ visible, phone, countryName, onEdit, onConfirm, isDark }: { visible: boolean; phone: string; countryName: string; onEdit: () => void; onConfirm: () => void; isDark: boolean }) {
+  return <Modal visible={visible} transparent animationType="fade" onRequestClose={onEdit}>
+    <View style={styles.confirmBackdrop}>
+      <Pressable style={styles.modalScrim} onPress={onEdit} accessibilityLabel="Fermer" />
+      <View accessibilityRole="alert" style={[styles.confirmCard, isDark && { backgroundColor: AUTH_DARK.surface }]}>
+        <Text style={[styles.confirmTitle, isDark && { color: AUTH_DARK.text }]}>Ce numéro est-il correct ?</Text>
+        <Text style={[styles.confirmPhone, isDark && { color: AUTH_DARK.text }]}>{phone}</Text>
+        <Text style={[styles.confirmText, isDark && { color: AUTH_DARK.muted }]}>Le code de connexion sera envoyé par SMS à ce numéro ({countryName}). Vérifiez chaque chiffre avant l’envoi.</Text>
+        <TikisseButton label="Envoyer le code" icon="sms" onPress={onConfirm} style={styles.confirmPrimary} />
+        <Pressable accessibilityRole="button" onPress={onEdit} style={({ pressed }) => [styles.confirmSecondary, pressed && styles.pressed]}>
+          <Text style={[styles.confirmSecondaryText, isDark && { color: AUTH_DARK.text }]}>Modifier le numéro</Text>
+        </Pressable>
+      </View>
+    </View>
+  </Modal>;
+}
+
 function CountryPicker({ visible, selected, countries, onClose, onSelect, isDark }: { visible: boolean; selected: CountrySpec; countries: CountrySpec[]; onClose: () => void; onSelect: (country: CountrySpec) => void; isDark: boolean }) { return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><View style={styles.modal}><Pressable style={styles.modalScrim} onPress={onClose} /><View style={[styles.countrySheet, isDark && { backgroundColor: AUTH_DARK.surface }]}><View style={[styles.sheetHandle, isDark && { backgroundColor: AUTH_DARK.border }]} /><View style={styles.sheetTop}><Text style={[styles.sheetTitle, isDark && { color: AUTH_DARK.text }]}>Choisir un pays</Text><Pressable onPress={onClose} style={[styles.sheetClose, isDark && { backgroundColor: AUTH_DARK.input }]}><MaterialIcons name="close" size={20} color={isDark ? AUTH_DARK.text : "#241510"} /></Pressable></View>{countries.map((country) => <Pressable key={country.id} onPress={() => onSelect(country)} style={({ pressed }) => [styles.countryRow, isDark && country.id === selected.id && { backgroundColor: AUTH_DARK.input }, !isDark && country.id === selected.id && styles.countryRowActive, pressed && styles.pressed]}><View style={[styles.countryBadge, isDark && { backgroundColor: AUTH_DARK.input }]}><Text style={styles.countryFlag}>{countryFlagEmoji(country.id)}</Text></View><View style={styles.countryInfo}><Text style={[styles.countryName, isDark && { color: AUTH_DARK.text }]}>{country.name}</Text></View>{country.id === selected.id ? <MaterialIcons name="check-circle" size={21} color="#367552" /> : null}</Pressable>)}</View></View></Modal>; }
 
 const baseStyles = StyleSheet.create({
@@ -543,6 +571,14 @@ const styles = StyleSheet.create({
   vehicleCardActive: { ...baseStyles.vehicleCardActive, backgroundColor: "#A95000", borderWidth: 0 },
   vehicleTitle: { ...baseStyles.vehicleTitle, fontWeight: "600" },
   nameInput: { ...baseStyles.nameInput, borderRadius: 10, borderWidth: 0, fontWeight: "500" },
+  confirmBackdrop: { flex: 1, justifyContent: "center", padding: 24 },
+  confirmCard: { backgroundColor: "#FFFFFF", borderRadius: 16, padding: 22 },
+  confirmTitle: { color: "#2B0D02", fontSize: 18, fontWeight: "700" },
+  confirmPhone: { color: "#241510", fontSize: 26, fontWeight: "800", letterSpacing: 0.5, marginTop: 14 },
+  confirmText: { color: "#76665E", fontSize: 13, lineHeight: 19, marginTop: 10 },
+  confirmPrimary: { marginTop: 20 },
+  confirmSecondary: { alignItems: "center", paddingVertical: 14, marginTop: 4 },
+  confirmSecondaryText: { color: "#241510", fontSize: 14, fontWeight: "700" },
   citySuggestions: { marginTop: 6, borderRadius: 10, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#E7D9CF", overflow: "hidden" },
   cityOption: { minHeight: 46, flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14 },
   cityOptionText: { flex: 1, color: "#241510", fontSize: 15, fontWeight: "500" },

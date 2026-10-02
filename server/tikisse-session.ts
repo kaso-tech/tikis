@@ -22,6 +22,15 @@ const PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
  */
 export const TIKISSE_SESSION_TTL_SECONDS = 365 * 24 * 60 * 60;
 
+/** Au-delà de cet âge, un jeton encore valide est remplacé par un neuf (sessions.renew, appelé par
+ *  l'application à chaque ouverture) : tant que l'application sert au moins une fois par an, la session
+ *  ne s'éteint jamais et personne ne repaie un SMS pour se reconnecter. */
+export const TIKISSE_SESSION_RENEW_AFTER_SECONDS = 7 * 24 * 60 * 60;
+
+export function shouldRenewSession(issuedAt: number, nowSeconds = Math.floor(Date.now() / 1000)) {
+  return nowSeconds - issuedAt >= TIKISSE_SESSION_RENEW_AFTER_SECONDS;
+}
+
 /** Secret brut : nouveau nom de variable d'environnement, avec repli sur l'ancien nom (pas encore
  *  renommé dans le déploiement) puis sur le secret générique de la plateforme. */
 function rawSecret() {
