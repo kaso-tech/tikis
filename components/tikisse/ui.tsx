@@ -1,6 +1,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { haptic } from "@/lib/haptics";
+import { themedStyleSheets, useDarkTone, useThemedStyles } from "@/lib/themed-styles";
 
 /**
  * L'ambre des étoiles de notation : une convention universelle (Google, l'App Store la gardent
@@ -52,13 +53,18 @@ export function TikisseButton({
   compact?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   const blocked = disabled || loading;
   const activePalette: ButtonPalette = buttonColors[variant];
   // Un bouton bloqué ne recevait que `opacity: 0.84` : sur un fond saturé, seize
   // pour cent d'atténuation ne se voient pas, et l'écran proposait une action
   // qui ne répondait pas. En chargement, la palette reste celle de l'action :
   // c'est elle qui est en cours, pas une action refusée.
-  const palette: ButtonPalette = disabled && !loading ? DISABLED_PALETTE : activePalette;
+  const basePalette: ButtonPalette = disabled && !loading ? DISABLED_PALETTE : activePalette;
+  // Mode sombre : le bouton principal garde son brun plein (le blanc s'y lit toujours) ; les autres
+  // passent sur la surface brune, avec un texte clair, au lieu de rester des pastilles blanches.
+  const palette: ButtonPalette = basePalette === buttonColors.primary ? basePalette : { background: hue(basePalette.background, "surface"), foreground: hue(basePalette.foreground), border: basePalette.border ? hue(basePalette.border, "border") : undefined };
 
   const textStyle = [styles.buttonText, compact && styles.buttonTextCompact, { color: palette.foreground }];
 
@@ -68,22 +74,27 @@ export function TikisseButton({
 }
 
 export function TikisseIconButton({ icon, label, onPress, accent = "#241510" }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; label: string; onPress: () => void; accent?: string }) {
+  const styles = useThemedStyles(styleSheets);
   return <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={() => { haptic.light(); onPress(); }} style={({ pressed }) => [styles.iconButton, pressed && styles.iconButtonPressed]}><MaterialIcons name={icon} size={21} color={accent} /></Pressable>;
 }
 
 export function SurfaceCard({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+  const styles = useThemedStyles(styleSheets);
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
 export function SectionHeading({ title, action }: { title: string; action?: string }) {
+  const styles = useThemedStyles(styleSheets);
   return <View style={styles.sectionHeading}><Text style={styles.sectionTitle}>{title}</Text>{action ? <Text style={styles.sectionAction}>{action}</Text> : null}</View>;
 }
 
 export function StatusBadge({ label, color, background }: { label: string; color: string; background: string }) {
+  const styles = useThemedStyles(styleSheets);
   return <View style={[styles.statusBadge, { backgroundColor: background }]}><View style={[styles.statusDot, { backgroundColor: color }]} /><Text style={[styles.statusText, { color }]}>{label}</Text></View>;
 }
 
 export function Avatar({ initials, color = "#241510", size = 44 }: { initials: string; color?: string; size?: number }) {
+  const styles = useThemedStyles(styleSheets);
   return <View style={[styles.avatar, { backgroundColor: color, width: size, height: size, borderRadius: size / 2 }]}><Text style={[styles.avatarText, { fontSize: Math.max(12, size * 0.34) }]}>{initials}</Text></View>;
 }
 
@@ -97,7 +108,7 @@ export const tikisseStyles = StyleSheet.create({
   muted: { color: "#76665E", fontSize: 12, lineHeight: 18 },
 });
 
-const styles = StyleSheet.create({
+const styleSheets = themedStyleSheets({
   button: { minHeight: 48, alignItems: "center", justifyContent: "center", borderRadius: 9, borderWidth: 1, paddingHorizontal: 15, flexDirection: "row", gap: 8 },
   buttonPressed: { opacity: 0.84, transform: [{ scale: 0.98 }] },
   buttonCompact: { minHeight: 44, paddingHorizontal: 10, gap: 5 },

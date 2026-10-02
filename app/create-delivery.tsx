@@ -18,6 +18,7 @@ import { trpc } from "@/lib/trpc";
 import { haptic } from "@/lib/haptics";
 import { locationSubtitle, locationTitle, type DeliveryType, type LocationLabel, type SavedFavorite, type SelectableVehicleType } from "@/shared/tikisse-domain";
 import { getDeliveryDraft, saveDeliveryDraft } from "@/lib/delivery-drafts";
+import { themedStyleSheets, useDarkTone, useThemedStyles } from "@/lib/themed-styles";
 
 const VEHICLES: SelectableVehicleType[] = ["Vélo", "Moto", "Tricycle", "Voiture"];
 const VEHICLE_ICON: Record<SelectableVehicleType, React.ComponentProps<typeof MaterialIcons>["name"]> = {
@@ -40,6 +41,8 @@ type DeliveryFieldName = "title" | "details" | "passengers" | "pickup" | "dropof
 const detailsInputIssue = (value: string) => deliveryTextInputIssue(value, false);
 
 export default function CreateDeliveryScreen() {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   const { deliveryId, draftId } = useLocalSearchParams<{ deliveryId?: string; draftId?: string }>();
   const { colors: theme } = useThemeColors();
   const { profile } = useTikisseStore();
@@ -323,11 +326,11 @@ export default function CreateDeliveryScreen() {
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
       <View style={styles.topBar}>
         <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Retour">
-          <MaterialIcons name="arrow-back" size={20} color="#241510" />
+          <MaterialIcons name="arrow-back" size={20} color={hue("#241510")} />
         </Pressable>
         <Text style={styles.topTitle} numberOfLines={1}>{isEditing ? "Modifier la livraison" : "Nouvelle livraison"}</Text>
         <Pressable onPress={() => router.push("/delivery-drafts" as any)} hitSlop={6} accessibilityRole="button" style={({ pressed }) => [styles.draftsLink, pressed && styles.pressed]}>
-          <MaterialIcons name="folder-open" size={14} color="#76665E" />
+          <MaterialIcons name="folder-open" size={14} color={hue("#76665E")} />
           <Text style={styles.draftsLinkText}>Brouillons</Text>
         </Pressable>
       </View>
@@ -350,7 +353,7 @@ export default function CreateDeliveryScreen() {
               </Text>
               {pickup || dropoff ? (
                 <Pressable onPress={swapPlaces} hitSlop={8} accessibilityRole="button" accessibilityLabel="Inverser la récupération et la destination" style={({ pressed }) => [styles.swapBtn, pressed && styles.pressed]}>
-                  <MaterialIcons name="swap-vert" size={18} color="#241510" />
+                  <MaterialIcons name="swap-vert" size={18} color={hue("#241510")} />
                 </Pressable>
               ) : null}
             </View>
@@ -359,7 +362,7 @@ export default function CreateDeliveryScreen() {
           {routeMessage ? <Text style={[styles.routeMessage, !route?.precise && styles.routeWarning]}>{routeMessage}</Text> : null}
           {pickup && dropoff && (!route || !route.precise) ? (
             <Pressable accessibilityRole="button" onPress={retryRoute} style={({ pressed }) => [styles.retryRoute, pressed && styles.pressed]}>
-              <MaterialIcons name="refresh" size={14} color="#76665E" />
+              <MaterialIcons name="refresh" size={14} color={hue("#76665E")} />
               <Text style={styles.retryRouteText}>{route ? "Recalculer avec Routes API" : "Réessayer le calcul d’itinéraire"}</Text>
             </Pressable>
           ) : null}
@@ -378,7 +381,7 @@ export default function CreateDeliveryScreen() {
                     accessibilityLabel={`${item.label} — ${item.sub}`}
                     style={({ pressed }) => [styles.pill, active && styles.pillActive, pressed && styles.pressed]}
                   >
-                    <MaterialIcons name={item.icon} size={15} color={active ? "#A95000" : "#76665E"} />
+                    <MaterialIcons name={item.icon} size={15} color={active ? hue("#A95000") : hue("#76665E")} />
                     <Text style={[styles.pillLabel, active && styles.pillLabelActive]} numberOfLines={1}>{item.label}</Text>
                   </Pressable>
                 );
@@ -421,7 +424,7 @@ export default function CreateDeliveryScreen() {
                     accessibilityLabel={item}
                     style={({ pressed }) => [styles.vehiclePill, active && styles.pillActive, pressed && styles.pressed]}
                   >
-                    <MaterialIcons name={VEHICLE_ICON[item]} size={17} color={active ? "#A95000" : "#76665E"} />
+                    <MaterialIcons name={VEHICLE_ICON[item]} size={17} color={active ? hue("#A95000") : hue("#76665E")} />
                     <Text style={[styles.vehicleLabel, active && styles.pillLabelActive]} numberOfLines={1}>{item}</Text>
                   </Pressable>
                 );
@@ -442,7 +445,7 @@ export default function CreateDeliveryScreen() {
               // n'affichait qu'un tiret au-dessus d'un champ vide : un écran de
               // haut pour ne rien dire, entre les adresses et le colis.
               <View style={styles.offerWaiting}>
-                <MaterialIcons name="schedule" size={16} color="#76665E" />
+                <MaterialIcons name="schedule" size={16} color={hue("#76665E")} />
                 <Text style={styles.offerWaitingText}>L’estimation s’affiche dès que les deux adresses sont choisies.</Text>
               </View>
             ) : (
@@ -461,7 +464,7 @@ export default function CreateDeliveryScreen() {
                     keyboardType="number-pad"
                     maxLength={8}
                     placeholder="0"
-                    placeholderTextColor="#CBB8AB"
+                    placeholderTextColor={hue("#CBB8AB")}
                     accessibilityLabel="Prix que vous proposez, en francs CFA"
                     style={styles.offerInput}
                   />
@@ -540,6 +543,8 @@ export default function CreateDeliveryScreen() {
 }
 
 function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { tone: "pickup" | "dropoff"; label: string; value: LocationLabel | null; invalid: boolean; onPress: () => void; onAddFavorite?: (label: string) => void }) {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   const { colors: theme } = useThemeColors();
   const isPickup = tone === "pickup";
   const [showFavoriteInput, setShowFavoriteInput] = useState(false);
@@ -550,7 +555,7 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
           l'intérieur, et le web en ferait un <button> dans un <button>. */}
       <Pressable onPress={onPress} accessibilityLabel={value ? `${label} : ${locationTitle(value)}. Changer` : `Choisir le lieu de ${isPickup ? "récupération" : "destination"}`} style={({ pressed }) => [styles.routeInput, pressed && styles.pressed]}>
         <View style={[styles.routeInputIcon, isPickup ? styles.routeInputIconFrom : styles.routeInputIconTo]}>
-          <MaterialIcons name={isPickup ? "inventory-2" : "sports-score"} size={14} color={isPickup ? "#A95000" : "#A43F32"} />
+          <MaterialIcons name={isPickup ? "inventory-2" : "sports-score"} size={14} color={isPickup ? hue("#A95000") : hue("#A43F32")} />
         </View>
         <View style={styles.routeInputContent}>
           <Text style={[styles.routeInputLabel, invalid && styles.routeInputLabelInvalid]}>{label}</Text>
@@ -571,10 +576,10 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
             accessibilityRole="button"
             accessibilityLabel="Ajouter aux favoris"
           >
-            <MaterialIcons name={showFavoriteInput ? "close" : "star-outline"} size={17} color="#76665E" />
+            <MaterialIcons name={showFavoriteInput ? "close" : "star-outline"} size={17} color={hue("#76665E")} />
           </Pressable>
         ) : null}
-        <MaterialIcons name="chevron-right" size={18} color="#76665E" />
+        <MaterialIcons name="chevron-right" size={18} color={hue("#76665E")} />
       </Pressable>
       {showFavoriteInput && value ? (
         <View style={styles.favoriteInputRow}>
@@ -594,16 +599,19 @@ function RouteInput({ tone, label, value, invalid, onPress, onAddFavorite }: { t
 }
 
 function Field({ label, icon, keyboardType, error, ...props }: { label: string; icon?: React.ComponentProps<typeof MaterialIcons>["name"]; keyboardType?: "default" | "number-pad" | "decimal-pad"; value: string; onChangeText: (value: string) => void; onBlur?: () => void; placeholder: string; multiline?: boolean; error?: string }) {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   const { colors: theme } = useThemeColors();
-  return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? "#A43F32" : "#76665E"} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor={theme.placeholder} /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>;
+  return <View style={styles.fieldWrap}><Text style={[styles.fieldLabel, error && styles.fieldLabelInvalid]}>{label}</Text><View style={[styles.field, props.multiline && styles.fieldMultiline, error && styles.fieldInvalid]}>{icon ? <MaterialIcons name={icon} size={18} color={error ? hue("#A43F32") : hue("#76665E")} style={styles.fieldIcon} /> : null}<TextInput {...props} keyboardType={keyboardType} maxLength={props.multiline ? 450 : 120} style={[styles.input, props.multiline && styles.inputMultiline]} placeholderTextColor={theme.placeholder} /></View>{error ? <Text style={styles.fieldIssue}>{error}</Text> : null}</View>;
 }
 
 function MiniNumber({ value, onChangeText, placeholder }: { value: string; onChangeText: (value: string) => void; placeholder: string }) {
+  const styles = useThemedStyles(styleSheets);
   const { colors: theme } = useThemeColors();
   return <TextInput value={value} onChangeText={(text) => onChangeText(text.replace(/\D/g, "").slice(0, 4))} keyboardType="number-pad" placeholder={placeholder} placeholderTextColor={theme.placeholder} style={styles.miniInput} />;
 }
 
-const styles = StyleSheet.create({
+const styleSheets = themedStyleSheets({
   safe: { flex: 1 },
   keyboard: { flex: 1 },
   content: { padding: 16, paddingBottom: 24, gap: 18 },

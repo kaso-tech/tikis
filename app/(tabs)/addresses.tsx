@@ -11,6 +11,7 @@ import { useThemeColors } from "@/lib/use-theme-colors";
 import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
 import type { LocationLabel, SavedFavorite } from "@/shared/tikisse-domain";
+import { themedStyleSheets, useDarkTone, useThemedStyles } from "@/lib/themed-styles";
 
 type FavoriteRecord = StoredFavoritePlace;
 type AddressCategory = "maison" | "bureau" | "famille" | "autre";
@@ -28,6 +29,7 @@ function categoryIcon(category: AddressCategory): React.ComponentProps<typeof Ma
 }
 
 export default function AddressesScreen() {
+  const styles = useThemedStyles(styleSheets);
   const { colors: theme, isDark } = useThemeColors();
   const { profile } = useTikisseStore();
   const utils = trpc.useUtils();
@@ -136,10 +138,12 @@ export default function AddressesScreen() {
 }
 
 function FilterChip({ label, count, active, onPress, theme }: { label: string; count: number; active: boolean; onPress: () => void; theme: { primary: string; surface: string; foreground: string; muted: string; border: string; pressed: string } }) {
-  return <Pressable onPress={onPress} style={({ pressed }) => [styles.chip, { backgroundColor: active ? theme.primary : theme.surface, borderColor: active ? theme.primary : theme.border }, pressed && styles.pressed]}><Text style={[styles.chipText, { color: active ? "#FFFFFF" : theme.foreground }]} numberOfLines={1}>{label}</Text><View style={[styles.chipCount, { backgroundColor: active ? "rgba(255,255,255,0.18)" : theme.pressed }]}><Text style={[styles.chipCountText, { color: active ? "#FFFFFF" : theme.muted }]}>{count}</Text></View></Pressable>;
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
+  return <Pressable onPress={onPress} style={({ pressed }) => [styles.chip, { backgroundColor: active ? theme.primary : theme.surface, borderColor: active ? theme.primary : theme.border }, pressed && styles.pressed]}><Text style={[styles.chipText, { color: active ? hue("#FFFFFF") : theme.foreground }]} numberOfLines={1}>{label}</Text><View style={[styles.chipCount, { backgroundColor: active ? "rgba(255,255,255,0.18)" : theme.pressed }]}><Text style={[styles.chipCountText, { color: active ? hue("#FFFFFF") : theme.muted }]}>{count}</Text></View></Pressable>;
 }
 
-const styles = StyleSheet.create({
+const styleSheets = themedStyleSheets({
   safe: { flex: 1 }, scrollContent: { paddingBottom: 98 }, pressed: { opacity: 0.68 },
   header: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 10 }, eyebrow: { fontSize: 10, fontWeight: "600", letterSpacing: 0.7 }, pageTitle: { fontSize: 23, fontWeight: "600", marginTop: 4, lineHeight: 29 },
   searchRow: { paddingHorizontal: 16, paddingBottom: 10 }, search: { flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 9, borderWidth: 1, paddingHorizontal: 12, height: 42 }, searchInput: { flex: 1, fontSize: 13, paddingVertical: 0 }, searchClear: { width: 24, height: 24, borderRadius: 7, alignItems: "center", justifyContent: "center" },

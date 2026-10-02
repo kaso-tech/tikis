@@ -16,14 +16,17 @@ import { formatDeliveryDetailPlace } from "@/lib/geo-rules";
 import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
 import { deliveryStatusMeta, formatMoney, formatRelativeDate, isPickupPending } from "@/shared/tikisse-domain";
+import { themedStyleSheets, useDarkTone, useThemedStyles } from "@/lib/themed-styles";
 
 type FinancialAction = "apply" | "withdraw" | "confirm" | "complete" | null;
 type SenderAction = "disable" | "reactivate" | "cancel" | "unselect" | null;
 
 function DetailRow({ icon, label, value }: { icon: ComponentProps<typeof MaterialIcons>["name"]; label: string; value: string }) {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   return (
     <View style={styles.detailsRow}>
-      <View style={styles.detailsIcon}><MaterialIcons name={icon} size={16} color="#76665E" /></View>
+      <View style={styles.detailsIcon}><MaterialIcons name={icon} size={16} color={hue("#76665E")} /></View>
       <Text style={styles.detailsLabel}>{label}</Text>
       <Text style={styles.detailsValue} numberOfLines={1}>{value}</Text>
     </View>
@@ -31,6 +34,8 @@ function DetailRow({ icon, label, value }: { icon: ComponentProps<typeof Materia
 }
 
 export default function DeliveryDetailScreen() {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   const { colors: theme } = useThemeColors();
   const params = useLocalSearchParams<{ id: string }>();
   const { role, profile } = useTikisseStore();
@@ -112,7 +117,7 @@ export default function DeliveryDetailScreen() {
   }, [senderAction]);
 
   if (deliveryQuery.isLoading) {
-    return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.notFound}><ActivityIndicator color="#76665E" /><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
+    return <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}><View style={styles.notFound}><ActivityIndicator color={hue("#76665E")} /><Text style={styles.notFoundTitle}>Chargement de la livraison…</Text></View></SafeAreaView>;
   }
 
   if (!delivery) {
@@ -196,10 +201,10 @@ export default function DeliveryDetailScreen() {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Retour">
-            <MaterialIcons name="arrow-back" size={20} color="#241510" />
+            <MaterialIcons name="arrow-back" size={20} color={hue("#241510")} />
           </Pressable>
           <Pressable onPress={() => router.push(`/report/${deliveryId}` as any)} style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]} accessibilityLabel="Signaler">
-            <MaterialIcons name="flag" size={18} color="#A43F32" />
+            <MaterialIcons name="flag" size={18} color={hue("#A43F32")} />
           </Pressable>
         </View>
 
@@ -218,7 +223,7 @@ export default function DeliveryDetailScreen() {
           </View>
           {isRouteLoading ? (
             <View style={styles.heroMapRouteLoading} pointerEvents="none">
-              <ActivityIndicator size="small" color="#76665E" />
+              <ActivityIndicator size="small" color={hue("#76665E")} />
               <Text style={styles.heroMapRouteLoadingText}>Calcul de l’itinéraire…</Text>
             </View>
           ) : null}
@@ -237,7 +242,7 @@ export default function DeliveryDetailScreen() {
             </>
           ) : null}
         </View>
-        {showsCountdown ? <View style={styles.countdown} accessibilityRole="text" accessibilityLabel={`${countdownLabel} ${countdown}`}><MaterialIcons name="schedule" size={15} color="#76665E" /><Text style={styles.countdownLabel}>{countdownLabel}</Text><Text style={styles.countdownValue}>{countdown}</Text></View> : null}
+        {showsCountdown ? <View style={styles.countdown} accessibilityRole="text" accessibilityLabel={`${countdownLabel} ${countdown}`}><MaterialIcons name="schedule" size={15} color={hue("#76665E")} /><Text style={styles.countdownLabel}>{countdownLabel}</Text><Text style={styles.countdownValue}>{countdown}</Text></View> : null}
 
         <View style={styles.timelineCard}>
           <Text style={styles.eyebrowSmall}>SUIVI</Text>
@@ -304,22 +309,22 @@ export default function DeliveryDetailScreen() {
             <View style={styles.driverAvatar}>
               <Text style={styles.driverAvatarText}>{(delivery.driverName ?? "?").split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()}</Text>
               <View style={styles.driverVerifiedBadge}>
-                <MaterialIcons name="check" size={10} color="#367552" />
+                <MaterialIcons name="check" size={10} color={hue("#367552")} />
               </View>
             </View>
             <View style={styles.driverInfo}>
               <View style={styles.driverNameRow}>
                 <Text style={styles.driverName} numberOfLines={1}>{role === "sender" ? delivery.driverName : delivery.senderName}</Text>
-                <MaterialIcons name="verified" size={14} color="#367552" />
+                <MaterialIcons name="verified" size={14} color={hue("#367552")} />
               </View>
               <Text style={styles.driverMeta}>{role === "sender" ? "Livreur confirmé" : "Expéditeur"}</Text>
             </View>
             <View style={styles.driverActions}>
               <Pressable onPress={() => void Linking.openURL(`tel:${role === "sender" ? delivery.driverPhone : delivery.senderPhone}`)} style={({ pressed }) => [styles.driverActionBtn, pressed && styles.pressed]} accessibilityLabel="Appeler">
-                <MaterialIcons name="phone" size={16} color="#241510" />
+                <MaterialIcons name="phone" size={16} color={hue("#241510")} />
               </Pressable>
               <Pressable style={({ pressed }) => [styles.driverActionBtn, pressed && styles.pressed]} accessibilityLabel="Message">
-                <MaterialIcons name="chat" size={16} color="#241510" />
+                <MaterialIcons name="chat" size={16} color={hue("#241510")} />
               </Pressable>
             </View>
           </View>
@@ -328,14 +333,14 @@ export default function DeliveryDetailScreen() {
         {showCandidates ? (
           <Pressable onPress={() => setCandidatesOpen(true)} style={({ pressed }) => [styles.candidatesTrigger, isActive && styles.candidatesTriggerActive, pressed && styles.pressed]}>
             <View style={[styles.candidatesIcon, isActive && styles.candidatesIconActive]}>
-              <MaterialIcons name="group" size={18} color="#76665E" />
+              <MaterialIcons name="group" size={18} color={hue("#76665E")} />
             </View>
             <View style={styles.candidatesBody}>
               <Text style={styles.candidatesTitle}>{isActive ? "Changer de livreur" : "Livreurs candidats"}</Text>
               <Text style={styles.candidatesMeta}>{isActive ? "Voir les autres candidatures reçues" : `${candidates.length} livreur${candidates.length > 1 ? "s" : ""} ont proposé leur service`}</Text>
             </View>
             {candidates.length > 0 ? <View style={styles.candidatesCount}><Text style={styles.candidatesCountText}>{candidates.length}</Text></View> : null}
-            <MaterialIcons name="chevron-right" size={18} color="#76665E" />
+            <MaterialIcons name="chevron-right" size={18} color={hue("#76665E")} />
           </Pressable>
         ) : null}
 
@@ -352,7 +357,7 @@ export default function DeliveryDetailScreen() {
 
         {role === "sender" && (isActive || delivery.status === "pending_confirmation") ? (
           <Pressable onPress={() => router.push(`/delivery/${deliveryId}/map` as any)} style={({ pressed }) => [styles.trackButton, pressed && styles.pressed]}>
-            <MaterialIcons name="my-location" size={16} color="#76665E" />
+            <MaterialIcons name="my-location" size={16} color={hue("#76665E")} />
             <Text style={styles.trackButtonText}>Suivre en direct</Text>
           </Pressable>
         ) : null}
@@ -370,7 +375,7 @@ export default function DeliveryDetailScreen() {
                 accessibilityLabel="Annuler la livraison"
                 style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed, senderProcessing && styles.cancelButtonDisabled]}
               >
-                <MaterialIcons name="cancel" size={16} color={senderProcessing ? "#A48B7B" : "#A43F32"} />
+                <MaterialIcons name="cancel" size={16} color={senderProcessing ? hue("#A48B7B") : hue("#A43F32")} />
                 <Text style={[styles.cancelButtonText, senderProcessing && styles.cancelButtonTextDisabled]} numberOfLines={1}>Annuler</Text>
               </Pressable>
             ) : null}
@@ -396,10 +401,12 @@ export default function DeliveryDetailScreen() {
 }
 
 function TimelineStep({ label, done }: { label: string; done: boolean }) {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   return (
     <View style={styles.timelineStep}>
       <View style={[styles.timelineDot, done && styles.timelineDotDone]}>
-        {done ? <MaterialIcons name="check" size={11} color="#FFFFFF" /> : <MaterialIcons name="radio-button-unchecked" size={9} color="#76665E" />}
+        {done ? <MaterialIcons name="check" size={11} color={hue("#FFFFFF")} /> : <MaterialIcons name="radio-button-unchecked" size={9} color={hue("#76665E")} />}
       </View>
       <Text style={[styles.timelineLabel, done && styles.timelineLabelDone]}>{label}</Text>
     </View>
@@ -407,23 +414,27 @@ function TimelineStep({ label, done }: { label: string; done: boolean }) {
 }
 
 function TimelineLine({ done }: { done: boolean }) {
+  const styles = useThemedStyles(styleSheets);
   return <View style={[styles.timelineLine, done && styles.timelineLineDone]} />;
 }
 
 function DeliveryActionConfirmationModal({ visible, title, description, confirmLabel, tone, loading, onCancel, onConfirm }: { visible: boolean; title: string; description: string; confirmLabel: string; tone: "success" | "warning" | "danger"; loading: boolean; onCancel: () => void; onConfirm: () => void }) {
-  const color = tone === "danger" ? "#A43F32" : tone === "warning" ? "#C65A00" : "#367552";
-  const background = tone === "danger" ? "#FFFFFF" : tone === "warning" ? "#FFFFFF" : "#E7D9CF";
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
+  const color = tone === "danger" ? hue("#A43F32") : tone === "warning" ? hue("#C65A00") : hue("#367552");
+  const background = tone === "danger" ? hue("#FFFFFF") : tone === "warning" ? hue("#FFFFFF") : hue("#E7D9CF");
   return <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}><View style={styles.actionOverlay}><Pressable style={StyleSheet.absoluteFill} onPress={onCancel} /><View style={styles.actionSheet}><View style={styles.actionHandle} /><View style={[styles.actionIcon, { backgroundColor: background }]}><MaterialIcons name={tone === "danger" ? "warning-amber" : tone === "warning" ? "pause-circle" : "play-circle"} size={24} color={color} /></View><Text style={styles.actionTitle}>{title}</Text><Text style={styles.actionDescription}>{description}</Text><TikisseButton label={confirmLabel} variant={tone === "danger" ? "danger" : tone === "warning" ? "secondary" : "primary"} onPress={onConfirm} loading={loading} style={styles.actionConfirm} /><TikisseButton label="Conserver la livraison" variant="ghost" onPress={onCancel} disabled={loading} style={styles.actionCancel} /></View></View></Modal>;
 }
 
 function DriverActions({ deliveryStatus, ownCandidateStatus, loading, onApply, onWithdraw, onConfirm, onComplete }: { deliveryStatus: string; ownCandidateStatus?: string; loading: boolean; onApply: () => void; onWithdraw: () => void; onConfirm: () => void; onComplete: () => void }) {
+  const styles = useThemedStyles(styleSheets);
   if (deliveryStatus === "open") return <View style={styles.driverAction}>{ownCandidateStatus === "applied" ? <TikisseButton label="Se retirer" variant="ghost" icon="undo" onPress={onWithdraw} loading={loading} disabled={loading} /> : <TikisseButton label="Se proposer" icon="add-circle" onPress={onApply} loading={loading} disabled={loading} />}<Text style={styles.driverHint}>{ownCandidateStatus === "applied" ? "Votre candidature est enregistrée. Vous pouvez la retirer tant que vous n’êtes pas sélectionné." : "Postulez au prix client ou proposez votre prix via la modale de confirmation."}</Text></View>;
   if (deliveryStatus === "pending_confirmation" && ownCandidateStatus === "selected") return <View style={styles.driverAction}><TikisseButton label="Confirmer la course" icon="check-circle" onPress={onConfirm} loading={loading} disabled={loading} /><Text style={styles.driverHint}>Après confirmation, vos coordonnées seront partagées avec l’expéditeur.</Text></View>;
   if (deliveryStatus === "active" && ownCandidateStatus === "confirmed") return <View style={styles.driverAction}><TikisseButton label="Marquer comme terminée" icon="task-alt" onPress={onComplete} loading={loading} disabled={loading} /><Text style={styles.driverHint}>À utiliser après remise et paiement direct avec l’expéditeur.</Text></View>;
   return null;
 }
 
-const styles = StyleSheet.create({
+const styleSheets = themedStyleSheets({
   safe: { flex: 1, backgroundColor: "#EEEDF3" },
   content: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32, gap: 10 },
 

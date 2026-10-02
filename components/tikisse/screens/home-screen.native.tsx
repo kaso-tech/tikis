@@ -27,6 +27,7 @@ import { deliveryCardContext, deliveryCardSignal, deliveryCardStateLabel, delive
 import { isOpenDeliveryStale } from "@/shared/delivery-freshness";
 import { deliveryMetricsForDay } from "@/lib/wallet-metrics";
 import { useThemeColors } from "@/lib/use-theme-colors";
+import { themedStyleSheets, useDarkTone, useThemedStyles } from "@/lib/themed-styles";
 
 const { height: SCREEN_H } = Dimensions.get("window");
 const SHEET_MIN = 130;
@@ -96,6 +97,8 @@ function openNavigation(origin: { latitude: number; longitude: number }, pickup:
 }
 
 export function HomeScreen() {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   const { role, profile } = useTikisseStore();
   const { isDark, colors: theme } = useThemeColors();
   const firstName = profile?.fullName.split(" ")[0] ?? "à vous";
@@ -503,7 +506,7 @@ export function HomeScreen() {
                 style={({ pressed }) => [styles.sheetFab, pressed && styles.pressed]}
                 accessibilityLabel="Créer une livraison"
               >
-                <MaterialIcons name="add" size={22} color="#FFFFFF" />
+                <MaterialIcons name="add" size={22} color={hue("#FFFFFF")} />
               </Pressable>
             )}
           </View>
@@ -531,26 +534,26 @@ export function HomeScreen() {
                   setIsManualRefreshing(false);
                 }
               }}
-              tintColor="#A95000"
-              colors={["#A95000"]}
-              progressBackgroundColor="#FFFFFF"
+              tintColor={hue("#A95000")}
+              colors={[hue("#A95000")]}
+              progressBackgroundColor={hue("#FFFFFF")}
             />
           }
         >
           {isDriver && !profile?.photoUrl ? (
             <Pressable onPress={() => router.push("/(tabs)/profile" as any)} style={({ pressed }) => [styles.kycBanner, pressed && styles.pressed]} accessibilityLabel="Vérifier mon profil">
-              <MaterialIcons name="verified-user" size={18} color="#76665E" />
+              <MaterialIcons name="verified-user" size={18} color={hue("#76665E")} />
               <View style={styles.kycBannerCopy}>
                 <Text style={styles.kycBannerTitle}>Profil à vérifier</Text>
                 <Text style={styles.kycBannerText}>Ajoutez votre photo et vos documents pour pouvoir candidater aux livraisons.</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={18} color="#76665E" />
+              <MaterialIcons name="chevron-right" size={18} color={hue("#76665E")} />
             </Pressable>
           ) : null}
 
           <View style={styles.searchRow}>
             <View style={styles.searchPill}>
-              <MaterialIcons name="search" size={16} color="#76665E" />
+              <MaterialIcons name="search" size={16} color={hue("#76665E")} />
               <TextInput
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -562,7 +565,7 @@ export function HomeScreen() {
               />
               {searchQuery.length > 0 ? (
                 <Pressable onPress={() => setSearchQuery("")} hitSlop={8} accessibilityLabel="Effacer la recherche">
-                  <MaterialIcons name="close" size={16} color="#76665E" />
+                  <MaterialIcons name="close" size={16} color={hue("#76665E")} />
                 </Pressable>
               ) : null}
             </View>
@@ -582,13 +585,13 @@ export function HomeScreen() {
           <Animated.View style={[styles.tabContent, { opacity: filterTransition, transform: [{ translateY: filterTranslateY }] }]}>
           {!hasInitialData && deliveriesQuery.isLoading ? (
             <View style={styles.loadingState}>
-              <ActivityIndicator color="#76665E" />
+              <ActivityIndicator color={hue("#76665E")} />
               <Text style={styles.loadingText}>Chargement de vos livraisons…</Text>
             </View>
           ) : !selected ? (
             <View style={styles.empty}>
               <View style={styles.emptyIcon}>
-                <MaterialIcons name={isDriver ? "local-shipping" : "add"} size={26} color="#76665E" />
+                <MaterialIcons name={isDriver ? "local-shipping" : "add"} size={26} color={hue("#76665E")} />
               </View>
                 <Text style={styles.emptyTitle}>{filter === "completed" ? isDriver ? "Aucune livraison terminée aujourd’hui" : "Aucune livraison terminée récemment" : isDriver ? "Aucune opportunité disponible" : "Aucune livraison disponible"}</Text>
                 <Text style={styles.emptyText}>
@@ -644,7 +647,7 @@ export function HomeScreen() {
       </Animated.View>
       {isDriver && showScrollTop ? (
         <Pressable onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })} style={({ pressed }) => [styles.scrollTopButton, pressed && styles.pressed]} accessibilityLabel="Revenir en haut">
-          <MaterialIcons name="keyboard-arrow-up" size={20} color="#241510" />
+          <MaterialIcons name="keyboard-arrow-up" size={20} color={hue("#241510")} />
         </Pressable>
       ) : null}
       <CandidatesSheet visible={Boolean(candidatesDeliveryId)} deliveryId={candidatesDeliveryId} onClose={() => setCandidatesDeliveryId(null)} />
@@ -684,6 +687,8 @@ export function HomeScreen() {
 }
 
 function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeading, userLocation }: { selected: Delivery | null | undefined; role: "sender" | "driver"; sheetSnap: number; driverPosition: { latitude: number; longitude: number } | null; /** Cap du livreur, en degrés : un nombre simple plutôt qu'un champ de `driverPosition`, dont la nouvelle identité relancerait le calcul d'itinéraire d'approche à chaque rendu. */ driverHeading: number | null; userLocation: { latitude: number; longitude: number } | null }) {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   const mapRef = useRef<MapView>(null);
   const pickup = selected?.pickup;
   const dropoff = selected?.dropoff;
@@ -825,7 +830,7 @@ function MapBackground({ selected, role, sheetSnap, driverPosition, driverHeadin
           accessibilityLabel="Recentrer la carte sur la course"
           style={({ pressed }) => [styles.fab, { bottom: sheetSnap + 20 }, pressed && styles.pressed]}
         >
-          <MaterialIcons name="my-location" size={20} color="#241510" />
+          <MaterialIcons name="my-location" size={20} color={hue("#241510")} />
         </Pressable>
       ) : null}
     </View>
@@ -857,6 +862,8 @@ function DeliveryRow({
   onDetails: () => void;
   onApply: () => void;
 }) {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   const [showPickupTooltip, setShowPickupTooltip] = useState(false);
   const isDriver = role === "driver";
   const driverAction = delivery.status === "completed"
@@ -919,7 +926,7 @@ function DeliveryRow({
               accessibilityLabel={`Afficher les lieux : collecte ${pickupPlace.title}, ${pickupPlace.subtitle} ; destination ${dropoffPlace.title}, ${dropoffPlace.subtitle}`}
               style={({ pressed }) => [pressed && styles.pressed]}
             >
-              <MaterialIcons accessible={false} name="navigation" size={15} color="#76665E" style={{ transform: [{ rotate: `${compassRotation}deg` }] }} />
+              <MaterialIcons accessible={false} name="navigation" size={15} color={hue("#76665E")} style={{ transform: [{ rotate: `${compassRotation}deg` }] }} />
             </Pressable>
             <Text style={styles.compactDistanceText} numberOfLines={1}>à {driverDistText} de vous</Text>
             {showPickupTooltip ? (
@@ -946,7 +953,7 @@ function DeliveryRow({
               accessibilityLabel={`${driverAction} — ${delivery.title}`}
               style={({ pressed }) => [applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
             >
-              {applying ? <ActivityIndicator size="small" color="#76665E" /> : <Text style={styles.compactAction}>{driverAction}</Text>}
+              {applying ? <ActivityIndicator size="small" color={hue("#76665E")} /> : <Text style={styles.compactAction}>{driverAction}</Text>}
             </Pressable>
           ) : null}
           {/* « Ouvrir » ne s'affichait qu'à défaut d'action, c'est-à-dire sur
@@ -1022,7 +1029,7 @@ function DeliveryRow({
             accessibilityLabel={`Annuler — ${delivery.title}`}
             style={({ pressed }) => [styles.tripCtaQuiet, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
           >
-            {applying ? <ActivityIndicator size="small" color="#A43F32" /> : <Text style={styles.tripCtaQuietText}>Annuler</Text>}
+            {applying ? <ActivityIndicator size="small" color={hue("#A43F32")} /> : <Text style={styles.tripCtaQuietText}>Annuler</Text>}
           </Pressable>
         ) : senderLabel ? (
           <Pressable
@@ -1032,7 +1039,7 @@ function DeliveryRow({
             accessibilityLabel={`${senderLabel} — ${delivery.title}`}
             style={({ pressed }) => [styles.tripCta, applying && { opacity: 0.6 }, pressed && !applying && styles.pressed]}
           >
-            {applying ? <ActivityIndicator size="small" color="#76665E" /> : <Text style={styles.tripCtaText}>{senderLabel}</Text>}
+            {applying ? <ActivityIndicator size="small" color={hue("#76665E")} /> : <Text style={styles.tripCtaText}>{senderLabel}</Text>}
           </Pressable>
         ) : null}
       </View>
@@ -1040,7 +1047,7 @@ function DeliveryRow({
   );
 }
 
-const styles = StyleSheet.create({
+const styleSheets = themedStyleSheets({
   safe: { flex: 1, backgroundColor: "#EEEDF3" },
 
   mapBg: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "#EEEDF3", zIndex: 0 },

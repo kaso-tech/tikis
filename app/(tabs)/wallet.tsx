@@ -11,6 +11,7 @@ import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
 import { deliveryMetricsForDay } from "@/lib/wallet-metrics";
 import { availableWalletBalance, formatMoney, formatRelativeDate, type WalletOperation } from "@/shared/tikisse-domain";
+import { themedStyleSheets, useDarkTone, useThemedStyles } from "@/lib/themed-styles";
 
 type Tone = "primary" | "success" | "warning" | "error" | "neutral";
 
@@ -37,6 +38,8 @@ const TONE_COLOR: Record<Tone, string> = {
 };
 
 export default function WalletScreen() {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   const { colors: theme } = useThemeColors();
   const { role, profile } = useTikisseStore();
   const utilities = trpc.useUtils();
@@ -131,12 +134,12 @@ export default function WalletScreen() {
             <Text style={styles.balanceValue}>{displayWalletAmount(available)}</Text>
             {isDriver ? (
               <View style={styles.trendPill}>
-                <MaterialIcons name="verified" size={11} color="#4D9B72" />
+                <MaterialIcons name="verified" size={11} color={hue("#4D9B72")} />
                 <Text style={styles.trendText}>Disponible</Text>
               </View>
             ) : (
               <View style={styles.trendPillLight}>
-                <MaterialIcons name="inventory-2" size={11} color="#FFFFFF" />
+                <MaterialIcons name="inventory-2" size={11} color={hue("#FFFFFF")} />
                 <Text style={styles.trendTextLight}>{todaysCount || 0} course{todaysCount > 1 ? "s" : ""}</Text>
               </View>
             )}
@@ -215,7 +218,7 @@ export default function WalletScreen() {
 
         {isDriver ? null : (
           <View style={[styles.senderInfo, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <View style={[styles.senderInfoIcon, { backgroundColor: theme.primary }]}><MaterialIcons name="handshake" size={16} color="#FFFFFF" /></View>
+            <View style={[styles.senderInfoIcon, { backgroundColor: theme.primary }]}><MaterialIcons name="handshake" size={16} color={hue("#FFFFFF")} /></View>
             <Text style={[styles.senderInfoText, { color: theme.foreground }]}>
               <Text style={[styles.senderInfoTextBold, { color: theme.foreground }]}>Paiement direct au livreur. </Text>
               Le règlement de la course se fait à la remise. Les mouvements Tikisse sont réservés aux règles de mise en relation.
@@ -234,7 +237,7 @@ export default function WalletScreen() {
           <View style={[styles.listCard, { backgroundColor: theme.surface }]}><Text style={[styles.emptyText, { color: theme.muted }]}>Le journal financier est momentanément indisponible.</Text></View>
         ) : recentJournal.length === 0 ? (
           <View style={styles.empty}>
-            <View style={styles.emptyIcon}><MaterialIcons name="savings" size={26} color="#76665E" /></View>
+            <View style={styles.emptyIcon}><MaterialIcons name="savings" size={26} color={hue("#76665E")} /></View>
             <Text style={styles.emptyTitle}>Aucun mouvement enregistré</Text>
             <Text style={styles.emptySub}>Vos premières opérations apparaîtront ici après votre premier dépôt ou votre première course.</Text>
           </View>
@@ -274,7 +277,7 @@ export default function WalletScreen() {
             <View style={styles.sheetGrip} />
             {payment ? (
               <>
-                <View style={styles.modalIcon}><MaterialIcons name="verified-user" size={22} color="#76665E" /></View>
+                <View style={styles.modalIcon}><MaterialIcons name="verified-user" size={22} color={hue("#76665E")} /></View>
                 <Text style={styles.modalTitle}>{payment.mode === "test" ? "Validation YengaPay" : "Paiement YengaPay Sandbox"}</Text>
                 <Text style={styles.modalSub}>{payment.mode === "test" ? `Mode test : confirmez le résultat de votre paiement de ${formatMoney(payment.amount)}. Votre Wallet ne changera qu’après cette confirmation serveur.` : `Ouvrez la page YengaPay pour finaliser votre dépôt de ${formatMoney(payment.amount)}. Votre Wallet sera crédité uniquement après la notification sécurisée de YengaPay.`}</Text>
                 <View style={styles.referenceCard}>
@@ -289,7 +292,7 @@ export default function WalletScreen() {
               </>
             ) : (
               <>
-                <View style={styles.modalIcon}><MaterialIcons name={requestType === "deposit" ? "add-card" : "account-balance-wallet"} size={22} color="#76665E" /></View>
+                <View style={styles.modalIcon}><MaterialIcons name={requestType === "deposit" ? "add-card" : "account-balance-wallet"} size={22} color={hue("#76665E")} /></View>
                 <Text style={styles.modalTitle}>Recharger mon compte</Text>
                 <Text style={styles.modalSub}>{requestType === "deposit" ? "Initialisez un dépôt de test. Le solde ne sera crédité qu'après la confirmation suivante." : "Initialisez un retrait de test. Le solde ne sera débité qu'après la confirmation suivante."}</Text>
                 <View style={styles.amountWrap}>
@@ -329,7 +332,7 @@ function iconBgForTone(tone: Tone, theme: any) {
   return { backgroundColor: theme.background };
 }
 
-const styles = StyleSheet.create({
+const styleSheets = themedStyleSheets({
   safe: { flex: 1, backgroundColor: "#EEEDF3" },
 
   pressed: { opacity: 0.7 },

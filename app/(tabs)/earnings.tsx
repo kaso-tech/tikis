@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { useTikisseStore } from "@/lib/tikisse-store";
@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { deliveryMetricsForDay, isDeliveryEarning } from "@/lib/wallet-metrics";
 import { formatMoney, formatRelativeDate, type FinancialRecord } from "@/shared/tikisse-domain";
 import { DriverEarningsTrend } from "@/components/tikisse/driver-earnings-trend";
+import { themedStyleSheets, useDarkTone, useThemedStyles } from "@/lib/themed-styles";
 
 type Period = "day" | "week" | "month";
 type FlowFilter = "earnings" | "bonus" | "all";
@@ -62,6 +63,8 @@ function periodStart(period: Period, now: Date): Date {
 }
 
 export default function EarningsScreen() {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   const { colors: theme } = useThemeColors();
   const { profile } = useTikisseStore();
   const [period, setPeriod] = useState<Period>("day");
@@ -156,14 +159,14 @@ export default function EarningsScreen() {
             <Text style={styles.balanceValue}>{isLoading ? "Chargement…" : formatMoney(totalEarnings)}</Text>
             {comparison.trend !== null ? (
               <View style={[styles.trendPill, comparison.trend < 0 && styles.trendPillDown]}>
-                <MaterialIcons name={comparison.trend >= 0 ? "trending-up" : "trending-down"} size={11} color={comparison.trend >= 0 ? "#4D9B72" : "#F8A008"} />
+                <MaterialIcons name={comparison.trend >= 0 ? "trending-up" : "trending-down"} size={11} color={comparison.trend >= 0 ? hue("#4D9B72") : hue("#F8A008")} />
                 <Text style={[styles.trendText, comparison.trend < 0 && styles.trendTextDown]}>
                   {comparison.trend >= 0 ? "+" : ""}{comparison.trend}% vs 7 j
                 </Text>
               </View>
             ) : (
               <View style={styles.trendPill}>
-                <MaterialIcons name="schedule" size={11} color="#4D9B72" />
+                <MaterialIcons name="schedule" size={11} color={hue("#4D9B72")} />
                 <Text style={styles.trendText}>Comparaison 7 j</Text>
               </View>
             )}
@@ -201,7 +204,7 @@ export default function EarningsScreen() {
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={PERIOD_META[key].label}
               >
-                <MaterialIcons name={PERIOD_META[key].icon} size={14} color={active ? "#FFFFFF" : "#76665E"} />
+                <MaterialIcons name={PERIOD_META[key].icon} size={14} color={active ? hue("#FFFFFF") : hue("#76665E")} />
                 <Text style={[styles.periodTabText, active && styles.periodTabTextActive]}>{PERIOD_META[key].label}</Text>
               </Pressable>
             );
@@ -222,7 +225,7 @@ export default function EarningsScreen() {
                 accessibilityState={{ selected: active }}
                 accessibilityLabel={FLOW_META[key].label}
               >
-                <MaterialIcons name={FLOW_META[key].icon} size={13} color={active ? "#FFFFFF" : theme.muted} />
+                <MaterialIcons name={FLOW_META[key].icon} size={13} color={active ? hue("#FFFFFF") : theme.muted} />
                 <Text style={[styles.flowTabText, active && styles.flowTabTextActive]}>{FLOW_META[key].label}</Text>
               </Pressable>
             );
@@ -329,6 +332,7 @@ export default function EarningsScreen() {
 }
 
 function StatCard({ icon, value, label, tone }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; value: string; label: string; tone: "primary" | "amber" | "success" }) {
+  const styles = useThemedStyles(styleSheets);
   const { colors: theme } = useThemeColors();
   const iconBg = tone === "primary" ? theme.primary + "22" : tone === "amber" ? theme.warning + "22" : theme.success + "22";
   return (
@@ -342,7 +346,7 @@ function StatCard({ icon, value, label, tone }: { icon: React.ComponentProps<typ
   );
 }
 
-const styles = StyleSheet.create({
+const styleSheets = themedStyleSheets({
   safe: { flex: 1, backgroundColor: "#EEEDF3" },
   pressed: { opacity: 0.7 },
   scroll: { padding: 12, paddingBottom: 32, gap: 14 },
@@ -368,7 +372,7 @@ const styles = StyleSheet.create({
   periodTabs: { flexDirection: "row", gap: 6, paddingHorizontal: 2 },
   periodTab: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 9, borderRadius: 9, borderWidth: 1 },
   periodTabActive: { backgroundColor: "#A95000", borderColor: "#A95000" },
-  periodTabText: { fontSize: 11, fontWeight: "600" },
+  periodTabText: { color: "#241510", fontSize: 11, fontWeight: "600" },
   periodTabTextActive: { color: "#FFFFFF" },
 
   periodDescription: { fontSize: 11, lineHeight: 16, paddingHorizontal: 4 },

@@ -16,8 +16,11 @@ import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
 import { describePerimeter } from "@/shared/driver-perimeter";
 import { profileVerification } from "@/lib/profile-verification";
+import { themedStyleSheets, useDarkTone, useThemedStyles } from "@/lib/themed-styles";
 
 export default function ProfileScreen() {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   const { colors: theme, isDark } = useThemeColors();
   const { role, profile, updateProfile } = useTikisseStore();
   const { openLogoutConfirmation } = useTikisseLogout();
@@ -195,7 +198,7 @@ export default function ProfileScreen() {
                 <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
               )}
               <View style={styles.avatarEdit}>
-                <MaterialIcons name="photo-camera" size={12} color="#76665E" />
+                <MaterialIcons name="photo-camera" size={12} color={hue("#76665E")} />
               </View>
             </Pressable>
             <View style={styles.headerIdentity}>
@@ -203,7 +206,7 @@ export default function ProfileScreen() {
               <Text style={styles.roleLine} numberOfLines={1}>{roleLine}</Text>
             </View>
             <Pressable onPress={openEditor} style={({ pressed }) => [styles.editBtn, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Modifier mon profil">
-              <MaterialIcons name="edit" size={16} color="#76665E" />
+              <MaterialIcons name="edit" size={16} color={hue("#76665E")} />
             </Pressable>
           </View>
 
@@ -214,17 +217,17 @@ export default function ProfileScreen() {
               onPress={() => { if (verification.target === "photo") openEditor(); else router.push("/verification" as any); }}
               accessibilityRole="button"
               accessibilityLabel={`${verification.title}${verification.detail ? `. ${verification.detail}` : ""}${verification.action ? `. ${verification.action}` : ""}`}
-              style={({ pressed }) => [styles.verifyBand, { backgroundColor: VERIFY_TONE[verification.tone].background }, pressed && styles.pressed]}
+              style={({ pressed }) => [styles.verifyBand, { backgroundColor: hue(VERIFY_TONE[verification.tone].background, "surface") }, pressed && styles.pressed]}
             >
-              <MaterialIcons name={VERIFY_TONE[verification.tone].icon} size={17} color={VERIFY_TONE[verification.tone].color} />
+              <MaterialIcons name={VERIFY_TONE[verification.tone].icon} size={17} color={hue(VERIFY_TONE[verification.tone].color)} />
               <View style={styles.verifyBody}>
-                <Text style={[styles.verifyTitle, { color: VERIFY_TONE[verification.tone].color }]} numberOfLines={1}>{verification.title}</Text>
+                <Text style={[styles.verifyTitle, { color: hue(VERIFY_TONE[verification.tone].color) }]} numberOfLines={1}>{verification.title}</Text>
                 {verification.detail ? <Text style={styles.verifyDetail}>{verification.detail}</Text> : null}
               </View>
               {verification.action ? (
-                <Text style={[styles.verifyAction, { color: VERIFY_TONE[verification.tone].color }]} numberOfLines={1}>{verification.action}</Text>
+                <Text style={[styles.verifyAction, { color: hue(VERIFY_TONE[verification.tone].color) }]} numberOfLines={1}>{verification.action}</Text>
               ) : (
-                <MaterialIcons name="chevron-right" size={16} color={VERIFY_TONE[verification.tone].color} />
+                <MaterialIcons name="chevron-right" size={16} color={hue(VERIFY_TONE[verification.tone].color)} />
               )}
             </Pressable>
           ) : null}
@@ -385,7 +388,7 @@ export default function ProfileScreen() {
                     style={({ pressed }) => [styles.vehicleRow, { borderColor: theme.border, backgroundColor: theme.background }, pressed && { backgroundColor: theme.pressed }]}
                   >
                     <View style={[styles.vehicleCheckbox, { borderColor: theme.border, backgroundColor: checked ? theme.primary : "transparent" }]}>
-                      {checked ? <MaterialIcons name="check" size={14} color="#FFFFFF" /> : null}
+                      {checked ? <MaterialIcons name="check" size={14} color={hue("#FFFFFF")} /> : null}
                     </View>
                     <Text style={[styles.vehicleLabel, { color: theme.foreground }]}>{option}</Text>
                     <MaterialIcons name={option === "Vélo" ? "directions-bike" : option === "Moto" ? "two-wheeler" : option === "Tricycle" ? "electric-rickshaw" : "directions-car"} size={20} color={theme.muted} />
@@ -410,7 +413,7 @@ export default function ProfileScreen() {
             {locationError ? <Text style={styles.error}>{locationError}</Text> : null}
             <ScrollView style={{ maxHeight: 380, marginTop: 8 }}>
               {(countriesQuery.data ?? []).map((c) => (
-                <Pressable key={c.id} onPress={() => void selectCountry(c.id)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, c.id === profile?.country && { borderColor: theme.primary, backgroundColor: isDark ? theme.pressed : "#EEEDF3" }, pressed && { opacity: 0.8 }]}>
+                <Pressable key={c.id} onPress={() => void selectCountry(c.id)} disabled={Boolean(locationSaving)} style={({ pressed }) => [styles.countryRow, { borderColor: theme.border }, c.id === profile?.country && { borderColor: theme.primary, backgroundColor: isDark ? theme.pressed : hue("#EEEDF3") }, pressed && { opacity: 0.8 }]}>
                   <Text style={styles.countryRowFlag}>{countryFlagEmoji(c.id)}</Text>
                   <Text style={[styles.countryOptionText, { color: theme.foreground, flex: 1 }, c.id === profile?.country && { color: theme.primary, fontWeight: "800" }]}>{c.name}</Text>
                   {locationSaving === "country" ? null : c.id === profile?.country ? <MaterialIcons name="check-circle" size={20} color={theme.primary} /> : null}
@@ -457,7 +460,7 @@ export default function ProfileScreen() {
           <Pressable style={StyleSheet.absoluteFill} onPress={() => !requestDeletionMutation.isPending && setDeleteConfirmOpen(false)} />
           <View style={[styles.sheet, isDark && { backgroundColor: theme.surface }]}>
             <View style={styles.sheetGrip} />
-            <View style={styles.deleteIconWrap}><MaterialIcons name="delete-forever" size={26} color="#A43F32" /></View>
+            <View style={styles.deleteIconWrap}><MaterialIcons name="delete-forever" size={26} color={hue("#A43F32")} /></View>
             <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Supprimer votre compte ?</Text>
             <Text style={[styles.sheetSubtitle, isDark && { color: theme.muted }]}>
               Vous aurez 30 jours pour changer d’avis. Pendant ce délai, votre compte sera bloqué et vous pourrez annuler la suppression à tout moment. Passé ce délai, vos données personnelles seront définitivement supprimées.
@@ -479,13 +482,13 @@ export default function ProfileScreen() {
             <Text style={[styles.sheetTitle, isDark && { color: theme.foreground }]}>Modifier mon profil</Text>
             <Pressable onPress={() => void pickPhoto()} style={({ pressed }) => [styles.photoPicker, pressed && styles.pressed]}>
               <View style={styles.photoPickerIcon}>
-                <MaterialIcons name="add-a-photo" size={22} color="#76665E" />
+                <MaterialIcons name="add-a-photo" size={22} color={hue("#76665E")} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.photoPickerText}>{photoBase64 || photoUri ? "Changer la photo" : "Ajouter une photo"}</Text>
                 <Text style={styles.photoPickerSub}>Format carré, JPEG/PNG/WebP</Text>
               </View>
-              <MaterialIcons name="chevron-right" size={16} color="#76665E" />
+              <MaterialIcons name="chevron-right" size={16} color={hue("#76665E")} />
             </Pressable>
             <Text style={[styles.fieldLabel, isDark && { color: theme.muted }]}>NOM COMPLET</Text>
             <TextInput
@@ -514,10 +517,12 @@ const VERIFY_TONE = {
 
 /** Un chiffre que le rôle a gagné, avec ce qu'il compte écrit dessous. */
 function StatTile({ icon, value, label }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; value: string; label: string }) {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   return (
     <View style={styles.statTile}>
       <View style={styles.statHead}>
-        <MaterialIcons name={icon} size={14} color="#76665E" />
+        <MaterialIcons name={icon} size={14} color={hue("#76665E")} />
         <Text style={styles.statValue} numberOfLines={1}>{value}</Text>
       </View>
       <Text style={styles.statLabel} numberOfLines={1}>{label}</Text>
@@ -526,6 +531,7 @@ function StatTile({ icon, value, label }: { icon: React.ComponentProps<typeof Ma
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  const styles = useThemedStyles(styleSheets);
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -535,6 +541,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function MenuRow({ icon, label, sub, tone = "default", onPress, last }: { icon: React.ComponentProps<typeof MaterialIcons>["name"]; label: string; sub?: string; tone?: "default" | "danger"; onPress: () => void; last?: boolean }) {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   const danger = tone === "danger";
   return (
     <Pressable
@@ -544,18 +552,18 @@ function MenuRow({ icon, label, sub, tone = "default", onPress, last }: { icon: 
       style={({ pressed }) => [styles.menuRow, !last && styles.menuRowBorder, pressed && styles.pressed]}
     >
       <View style={[styles.menuIcon, danger && styles.menuIconDanger]}>
-        <MaterialIcons name={icon} size={15} color={danger ? "#A43F32" : "#76665E"} />
+        <MaterialIcons name={icon} size={15} color={danger ? hue("#A43F32") : hue("#76665E")} />
       </View>
       <View style={styles.menuBody}>
         <Text style={[styles.menuLabel, danger && styles.menuLabelDanger]} numberOfLines={1}>{label}</Text>
         {sub ? <Text style={styles.menuSub} numberOfLines={1}>{sub}</Text> : null}
       </View>
-      {danger ? null : <MaterialIcons name="chevron-right" size={16} color="#76665E" />}
+      {danger ? null : <MaterialIcons name="chevron-right" size={16} color={hue("#76665E")} />}
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const styleSheets = themedStyleSheets({
   safe: { flex: 1 },
   content: { paddingBottom: 32 },
 

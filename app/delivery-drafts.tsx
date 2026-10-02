@@ -1,7 +1,7 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import { ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, FlatList, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { TikisseButton } from "@/components/tikisse/ui";
 import { deleteDeliveryDraft, listDeliveryDrafts, type DeliveryDraft } from "@/lib/delivery-drafts";
@@ -9,8 +9,10 @@ import { locationTitle } from "@/lib/geo-rules";
 import { haptic } from "@/lib/haptics";
 import { useTikisseStore } from "@/lib/tikisse-store";
 import { useThemeColors } from "@/lib/use-theme-colors";
+import { themedStyleSheets, useDarkTone, useThemedStyles } from "@/lib/themed-styles";
 
 export default function DeliveryDraftsScreen() {
+  const styles = useThemedStyles(styleSheets);
   const router = useRouter();
   const { profile } = useTikisseStore();
   const { colors: theme } = useThemeColors();
@@ -105,6 +107,8 @@ export default function DeliveryDraftsScreen() {
 }
 
 function DraftRow({ draft, onRestore, onDelete, index }: { draft: DeliveryDraft; onRestore: () => void; onDelete: () => void; index: number }) {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   const { colors: theme } = useThemeColors();
   const typeLabel = draft.deliveryType;
   // Le titre du lieu, pas son nom brut : un brouillon enregistré avant la correction du sélecteur peut
@@ -146,7 +150,7 @@ function DraftRow({ draft, onRestore, onDelete, index }: { draft: DeliveryDraft;
           <Text style={[styles.draftDeleteText, { color: theme.error }]}>Supprimer</Text>
         </Pressable>
         <Pressable onPress={onRestore} style={({ pressed }) => [styles.draftRestore, { backgroundColor: theme.primary }, pressed && styles.pressed]} accessibilityLabel="Reprendre le brouillon">
-          <MaterialIcons name="edit" size={15} color="#FFFFFF" />
+          <MaterialIcons name="edit" size={15} color={hue("#FFFFFF")} />
           <Text style={styles.draftRestoreText}>Reprendre</Text>
         </Pressable>
       </View>
@@ -154,7 +158,7 @@ function DraftRow({ draft, onRestore, onDelete, index }: { draft: DeliveryDraft;
   );
 }
 
-const styles = StyleSheet.create({
+const styleSheets = themedStyleSheets({
   safe: { flex: 1 },
   pressed: { opacity: 0.7 },
 

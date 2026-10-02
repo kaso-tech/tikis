@@ -11,6 +11,7 @@ import { useTikisseNavigation } from "@/lib/tikisse-navigation";
 import { useTikisseLogout } from "@/lib/tikisse-logout";
 import { useTikisseStore } from "@/lib/tikisse-store";
 import { trpc } from "@/lib/trpc";
+import { themedStyleSheets, useDarkTone, useThemedStyles } from "@/lib/themed-styles";
 
 type DrawerItem = { key: string; label: string; caption?: string; icon: React.ComponentProps<typeof MaterialIcons>["name"]; route: string; badge?: number };
 
@@ -24,6 +25,7 @@ const supportItems: DrawerItem[] = [
 function unreadLabel(count: number) { return count > 9 ? "9+" : String(count); }
 
 export function TikisseHeader() {
+  const styles = useThemedStyles(styleSheets);
   const { openDrawer } = useTikisseNavigation();
   const insets = useSafeAreaInsets();
   const { profile } = useTikisseStore();
@@ -52,6 +54,8 @@ const DRAWER_WIDTH = 308;
 const ANIM_DURATION = 240;
 
 export function TikisseDrawer() {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { isDrawerOpen, closeDrawer } = useTikisseNavigation();
@@ -108,11 +112,11 @@ export function TikisseDrawer() {
           <View style={styles.drawerTop}>
             <Text style={[styles.drawerEyebrow, isDark && styles.drawerEyebrowDark]}>MENU</Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Fermer le menu" onPress={closeDrawer} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
-              <MaterialIcons name="close" size={21} color={isDark ? "#FFF9F2" : "#241510"} />
+              <MaterialIcons name="close" size={21} color={isDark ? hue("#FFF9F2") : hue("#241510")} />
             </Pressable>
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir mon profil" onPress={() => navigate("/(tabs)/profile")} style={({ pressed }) => [styles.profileBlock, isDark && styles.profileBlockDark, pressed && styles.pressed]}>
-            <Avatar initials={initials} color={isDark ? "#FFF9F2" : "#241510"} />
+            <Avatar initials={initials} color={isDark ? hue("#FFF9F2") : hue("#241510")} />
             <View style={styles.profileText}>
               <Text style={[styles.profileName, isDark && styles.profileNameDark]} numberOfLines={1}>{name}</Text>
               <View style={styles.rolePill}>
@@ -120,7 +124,7 @@ export function TikisseDrawer() {
                 <Text style={[styles.roleLabel, isDark && styles.roleLabelDark]}>{role === "sender" ? "Expéditeur vérifié" : "Livreur vérifié"}</Text>
               </View>
             </View>
-            <MaterialIcons name="chevron-right" size={18} color={isDark ? "#D7B79C" : "#9B8478"} />
+            <MaterialIcons name="chevron-right" size={18} color={isDark ? hue("#D7B79C") : hue("#9B8478")} />
           </Pressable>
 
           <View style={[styles.themeRow, isDark && styles.themeRowDark]}>
@@ -132,8 +136,8 @@ export function TikisseDrawer() {
               accessibilityLabel="Activer le mode sombre"
               value={isDark}
               onValueChange={toggleDarkMode}
-              trackColor={{ false: "#E7D9CF", true: "#A95000" }}
-              thumbColor={isDark ? "#FFF9F2" : "#FFFFFF"}
+              trackColor={{ false: hue("#E7D9CF"), true: hue("#A95000") }}
+              thumbColor={isDark ? hue("#FFF9F2") : hue("#FFFFFF")}
             />
           </View>
 
@@ -151,11 +155,11 @@ export function TikisseDrawer() {
           </View>
           <View style={styles.drawerFooter}>
             <View style={styles.securityRow}>
-              <MaterialIcons name="verified-user" size={16} color="#76665E" />
+              <MaterialIcons name="verified-user" size={16} color={hue("#76665E")} />
               <Text style={[styles.securityText, isDark && styles.securityTextDark]}>Compte sécurisé par Tikisse</Text>
             </View>
             <Pressable accessibilityRole="button" accessibilityLabel="Se déconnecter" onPress={openLogoutConfirmation} style={({ pressed }) => [styles.signOut, isDark && styles.signOutDark, pressed && styles.pressed]}>
-              <MaterialIcons name="logout" size={18} color={isDark ? "#F09286" : "#A43F32"} />
+              <MaterialIcons name="logout" size={18} color={isDark ? hue("#F09286") : hue("#A43F32")} />
               <Text style={[styles.signOutText, isDark && styles.signOutTextDark]}>Se déconnecter</Text>
             </Pressable>
           </View>
@@ -166,10 +170,12 @@ export function TikisseDrawer() {
 }
 
 function DrawerRow({ item, active, onPress, isDark }: { item: DrawerItem; active: boolean; onPress: () => void; isDark: boolean }) {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.menuRow, active && styles.menuRowActive, isDark && styles.menuRowDark, active && isDark && styles.menuRowActiveDark, pressed && styles.pressed]}>
       <View style={[styles.menuIcon, active && styles.menuIconActive, isDark && !active && styles.menuIconDark]}>
-        <MaterialIcons name={item.icon} size={18} color={active ? "#FFFFFF" : "#76665E"} />
+        <MaterialIcons name={item.icon} size={18} color={active ? hue("#FFFFFF") : hue("#76665E")} />
       </View>
       <View style={styles.menuText}>
         <Text style={[styles.menuTitle, active && styles.menuTitleActive, active && isDark && styles.menuTitleActiveDark, isDark && !active && styles.menuTitleDark]} numberOfLines={1}>{item.label}</Text>
@@ -180,13 +186,13 @@ function DrawerRow({ item, active, onPress, isDark }: { item: DrawerItem; active
       {item.badge && item.badge > 0 ? (
         <View style={styles.menuBadge}><Text style={styles.menuBadgeText}>{unreadLabel(item.badge)}</Text></View>
       ) : (
-        <MaterialIcons name="chevron-right" size={18} color={active ? "#D7C3B8" : (isDark ? "#76665E" : "#C9B6AA")} />
+        <MaterialIcons name="chevron-right" size={18} color={active ? hue("#D7C3B8") : (isDark ? hue("#76665E") : hue("#C9B6AA"))} />
       )}
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const styleSheets = themedStyleSheets({
   header: { backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingBottom: 6, flexDirection: "row", alignItems: "center" },
   headerIcon: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
   brand: { flex: 1, flexDirection: "row", alignItems: "center", paddingLeft: 11, gap: 8 },

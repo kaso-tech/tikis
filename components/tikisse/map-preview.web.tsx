@@ -1,9 +1,10 @@
 import { DropoffMarker, PickupMarker } from "@/components/tikisse/map-markers";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { StyleSheet, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import { formatListRouteParts, formatNavigationTarget } from "@/lib/geo-rules";
 import type { LocationLabel } from "@/shared/tikisse-domain";
+import { themedStyleSheets, useDarkTone, useThemedStyles } from "@/lib/themed-styles";
 
 type Props = {
   pickup: LocationLabel;
@@ -36,6 +37,8 @@ function projectOntoCanvas(
 }
 
 export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate, showLegend = true }: Props) {
+  const styles = useThemedStyles(styleSheets);
+  const hue = useDarkTone();
   // Même formateur centralisé que le texte du trajet (delivery-card.tsx) : sans lui, cette légende
   // affichait `pickup.name`/`dropoff.name` bruts, ignorant la règle "Ville → Ville" quand les villes
   // diffèrent — deux libellés différents pour le même trajet, dans le même écran.
@@ -88,7 +91,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate, 
       </View>
       {approximate ? (
         <View style={styles.approximate}>
-          <MaterialIcons name="privacy-tip" size={11} color="#76665E" />
+          <MaterialIcons name="privacy-tip" size={11} color={hue("#76665E")} />
           <Text style={styles.approximateText}>Aperçu indicatif</Text>
         </View>
       ) : null}
@@ -121,7 +124,7 @@ export function MapPreviewLeaflet({ pickup, dropoff, height = 132, approximate, 
 
 export { MapPreviewLeaflet as MapPreview };
 
-const styles = StyleSheet.create({
+const styleSheets = themedStyleSheets({
   frame: {
     borderRadius: 9,
     backgroundColor: "#EEEDF3",
