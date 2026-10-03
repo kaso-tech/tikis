@@ -11,7 +11,7 @@ déposées de leurs propriétaires). Recadrés en PNG 192×192.
 | wave.png | paquet pub.dev `digitalpaye_sdk_flutter` (assets/images/icon_wave_money.png) |
 | airtel_money.png | paquet pub.dev `ctechpay` (assets/images/airtel-money.webp) |
 | vodacom_mpesa.png | github.com/terravidhal/logoforge (logos/m-pesa, d'après Wikimedia Commons « M-PESA_LOGO-01.svg ») |
+| yas_money.png | logo Mixx by Yas fourni par l'équipe Tikisse, recadré sur fond jaune |
 | zamani_money.png | paquet pub.dev `ipay_money_flutter_sdk` (lib/assets/zamani-cash.png) |
 
-Sans logo pour l'instant (pastille d'initiales) : Mixx by Yas, Free Money (devenu Mixx by Yas au Sénégal),
-Africell Money. Pour en ajouter un : déposer le PNG ici et l'inscrire dans components/tikisse/mobile-money-logos.ts.
+Sans logo pour l'instant (pastille d'initiales) : Africell Money. Pour en ajouter un : déposer le PNG ici et l'inscrire dans components/tikisse/mobile-money-logos.ts.

@@ -13,4 +13,5 @@ export const MOBILE_MONEY_LOGOS: Partial<Record<MobileMoneyOperatorId, ImageSour
   airtel_money: require("@/assets/images/operators/airtel_money.png"),
   vodacom_mpesa: require("@/assets/images/operators/vodacom_mpesa.png"),
   zamani_money: require("@/assets/images/operators/zamani_money.png"),
+  yas_money: require("@/assets/images/operators/yas_money.png"),
 };

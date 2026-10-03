@@ -180,7 +180,7 @@ describe("opérateurs pays par pays", () => {
       ML: ["orange_money:redirect"],
       NE: ["airtel_money:push", "zamani_money:guided_ussd", "moov_money:push"],
       CD: ["orange_money:redirect", "vodacom_mpesa:push", "airtel_money:push", "africell_money:push"],
-      SN: ["orange_money:redirect", "wave:redirect", "free_money:redirect"],
+      SN: ["orange_money:redirect", "wave:redirect", "yas_money:redirect"],
       TG: ["moov_money:push", "yas_money:push"],
     });
     expect(mobileMoneyOperatorsFor("ligdicash", "bf")[0].otpUssd).toBe("*144*4*6#");
@@ -193,9 +193,9 @@ describe("opérateurs pays par pays", () => {
     expect(view.otpInstructions).toContain("Zamani Money");
   });
 
-  it("Free Sénégal : page LigdiCash renvoyée, numéro transmis dans customer", async () => {
+  it("Mixx by Yas Sénégal (ex-Free) : page LigdiCash renvoyée, numéro transmis dans customer", async () => {
     replies.push({ response_code: "00", token: "jeton-free", response_text: "https://app.ligdicash.com/pay/abc" });
-    const view = await deposit.createDirectDeposit({ ...request("free_money", "cle-idempotence-sn01", "SN"), phone: "+221770001122" });
+    const view = await deposit.createDirectDeposit({ ...request("yas_money", "cle-idempotence-sn01", "SN"), phone: "+221770001122" });
     expect((calls[0].body as { commande: { invoice: { customer: string } } }).commande.invoice.customer).toBe("221770001122");
     expect(view).toMatchObject({ flow: "REDIRECT", checkoutUrl: "https://app.ligdicash.com/pay/abc" });
   });

@@ -15,6 +15,8 @@
  *  - redirect    : la demande part tout de suite ; `response_text` contient l'adresse d'une page de paiement à
  *                  ouvrir — portail de l'opérateur (Orange Côte d'Ivoire, Orange Mali) ou page LigdiCash où
  *                  le numéro est prérempli (Sénégal, Guinée, Orange RD Congo).
+ * `free_money` n'est plus proposé (Free Money Sénégal est devenu Mixx by Yas) : l'identifiant reste reconnu pour
+ * l'historique.
  * Un opérateur absent de la table n'est pas proposé : ajouter un pays ou un opérateur se fait ici seulement.
  * Un pays de la table n'apparaît que s'il fait partie des pays d'inscription (lib/registration-rules.ts).
  */
@@ -57,9 +59,8 @@ const MOOV = { id: "moov_money", label: "Moov Money", short: "MV", color: "#0033
 const MTN = { id: "mtn_money", label: "MTN MoMo", short: "MTN", color: "#B58900" } as const;
 const WAVE = { id: "wave", label: "Wave", short: "WV", color: "#1A73C9" } as const;
 const AIRTEL = { id: "airtel_money", label: "Airtel Money", short: "AM", color: "#C8102E" } as const;
-const YAS = { id: "yas_money", label: "Mixx by Yas", short: "YAS", color: "#5B2C83" } as const;
+const YAS = { id: "yas_money", label: "Mixx by Yas", short: "YAS", color: "#F9D908" } as const;
 const ZAMANI = { id: "zamani_money", label: "Zamani Money", short: "ZM", color: "#D9530F" } as const;
-const FREE = { id: "free_money", label: "Free Money", short: "FM", color: "#B3122E" } as const;
 const MPESA = { id: "vodacom_mpesa", label: "M-Pesa (Vodacom)", short: "MP", color: "#C8102E" } as const;
 const AFRICELL = { id: "africell_money", label: "Africell Money", short: "AF", color: "#6A1B9A" } as const;
 
@@ -110,7 +111,8 @@ export const LIGDICASH_OPERATORS: Readonly<Record<string, readonly MobileMoneyOp
   SN: [
     { ...ORANGE, flow: "redirect", instructions: ligdicashPage("Orange Money") },
     { ...WAVE, flow: "redirect", instructions: ligdicashPage("Wave") },
-    { ...FREE, flow: "redirect", instructions: ligdicashPage("Free Money") },
+    // « Free Sénégal » chez LigdiCash : Free Money est devenu Mixx by Yas.
+    { ...YAS, flow: "redirect", instructions: ligdicashPage("Mixx by Yas") },
   ],
   TG: [
     { ...MOOV, flow: "push", instructions: push("Moov Money"), minAmount: 100 },
@@ -148,7 +150,7 @@ export function findMobileMoneyOperator(provider: DirectPaymentProvider, country
 
 const LABELS: Record<MobileMoneyOperatorId, string> = {
   orange_money: ORANGE.label, moov_money: MOOV.label, mtn_money: MTN.label, wave: WAVE.label, airtel_money: AIRTEL.label, yas_money: YAS.label,
-  zamani_money: ZAMANI.label, free_money: FREE.label, vodacom_mpesa: MPESA.label, africell_money: AFRICELL.label,
+  zamani_money: ZAMANI.label, free_money: "Free Money", vodacom_mpesa: MPESA.label, africell_money: AFRICELL.label,
 };
 
 export function mobileMoneyOperatorLabel(operator: string): string {
