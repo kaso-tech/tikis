@@ -345,7 +345,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
               const code = deposit?.ussdCode || fallbackUssd(selectedOperator, Number.parseInt(amount, 10));
               if (!code) return;
               try {
-                await Linking.openURL(`tel:${code.replace("#", "%23")}`);
+                await Linking.openURL(`tel:${code.replace(/#/g, "%23")}`);
               } catch {
                 setSubmitError("Impossible d'ouvrir l'application téléphone sur cet appareil.");
               }

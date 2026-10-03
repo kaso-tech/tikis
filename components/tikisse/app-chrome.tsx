@@ -1,7 +1,7 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { router, usePathname } from "expo-router";
 import { useEffect, useState } from "react";
-import { Animated, Easing, Image, Modal, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Animated, Easing, Modal, Pressable, StyleSheet, Switch, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Avatar } from "@/components/tikisse/ui";
 import { haptic } from "@/lib/haptics";
@@ -39,7 +39,6 @@ export function TikisseHeader() {
         <MaterialIcons name="menu" size={24} color={theme.foreground} />
       </Pressable>
       <View style={styles.brand}>
-        <Image accessibilityLabel="Logo Tikisse" source={require("../../assets/images/tikisse-logo.png")} style={styles.brandLogo} />
         <Text style={[styles.brandName, { color: theme.foreground }]}>Tikisse</Text>
       </View>
       <Pressable accessibilityRole="button" accessibilityLabel="Ouvrir les notifications" onPress={() => { haptic.light(); router.push("/notifications" as any); }} style={({ pressed }) => [styles.headerIcon, { backgroundColor: theme.background }, pressed && styles.pressed]}>
@@ -195,8 +194,7 @@ function DrawerRow({ item, active, onPress, isDark }: { item: DrawerItem; active
 const styleSheets = themedStyleSheets({
   header: { backgroundColor: "#FFFFFF", paddingHorizontal: 14, paddingBottom: 6, flexDirection: "row", alignItems: "center" },
   headerIcon: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "#EEEDF3" },
-  brand: { flex: 1, flexDirection: "row", alignItems: "center", paddingLeft: 11, gap: 8 },
-  brandLogo: { width: 30, height: 30, borderRadius: 7 },
+  brand: { flex: 1, flexDirection: "row", alignItems: "center", paddingLeft: 12, gap: 8 },
   brandName: { color: "#241510", fontSize: 19, fontWeight: "700", letterSpacing: -0.4 },
   headerBadge: { position: "absolute", right: 3, top: 3, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: "#A43F32", alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
   headerBadgeText: { color: "#FFFFFF", fontWeight: "600", fontSize: 9 },

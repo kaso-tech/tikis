@@ -25,7 +25,7 @@ vi.mock("../server/yengapay-direct", () => ({}));
 
 const { ligdicashPayinBody, ligdicashStatus, readLigdicashConfig } = await import("../server/ligdicash");
 const deposit = await import("../server/direct-deposit");
-const { LIGDICASH_OPERATORS, mobileMoneyOperatorsFor } = await import("../shared/mobile-money-operators");
+const { LIGDICASH_OPERATORS, mobileMoneyOperatorsFor, otpUssdWithAmount } = await import("../shared/mobile-money-operators");
 
 type Call = { url: string; method: string; headers: Record<string, string>; body: unknown };
 let calls: Call[] = [];
@@ -98,7 +98,7 @@ describe("Orange Money via LigdiCash : code obtenu par *144*4*6#", () => {
   it("rien ne part avant le code ; puis une seule demande avec le code", async () => {
     const view = await deposit.createDirectDeposit(request("orange_money"));
     expect(calls).toHaveLength(0);
-    expect(view).toMatchObject({ requiresOtp: true, ussdCode: "*144*4*6#", flow: "ONE_STEP" });
+    expect(view).toMatchObject({ requiresOtp: true, ussdCode: "*144*4*6*2500#", flow: "ONE_STEP" });
     replies.push({ response_code: "00", token: "jeton-orange" }, { response_code: "00", status: "pending" });
     const paid = await deposit.payDirectDeposit({ profilePhone: "+22670000001", transactionId: view.transactionId, otp: "654321" });
     expect((calls[0].body as { commande: { invoice: { otp: string } } }).commande.invoice.otp).toBe("654321");
@@ -184,6 +184,8 @@ describe("opérateurs pays par pays", () => {
       TG: ["moov_money:push", "yas_money:push"],
     });
     expect(mobileMoneyOperatorsFor("ligdicash", "bf")[0].otpUssd).toBe("*144*4*6#");
+    expect(otpUssdWithAmount("*144*4*6#", 500)).toBe("*144*4*6*500#");
+    expect(otpUssdWithAmount("*144*4*6#", Number.NaN)).toBe("*144*4*6#");
   });
 
   it("Zamani Niger : USSD guidé, consigne du SMS Zamani", async () => {

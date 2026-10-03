@@ -35,13 +35,14 @@ describe("charte officielle Tikisse mobile", () => {
     expect(read("components/tikisse/ui.tsx")).toContain('primary: { background: "#A95000", foreground: "#FFFFFF", border: "#A95000" }');
   });
 
-  it("utilise le logo officiel pour les icônes, le splash et l’en-tête", () => {
+  it("utilise le logo officiel pour les icônes, le splash et la connexion, pas dans l’en-tête", () => {
     for (const asset of ["tikisse-logo.png", "android-icon-foreground.png"]) {
       expect(existsSync(join(process.cwd(), "assets/images", asset))).toBe(true);
     }
     expect(read("app.config.ts")).toContain('icon: "./assets/images/tikisse-logo.png"');
     expect(read("app.config.ts")).toContain('image: "./assets/images/tikisse-logo.png"');
-    expect(read("components/tikisse/app-chrome.tsx")).toContain('source={require("../../assets/images/tikisse-logo.png")}');
+    // L'en-tête de l'application affiche le nom seul, sans logo.
+    expect(read("components/tikisse/app-chrome.tsx")).not.toContain("tikisse-logo.png");
     expect(read("components/tikisse/auth-flow.tsx")).toContain('source={require("@/assets/images/tikisse-logo.png")}');
   });
 

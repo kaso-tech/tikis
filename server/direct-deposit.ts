@@ -20,7 +20,7 @@ import * as db from "./db";
 import * as yengapay from "./yengapay-direct";
 import { createLigdicashPayin, getLigdicashPayinStatus, LigdicashError, readLigdicashConfig } from "./ligdicash";
 import type { YengapayOperatorCode } from "../shared/yengapay-ussd";
-import { findMobileMoneyOperator, mobileMoneyAmountError, type MobileMoneyOperatorId } from "../shared/mobile-money-operators";
+import { findMobileMoneyOperator, mobileMoneyAmountError, otpUssdWithAmount, type MobileMoneyOperatorId } from "../shared/mobile-money-operators";
 
 export type DirectDepositView = Omit<yengapay.YengapayDirectDeposit, "flow" | "operator"> & {
   operator: MobileMoneyOperatorId;
@@ -55,7 +55,7 @@ function ligdicashView(stored: db.DirectDepositRecord): DirectDepositView {
   return {
     transactionId: stored.transactionId,
     providerReference: stored.providerReference,
-    ussdCode: withCode ? operator?.otpUssd ?? "" : "",
+    ussdCode: withCode ? otpUssdWithAmount(operator?.otpUssd ?? "", stored.amount) : "",
     amount: stored.amount,
     phone: stored.phone,
     operator: stored.operator,
@@ -135,7 +135,7 @@ export async function createDirectDeposit(input: DirectDepositRequest): Promise<
     phone: input.phone,
     operator: input.operator,
     countryCode: input.countryCode,
-    ussdCode: operator.otpUssd ?? "",
+    ussdCode: otpUssdWithAmount(operator.otpUssd ?? "", input.amount),
     expiresAt: new Date(Date.now() + DEPOSIT_LIFETIME_MS).toISOString(),
     providerReference: `LIGDICASH-${transactionId}`,
     idempotencyKey: input.idempotencyKey,

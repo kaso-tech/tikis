@@ -82,7 +82,7 @@ export const LIGDICASH_OPERATORS: Readonly<Record<string, readonly MobileMoneyOp
     { ...MTN, flow: "push", instructions: push("MoMo"), minAmount: 100 },
   ],
   BF: [
-    { ...ORANGE, flow: "otp_ussd", otpUssd: "*144*4*6#", instructions: "Composez *144*4*6# sur votre téléphone Orange pour obtenir votre code de paiement, puis saisissez-le ici sans attendre : il expire vite.", minAmount: 10, maxAmount: 2_000_000 },
+    { ...ORANGE, flow: "otp_ussd", otpUssd: "*144*4*6#", instructions: "Composez le code ci-dessous (montant compris) sur votre téléphone Orange pour obtenir votre code de paiement, puis saisissez-le ici sans attendre : il expire vite.", minAmount: 10, maxAmount: 2_000_000 },
     { ...MOOV, flow: "push", instructions: PUSH_OR_SMS, minAmount: 100, maxAmount: 2_000_000 },
   ],
   CI: [
@@ -120,6 +120,13 @@ export const LIGDICASH_OPERATORS: Readonly<Record<string, readonly MobileMoneyOp
     { ...YAS, flow: "push", instructions: push("Mixx by Yas"), minAmount: 100 },
   ],
 };
+
+/** Code USSD qui génère le code de paiement, montant compris : « *144*4*6# » et 500 FCFA donnent
+ *  « *144*4*6*500# » — le client n'a plus qu'à valider ; sans montant valide, le code tel quel. */
+export function otpUssdWithAmount(code: string, amount: number): string {
+  if (!code || !Number.isInteger(amount) || amount <= 0) return code;
+  return code.replace(/#$/, `*${amount}#`);
+}
 
 /** Raison pour laquelle ce montant n'est pas accepté par cet opérateur ; null s'il l'est. */
 export function mobileMoneyAmountError(operator: Pick<MobileMoneyOperator, "label" | "minAmount" | "maxAmount"> | null, amount: number): string | null {
