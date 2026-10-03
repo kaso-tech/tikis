@@ -8,10 +8,11 @@
  * LigdiCash : opérateurs et parcours pays par pays dans shared/mobile-money-operators.ts —
  *  - otp_ussd (Orange Burkina) : le client obtient un code par USSD et le saisit ; une seule demande part
  *    alors chez LigdiCash avec le numéro et ce code ;
- *  - push, guided_ussd (Moov, Airtel, YAS, MTN Côte d'Ivoire) : la demande part tout de suite, sans code ;
- *    le client valide sur son téléphone avec son code PIN ;
- *  - redirect (Orange Mali, Wave Sénégal) : la demande part tout de suite et LigdiCash renvoie une page de
- *    paiement, que l'application ouvre.
+ *  - push, guided_ussd (Moov, MTN Bénin, Airtel, YAS, M-Pesa, Africell, Zamani…) : la demande part tout de
+ *    suite, sans code ; le client valide sur son téléphone avec son code PIN ;
+ *  - redirect (Orange Côte d'Ivoire et Mali, opérateurs du Sénégal et de Guinée, Orange RD Congo) : la demande
+ *    part tout de suite et LigdiCash renvoie une page de paiement, que l'application ouvre.
+ * Les montants minimum et maximum propres à chaque opérateur sont vérifiés avant l'envoi.
  * Dans tous les cas, le Wallet n'est crédité qu'une fois le paiement confirmé par la vérification LigdiCash.
  */
 import { randomUUID } from "node:crypto";
@@ -19,7 +20,7 @@ import * as db from "./db";
 import * as yengapay from "./yengapay-direct";
 import { createLigdicashPayin, getLigdicashPayinStatus, LigdicashError, readLigdicashConfig } from "./ligdicash";
 import type { YengapayOperatorCode } from "../shared/yengapay-ussd";
-import { findMobileMoneyOperator, type MobileMoneyOperatorId } from "../shared/mobile-money-operators";
+import { findMobileMoneyOperator, mobileMoneyAmountError, type MobileMoneyOperatorId } from "../shared/mobile-money-operators";
 
 export type DirectDepositView = Omit<yengapay.YengapayDirectDeposit, "flow" | "operator"> & {
   operator: MobileMoneyOperatorId;
@@ -124,6 +125,8 @@ export async function createDirectDeposit(input: DirectDepositRequest): Promise<
 
   const config = readLigdicashConfig();
   const operator = ligdicashOperator(input);
+  const amountError = mobileMoneyAmountError(operator, input.amount);
+  if (amountError) throw new Error(amountError);
   const transactionId = randomUUID();
   await db.recordDirectDepositIntent({
     transactionId,

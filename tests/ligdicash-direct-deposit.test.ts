@@ -25,6 +25,7 @@ vi.mock("../server/yengapay-direct", () => ({}));
 
 const { ligdicashPayinBody, ligdicashStatus, readLigdicashConfig } = await import("../server/ligdicash");
 const deposit = await import("../server/direct-deposit");
+const { LIGDICASH_OPERATORS, mobileMoneyOperatorsFor } = await import("../shared/mobile-money-operators");
 
 type Call = { url: string; method: string; headers: Record<string, string>; body: unknown };
 let calls: Call[] = [];
@@ -43,8 +44,8 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
-type OperatorId = "orange_money" | "moov_money" | "mtn_money" | "wave" | "airtel_money" | "yas_money";
-const request = (operator: OperatorId, key = "cle-idempotence-0001", countryCode = "BF") => ({ profilePhone: "+22670000001", amount: 2500, phone: "+22670111222", operator, countryCode, idempotencyKey: key });
+type OperatorId = import("../shared/mobile-money-operators").MobileMoneyOperatorId;
+const request = (operator: OperatorId, key = "cle-idempotence-0001", countryCode = "BF", amount = 2500) => ({ profilePhone: "+22670000001", amount, phone: "+22670111222", operator, countryCode, idempotencyKey: key });
 
 describe("LigdiCash : format des requêtes", () => {
   it("corps du paiement sans redirection : numéro sans « + », code, rappel vers la transaction", () => {
@@ -167,5 +168,48 @@ describe("opérateurs pays par pays", () => {
     await expect(deposit.createDirectDeposit(request("wave", "cle-idempotence-bf99", "BF"))).rejects.toThrow("pas disponible dans votre pays");
     await expect(deposit.createDirectDeposit(request("orange_money", "cle-idempotence-gh01", "GH"))).rejects.toThrow("pas disponible dans votre pays");
     expect(calls).toHaveLength(0);
+  });
+
+  it("table conforme aux fiches LigdiCash : opérateurs et parcours par pays", () => {
+    const table = Object.fromEntries(Object.entries(LIGDICASH_OPERATORS).map(([country, list]) => [country, list.map((item) => `${item.id}:${item.flow}`)]));
+    expect(table).toEqual({
+      BJ: ["moov_money:push", "mtn_money:push"],
+      BF: ["orange_money:otp_ussd", "moov_money:push"],
+      CI: ["orange_money:redirect", "moov_money:push", "mtn_money:guided_ussd"],
+      GN: ["orange_money:redirect", "mtn_money:redirect"],
+      ML: ["orange_money:redirect"],
+      NE: ["airtel_money:push", "zamani_money:guided_ussd", "moov_money:push"],
+      CD: ["orange_money:redirect", "vodacom_mpesa:push", "airtel_money:push", "africell_money:push"],
+      SN: ["orange_money:redirect", "wave:redirect", "free_money:redirect"],
+      TG: ["moov_money:push", "yas_money:push"],
+    });
+    expect(mobileMoneyOperatorsFor("ligdicash", "bf")[0].otpUssd).toBe("*144*4*6#");
+  });
+
+  it("Zamani Niger : USSD guidé, consigne du SMS Zamani", async () => {
+    replies.push({ response_code: "00", token: "jeton-zamani" });
+    const view = await deposit.createDirectDeposit(request("zamani_money", "cle-idempotence-ne01", "NE"));
+    expect(view).toMatchObject({ flow: "GUIDED", requiresOtp: false });
+    expect(view.otpInstructions).toContain("Zamani Money");
+  });
+
+  it("Free Sénégal : page LigdiCash renvoyée, numéro transmis dans customer", async () => {
+    replies.push({ response_code: "00", token: "jeton-free", response_text: "https://app.ligdicash.com/pay/abc" });
+    const view = await deposit.createDirectDeposit({ ...request("free_money", "cle-idempotence-sn01", "SN"), phone: "+221770001122" });
+    expect((calls[0].body as { commande: { invoice: { customer: string } } }).commande.invoice.customer).toBe("221770001122");
+    expect(view).toMatchObject({ flow: "REDIRECT", checkoutUrl: "https://app.ligdicash.com/pay/abc" });
+  });
+
+  it("Moov Burkina : consigne couvrant le push et le repli par SMS", async () => {
+    replies.push({ response_code: "00", token: "jeton-moov" });
+    const view = await deposit.createDirectDeposit(request("moov_money", "cle-idempotence-bf02"));
+    expect(view.otpInstructions).toContain("ou un SMS");
+  });
+
+  it("limites de l'opérateur : refus avant tout envoi", async () => {
+    await expect(deposit.createDirectDeposit(request("orange_money", "cle-idempotence-bf03", "BF", 2_500_000))).rejects.toThrow("Montant maximum avec Orange Money : 2");
+    await expect(deposit.createDirectDeposit(request("orange_money", "cle-idempotence-gn01", "GN", 150))).rejects.toThrow("Montant minimum avec Orange Money : 200");
+    expect(calls).toHaveLength(0);
+    expect(rows.size).toBe(0);
   });
 });

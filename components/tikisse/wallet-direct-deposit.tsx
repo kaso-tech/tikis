@@ -7,7 +7,7 @@ import { COUNTRIES, countryFlagEmoji, formatLocalPhone, sanitizePhoneInput, type
 import { trpc } from "@/lib/trpc";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { buildUssdCode } from "@/shared/yengapay-ussd";
-import { mobileMoneyOperatorLabel as operatorLabel, mobileMoneyOperatorsFor, type MobileMoneyOperator, type MobileMoneyOperatorId } from "@/shared/mobile-money-operators";
+import { mobileMoneyAmountError, mobileMoneyOperatorLabel as operatorLabel, mobileMoneyOperatorsFor, type MobileMoneyOperator, type MobileMoneyOperatorId } from "@/shared/mobile-money-operators";
 import { useTikisseStore } from "@/lib/tikisse-store";
 
 /**
@@ -121,10 +121,12 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
 
   // ===== Calculs dérivés =====
   const amountNum = useMemo(() => parseInt(amount, 10), [amount]);
-  const isAmountValid = Number.isFinite(amountNum) && amountNum >= 100 && amountNum <= 10_000_000;
   const isPhoneValid = phoneLocal.length === country.digits;
   // L'opérateur choisi doit exister dans le pays : sinon, le premier proposé.
   const selectedOperator: Operator = operators.some((item) => item.id === operator) ? operator : operators[0]?.id ?? operator;
+  // Limites de Tikisse, resserrées par celles de l'opérateur (ex. 2 000 000 FCFA au plus avec Orange Burkina).
+  const amountError = mobileMoneyAmountError(operators.find((item) => item.id === selectedOperator) ?? null, amountNum);
+  const isAmountValid = amountError === null;
   const canSubmit = isAmountValid && isPhoneValid && operators.some((item) => item.id === selectedOperator) && !requestMutation.isPending;
 
   // ===== Reset =====
@@ -182,7 +184,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
   const onSubmit = useCallback(async () => {
     setSubmitError("");
     if (!isAmountValid) {
-      setSubmitError("Le montant doit être compris entre 100 FCFA et 10 000 000 FCFA.");
+      setSubmitError(amountError ?? "Montant invalide.");
       return;
     }
     if (!isPhoneValid) {
@@ -196,7 +198,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
     } catch (cause) {
       setSubmitError(cause instanceof Error ? cause.message : "La demande de paiement n'a pas pu être créée.");
     }
-  }, [amountNum, phoneLocal, country, selectedOperator, requestKey, requestMutation, isAmountValid, isPhoneValid]);
+  }, [amountNum, amountError, phoneLocal, country, selectedOperator, requestKey, requestMutation, isAmountValid, isPhoneValid]);
 
   const onCancelWaiting = useCallback(async () => {
     if (!deposit) return;
@@ -316,6 +318,7 @@ export function WalletDirectDepositScreen({ visible, onClose, onSuccess, initial
             styles={styles}
             country={country}
             amount={amount}
+            amountHint={amount.trim() ? amountError ?? "" : ""}
             phoneLocal={phoneLocal}
             operator={selectedOperator}
             operators={operators}
@@ -372,6 +375,8 @@ function InputStage(props: {
   styles: ReturnType<typeof makeStyles>;
   country: CountrySpec;
   amount: string;
+  /** Montant saisi refusé par l'opérateur choisi (limites). */
+  amountHint: string;
   phoneLocal: string;
   operator: Operator;
   operators: readonly MobileMoneyOperator[];
@@ -397,7 +402,7 @@ function InputStage(props: {
   onCancel: () => void;
   onDevSettle: (outcome: "succeeded" | "failed") => void;
 }) {
-  const { theme, styles, country, amount, phoneLocal, operator, operators, submitError, deposit, otpCells, submitting, confirming, resendingOtp, cancelling, settling, modifying, pollError, canSubmit, onChangeAmount, onChangePhone, onChangeOperator, onChangeOtpCell, onSubmit, onOpenUssd, onModify, onResendOtp, onCancel, onDevSettle } = props;
+  const { theme, styles, country, amount, amountHint, phoneLocal, operator, operators, submitError, deposit, otpCells, submitting, confirming, resendingOtp, cancelling, settling, modifying, pollError, canSubmit, onChangeAmount, onChangePhone, onChangeOperator, onChangeOtpCell, onSubmit, onOpenUssd, onModify, onResendOtp, onCancel, onDevSettle } = props;
 
   if (deposit) {
     return <ConfirmationStage
@@ -431,6 +436,7 @@ function InputStage(props: {
             <TextInput value={amount} editable={!submitting} onChangeText={onChangeAmount} keyboardType="number-pad" maxLength={8} style={[styles.amountInput, { color: theme.foreground, backgroundColor: theme.background, borderColor: theme.border }]} placeholder="Ex: 2500" placeholderTextColor={theme.muted} />
             <Text style={[styles.amountSuffix, { color: theme.muted }]}>FCFA</Text>
           </View>
+          {amountHint ? <Text style={[styles.amountHint, { color: theme.muted }]}>{amountHint}</Text> : null}
           <View style={styles.quickAmounts}>
             <Pressable key={500} disabled={submitting} onPress={() => onChangeAmount("500")} style={({ pressed }) => [styles.quickAmount, { backgroundColor: theme.background, borderColor: theme.border }, submitting && { opacity: 0.45 }, pressed && styles.pressed]}>
               <Text style={[styles.quickAmountText, { color: theme.foreground }]}>500</Text>
@@ -670,6 +676,7 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
     amountRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     amountInput: { flex: 1, fontSize: 22, fontWeight: "700", paddingHorizontal: 14, height: 46, borderRadius: 9, borderWidth: StyleSheet.hairlineWidth },
     amountSuffix: { fontSize: 13, fontWeight: "600" },
+    amountHint: { fontSize: 12, marginTop: 6 },
     lockedInput: { opacity: 0.65 },
     quickAmounts: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
     quickAmount: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, borderWidth: StyleSheet.hairlineWidth },
