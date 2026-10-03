@@ -1,5 +1,6 @@
 // Load environment variables with proper priority (system > .env)
 import "./scripts/load-env.js";
+import { existsSync } from "node:fs";
 import type { ExpoConfig } from "expo/config";
 
 // Identifiant de l'application sur les stores (iOS et Android). Ne jamais le changer après publication :
@@ -8,6 +9,9 @@ const bundleId = "com.app.tikissemobile";
 // Liens profonds : `tikisse://…`. Le second scheme est celui du modèle de départ ; il reste déclaré pour
 // qu'un lien émis par une version précédente de l'application ouvre toujours celle-ci.
 const schemes = ["tikisse", "manusikissemobile"];
+// Identifiant du projet sur expo.dev (EAS Build, notifications push). Pas un secret : il figure dans
+// chaque application construite. EXPO_PUBLIC_EAS_PROJECT_ID, s'il est défini, prime.
+const EAS_PROJECT_ID = "";
 
 const env = {
   // App branding - update these values directly (do not use env vars)
@@ -18,7 +22,13 @@ const env = {
   androidPackage: bundleId,
   googleMapsAndroidKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY,
   googleMapsIosKey: process.env.GOOGLE_MAPS_IOS_API_KEY,
-  easProjectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID,
+  easProjectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID || EAS_PROJECT_ID || undefined,
+  // Compte Expo propriétaire du projet (facultatif : par défaut, celui qui lance la construction).
+  easOwner: process.env.EXPO_OWNER,
+  // Fichier Firebase de l'application Android (notifications push via FCM). Sur EAS : variable
+  // d'environnement de type « fichier » GOOGLE_SERVICES_JSON ; en local : ./google-services.json.
+  // Sans lui, l'application se construit quand même, mais ne reçoit pas de notifications push.
+  googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? (existsSync("./google-services.json") ? "./google-services.json" : undefined),
 };
 
 const config: ExpoConfig = {
@@ -57,6 +67,7 @@ const config: ExpoConfig = {
     softwareKeyboardLayoutMode: "pan",
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
+    ...(env.googleServicesFile ? { googleServicesFile: env.googleServicesFile } : {}),
     // Entier strictement croissant exigé par le Play Store à chaque envoi, y compris entre deux
     // versions identiques (contrairement à `version`, jamais montré à l'utilisateur).
     versionCode: 1,
@@ -80,6 +91,7 @@ const config: ExpoConfig = {
     output: "static",
     favicon: "./assets/images/tikisse-logo.png",
   },
+  ...(env.easOwner ? { owner: env.easOwner } : {}),
   extra: env.easProjectId ? { eas: { projectId: env.easProjectId } } : undefined,
   plugins: [
     [
