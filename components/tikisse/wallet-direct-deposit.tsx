@@ -1,10 +1,12 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { MOBILE_MONEY_LOGOS } from "@/components/tikisse/mobile-money-logos";
 import { TikisseButton } from "@/components/tikisse/ui";
 import { COUNTRIES, countryFlagEmoji, formatLocalPhone, sanitizePhoneInput, type CountrySpec } from "@/lib/registration-rules";
 import { trpc } from "@/lib/trpc";
+import { useDarkTone } from "@/lib/themed-styles";
 import { useThemeColors } from "@/lib/use-theme-colors";
 import { buildUssdCode } from "@/shared/yengapay-ussd";
 import { mobileMoneyAmountError, mobileMoneyOperatorLabel as operatorLabel, mobileMoneyOperatorsFor, type MobileMoneyOperator, type MobileMoneyOperatorId } from "@/shared/mobile-money-operators";
@@ -592,11 +594,15 @@ function OtpCells(props: { theme: ReturnType<typeof useThemeColors>["colors"]; s
 function OperatorCard(props: { theme: ReturnType<typeof useThemeColors>["colors"]; styles: ReturnType<typeof makeStyles>; operator: MobileMoneyOperator; active: boolean; disabled?: boolean; onPress: () => void }) {
   const { theme, styles, operator, active, disabled = false, onPress } = props;
   const color = operator.color;
+  const logo = MOBILE_MONEY_LOGOS[operator.id];
+  const hue = useDarkTone();
   return (
-    <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.operatorCard, { backgroundColor: active ? "#FFF0D8" : theme.surface, borderColor: active ? theme.primary : theme.border }, disabled && { opacity: 0.55 }, pressed && styles.pressed]} accessibilityRole="radio" accessibilityState={{ selected: active, disabled }}>
-      <View style={[styles.operatorLogo, { backgroundColor: color }]}>
-        <Text style={styles.operatorLogoText}>{operator.short}</Text>
-      </View>
+    <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.operatorCard, { backgroundColor: active ? hue("#FFF0D8", "surface") : theme.surface, borderColor: active ? theme.primary : theme.border }, disabled && { opacity: 0.55 }, pressed && styles.pressed]} accessibilityRole="radio" accessibilityState={{ selected: active, disabled }}>
+      {logo
+        ? <Image source={logo} style={styles.operatorLogo} resizeMode="cover" accessibilityIgnoresInvertColors />
+        : <View style={[styles.operatorLogo, { backgroundColor: color }]}>
+          <Text style={styles.operatorLogoText}>{operator.short}</Text>
+        </View>}
       <View style={{ flex: 1 }}>
         <Text style={[styles.operatorName, { color: theme.foreground }]}>{operator.label}</Text>
       </View>
@@ -683,7 +689,7 @@ function makeStyles(theme: ReturnType<typeof useThemeColors>["colors"]) {
     quickAmountText: { fontSize: 12, fontWeight: "600" },
     operatorRow: { flexDirection: "row", gap: 10 },
     operatorCard: { flex: 1, minWidth: 140, flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: 10, borderWidth: 2 },
-    operatorLogo: { width: 36, height: 36, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+    operatorLogo: { width: 36, height: 36, borderRadius: 8, overflow: "hidden", alignItems: "center", justifyContent: "center" },
     operatorLogoText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
     operatorName: { fontSize: 13, fontWeight: "600" },
     phoneRow: { flexDirection: "row", alignItems: "stretch", gap: 8 },
