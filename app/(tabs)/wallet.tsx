@@ -452,7 +452,7 @@ const styleSheets = themedStyleSheets({
   referenceValue: { color: "#241510", fontSize: 12, fontWeight: "600", textAlign: "center", marginTop: 4, letterSpacing: 0.3 },
   requestError: { color: "#A43F32", fontSize: 11, fontWeight: "600", textAlign: "center", marginTop: 6 },
   amountWrap: { flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 9, borderWidth: 1, borderColor: "#E7D9CF", paddingHorizontal: 12, marginTop: 14 },
-  amountInput: { flex: 1, color: "#241510", fontSize: 15, fontWeight: "500", minHeight: 46 },
+  amountInput: { flex: 1, minWidth: 0, color: "#241510", fontSize: 15, fontWeight: "500", minHeight: 46 },
   amountCurrency: { color: "#76665E", fontSize: 11, fontWeight: "600" },
   modalActions: { flexDirection: "row", gap: 8, marginTop: 16 },
   modalAction: { flex: 1, minHeight: 42 },

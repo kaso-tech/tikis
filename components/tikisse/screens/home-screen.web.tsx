@@ -1,6 +1,6 @@
 import { router } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Animated, PanResponder, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Animated, PanResponder, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, type LayoutChangeEvent } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { CandidatesSheet } from "@/components/tikisse/candidates-sheet";
 import { DriverMarker, DropoffMarker, PickupMarker } from "@/components/tikisse/map-markers";
@@ -36,6 +36,8 @@ const TONE_COLOR: Record<ReturnType<typeof deliveryCardTone>, string> = {
 const SHEET_MIN = 130;
 const SHEET_PEEK = 420;
 const SHEET_EXPANDED = 720;
+/** Marge gardée entre le haut de la feuille déployée et l'en-tête : sa poignée reste toujours visible et saisissable. */
+const SHEET_TOP_GAP = 16;
 
 
 type FilterKey = "active" | "open" | "pending" | "completed";
@@ -150,6 +152,9 @@ export function HomeScreen() {
   const [sheetHeight] = useState(() => new Animated.Value(SHEET_PEEK));
   const sheetValue = useRef(SHEET_PEEK);
   const dragStartHeight = useRef(SHEET_PEEK);
+  /** Hauteur de la feuille déployée : SHEET_EXPANDED au plus, mais jamais plus que la place laissée sous
+   *  l'en-tête (mesurée à l'affichage) — sinon son bord supérieur, et la poignée, passent derrière lui. */
+  const sheetMaxRef = useRef(SHEET_EXPANDED);
   const [filterTransition] = useState(() => new Animated.Value(1));
   const previousDeliveryStatuses = useRef<Record<string, DeliveryStatus> | null>(null);
   const [badgeScales] = useState<Record<FilterKey, Animated.Value>>(() => ({
@@ -226,6 +231,13 @@ export function HomeScreen() {
     Animated.timing(sheetHeight, { toValue, duration: 220, useNativeDriver: false }).start();
   };
 
+  const onScreenLayout = (event: LayoutChangeEvent) => {
+    const max = Math.max(SHEET_PEEK, Math.min(SHEET_EXPANDED, Math.floor(event.nativeEvent.layout.height - SHEET_TOP_GAP)));
+    if (max === sheetMaxRef.current) return;
+    sheetMaxRef.current = max;
+    if (sheetValue.current > max) animateSheetTo(max);
+  };
+
   // useState (initialiseur paresseux) plutôt que useRef(...).current : PanResponder.create est appelé
   // une seule fois, sa référence reste stable sur toute la vie de l'écran — un recalcul à chaque
   // rendu casserait un glissement en cours au prochain rafraîchissement de données (livraisons,
@@ -237,14 +249,14 @@ export function HomeScreen() {
     onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 5 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
     onPanResponderGrant: () => { dragStartHeight.current = sheetValue.current; },
     onPanResponderMove: (_, gesture) => {
-      const next = Math.max(SHEET_MIN, Math.min(SHEET_EXPANDED, dragStartHeight.current - gesture.dy));
+      const next = Math.max(SHEET_MIN, Math.min(sheetMaxRef.current, dragStartHeight.current - gesture.dy));
       sheetHeight.setValue(next);
     },
     onPanResponderRelease: (_, gesture) => {
       const current = sheetValue.current;
-      const targets = [SHEET_MIN, SHEET_PEEK, SHEET_EXPANDED];
+      const targets = [SHEET_MIN, SHEET_PEEK, sheetMaxRef.current];
       const target = gesture.vy <= -0.65
-        ? SHEET_EXPANDED
+        ? sheetMaxRef.current
         : gesture.vy >= 0.65
           ? SHEET_MIN
           : targets.reduce((closest, snap) => Math.abs(snap - current) < Math.abs(closest - current) ? snap : closest, SHEET_PEEK);
@@ -439,7 +451,7 @@ export function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={["top", "bottom"]} onLayout={onScreenLayout}>
       <MapBackground selected={selected} role={role} driverPosition={role === "driver" ? driverLocation.location : senderLivePosition} driverHeading={senderLivePosition?.heading ?? null} />
 
       <Animated.View style={[styles.sheet, { height: sheetHeight }]}>
