@@ -3,15 +3,25 @@ import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createTikisseProfileSession, TIKISSE_SESSION_TTL_SECONDS, verifyTikisseProfileSession } from "../server/tikisse-session";
 
-const previousJwtSecret = process.env.JWT_SECRET;
+const previousSecrets = {
+  jwt: process.env.JWT_SECRET,
+  tikisse: process.env.TIKISSE_SESSION_SECRET,
+  tikis: process.env.TIKIS_SESSION_SECRET,
+};
 
 beforeEach(() => {
+  delete process.env.TIKISSE_SESSION_SECRET;
+  delete process.env.TIKIS_SESSION_SECRET;
   process.env.JWT_SECRET = "x".repeat(48);
 });
 
 afterEach(() => {
-  if (previousJwtSecret === undefined) delete process.env.JWT_SECRET;
-  else process.env.JWT_SECRET = previousJwtSecret;
+  if (previousSecrets.jwt === undefined) delete process.env.JWT_SECRET;
+  else process.env.JWT_SECRET = previousSecrets.jwt;
+  if (previousSecrets.tikisse === undefined) delete process.env.TIKISSE_SESSION_SECRET;
+  else process.env.TIKISSE_SESSION_SECRET = previousSecrets.tikisse;
+  if (previousSecrets.tikis === undefined) delete process.env.TIKIS_SESSION_SECRET;
+  else process.env.TIKIS_SESSION_SECRET = previousSecrets.tikis;
 });
 
 describe("session Tikisse signée", () => {
