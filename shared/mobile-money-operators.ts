@@ -62,7 +62,8 @@ const AIRTEL = { id: "airtel_money", label: "Airtel Money", short: "AM", color: 
 const YAS = { id: "yas_money", label: "Mixx by Yas", short: "YAS", color: "#F9D908" } as const;
 const ZAMANI = { id: "zamani_money", label: "Zamani Money", short: "ZM", color: "#D9530F" } as const;
 const MPESA = { id: "vodacom_mpesa", label: "M-Pesa (Vodacom)", short: "MP", color: "#C8102E" } as const;
-const AFRICELL = { id: "africell_money", label: "Africell Money", short: "AF", color: "#6A1B9A" } as const;
+// « Africell Money » chez LigdiCash ; le service s'appelle Afrimoney.
+const AFRICELL = { id: "africell_money", label: "Afrimoney", short: "AF", color: "#A11776" } as const;
 
 /** Consigne d'attente des fiches LigdiCash (USSD Push). */
 const push = (pin: string) =>
@@ -106,7 +107,7 @@ export const LIGDICASH_OPERATORS: Readonly<Record<string, readonly MobileMoneyOp
     { ...ORANGE, flow: "redirect", instructions: ligdicashPage("Orange Money"), minAmount: 10 },
     { ...MPESA, flow: "push", instructions: push("M-Pesa"), minAmount: 10 },
     { ...AIRTEL, flow: "push", instructions: push("Airtel Money"), minAmount: 10 },
-    { ...AFRICELL, flow: "push", instructions: push("Africell Money"), minAmount: 100 },
+    { ...AFRICELL, flow: "push", instructions: push("Afrimoney"), minAmount: 100 },
   ],
   SN: [
     { ...ORANGE, flow: "redirect", instructions: ligdicashPage("Orange Money") },
