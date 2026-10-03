@@ -6,6 +6,10 @@ describe("résolution de l’API Tikisse", () => {
     expect(resolveApiBaseUrl("https://preview.example.test/", "android")).toBe("https://preview.example.test");
   });
 
+  it("ignore une URL temporaire Manus injectée par le preview", () => {
+    expect(resolveApiBaseUrl("https://3000-example.manus.computer", "android")).toBe(TIKISSE_PRODUCTION_API_URL);
+  });
+
   it("conserve l’API locale uniquement pour Expo Web sur Metro", () => {
     expect(resolveApiBaseUrl(undefined, "web", { protocol: "http:", hostname: "localhost", port: "8081" })).toBe("http://localhost:3000");
   });

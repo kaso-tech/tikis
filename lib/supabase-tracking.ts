@@ -20,12 +20,13 @@ type DeliveryStatusListener = (event: DeliveryStatusEvent) => void;
 
 let client: SupabaseClient | null = null;
 
-/**
- * Supabase Phone reste volontairement désactivé en développement. La simple
- * présence des clés Realtime ne doit jamais détourner le parcours OTP simulé.
- */
+const PUBLIC_SUPABASE_URL = "https://lcyxefqbcgowpkhauqzx.supabase.co";
+const PUBLIC_SUPABASE_ANON_KEY = "sb_publishable_oeYE1JOkjsqptdiJgV7Rlg_VHO5osB4";
+
+/** La configuration publique de secours garantit le même OTP Supabase sur Expo Go, le preview et le web publié. */
 export function isSupabasePhoneAuthEnabled() {
-  return process.env.EXPO_PUBLIC_ENABLE_SUPABASE_PHONE_AUTH === "true";
+  return process.env.EXPO_PUBLIC_ENABLE_SUPABASE_PHONE_AUTH === "true"
+    || Boolean((process.env.EXPO_PUBLIC_SUPABASE_URL || PUBLIC_SUPABASE_URL) && (process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || PUBLIC_SUPABASE_ANON_KEY));
 }
 
 const supabaseSessionStorage = {
@@ -35,8 +36,8 @@ const supabaseSessionStorage = {
 };
 
 export function supabaseClient() {
-  const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
-  const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  const url = process.env.EXPO_PUBLIC_SUPABASE_URL || PUBLIC_SUPABASE_URL;
+  const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
   if (!client) client = createClient(url, key, { auth: { storage: supabaseSessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
   return client;

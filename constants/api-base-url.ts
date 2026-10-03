@@ -9,7 +9,18 @@ export type WebLocationLike = {
 
 function normalizedBaseUrl(value: string | undefined) {
   const trimmed = value?.trim();
-  return trimmed ? trimmed.replace(/\/$/, "") : "";
+  if (!trimmed) return "";
+  try {
+    const parsed = new URL(trimmed);
+    const temporaryHost = parsed.hostname === "localhost"
+      || parsed.hostname === "127.0.0.1"
+      || parsed.hostname === "::1"
+      || parsed.hostname.endsWith(".manus.computer");
+    if (temporaryHost) return "";
+  } catch {
+    return "";
+  }
+  return trimmed.replace(/\/$/, "");
 }
 
 /**

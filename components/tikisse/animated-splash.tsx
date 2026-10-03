@@ -264,7 +264,6 @@ const styles = StyleSheet.create({
   speed: { position: "absolute", right: SPLASH_LOGO_SIZE - 8, top: SPLASH_LOGO_SIZE / 2 - 16, gap: 9 },
   logoShadow: {
     position: "absolute", top: 10, left: 10, right: 10, bottom: 10, borderRadius: 26, backgroundColor: "#481300",
-    shadowColor: "#1A0702", shadowOpacity: 0.45, shadowRadius: 12, shadowOffset: { width: 0, height: 16 }, elevation: 14,
   },
   logo: { width: SPLASH_LOGO_SIZE, height: SPLASH_LOGO_SIZE },
   wordmark: { position: "absolute", top: SPLASH_LOGO_SIZE + 22, width: 280, alignItems: "center" },
